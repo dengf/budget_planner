@@ -91,20 +91,24 @@ jobs:
         with:
           tool: cargo-llvm-cov
 
-      # Measured 76.95% lines on the workspace as it stands (the
-      # wasm-binding modules -- budget-wasm's category.rs, rules.rs,
-      # csv_import.rs, goals.rs, debt.rs, transaction.rs -- show near 0%
-      # from cargo llvm-cov alone, same as mortgage-wasm's own bindings:
-      # they take a JsValue, which native `cargo test` cannot construct,
-      # so they're exercised by the browser instead, not this gate).
+      # Measured 69.04% *lines* on the workspace as it stands -- the
+      # summary table's first number triplet is Regions (76.95%), not
+      # Lines; the Lines triplet is the third one. Got this backwards on
+      # the first attempt at this gate and it failed CI by a hair (70
+      # against an actual 69.04%) -- corrected here, worth remembering
+      # when recalibrating this later.
       #
-      # Set to 70, a few points of headroom below the measured figure so
+      # The wasm-binding modules (budget-wasm's category.rs, rules.rs,
+      # csv_import.rs, goals.rs, debt.rs, transaction.rs) show near 0%:
+      # same as mortgage-wasm's own bindings, they take a JsValue, which
+      # native `cargo test` cannot construct, so they're exercised by the
+      # browser instead, not this gate.
+      #
+      # Set to 65, a few points of headroom below the measured figure so
       # ordinary fluctuation doesn't trip it -- a regression gate against
-      # what this repo already has, not a target to chase. Mirrors how
-      # mortgage_calculator's own gate is calibrated against its measured
-      # coverage rather than picked from habit.
+      # what this repo already has, not a target to chase.
       - name: cargo llvm-cov --fail-under-lines
-        run: cargo llvm-cov --workspace --fail-under-lines 70
+        run: cargo llvm-cov --workspace --fail-under-lines 65
 
   www-test:
     name: www/ (React) unit tests
