@@ -74,6 +74,12 @@ module.exports = {
     compress: true,
     port: 3002,
     hot: true,
+    // Lets a tunnel (localtunnel/ngrok) reach this dev server despite
+    // arriving with a Host header that doesn't match localhost -- the
+    // default 'auto' rejects those as a DNS-rebinding guard. Fine for a
+    // local dev server with no auth of its own; not something to carry
+    // into a production config.
+    allowedHosts: 'all',
   },
   performance: { hints: false, maxEntrypointSize: 512000, maxAssetSize: 512000 },
 };
