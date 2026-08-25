@@ -1,0 +1,48 @@
+# Budget Planner - workspace configuration
+#
+# Same layering as meifio's mortgage calculator: a dependency-free
+# domain-types crate at the bottom, pure calculation logic in the middle,
+# a hexagonal persistence port + redb adapter, and a thin wasm-bindgen
+# crate on top that only translates JS <-> Rust and never contains
+# business logic itself. One target: the browser. No server, no account,
+# nothing uploaded -- see CLAUDE.md.
+
+[workspace]
+members = [
+    "crates/budget-core",
+    "crates/budget-calc",
+    "crates/budget-ports",
+    "crates/budget-ext-redb",
+    "crates/budget-wasm",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Feng Deng", "Dongmei Tang"]
+license = "MIT"
+
+[workspace.dependencies]
+budget-core = { path = "crates/budget-core" }
+budget-calc = { path = "crates/budget-calc" }
+budget-ports = { path = "crates/budget-ports" }
+budget-ext-redb = { path = "crates/budget-ext-redb" }
+
+rust_decimal = { version = "1.42", features = ["serde", "serde-float", "maths"] }
+rust_decimal_macros = "1.40"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+
+[profile.release]
+# Size, not speed -- same rationale as mortgage_calculator: nothing here is
+# compute-bound (a CSV import of a year of transactions is a few hundred
+# rows), and the wasm binary is most of the download.
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

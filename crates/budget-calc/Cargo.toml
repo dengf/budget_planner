@@ -1,0 +1,17 @@
+[package]
+name = "budget-calc"
+description = "Budgeting, goals, debt payoff and CSV-import logic for budget-planner"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+budget-core = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+csv = "1"
+
+[dev-dependencies]
+rust_decimal_macros = { workspace = true }

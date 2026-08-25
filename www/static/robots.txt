@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dengf.github.io/budget_planner/sitemap.xml

@@ -1,0 +1,16 @@
+[package]
+name = "budget-core"
+description = "Foundational types shared across the budget-planner crates"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+rust_decimal_macros = { workspace = true }

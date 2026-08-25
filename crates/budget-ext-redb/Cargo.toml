@@ -1,0 +1,25 @@
+[package]
+name = "budget-ext-redb"
+description = "redb-backed BudgetStore: a plain file on native targets, an in-memory buffer asynchronously flushed to IndexedDB in the browser"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+budget-ports = { workspace = true }
+async-trait = { workspace = true }
+redb = "3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+rexie = "0.6"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+tempfile = "3"

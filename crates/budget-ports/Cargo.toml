@@ -1,0 +1,13 @@
+[package]
+name = "budget-ports"
+description = "Storage port definitions for budget-planner: record types and the BudgetStore trait, with no concrete backend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

@@ -1,0 +1,14 @@
+/target
+
+# Node / webpack
+www/node_modules/
+www/dist/
+www/pkg/
+
+# wasm-pack
+crates/budget-wasm/pkg/
+crates/budget-wasm/target/
+
+.DS_Store
+__pycache__/
+*.pyc

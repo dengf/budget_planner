@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://dengf.github.io/budget_planner/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dengf.github.io/budget_planner/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://dengf.github.io/budget_planner/?lang=zh-Hans"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://dengf.github.io/budget_planner/?lang=zh-Hant"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://dengf.github.io/budget_planner/"/>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://dengf.github.io/budget_planner/?lang=zh-Hans</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dengf.github.io/budget_planner/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://dengf.github.io/budget_planner/?lang=zh-Hans"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://dengf.github.io/budget_planner/?lang=zh-Hant"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://dengf.github.io/budget_planner/?lang=zh-Hant</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://dengf.github.io/budget_planner/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://dengf.github.io/budget_planner/?lang=zh-Hans"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://dengf.github.io/budget_planner/?lang=zh-Hant"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://dengf.github.io/budget_planner/privacy.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>
