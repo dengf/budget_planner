@@ -230,10 +230,42 @@ table.data tr:last-child td { border-bottom: none; }
 .goal-contribution { font-size: 0.82rem; color: var(--positive); }
 .goal-milestone { font-size: 0.85rem; color: var(--gold); margin-top: 4px; }
 
-.category-row { display: grid; grid-template-columns: 1.4fr repeat(4, 0.9fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+.category-row { display: grid; grid-template-columns: 1.4fr 0.9fr 0.9fr 1.1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .category-row:last-child { border-bottom: none; }
 .category-name { font-weight: 600; }
 .category-group { color: var(--muted-2); font-size: 0.75rem; }
+
+/* Column headers: Planned/Spent/Remaining were three unlabelled figures
+   before these existed. */
+.category-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); padding-bottom: 6px; }
+
+/* The planned field sits inside a row rather than a form-grid, so it
+   needs to be shorter than a standalone .field-input. */
+.planned-input input { padding: 6px 4px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Redundant while the header row is visible; the only labelling once the
+   row stacks on a narrow screen. */
+.cell-label { display: none; }
+
+@media (max-width: 720px) {
+  .category-head { display: none; }
+  .category-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    padding: 12px 0;
+    align-items: baseline;
+  }
+  /* Name and the planned field each take the full width -- the input
+     needs the room -- with the two read-only figures paired underneath,
+     each carrying its own label now that the header is gone. */
+  .category-row > :first-child { grid-column: 1 / -1; }
+  .planned-input { grid-column: 1 / -1; }
+  .category-row .btn { grid-column: 1 / -1; justify-self: start; padding-left: 0; }
+  .cell-label { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); }
+  .category-row .num { display: flex; flex-direction: column; align-items: flex-start; }
+  .planned-input { flex-direction: column; align-items: stretch; padding: 4px 8px; }
+  .planned-input input { text-align: left; }
+}
 
 .report-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
@@ -298,6 +330,9 @@ table.data tr:last-child td { border-bottom: none; }
 }
 
 @media (max-width: 640px) {
-  .category-row { grid-template-columns: 1fr; gap: 2px; }
+  /* `.category-row` is handled by the 720px block above, which stacks it
+     into two labelled columns. The single-column rule that used to live
+     here put the planned field and both figures on separate lines with
+     nothing naming them -- three anonymous numbers under each category. */
   .app-header { flex-direction: column; align-items: flex-start; }
 }

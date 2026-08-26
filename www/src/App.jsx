@@ -1,9 +1,10 @@
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Header from './components/Header';
 import Intro from './components/Intro';
 import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { detectRegion, rememberRegion } from './region';
+import { hasSeeded, rememberSeeded } from './seeded';
 import { currentMonth } from './month';
 
 // Code-split: a visitor logging one transaction shouldn't download the
@@ -147,9 +148,65 @@ export function AppShell({ wasmModule }) {
     [transactions.items, categories, budgetPlan, confirm, t],
   );
 
+  /**
+   * Inserts the region's starter set, translated.
+   *
+   * `budget-calc::presets` owns *which* categories a region gets and
+   * hands back i18n keys; this composes the name actually stored, in the
+   * reader's language, so a Chinese budget doesn't open with English
+   * category names. Skipping a preset whose name is already present is a
+   * referential check against in-memory state -- host-layer, same
+   * category as `region.js` -- not a rule the core should own.
+   */
+  const addCommonCategories = useCallback(async () => {
+    if (!wasmModule?.preset_categories) return;
+    const presets = (await wasmModule.preset_categories(region)) ?? [];
+    const taken = new Set(categories.items.map((c) => c.name.trim().toLowerCase()));
+    for (const preset of presets) {
+      const name = t(preset.key);
+      const fingerprint = name.trim().toLowerCase();
+      if (taken.has(fingerprint)) continue;
+      taken.add(fingerprint);
+      // Sequential rather than Promise.all: each save is one IndexedDB
+      // write through the same store handle, and the list they land in
+      // reads better in the order the presets are declared.
+      // eslint-disable-next-line no-await-in-loop
+      await categories.save({ id: newId(), name, group: t(preset.group_key) });
+    }
+    rememberSeeded();
+  }, [wasmModule, region, categories, newId, t]);
+
+  /**
+   * A brand-new budget opens with the starter categories already in it,
+   * rather than on a blank page with a button to press.
+   *
+   * Gated on `hasSeeded()` rather than on the list merely being empty:
+   * someone who deletes every category, or uses "clear all data", has
+   * said something, and finding the presets back on the next load would
+   * be the app overriding them. `seedingRef` covers the same tick, before
+   * the first save has landed in `items`.
+   */
+  const seedingRef = useRef(false);
+  useEffect(() => {
+    if (!categories.loaded || seedingRef.current || hasSeeded()) return;
+    seedingRef.current = true;
+    if (categories.items.length > 0) {
+      // Already has categories, so this browser is not on its first run.
+      // Recording that matters as much as seeding does: without it, a
+      // budget created before this flag existed would get the presets
+      // dumped back in the moment its owner cleared their data.
+      rememberSeeded();
+      return;
+    }
+    addCommonCategories();
+  }, [categories.loaded, categories.items.length, addCommonCategories]);
+
   const clearAllData = useCallback(async () => {
     const ok = await confirm(t('data.clearConfirm'));
     if (!ok) return;
+    // Emptying everything is a decision, not a fresh install -- make sure
+    // the first-run seeding can't undo it on the next load.
+    rememberSeeded();
     for (const collection of [transactions, budgetPlan, rules, goals, debts, categories]) {
       for (const item of [...collection.items]) {
         // eslint-disable-next-line no-await-in-loop
@@ -182,6 +239,7 @@ export function AppShell({ wasmModule }) {
             confirm={confirm}
             categories={categories}
             removeCategory={removeCategory}
+            addCommonCategories={addCommonCategories}
             transactions={transactions}
             rules={rules}
             goals={goals}

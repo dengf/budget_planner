@@ -14,7 +14,16 @@ import CalcError from './CalcError';
  * and summing the actual previous month) left for a follow-up round
  * rather than this one.
  */
-export default function BudgetTab({ wasmModule, region, month, categories, removeCategory, transactions, budgetPlan }) {
+export default function BudgetTab({
+  wasmModule,
+  region,
+  month,
+  categories,
+  removeCategory,
+  addCommonCategories,
+  transactions,
+  budgetPlan,
+}) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [income, setIncome] = useState(() => loadIncome(month));
@@ -56,6 +65,28 @@ export default function BudgetTab({ wasmModule, region, month, categories, remov
   }, [wasmModule, income, budgetPlan.items, categories.items, monthTransactions]);
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
+  const categoryGroup = (id) => categories.items.find((c) => c.id === id)?.group ?? '';
+
+  /**
+   * Grouped for display, alphabetically within each group.
+   *
+   * Storage lists categories in id order, and ids are timestamp-plus-
+   * random, so a seeded budget came back with its groups interleaved
+   * (Home, Food, Home...) even though the presets are declared grouped.
+   * `Category.group` is documented in budget-calc as carrying no
+   * behaviour and existing only for display order -- this is that use.
+   * Ordering for the eye is host-layer, hence `localeCompare` here rather
+   * than a sort in Rust.
+   */
+  const orderedLines = useMemo(() => {
+    const collator = new Intl.Collator(locale);
+    return [...(result?.lines ?? [])].sort((a, b) => {
+      const byGroup = collator.compare(categoryGroup(a.category_id), categoryGroup(b.category_id));
+      return byGroup !== 0
+        ? byGroup
+        : collator.compare(categoryName(a.category_id), categoryName(b.category_id));
+    });
+  }, [result, categories.items, locale]);
 
   const addCategory = async (e) => {
     e.preventDefault();
@@ -63,33 +94,6 @@ export default function BudgetTab({ wasmModule, region, month, categories, remov
     const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
     await categories.save({ id, name: newCategory.name, group: newCategory.group || 'General' });
     setNewCategory({ name: '', group: '' });
-  };
-
-  /**
-   * Inserts the region's starter set, translated.
-   *
-   * `budget-calc::presets` owns *which* categories a region gets and
-   * hands back i18n keys; this composes the name actually stored, in the
-   * reader's language, so a Chinese budget doesn't open with English
-   * category names. Skipping a preset whose name is already present is a
-   * referential check against in-memory state -- host-layer, same
-   * category as `region.js` -- not a rule the core should own.
-   */
-  const addCommonCategories = async () => {
-    if (!wasmModule?.preset_categories) return;
-    const presets = (await wasmModule.preset_categories(region)) ?? [];
-    const taken = new Set(categories.items.map((c) => c.name.trim().toLowerCase()));
-    for (const preset of presets) {
-      const name = t(preset.key);
-      if (taken.has(name.trim().toLowerCase())) continue;
-      taken.add(name.trim().toLowerCase());
-      const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
-      // Sequential rather than Promise.all: each save is one IndexedDB
-      // write through the same store handle, and the list they land in
-      // reads better in the order the presets are declared.
-      // eslint-disable-next-line no-await-in-loop
-      await categories.save({ id, name, group: t(preset.group_key) });
-    }
   };
 
   const savePlanned = async (categoryId, amount) => {
@@ -149,21 +153,30 @@ export default function BudgetTab({ wasmModule, region, month, categories, remov
       {categories.items.length === 0 ? (
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
-        <div>
-          {(result?.lines ?? []).map((line) => (
+        <div className="category-table">
+          {/* Without these, Planned/Spent/Remaining read as three bare
+              figures with nothing saying which is which. */}
+          <div className="category-row category-head">
+            <div>{t('budget.categoryName')}</div>
+            <div className="num">{t('budget.planned')}</div>
+            <div className="num">{t('budget.spent')}</div>
+            <div className="num">{t('budget.remaining')}</div>
+            <div />
+          </div>
+          {orderedLines.map((line) => (
             <div className="category-row" key={line.category_id}>
               <div>
                 <div className="category-name">{categoryName(line.category_id)}</div>
-                <div className="category-group">{categories.items.find((c) => c.id === line.category_id)?.group}</div>
+                <div className="category-group">{categoryGroup(line.category_id)}</div>
               </div>
-              <div className="num">
+              <div className="field-input planned-input">
+                <span className="cell-label">{t('budget.planned')}</span>
                 <input
                   type="number"
                   inputMode="decimal"
                   step="any"
+                  aria-label={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
                   value={plannedDraft[line.category_id] ?? line.planned}
-                  className="field-input"
-                  style={{ width: '100%' }}
                   onChange={(e) => {
                     const raw = e.target.value;
                     setPlannedDraft((d) => ({ ...d, [line.category_id]: raw }));
@@ -171,14 +184,20 @@ export default function BudgetTab({ wasmModule, region, month, categories, remov
                   }}
                 />
               </div>
-              <div className="num">{formatMoney(line.spent)}</div>
+              {/* The .cell-label spans are hidden once the header row is
+                  visible; on a narrow screen the row stacks and they are
+                  the only thing naming each figure. */}
+              <div className="num">
+                <span className="cell-label">{t('budget.spent')}</span>
+                {formatMoney(line.spent)}
+              </div>
               <div className={`num ${line.remaining < 0 ? 'negative' : 'positive'}`}>
+                <span className="cell-label">{t('budget.remaining')}</span>
                 {line.remaining < 0
                   ? t('budget.borrowed', { amount: formatMoney(-line.remaining) })
                   : formatMoney(line.remaining)}
               </div>
-              <div />
-              <button className="btn danger" onClick={() => removeCategory(line.category_id)}>
+              <button className="btn ghost" onClick={() => removeCategory(line.category_id)}>
                 {t('budget.remove')}
               </button>
             </div>
