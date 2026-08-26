@@ -144,11 +144,21 @@ export default function BudgetTab({
   const days = daysLeftInMonth();
   const summary = result?.summary;
   const unassigned = summary?.unassigned ?? 0;
+  // "Every dollar has a job" used to show whenever unassigned was 0 --
+  // which is vacuously true on an empty budget, so the first thing the app
+  // ever said about someone's money was a congratulation for doing
+  // nothing. A budget only counts as assigned once income exists and
+  // something has actually been planned against it.
+  const hasIncome = (summary?.income ?? 0) > 0;
+  const hasBudget = hasIncome && (summary?.total_planned ?? 0) > 0;
 
   return (
     <div className="panel">
       <h2>{t('budget.title')} · {monthLabel(month, locale)}</h2>
       <p className="headline">{t('budget.daysLeft', { days, month: monthLabel(month, locale) })}</p>
+      {/* The method, stated once. Zero-based budgeting is the entire
+          premise of this tab and the UI never said what it was. */}
+      <p className="panel-subtitle">{t('budget.method')}</p>
 
       <div className="form-grid">
         <NumberField
@@ -163,30 +173,42 @@ export default function BudgetTab({
       {result?.error && <CalcError result={result} />}
 
       {summary && (
-        <div className="stat-grid">
-          <div className="stat stat-primary">
-            <span className="stat-label">{t('budget.income')}</span>
-            <span className="stat-value">{formatMoney(summary.income)}</span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">{t('budget.totalPlanned')}</span>
-            <span className="stat-value">{formatMoney(summary.total_planned)}</span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">{t('budget.totalSpent')}</span>
-            <span className="stat-value">{formatMoney(summary.total_spent)}</span>
-          </div>
-          <div className={unassigned < 0 ? 'stat stat-negative' : 'stat'}>
-            <span className="stat-label">
-              {unassigned === 0
-                ? t('budget.fullyAssigned')
-                : unassigned > 0
-                  ? t('budget.unassignedPositive', { amount: formatMoney(unassigned) })
-                  : t('budget.unassignedNegative', { amount: formatMoney(-unassigned) })}
+        <>
+          {/* Unassigned is the whole activity of zero-based budgeting --
+              you are done when it reaches zero -- so it leads, at the size
+              that says so, and the three derived figures you can't act on
+              sit underneath it. It used to be the fourth of four
+              identical tiles, after three you don't act on at all. */}
+          <div className={`assign-banner${hasBudget ? '' : ' assign-banner-start'}${unassigned < 0 ? ' assign-banner-over' : ''}`}>
+            <span className="assign-label">
+              {!hasIncome
+                ? t('budget.startWithIncome')
+                : !hasBudget
+                  ? t('budget.assignPrompt', { amount: formatMoney(summary.income) })
+                  : unassigned === 0
+                    ? t('budget.fullyAssigned')
+                    : unassigned > 0
+                      ? t('budget.unassignedPositive', { amount: formatMoney(unassigned) })
+                      : t('budget.unassignedNegative', { amount: formatMoney(-unassigned) })}
             </span>
-            <span className="stat-value">{formatMoney(unassigned)}</span>
+            {hasIncome && <span className="assign-value">{formatMoney(unassigned)}</span>}
           </div>
-        </div>
+
+          <div className="stat-grid stat-grid-secondary">
+            <div className="stat">
+              <span className="stat-label">{t('budget.income')}</span>
+              <span className="stat-value">{formatMoney(summary.income)}</span>
+            </div>
+            <div className="stat">
+              <span className="stat-label">{t('budget.totalPlanned')}</span>
+              <span className="stat-value">{formatMoney(summary.total_planned)}</span>
+            </div>
+            <div className="stat">
+              <span className="stat-label">{t('budget.totalSpent')}</span>
+              <span className="stat-value">{formatMoney(summary.total_spent)}</span>
+            </div>
+          </div>
+        </>
       )}
 
       {categories.items.length === 0 ? (
@@ -216,7 +238,11 @@ export default function BudgetTab({
                   inputMode="decimal"
                   step="any"
                   aria-label={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
-                  value={plannedDraft[line.category_id] ?? line.planned}
+                  placeholder="0"
+                  // Empty rather than a literal 0, so budgeting a category
+                  // is one keystroke instead of select-then-replace --
+                  // fourteen times over on a seeded budget.
+                  value={plannedDraft[line.category_id] ?? (line.planned || '')}
                   onChange={(e) => {
                     const raw = e.target.value;
                     setPlannedDraft((d) => ({ ...d, [line.category_id]: raw }));
@@ -241,11 +267,18 @@ export default function BudgetTab({
                   +
                 </button>
               </div>
-              <div className={`num ${line.remaining < 0 ? 'negative' : 'positive'}`}>
+              {/* "Borrowed from next month" only makes sense against a
+                  plan that existed. With planned still 0 nothing was
+                  borrowed -- the category simply hasn't been budgeted --
+                  and saying otherwise made the app's characteristic
+                  phrase nonsense on every expense in a fresh budget. */}
+              <div className={`num ${line.remaining < 0 ? (line.planned > 0 ? 'negative' : 'muted-note') : 'positive'}`}>
                 <span className="cell-label">{t('budget.remaining')}</span>
-                {line.remaining < 0
-                  ? t('budget.borrowed', { amount: formatMoney(-line.remaining) })
-                  : formatMoney(line.remaining)}
+                {line.remaining >= 0
+                  ? formatMoney(line.remaining)
+                  : line.planned > 0
+                    ? t('budget.borrowed', { amount: formatMoney(-line.remaining) })
+                    : t('budget.unbudgetedSpend')}
               </div>
               <button className="btn ghost" onClick={() => removeCategory(line.category_id)}>
                 {t('budget.remove')}

@@ -5,6 +5,8 @@ import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { detectRegion, rememberRegion } from './region';
 import { hasSeeded, rememberSeeded } from './seeded';
+import { COLLECTIONS, readBackup } from './backup';
+import { saveIncome } from './income';
 import { currentMonth } from './month';
 
 // Code-split: a visitor logging one transaction shouldn't download the
@@ -201,6 +203,70 @@ export function AppShell({ wasmModule }) {
     addCommonCategories();
   }, [categories.loaded, categories.items.length, addCommonCategories]);
 
+  /**
+   * Replaces everything in the app with the contents of an export file.
+   *
+   * Replace rather than merge: two files with the same record ids but
+   * different contents have no correct merge without asking a person
+   * about each conflict, which is the two-person merge flow the plan
+   * parks for later. Replace-after-confirm is the honest version of what
+   * this can do today, and the confirm says so.
+   */
+  const importData = useCallback(
+    async (payload) => {
+      const backup = readBackup(payload);
+      if (!backup.ok) return { error: t(backup.reason) };
+
+      const ok = await confirm(t('data.importConfirm', { count: backup.count }));
+      if (!ok) return null;
+
+      const byName = {
+        categories,
+        rules,
+        transactions,
+        goals,
+        debts,
+      };
+      // Clear first, in reverse dependency order, so nothing is briefly
+      // pointing at a category that has already gone.
+      for (const name of [...COLLECTIONS].reverse()) {
+        for (const item of [...byName[name].items]) {
+          // eslint-disable-next-line no-await-in-loop
+          await byName[name].remove(item.id);
+        }
+      }
+      for (const item of [...budgetPlan.items]) {
+        // eslint-disable-next-line no-await-in-loop
+        await budgetPlan.remove(item.id);
+      }
+
+      for (const name of COLLECTIONS) {
+        for (const record of backup.collections[name]) {
+          // eslint-disable-next-line no-await-in-loop
+          await byName[name].save(record);
+        }
+      }
+      // Only restore plan rows belonging to the month now on screen --
+      // budgetPlan is a per-month collection, and writing another month's
+      // rows into it would show them under the wrong heading.
+      if (backup.budgetPlan.month === month) {
+        for (const entry of backup.budgetPlan.entries) {
+          // eslint-disable-next-line no-await-in-loop
+          await budgetPlan.save(entry);
+        }
+      }
+      if (backup.income && backup.income.month) {
+        saveIncome(backup.income.month, backup.income.amount);
+      }
+
+      // The file is the person's data now, so first-run seeding must not
+      // run again on top of it.
+      rememberSeeded();
+      return { imported: backup.count, month: backup.budgetPlan.month };
+    },
+    [categories, rules, transactions, goals, debts, budgetPlan, month, confirm, t],
+  );
+
   const clearAllData = useCallback(async () => {
     const ok = await confirm(t('data.clearConfirm'));
     if (!ok) return;
@@ -246,6 +312,7 @@ export function AppShell({ wasmModule }) {
             debts={debts}
             budgetPlan={budgetPlan}
             clearAllData={clearAllData}
+            importData={importData}
           />
         </Suspense>
       </main>

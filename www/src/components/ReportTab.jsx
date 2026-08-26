@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
+import { loadIncome } from '../income';
+import { EXPORT_FORMAT } from '../backup';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 
 export default function ReportTab({
@@ -15,11 +17,14 @@ export default function ReportTab({
   goals,
   debts,
   clearAllData,
+  importData,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [lines, setLines] = useState([]);
   const [recipients, setRecipients] = useState('');
+  const income = loadIncome(month);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,15 +33,26 @@ export default function ReportTab({
       const monthTx = transactions.items.filter((tx) => tx.date?.startsWith(month));
       const spendResult = await wasmModule.spend_by_category({ transactions: monthTx });
       const spent = (spendResult?.totals ?? []).map((r) => ({ category_id: r.category_id, amount: r.amount }));
-      const planned = budgetPlan.items.map((p) => ({ category_id: p.category_id, amount: p.planned }));
-      const built = await wasmModule.build_month({ income: 0, planned, previous_remaining: [], spent });
+      // Every known category, defaulting to 0 planned -- NOT budgetPlan.items
+      // alone. `build_month` only returns lines for categories it is given a
+      // planned entry for, so building this list from saved plan rows drops
+      // every category that has spending but no typed budget: the report
+      // printed an empty table while the Budget tab showed real spending.
+      // This is the same trap CLAUDE.md documents for BudgetTab under "A new
+      // category has no budget-plan entry until one is saved"; it was fixed
+      // there and missed here. Don't "simplify" this back to budgetPlan.items.
+      const planned = categories.items.map((c) => ({
+        category_id: c.id,
+        amount: budgetPlan.items.find((p) => p.category_id === c.id)?.planned ?? 0,
+      }));
+      const built = await wasmModule.build_month({ income, planned, previous_remaining: [], spent });
       if (!cancelled) setLines(built?.lines ?? []);
     }
     run();
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, budgetPlan.items, transactions.items, month]);
+  }, [wasmModule, budgetPlan.items, categories.items, transactions.items, month, income]);
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
 
@@ -60,6 +76,7 @@ export default function ReportTab({
   // there is no server this app could hold a copy on.
   const exportData = () => {
     const payload = {
+      format: EXPORT_FORMAT,
       exported_at: new Date().toISOString(),
       categories: categories.items,
       transactions: transactions.items,
@@ -69,6 +86,10 @@ export default function ReportTab({
       // Only the currently loaded month -- budget-plan rows are fetched
       // per month, and this app has no "every month" listing to export.
       budget_plan: { month, entries: budgetPlan.items },
+      // Income lives in localStorage, not the store, so it has to be
+      // named explicitly here. Leaving it out meant a restore came back
+      // with every summary figure wrong until it was retyped.
+      income: { month, amount: income },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -77,6 +98,26 @@ export default function ReportTab({
     a.download = `budget-planner-${month}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const onImportFile = (e) => {
+    const file = e.target.files?.[0];
+    // Reset immediately so picking the same file twice still fires a change.
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let payload;
+      try {
+        payload = JSON.parse(String(reader.result ?? ''));
+      } catch {
+        setImportResult({ error: t('err.badImportFile') });
+        return;
+      }
+      const outcome = await importData(payload);
+      setImportResult(outcome);
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -154,8 +195,16 @@ export default function ReportTab({
         <p className="panel-subtitle">{t('data.exportHint')}</p>
         <div className="data-management-actions">
           <button className="btn secondary" onClick={exportData}>{t('data.export')}</button>
+          <label className="btn secondary import-button">
+            {t('data.import')}
+            <input type="file" accept="application/json,.json" onChange={onImportFile} />
+          </label>
           <button className="btn danger" onClick={clearAllData}>{t('data.clearAll')}</button>
         </div>
+        {importResult?.error && <p className="import-error" role="alert">{importResult.error}</p>}
+        {importResult?.imported != null && (
+          <p className="headline">{t('data.imported', { count: importResult.imported })}</p>
+        )}
       </div>
     </div>
   );

@@ -235,6 +235,31 @@ table.data tr:last-child td { border-bottom: none; }
 .category-name { font-weight: 600; }
 .category-group { color: var(--muted-2); font-size: 0.75rem; }
 
+/* Unassigned leads the tab: reaching zero IS zero-based budgeting, so it
+   gets the weight, and the derived figures below it are subordinate. */
+.assign-banner {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px;
+  padding: 18px 20px; margin-bottom: 12px;
+  background: var(--positive-bg); border: 1px solid var(--positive-border); border-radius: 12px;
+}
+.assign-label { font-size: 1.02rem; font-weight: 600; color: var(--ink); }
+.assign-value { font-size: 1.7rem; font-weight: 700; color: var(--positive); font-variant-numeric: tabular-nums; }
+/* Before a budget exists this is an instruction, not a result. */
+.assign-banner-start { background: var(--panel-alt); border-color: var(--line); }
+.assign-banner-start .assign-value { color: var(--muted); }
+.assign-banner-over { background: var(--negative-bg); border-color: var(--negative-border); }
+.assign-banner-over .assign-value { color: var(--negative); }
+
+.stat-grid-secondary .stat-value { font-size: 1.05rem; }
+
+/* Spending in a category that was never budgeted is a note, not a
+   failure -- nothing was overspent against a plan that doesn't exist. */
+.muted-note { color: var(--muted-2); }
+
+.import-button { position: relative; overflow: hidden; cursor: pointer; }
+.import-button input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.import-error { color: var(--negative); font-size: 0.85rem; }
+
 /* Column headers: Planned/Spent/Remaining were three unlabelled figures
    before these existed. */
 .category-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); padding-bottom: 6px; }

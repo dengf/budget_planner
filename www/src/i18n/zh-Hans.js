@@ -49,6 +49,13 @@ export default {
 
   'budget.addCommon': '添加常用分类',
   'budget.logSpending': '记一笔支出',
+  'budget.method': '零基预算：给每一分钱都安排好去处，直到没有剩余未分配。',
+  'budget.startWithIncome': '从这里开始——本月有多少收入？',
+  'budget.assignPrompt': '现在把这 {amount} 分配到下面的各个分类。',
+  'budget.unbudgetedSpend': '尚未编入预算',
+  'data.import': '导入数据',
+  'data.importConfirm': '用该文件中的 {count} 条记录替换本应用中的全部内容？现有数据将被清除。',
+  'data.imported': '已恢复 {count} 条记录。',
   'budget.spendAmount': '支出金额',
   'budget.spentHint': '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
@@ -174,6 +181,7 @@ export default {
   'err.csvRow': '第 {row} 行：{reason}',
   'err.emptyCsv': '该文件没有可导入的内容。',
   'err.columnOutOfRange': '列映射指向了超出该行范围的列。',
+  'err.badImportFile': '该文件不是预算规划导出的备份——未做任何更改。',
   'err.categoryInUse': '“{name}”被 {count} 笔账目使用——请先给它们重新分类，再删除该分类。',
 
   'errors.dismiss': '关闭',

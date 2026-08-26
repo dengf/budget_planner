@@ -49,6 +49,13 @@ export default {
 
   'budget.addCommon': '新增常用分類',
   'budget.logSpending': '記一筆支出',
+  'budget.method': '零基預算：給每一分錢都安排好去處，直到沒有剩餘未分配。',
+  'budget.startWithIncome': '從這裡開始——本月有多少收入？',
+  'budget.assignPrompt': '現在把這 {amount} 分配到下面的各個分類。',
+  'budget.unbudgetedSpend': '尚未編入預算',
+  'data.import': '匯入資料',
+  'data.importConfirm': '用該檔案中的 {count} 筆記錄取代本應用中的全部內容？現有資料將被清除。',
+  'data.imported': '已復原 {count} 筆記錄。',
   'budget.spendAmount': '支出金額',
   'budget.spentHint': '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
@@ -174,6 +181,7 @@ export default {
   'err.csvRow': '第 {row} 列：{reason}',
   'err.emptyCsv': '該檔案沒有可匯入的內容。',
   'err.columnOutOfRange': '欄位對應指向了超出該列範圍的欄。',
+  'err.badImportFile': '該檔案不是預算規劃匯出的備份——未做任何變更。',
   'err.categoryInUse': '「{name}」被 {count} 筆帳目使用——請先為它們重新分類，再刪除該分類。',
 
   'errors.dismiss': '關閉',

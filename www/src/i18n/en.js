@@ -53,6 +53,13 @@ export default {
 
   'budget.addCommon': 'Add common categories',
   'budget.logSpending': 'Log spending',
+  'budget.method': 'Zero-based: give every dollar a job until nothing is left unassigned.',
+  'budget.startWithIncome': "Start here — what's coming in this month?",
+  'budget.assignPrompt': 'Now assign your {amount} across the categories below.',
+  'budget.unbudgetedSpend': 'Not budgeted yet',
+  'data.import': 'Import data',
+  'data.importConfirm': 'Replace everything in this app with the {count} records in that file? What is here now will be gone.',
+  'data.imported': '{count} records restored.',
   'budget.spendAmount': 'Amount spent',
   'budget.spentHint': 'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
@@ -181,6 +188,7 @@ export default {
   'err.csvRow': 'Row {row}: {reason}',
   'err.emptyCsv': 'That file has nothing to import.',
   'err.columnOutOfRange': 'That column mapping points past the end of a row.',
+  'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.categoryInUse': '"{name}" is used by {count} transactions — recategorize them before removing it.',
 
   'errors.dismiss': 'Dismiss',
