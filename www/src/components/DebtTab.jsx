@@ -3,8 +3,9 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import NumberField from './NumberField';
 import CalcError from './CalcError';
+import DebtChart from './DebtChart';
 
-export default function DebtTab({ wasmModule, region, newId, debts }) {
+export default function DebtTab({ wasmModule, region, newId, confirm, debts }) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [draft, setDraft] = useState({ name: '', balance: '', apr_percent: '', min_payment: '' });
@@ -49,6 +50,11 @@ export default function DebtTab({ wasmModule, region, newId, debts }) {
   const debtName = (id) => debts.items.find((d) => d.id === id)?.name ?? id;
   const firstMonthRows = (plan?.schedule ?? []).filter((row) => row.month === 1);
 
+  const removeDebt = async (debt) => {
+    const ok = await confirm(t('confirm.removeDebt', { name: debt.name }));
+    if (ok) await debts.remove(debt.id);
+  };
+
   return (
     <div className="panel">
       <h2>{t('debt.title')}</h2>
@@ -73,7 +79,7 @@ export default function DebtTab({ wasmModule, region, newId, debts }) {
                 <td className="num">{formatMoney(d.balance)}</td>
                 <td className="num">{d.apr_percent.toFixed(2)}%</td>
                 <td className="num">{formatMoney(d.min_payment)}</td>
-                <td><button className="btn ghost" onClick={() => debts.remove(d.id)}>{t('budget.remove')}</button></td>
+                <td><button className="btn ghost" onClick={() => removeDebt(d)}>{t('budget.remove')}</button></td>
               </tr>
             ))}
           </tbody>
@@ -114,6 +120,11 @@ export default function DebtTab({ wasmModule, region, newId, debts }) {
               <p className="field-label">
                 {t('debt.order')}: {plan.order.map(debtName).join(' → ')}
               </p>
+              <DebtChart
+                schedule={plan.schedule}
+                monthsToDebtFree={plan.months_to_debt_free}
+                formatMoney={formatMoney}
+              />
               <table className="data">
                 <thead>
                   <tr>

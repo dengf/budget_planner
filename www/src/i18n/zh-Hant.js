@@ -1,6 +1,7 @@
 // 繁體中文
 export default {
   'app.title': '預算規劃',
+  'app.loading': '載入中…',
   'app.byline': '— {logo} 出品',
   'app.language': '語言',
   'app.region': '地區',
@@ -75,6 +76,8 @@ export default {
   'transactions.addRule': '新增規則',
   'transactions.applyRules': '將規則套用到未分類帳目',
   'transactions.noRules': '還沒有規則。',
+  'transactions.showAllMonths': '顯示所有月份',
+  'transactions.noneThisMonth': '本月沒有帳目記錄。',
 
   'goals.title': '儲蓄目標',
   'goals.add': '新增目標',
@@ -135,4 +138,28 @@ export default {
   'err.csvRow': '第 {row} 列：{reason}',
   'err.emptyCsv': '該檔案沒有可匯入的內容。',
   'err.columnOutOfRange': '欄位對應指向了超出該列範圍的欄。',
+  'err.categoryInUse': '「{name}」被 {count} 筆帳目使用——請先為它們重新分類，再刪除該分類。',
+
+  'errors.dismiss': '關閉',
+
+  'confirm.cancel': '取消',
+  'confirm.remove': '刪除',
+  'confirm.removeCategory': '刪除「{name}」？本月為它計劃的金額也會一併刪除。',
+  'confirm.removeTransaction': '刪除「{description}」？',
+  'confirm.removeRule': '刪除關於「{keyword}」的規則？',
+  'confirm.removeGoal': '刪除「{name}」？已儲蓄的進度也會一併刪除。',
+  'confirm.removeDebt': '將「{name}」從還債計劃中刪除？',
+
+  'data.title': '您的資料',
+  'data.exportHint': '將您輸入的所有內容下載為單一 JSON 檔案。',
+  'data.export': '匯出所有資料',
+  'data.clearAll': '清空所有資料',
+  'data.clearConfirm': '刪除全部內容——每一個分類、帳目、規則、目標和債務？此操作無法復原。',
+
+  'chart.debtTitle': '還債進度',
+  'chart.remainingBalance': '剩餘餘額',
+  'chart.interestToDate': '累計已付利息',
+  'chart.debtAria': '圖表顯示剩餘餘額在 {months} 個月內逐步降為零，期間共支付利息 {interest}。',
+  'chart.monthN': '第 {n} 個月',
+  'chart.sharedScale': '刻度範圍：{min} 至 {max}',
 };

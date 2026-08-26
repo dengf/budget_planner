@@ -4,7 +4,18 @@ import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 
-export default function ReportTab({ wasmModule, region, month, categories, transactions, budgetPlan, goals, debts }) {
+export default function ReportTab({
+  wasmModule,
+  region,
+  month,
+  categories,
+  transactions,
+  rules,
+  budgetPlan,
+  goals,
+  debts,
+  clearAllData,
+}) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [lines, setLines] = useState([]);
@@ -42,6 +53,30 @@ export default function ReportTab({ wasmModule, region, month, categories, trans
   const send = () => {
     if (addresses.length === 0 || rejected.length > 0) return;
     window.location.href = mailtoUrl({ recipients, subject: t('report.mailSubject'), body: bodyText() });
+  };
+
+  // Everything the app holds, as one file the person keeps themselves --
+  // the only way to move data between devices or make a backup, since
+  // there is no server this app could hold a copy on.
+  const exportData = () => {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      categories: categories.items,
+      transactions: transactions.items,
+      rules: rules.items,
+      goals: goals.items,
+      debts: debts.items,
+      // Only the currently loaded month -- budget-plan rows are fetched
+      // per month, and this app has no "every month" listing to export.
+      budget_plan: { month, entries: budgetPlan.items },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `budget-planner-${month}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -112,6 +147,15 @@ export default function ReportTab({ wasmModule, region, month, categories, trans
         <button className="btn secondary" onClick={send} disabled={addresses.length === 0 || rejected.length > 0}>
           {t('report.send')}
         </button>
+      </div>
+
+      <div className="data-management no-print">
+        <h2>{t('data.title')}</h2>
+        <p className="panel-subtitle">{t('data.exportHint')}</p>
+        <div className="data-management-actions">
+          <button className="btn secondary" onClick={exportData}>{t('data.export')}</button>
+          <button className="btn danger" onClick={clearAllData}>{t('data.clearAll')}</button>
+        </div>
       </div>
     </div>
   );

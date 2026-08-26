@@ -7,7 +7,7 @@ import NumberField from './NumberField';
 
 const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
-function GoalCard({ goal, wasmModule, formatMoney, t, onSave, onRemove }) {
+function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove }) {
   const [progress, setProgress] = useState(null);
   const [contribution, setContribution] = useState(null);
   const [addAmount, setAddAmount] = useState('');
@@ -76,12 +76,20 @@ function GoalCard({ goal, wasmModule, formatMoney, t, onSave, onRemove }) {
         />
       </form>
       <button className="btn secondary" onClick={addFunds}>+</button>
-      <button className="btn danger" onClick={() => onRemove(goal.id)}>{t('budget.remove')}</button>
+      <button
+        className="btn danger"
+        onClick={async () => {
+          const ok = await confirm(t('confirm.removeGoal', { name: goal.name }));
+          if (ok) onRemove(goal.id);
+        }}
+      >
+        {t('budget.remove')}
+      </button>
     </div>
   );
 }
 
-export default function GoalsTab({ wasmModule, region, newId, goals }) {
+export default function GoalsTab({ wasmModule, region, newId, confirm, goals }) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [draft, setDraft] = useState({ name: '', target_amount: '', target_date: '', cadence: 'monthly' });
@@ -115,6 +123,7 @@ export default function GoalsTab({ wasmModule, region, newId, goals }) {
               wasmModule={wasmModule}
               formatMoney={formatMoney}
               t={t}
+              confirm={confirm}
               onSave={goals.save}
               onRemove={goals.remove}
             />

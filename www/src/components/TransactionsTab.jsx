@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
+import { currentMonth } from '../month';
 import CalcError from './CalcError';
+import NumberField from './NumberField';
 
 const DEFAULT_MAPPING = { date_col: 0, description_col: 1, amount_col: 2, credit_col: null, has_header: true };
 
-export default function TransactionsTab({ wasmModule, region, newId, categories, transactions, rules }) {
+export default function TransactionsTab({ wasmModule, region, newId, confirm, categories, transactions, rules }) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(region);
+  const thisMonth = useMemo(() => currentMonth(), []);
+  const [showAllMonths, setShowAllMonths] = useState(false);
 
   const [draft, setDraft] = useState({ date: '', description: '', amount: '', category_id: '' });
   const [csvText, setCsvText] = useState('');
@@ -68,6 +72,23 @@ export default function TransactionsTab({ wasmModule, region, newId, categories,
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? t('transactions.uncategorized');
 
+  const removeTransaction = async (tx) => {
+    const ok = await confirm(t('confirm.removeTransaction', { description: tx.description }));
+    if (ok) await transactions.remove(tx.id);
+  };
+
+  const removeRule = async (rule) => {
+    const ok = await confirm(t('confirm.removeRule', { keyword: rule.keyword }));
+    if (ok) await rules.remove(rule.id);
+  };
+
+  // Defaults to the current month so the list stays short and fast to scan
+  // as history accumulates; "show all" is one click away for anyone
+  // reconciling further back.
+  const visibleTransactions = showAllMonths
+    ? transactions.items
+    : transactions.items.filter((tx) => tx.date?.startsWith(thisMonth));
+
   return (
     <div className="panel">
       <h2>{t('transactions.title')}</h2>
@@ -75,32 +96,42 @@ export default function TransactionsTab({ wasmModule, region, newId, categories,
       {transactions.items.length === 0 ? (
         <p className="empty-state">{t('transactions.noTransactions')}</p>
       ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('transactions.date')}</th>
-              <th>{t('transactions.description')}</th>
-              <th>{t('transactions.category')}</th>
-              <th>{t('transactions.amount')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {[...transactions.items]
-              .sort((a, b) => (a.date < b.date ? 1 : -1))
-              .map((tx) => (
-                <tr key={tx.id}>
-                  <td>{tx.date}</td>
-                  <td>{tx.description}</td>
-                  <td>{categoryName(tx.category_id)}</td>
-                  <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
-                  <td>
-                    <button className="btn ghost" onClick={() => transactions.remove(tx.id)}>{t('budget.remove')}</button>
-                  </td>
+        <>
+          <label className="field field-check">
+            <input type="checkbox" checked={showAllMonths} onChange={(e) => setShowAllMonths(e.target.checked)} />
+            <span>{t('transactions.showAllMonths')}</span>
+          </label>
+          {visibleTransactions.length === 0 ? (
+            <p className="empty-state">{t('transactions.noneThisMonth')}</p>
+          ) : (
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>{t('transactions.date')}</th>
+                  <th>{t('transactions.description')}</th>
+                  <th>{t('transactions.category')}</th>
+                  <th>{t('transactions.amount')}</th>
+                  <th />
                 </tr>
-              ))}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {[...visibleTransactions]
+                  .sort((a, b) => (a.date < b.date ? 1 : -1))
+                  .map((tx) => (
+                    <tr key={tx.id}>
+                      <td>{tx.date}</td>
+                      <td>{tx.description}</td>
+                      <td>{categoryName(tx.category_id)}</td>
+                      <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
+                      <td>
+                        <button className="btn ghost" onClick={() => removeTransaction(tx)}>{t('budget.remove')}</button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
 
       <form className="form-grid" onSubmit={addTransaction}>
@@ -112,10 +143,12 @@ export default function TransactionsTab({ wasmModule, region, newId, categories,
           <span className="field-label">{t('transactions.description')}</span>
           <div className="field-input"><input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
         </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.amount')}</span>
-          <div className="field-input"><input type="number" step="any" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} /></div>
-        </label>
+        <NumberField
+          label={t('transactions.amount')}
+          value={draft.amount}
+          onChange={(v) => setDraft({ ...draft, amount: v })}
+          grouped
+        />
         <label className="field">
           <span className="field-label">{t('transactions.category')}</span>
           <select className="field-select" value={draft.category_id} onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}>
@@ -181,7 +214,7 @@ export default function TransactionsTab({ wasmModule, region, newId, categories,
                 <td>{r.keyword}</td>
                 <td>{categoryName(r.category_id)}</td>
                 <td className="num">{r.priority}</td>
-                <td><button className="btn ghost" onClick={() => rules.remove(r.id)}>{t('budget.remove')}</button></td>
+                <td><button className="btn ghost" onClick={() => removeRule(r)}>{t('budget.remove')}</button></td>
               </tr>
             ))}
           </tbody>

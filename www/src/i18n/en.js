@@ -2,6 +2,7 @@
 // zh-Hans.js and zh-Hant.js must carry the same keys (see catalogs.test.js).
 export default {
   'app.title': 'Budget Planner',
+  'app.loading': 'Loading…',
   'app.byline': '— a {logo} app',
   'app.language': 'Language',
   'app.region': 'Region',
@@ -81,6 +82,8 @@ export default {
   'transactions.addRule': 'Add rule',
   'transactions.applyRules': 'Apply rules to uncategorized',
   'transactions.noRules': 'No rules yet.',
+  'transactions.showAllMonths': 'Show all months',
+  'transactions.noneThisMonth': 'No transactions this month.',
 
   'goals.title': 'Savings goals',
   'goals.add': 'Add a goal',
@@ -142,4 +145,28 @@ export default {
   'err.csvRow': 'Row {row}: {reason}',
   'err.emptyCsv': 'That file has nothing to import.',
   'err.columnOutOfRange': 'That column mapping points past the end of a row.',
+  'err.categoryInUse': '"{name}" is used by {count} transactions — recategorize them before removing it.',
+
+  'errors.dismiss': 'Dismiss',
+
+  'confirm.cancel': 'Cancel',
+  'confirm.remove': 'Remove',
+  'confirm.removeCategory': 'Remove "{name}"? Its planned amount for this month goes with it.',
+  'confirm.removeTransaction': 'Remove "{description}"?',
+  'confirm.removeRule': 'Remove the rule for "{keyword}"?',
+  'confirm.removeGoal': 'Remove "{name}"? Its saved progress goes with it.',
+  'confirm.removeDebt': 'Remove "{name}" from the payoff plan?',
+
+  'data.title': 'Your data',
+  'data.exportHint': 'Download everything you have entered as a single JSON file.',
+  'data.export': 'Export all data',
+  'data.clearAll': 'Clear all data',
+  'data.clearConfirm': 'Delete everything — every category, transaction, rule, goal and debt? This cannot be undone.',
+
+  'chart.debtTitle': 'Payoff over time',
+  'chart.remainingBalance': 'Remaining balance',
+  'chart.interestToDate': 'Interest paid to date',
+  'chart.debtAria': 'Chart of the remaining balance declining to zero over {months} months, with {interest} paid in interest along the way.',
+  'chart.monthN': 'Month {n}',
+  'chart.sharedScale': 'Scale: {min} to {max}',
 };

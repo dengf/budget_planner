@@ -1,9 +1,69 @@
+/* Token system. Dark values are exactly the literals this file used to
+   hardcode -- converting to variables here changes nothing about how dark
+   mode looks; it only makes a light mode possible without duplicating every
+   rule. Light values are a first pass: readable, same blue/green accent
+   family as the rest of the app (deliberately not meifio's plum -- this app
+   inherited mortgage_calculator's blue/green palette, and swapping the
+   accent hue is a bigger brand decision than "add a light theme" asked for),
+   not run through a formal contrast checker yet. */
+:root {
+  --bg: #0f1720;
+  --panel: #131c26;
+  --panel-alt: #161e2b;
+  --surface: #0f1720;
+  --ink: #e6edf3;
+  --muted: #9fb0c3;
+  --muted-2: #5c6b7d;
+  --byline: #9aa7b4;
+  --line: #223;
+  --line-soft: #1a2433;
+  --input-border: #2a3546;
+
+  --accent: #4f8cff;
+  --accent-ink: #0b1119;
+  --positive: #7ee787;
+  --positive-ink: #0f1720;
+  --positive-bg: #16311f;
+  --positive-border: #2f6b3f;
+  --negative: #ff8a8a;
+  --negative-bg: #331a1a;
+  --negative-border: #6b3030;
+  --gold: #d9b46a;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --panel-alt: #eef1f5;
+    --surface: #ffffff;
+    --ink: #16202b;
+    --muted: #5a6b7d;
+    --muted-2: #8492a3;
+    --byline: #6b7a8a;
+    --line: #dde3ea;
+    --line-soft: #e7ebf0;
+    --input-border: #c7d0da;
+
+    --accent: #2f6fe0;
+    --accent-ink: #ffffff;
+    --positive: #1f7a3d;
+    --positive-ink: #ffffff;
+    --positive-bg: #e4f3e8;
+    --positive-border: #b8ddc2;
+    --negative: #b3261e;
+    --negative-bg: #fbeae9;
+    --negative-border: #e7b7b3;
+    --gold: #8a6a2c;
+  }
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: #0f1720;
-  color: #e6edf3;
+  background: var(--bg);
+  color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -23,7 +83,7 @@ body {
   flex-wrap: wrap;
   gap: 16px;
   padding: 24px 0 16px;
-  border-bottom: 1px solid #223;
+  border-bottom: 1px solid var(--line);
 }
 
 .app-brand { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.45rem; }
@@ -33,50 +93,50 @@ body {
   align-items: center;
   gap: 0.32em;
   font-size: 0.82rem;
-  color: #9aa7b4;
+  color: var(--byline);
   text-decoration: none;
 }
-.app-byline:hover, .app-byline:focus-visible { color: #e6edf3; }
-.meifio-mark { width: auto; display: block; color: #e6edf3; vertical-align: middle; }
+.app-byline:hover, .app-byline:focus-visible { color: var(--ink); }
+.meifio-mark { width: auto; display: block; color: var(--ink); vertical-align: middle; }
 
 .app-switches { display: flex; gap: 10px; }
-.app-regions { display: flex; gap: 2px; background: #161e2b; padding: 3px; border-radius: 8px; }
+.app-regions { display: flex; gap: 2px; background: var(--panel-alt); padding: 3px; border-radius: 8px; }
 .app-region {
   border: none;
   background: transparent;
-  color: #9fb0c3;
+  color: var(--muted);
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 600;
 }
-.app-region.active { background: #4f8cff; color: #0b1119; }
+.app-region.active { background: var(--accent); color: var(--accent-ink); }
 
-.app-tabs { display: flex; gap: 4px; background: #161e2b; padding: 4px; border-radius: 10px; flex-wrap: wrap; }
+.app-tabs { display: flex; gap: 4px; background: var(--panel-alt); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
 .app-tab {
   border: none;
   background: transparent;
-  color: #9fb0c3;
+  color: var(--muted);
   padding: 8px 16px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
 }
-.app-tab.active { background: #7ee787; color: #0f1720; }
+.app-tab.active { background: var(--positive); color: var(--positive-ink); }
 
 .app-main { padding: 24px 0 64px; display: flex; flex-direction: column; gap: 24px; }
 
 .intro { display: flex; flex-direction: column; gap: 6px; }
 .intro-lede { font-size: 1.05rem; margin: 0; }
-.intro-privacy { margin: 0; font-size: 0.9rem; color: #c6d2df; }
-.intro-privacy b { color: #7ee787; }
-.intro-privacy a { color: #7ee787; }
+.intro-privacy { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.intro-privacy b { color: var(--positive); }
+.intro-privacy a { color: var(--positive); }
 
 .panel {
-  background: #131c26;
-  border: 1px solid #223;
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 20px;
   display: flex;
@@ -85,25 +145,25 @@ body {
 }
 
 .panel h2 { margin: 0; font-size: 1.1rem; }
-.panel-subtitle { margin: -8px 0 0; color: #9fb0c3; font-size: 0.85rem; }
+.panel-subtitle { margin: -8px 0 0; color: var(--muted); font-size: 0.85rem; }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 0.8rem; color: #9fb0c3; }
+.field-label { font-size: 0.8rem; color: var(--muted); }
 .field-check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
-.field-check input { accent-color: #4c8dff; width: 15px; height: 15px; margin: 0; }
+.field-check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 
 .field-input {
   display: flex;
   align-items: center;
-  background: #0f1720;
-  border: 1px solid #2a3546;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   padding: 0 10px;
 }
 .field-input input, .field-input select {
   background: transparent;
   border: none;
-  color: #e6edf3;
+  color: var(--ink);
   padding: 10px 4px;
   width: 100%;
   font-size: 0.95rem;
@@ -112,13 +172,13 @@ body {
 .field-input input[type='number']::-webkit-outer-spin-button,
 .field-input input[type='number']::-webkit-inner-spin-button { appearance: none; margin: 0; }
 .field-input input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
-.field-suffix { color: #5c6b7d; font-size: 0.8rem; white-space: nowrap; }
+.field-suffix { color: var(--muted-2); font-size: 0.8rem; white-space: nowrap; }
 
 .field-select {
-  background: #0f1720;
-  border: 1px solid #2a3546;
+  background: var(--surface);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
-  color: #e6edf3;
+  color: var(--ink);
   padding: 10px;
   font-size: 0.95rem;
 }
@@ -132,50 +192,104 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  background: #4f8cff;
-  color: #0b1119;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
-.btn.secondary { background: #223047; color: #cdd9e8; }
-.btn.ghost { background: transparent; color: #9fb0c3; padding: 6px 10px; }
-.btn.danger { background: transparent; color: #ff8a8a; padding: 6px 10px; }
+.btn.secondary { background: var(--panel-alt); color: var(--ink); }
+.btn.ghost { background: transparent; color: var(--muted); padding: 6px 10px; }
+.btn.danger { background: transparent; color: var(--negative); padding: 6px 10px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-.stat { background: #161e2b; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-.stat-primary { background: #16311f; border: 1px solid #2f6b3f; }
-.stat-negative { background: #331a1a; border: 1px solid #6b3030; }
-.stat-label { font-size: 0.78rem; color: #9fb0c3; }
+.stat { background: var(--panel-alt); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.stat-primary { background: var(--positive-bg); border: 1px solid var(--positive-border); }
+.stat-negative { background: var(--negative-bg); border: 1px solid var(--negative-border); }
+.stat-label { font-size: 0.78rem; color: var(--muted); }
 .stat-value { font-size: 1.35rem; font-weight: 700; }
 
-.headline { font-size: 0.95rem; color: #c6d2df; margin: 0; padding: 10px 14px; background: #161e2b; border-radius: 10px; }
+.headline { font-size: 0.95rem; color: var(--ink); margin: 0; padding: 10px 14px; background: var(--panel-alt); border-radius: 10px; }
 
 table.data { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-table.data th { text-align: left; color: #9fb0c3; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid #223; }
-table.data td { padding: 8px 10px; border-bottom: 1px solid #1a2433; }
+table.data th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.data td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); }
 table.data tr:last-child td { border-bottom: none; }
 .num { font-variant-numeric: tabular-nums; text-align: right; }
-.negative { color: #ff8a8a; }
-.positive { color: #7ee787; }
+.negative { color: var(--negative); }
+.positive { color: var(--positive); }
 
-.empty-state { color: #5c6b7d; font-size: 0.88rem; padding: 12px 0; }
+.empty-state { color: var(--muted-2); font-size: 0.88rem; padding: 12px 0; }
 
-.error { background: #331a1a; border: 1px solid #6b3030; border-radius: 8px; padding: 10px 14px; color: #ffb4b4; font-size: 0.88rem; }
+.error { background: var(--negative-bg); border: 1px solid var(--negative-border); border-radius: 8px; padding: 10px 14px; color: var(--negative); font-size: 0.88rem; }
 
 /* Goal cards -- the blossom is the progress bar. */
-.goal-card { background: #161e2b; border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: center; }
+.goal-card { background: var(--panel-alt); border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: center; }
 .goal-blossom { flex: none; width: 64px; height: 64px; }
 .goal-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .goal-name { font-weight: 700; font-size: 1rem; }
-.goal-progress-text { font-size: 0.82rem; color: #9fb0c3; }
-.goal-contribution { font-size: 0.82rem; color: #7ee787; }
-.goal-milestone { font-size: 0.85rem; color: #d9b46a; margin-top: 4px; }
+.goal-progress-text { font-size: 0.82rem; color: var(--muted); }
+.goal-contribution { font-size: 0.82rem; color: var(--positive); }
+.goal-milestone { font-size: 0.85rem; color: var(--gold); margin-top: 4px; }
 
-.category-row { display: grid; grid-template-columns: 1.4fr repeat(4, 0.9fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #1a2433; }
+.category-row { display: grid; grid-template-columns: 1.4fr repeat(4, 0.9fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .category-row:last-child { border-bottom: none; }
 .category-name { font-weight: 600; }
-.category-group { color: #5c6b7d; font-size: 0.75rem; }
+.category-group { color: var(--muted-2); font-size: 0.75rem; }
 
 .report-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* Charts -- hand-rolled SVG, same reasoning as mortgage_calculator's
+   Charts.jsx: a charting library would cost more gzipped than the wasm
+   module the app is built around. */
+.chart { margin: 0; display: flex; flex-direction: column; gap: 10px; background: var(--panel-alt); border-radius: 12px; padding: 18px 20px; }
+.chart-title { font-size: 0.95rem; font-weight: 700; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.78rem; color: var(--muted); }
+.chart-key { display: inline-flex; align-items: center; gap: 6px; }
+.chart-key i { width: 10px; height: 10px; border-radius: 5px; flex: none; }
+.chart-svg { width: 100%; height: 180px; display: block; background: var(--surface); border-radius: 8px; }
+.chart-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.chart-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
+
+/* Toasts -- CalcError renders here instead of inline in document flow, so a
+   failure is noticeable regardless of scroll position and can be dismissed. */
+.toast-region {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px; pointer-events: none; z-index: 100;
+}
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 12px;
+  max-width: 480px; width: 100%;
+  background: var(--negative-bg); border: 1px solid var(--negative-border);
+  color: var(--negative); border-radius: 10px; padding: 12px 14px;
+  font-size: 0.88rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.toast-message { flex: 1; }
+.toast-dismiss {
+  border: none; background: transparent; color: inherit; cursor: pointer;
+  font-size: 1.1rem; line-height: 1; padding: 2px 4px; flex: none;
+}
+
+/* Confirm dialog */
+.confirm-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 200;
+}
+.confirm-dialog {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px; max-width: 360px; width: 100%;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.confirm-message { margin: 0; font-size: 0.95rem; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+/* .btn.danger is a transparent ghost button everywhere else (a small
+   "Remove" link in a table row); inside the dialog it's the primary action
+   and needs to read as one. */
+.confirm-actions .btn.danger { background: var(--negative); color: #fff; padding: 10px 16px; }
+
+.data-management { display: flex; flex-direction: column; gap: 10px; }
+.data-management-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 @media print {
   .app-header, .app-tabs, .app-switches, .report-actions, .no-print { display: none !important; }

@@ -14,7 +14,7 @@ import CalcError from './CalcError';
  * and summing the actual previous month) left for a follow-up round
  * rather than this one.
  */
-export default function BudgetTab({ wasmModule, region, month, categories, transactions, budgetPlan }) {
+export default function BudgetTab({ wasmModule, region, month, categories, removeCategory, transactions, budgetPlan }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [income, setIncome] = useState(() => loadIncome(month));
@@ -132,10 +132,16 @@ export default function BudgetTab({ wasmModule, region, month, categories, trans
               <div className="num">
                 <input
                   type="number"
-                  defaultValue={line.planned}
+                  inputMode="decimal"
+                  step="any"
+                  value={plannedDraft[line.category_id] ?? line.planned}
                   className="field-input"
                   style={{ width: '100%' }}
-                  onBlur={(e) => savePlanned(line.category_id, e.target.value)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setPlannedDraft((d) => ({ ...d, [line.category_id]: raw }));
+                    savePlanned(line.category_id, raw);
+                  }}
                 />
               </div>
               <div className="num">{formatMoney(line.spent)}</div>
@@ -145,7 +151,7 @@ export default function BudgetTab({ wasmModule, region, month, categories, trans
                   : formatMoney(line.remaining)}
               </div>
               <div />
-              <button className="btn danger" onClick={() => categories.remove(line.category_id)}>
+              <button className="btn danger" onClick={() => removeCategory(line.category_id)}>
                 {t('budget.remove')}
               </button>
             </div>

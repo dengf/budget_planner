@@ -1,6 +1,7 @@
 // 简体中文
 export default {
   'app.title': '预算规划',
+  'app.loading': '加载中…',
   'app.byline': '— {logo} 出品',
   'app.language': '语言',
   'app.region': '地区',
@@ -75,6 +76,8 @@ export default {
   'transactions.addRule': '添加规则',
   'transactions.applyRules': '将规则应用到未分类账目',
   'transactions.noRules': '还没有规则。',
+  'transactions.showAllMonths': '显示所有月份',
+  'transactions.noneThisMonth': '本月没有账目记录。',
 
   'goals.title': '储蓄目标',
   'goals.add': '添加目标',
@@ -135,4 +138,28 @@ export default {
   'err.csvRow': '第 {row} 行：{reason}',
   'err.emptyCsv': '该文件没有可导入的内容。',
   'err.columnOutOfRange': '列映射指向了超出该行范围的列。',
+  'err.categoryInUse': '“{name}”被 {count} 笔账目使用——请先给它们重新分类，再删除该分类。',
+
+  'errors.dismiss': '关闭',
+
+  'confirm.cancel': '取消',
+  'confirm.remove': '删除',
+  'confirm.removeCategory': '删除“{name}”？本月为它计划的金额也会一并删除。',
+  'confirm.removeTransaction': '删除“{description}”？',
+  'confirm.removeRule': '删除关于“{keyword}”的规则？',
+  'confirm.removeGoal': '删除“{name}”？已储蓄的进度也会一并删除。',
+  'confirm.removeDebt': '将“{name}”从还债计划中删除？',
+
+  'data.title': '您的数据',
+  'data.exportHint': '将您输入的所有内容下载为单个 JSON 文件。',
+  'data.export': '导出所有数据',
+  'data.clearAll': '清空所有数据',
+  'data.clearConfirm': '删除全部内容——每一个分类、账目、规则、目标和债务？此操作无法撤销。',
+
+  'chart.debtTitle': '还债进度',
+  'chart.remainingBalance': '剩余余额',
+  'chart.interestToDate': '累计已付利息',
+  'chart.debtAria': '图表显示剩余余额在 {months} 个月内逐步降为零，期间共支付利息 {interest}。',
+  'chart.monthN': '第 {n} 个月',
+  'chart.sharedScale': '刻度范围：{min} 至 {max}',
 };
