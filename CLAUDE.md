@@ -80,6 +80,36 @@ number the person types, not something derived.
   (hex 80 through FF) across all three catalogs; a single mis-encoded
   write turns Chinese text into mojibake that passes every other check.
 
+## The other rule: it has to be obvious to use
+
+Near-perfect, intuitive user experience is a requirement for every tool we
+ship, not a polish pass afterwards. A tool that is correct but confusing
+has not been delivered.
+
+What this means in practice:
+
+- **Someone opening it for the first time must know what to do next**
+  without being told. If the first screen doesn't make the next action
+  obvious, that is a defect and gets logged like any other.
+- **The number the tool exists to produce is the most prominent thing on
+  the screen.** Supporting figures are subordinate to it.
+- **Never state something that isn't true yet.** A success message on an
+  empty state, a total that omits data, a phrase that only makes sense
+  once the user has done something they haven't done -- these are wrong
+  answers, not cosmetic issues, and rank with a miscalculation.
+- **Defaults must reduce work, not just fill space.** Seeding a screen
+  with rows of zeros only helps if the next action is still obvious.
+- **Every destructive action confirms; every reversible one is quiet.**
+  Visual weight goes to the action people take most, never the rarest one.
+- **If it can be exported it must be importable.** A one-way door beside
+  a delete button is a trap.
+- **Check it on a phone before calling it done.** Layout bugs in this
+  codebase have shown up on narrow screens first, more than once.
+
+When a change is reviewed, "does this work?" and "would a first-time user
+understand this?" carry equal weight. The second question is the one that
+gets skipped, so ask it explicitly.
+
 ## Verification traps specific to this repo
 
 - **`cargo build --workspace` never compiles `budget-ext-redb::wasm` or
