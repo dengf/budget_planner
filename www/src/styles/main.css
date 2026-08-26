@@ -260,6 +260,38 @@ table.data tr:last-child td { border-bottom: none; }
 .import-button input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .import-error { color: var(--negative); font-size: 0.85rem; }
 
+.commitments-toggle { margin: 4px 0 16px; }
+
+/* Per-category progress: how far through the plan this month is, at a
+   glance, instead of reading three numbers and doing the division. */
+.progress { height: 4px; border-radius: 2px; background: var(--line-soft); margin-top: 4px; overflow: hidden; }
+.progress-fill { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s ease; }
+.progress-fill.over { background: var(--negative); }
+
+.commitments-table { margin-bottom: 8px; }
+
+/* Spending chart: horizontal bars, longest first, with a marker at each
+   category's planned amount so a bar reads as over/under at a glance
+   rather than needing the figure beside it. */
+.spend-chart { margin-top: 16px; }
+.chart-key i { border-radius: 3px; }
+.key-spent { background: var(--accent); }
+.key-planned { background: var(--muted-2); }
+.spend-rows { display: flex; flex-direction: column; gap: 10px; }
+.spend-row { display: grid; grid-template-columns: minmax(90px, 0.9fr) 2fr auto; align-items: center; gap: 10px; }
+.spend-name { font-size: 0.82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spend-track { position: relative; height: 14px; background: var(--surface); border-radius: 7px; overflow: visible; }
+.spend-bar { display: block; height: 100%; background: var(--accent); border-radius: 7px; min-width: 2px; }
+.spend-bar.over { background: var(--negative); }
+.spend-marker { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: 0.55; }
+.spend-figure { font-size: 0.82rem; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.spend-figure.over { color: var(--negative); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .spend-row { grid-template-columns: 1fr; gap: 2px; }
+  .spend-figure { text-align: left; }
+}
+
 /* Column headers: Planned/Spent/Remaining were three unlabelled figures
    before these existed. */
 .category-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); padding-bottom: 6px; }

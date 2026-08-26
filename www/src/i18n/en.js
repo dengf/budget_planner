@@ -53,6 +53,12 @@ export default {
 
   'budget.addCommon': 'Add common categories',
   'budget.logSpending': 'Log spending',
+  'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
+  'budget.commitmentsTitle': 'Goals & debt this month',
+  'budget.progressAria': '{name}: {spent} of {planned} spent',
+  'chart.spendTitle': 'Where it went',
+  'chart.spendTotal': '{amount} spent this month, across every category',
+  'chart.spendRowAria': '{name}: {spent} spent of {planned} planned',
   'budget.method': 'Zero-based: give every dollar a job until nothing is left unassigned.',
   'budget.startWithIncome': "Start here — what's coming in this month?",
   'budget.assignPrompt': 'Now assign your {amount} across the categories below.',

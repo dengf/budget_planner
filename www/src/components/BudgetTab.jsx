@@ -5,6 +5,15 @@ import { daysLeftInMonth, monthLabel, todayIso } from '../month';
 import { loadIncome, saveIncome } from '../income';
 import NumberField from './NumberField';
 import CalcError from './CalcError';
+import SpendChart from './SpendChart';
+import {
+  DEBT_PREFIX,
+  GOAL_PREFIX,
+  isCommitmentId,
+  loadIncludeCommitments,
+  saveIncludeCommitments,
+} from '../commitments';
+import { monthsBetween } from '../month';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -23,6 +32,8 @@ export default function BudgetTab({
   addCommonCategories,
   transactions,
   budgetPlan,
+  goals,
+  debts,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
@@ -33,6 +44,7 @@ export default function BudgetTab({
   // Which category's "log spending" row is open, and what's typed in it.
   const [spendFor, setSpendFor] = useState(null);
   const [spendDraft, setSpendDraft] = useState({ amount: '', description: '' });
+  const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
 
   useEffect(() => {
     saveIncome(month, income);
@@ -58,6 +70,34 @@ export default function BudgetTab({
         category_id: c.id,
         amount: budgetPlan.items.find((p) => p.category_id === c.id)?.planned ?? 0,
       }));
+
+      // Goals and debts, when the toggle is on, join the budget as
+      // ordinary planned entries under synthetic ids. Deliberately not
+      // summed here first: handing each one to `build_month` separately
+      // means the totals and `unassigned` are still Rust's arithmetic, and
+      // each commitment gets its own line to show, rather than the front
+      // end doing money maths CLAUDE.md puts in the core.
+      if (includeCommitments) {
+        for (const goal of goals?.items ?? []) {
+          const months = monthsBetween(todayIso(), goal.target_date);
+          // eslint-disable-next-line no-await-in-loop
+          const contribution = await wasmModule.required_contribution?.({
+            target_amount: goal.target_amount,
+            current_amount: goal.current_amount,
+            months_remaining: months,
+            cadence: 'monthly',
+          });
+          if (contribution?.amount > 0) {
+            planned.push({ category_id: `${GOAL_PREFIX}${goal.id}`, amount: contribution.amount });
+          }
+        }
+        for (const debt of debts?.items ?? []) {
+          if (debt.min_payment > 0) {
+            planned.push({ category_id: `${DEBT_PREFIX}${debt.id}`, amount: debt.min_payment });
+          }
+        }
+      }
+
       const built = await wasmModule.build_month({ income, planned, previous_remaining: [], spent });
       if (!cancelled) setResult(built);
     }
@@ -65,7 +105,16 @@ export default function BudgetTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, income, budgetPlan.items, categories.items, monthTransactions]);
+  }, [
+    wasmModule,
+    income,
+    budgetPlan.items,
+    categories.items,
+    monthTransactions,
+    includeCommitments,
+    goals?.items,
+    debts?.items,
+  ]);
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
   const categoryGroup = (id) => categories.items.find((c) => c.id === id)?.group ?? '';
@@ -83,13 +132,30 @@ export default function BudgetTab({
    */
   const orderedLines = useMemo(() => {
     const collator = new Intl.Collator(locale);
-    return [...(result?.lines ?? [])].sort((a, b) => {
-      const byGroup = collator.compare(categoryGroup(a.category_id), categoryGroup(b.category_id));
-      return byGroup !== 0
-        ? byGroup
-        : collator.compare(categoryName(a.category_id), categoryName(b.category_id));
-    });
+    return [...(result?.lines ?? [])]
+      .filter((l) => !isCommitmentId(l.category_id))
+      .sort((a, b) => {
+        const byGroup = collator.compare(categoryGroup(a.category_id), categoryGroup(b.category_id));
+        return byGroup !== 0
+          ? byGroup
+          : collator.compare(categoryName(a.category_id), categoryName(b.category_id));
+      });
   }, [result, categories.items, locale]);
+
+  /** The goal/debt lines `build_month` returned, paired back with the
+   *  record each one came from so it can be shown by name. */
+  const commitmentLines = useMemo(
+    () =>
+      (result?.lines ?? [])
+        .filter((l) => isCommitmentId(l.category_id))
+        .map((line) => {
+          const isGoal = line.category_id.startsWith(GOAL_PREFIX);
+          const id = line.category_id.slice((isGoal ? GOAL_PREFIX : DEBT_PREFIX).length);
+          const source = (isGoal ? goals?.items : debts?.items)?.find((r) => r.id === id);
+          return { line, isGoal, name: source?.name ?? id };
+        }),
+    [result, goals?.items, debts?.items],
+  );
 
   const addCategory = async (e) => {
     e.preventDefault();
@@ -170,6 +236,20 @@ export default function BudgetTab({
         />
       </div>
 
+      {/* Off by default: a goal or debt only claims part of this month's
+          income once someone says so, not because the feature exists. */}
+      <label className="field-check commitments-toggle">
+        <input
+          type="checkbox"
+          checked={includeCommitments}
+          onChange={(e) => {
+            setIncludeCommitments(e.target.checked);
+            saveIncludeCommitments(e.target.checked);
+          }}
+        />
+        <span>{t('budget.includeCommitments')}</span>
+      </label>
+
       {result?.error && <CalcError result={result} />}
 
       {summary && (
@@ -230,6 +310,26 @@ export default function BudgetTab({
               <div>
                 <div className="category-name">{categoryName(line.category_id)}</div>
                 <div className="category-group">{categoryGroup(line.category_id)}</div>
+                {/* How far through the plan this category is, without
+                    reading three numbers and doing the division. Only
+                    once a plan exists -- a full bar on planned 0 would
+                    read as "done" when it means "unbudgeted". */}
+                {line.planned > 0 && (
+                  <div
+                    className="progress"
+                    role="img"
+                    aria-label={t('budget.progressAria', {
+                      name: categoryName(line.category_id),
+                      spent: formatMoney(line.spent),
+                      planned: formatMoney(line.planned),
+                    })}
+                  >
+                    <span
+                      className={line.spent > line.planned ? 'progress-fill over' : 'progress-fill'}
+                      style={{ width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%` }}
+                    />
+                  </div>
+                )}
               </div>
               <div className="field-input planned-input">
                 <span className="cell-label">{t('budget.planned')}</span>
@@ -323,6 +423,33 @@ export default function BudgetTab({
       {categories.items.length > 0 && (
         <p className="field-label">{t('budget.spentHint')}</p>
       )}
+
+      {includeCommitments && commitmentLines.length > 0 && (
+        <div className="category-table commitments-table">
+          <div className="category-row category-head">
+            <div>{t('budget.commitmentsTitle')}</div>
+            <div className="num">{t('budget.planned')}</div>
+            <div />
+          </div>
+          {commitmentLines.map(({ line, isGoal, name }) => (
+            <div className="category-row" key={line.category_id}>
+              <div>
+                <div className="category-name">{name}</div>
+                <div className="category-group">
+                  {isGoal ? t('goals.title') : t('debt.title')}
+                </div>
+              </div>
+              <div className="num">
+                <span className="cell-label">{t('budget.planned')}</span>
+                {formatMoney(line.planned)}
+              </div>
+              <div />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <SpendChart lines={orderedLines} categoryName={categoryName} formatMoney={formatMoney} />
 
       <form className="form-grid" onSubmit={addCategory}>
         <label className="field">

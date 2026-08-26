@@ -49,6 +49,12 @@ export default {
 
   'budget.addCommon': '添加常用分类',
   'budget.logSpending': '记一笔支出',
+  'budget.includeCommitments': '将目标存入与债务最低还款计入本月预算',
+  'budget.commitmentsTitle': '本月目标与债务',
+  'budget.progressAria': '{name}：已花费 {spent}，计划 {planned}',
+  'chart.spendTitle': '钱花在了哪里',
+  'chart.spendTotal': '本月共花费 {amount}，涵盖所有分类',
+  'chart.spendRowAria': '{name}：已花费 {spent}，计划 {planned}',
   'budget.method': '零基预算：给每一分钱都安排好去处，直到没有剩余未分配。',
   'budget.startWithIncome': '从这里开始——本月有多少收入？',
   'budget.assignPrompt': '现在把这 {amount} 分配到下面的各个分类。',

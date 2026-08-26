@@ -49,6 +49,12 @@ export default {
 
   'budget.addCommon': '新增常用分類',
   'budget.logSpending': '記一筆支出',
+  'budget.includeCommitments': '將目標存入與債務最低還款計入本月預算',
+  'budget.commitmentsTitle': '本月目標與債務',
+  'budget.progressAria': '{name}：已花費 {spent}，計劃 {planned}',
+  'chart.spendTitle': '錢花在了哪裡',
+  'chart.spendTotal': '本月共花費 {amount}，涵蓋所有分類',
+  'chart.spendRowAria': '{name}：已花費 {spent}，計劃 {planned}',
   'budget.method': '零基預算：給每一分錢都安排好去處，直到沒有剩餘未分配。',
   'budget.startWithIncome': '從這裡開始——本月有多少收入？',
   'budget.assignPrompt': '現在把這 {amount} 分配到下面的各個分類。',
