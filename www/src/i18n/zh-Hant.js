@@ -48,6 +48,9 @@ export default {
   'budget.remove': '刪除',
 
   'budget.addCommon': '新增常用分類',
+  'budget.logSpending': '記一筆支出',
+  'budget.spendAmount': '支出金額',
+  'budget.spentHint': '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
 
   'cat.group.home': '居家',

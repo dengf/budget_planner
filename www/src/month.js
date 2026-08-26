@@ -8,6 +8,24 @@ export function currentMonth(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/**
+ * Today as `YYYY-MM-DD`, in the reader's own timezone.
+ *
+ * Deliberately not `toISOString().slice(0, 10)`, which is UTC: east of
+ * Greenwich that returns yesterday for the whole first part of the day.
+ * A transaction stamped that way lands in the previous month whenever
+ * someone logs spending in the small hours of the 1st -- and a spend that
+ * silently misses the month it belongs to is exactly the quietly-wrong
+ * number this app is not allowed to produce. Built from the same local
+ * getters as `currentMonth`, so the two can never disagree about which
+ * month "now" is in.
+ */
+export function todayIso(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export function daysLeftInMonth(date = new Date()) {
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
   return end.getDate() - date.getDate();

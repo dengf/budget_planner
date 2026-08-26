@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
-import { daysLeftInMonth, monthLabel } from '../month';
+import { daysLeftInMonth, monthLabel, todayIso } from '../month';
 import { loadIncome, saveIncome } from '../income';
 import NumberField from './NumberField';
 import CalcError from './CalcError';
@@ -30,6 +30,9 @@ export default function BudgetTab({
   const [result, setResult] = useState(null);
   const [newCategory, setNewCategory] = useState({ name: '', group: '' });
   const [plannedDraft, setPlannedDraft] = useState({});
+  // Which category's "log spending" row is open, and what's typed in it.
+  const [spendFor, setSpendFor] = useState(null);
+  const [spendDraft, setSpendDraft] = useState({ amount: '', description: '' });
 
   useEffect(() => {
     saveIncome(month, income);
@@ -94,6 +97,42 @@ export default function BudgetTab({
     const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
     await categories.save({ id, name: newCategory.name, group: newCategory.group || 'General' });
     setNewCategory({ name: '', group: '' });
+  };
+
+  /**
+   * Records spending against a category without leaving this tab.
+   *
+   * "Spent" is derived -- `budget-calc::spend_by_category` sums this
+   * month's negative transactions -- so the only way to move it was the
+   * Transactions tab, which nothing here said. This writes an ordinary
+   * transaction; the Transactions tab lists it and can edit or delete it
+   * exactly as if it had been typed there.
+   *
+   * The field asks for a spend amount and stores it negated, because
+   * negative-is-spending is the storage convention (a bank export's own,
+   * see Transaction::amount). Asking people to type a minus sign to
+   * record an expense is the kind of trap that produces a confidently
+   * wrong budget: type 50 for lunch without it and it books as income.
+   */
+  const logSpending = async (e, categoryId) => {
+    e.preventDefault();
+    const magnitude = Math.abs(Number(spendDraft.amount));
+    if (!Number.isFinite(magnitude) || magnitude === 0) return;
+    const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
+    await transactions.save({
+      id,
+      date: todayIso(),
+      description: spendDraft.description.trim() || categoryName(categoryId),
+      amount: -magnitude,
+      category_id: categoryId,
+    });
+    setSpendDraft({ amount: '', description: '' });
+    setSpendFor(null);
+  };
+
+  const openSpend = (categoryId) => {
+    setSpendDraft({ amount: '', description: '' });
+    setSpendFor((current) => (current === categoryId ? null : categoryId));
   };
 
   const savePlanned = async (categoryId, amount) => {
@@ -164,7 +203,8 @@ export default function BudgetTab({
             <div />
           </div>
           {orderedLines.map((line) => (
-            <div className="category-row" key={line.category_id}>
+            <React.Fragment key={line.category_id}>
+            <div className="category-row">
               <div>
                 <div className="category-name">{categoryName(line.category_id)}</div>
                 <div className="category-group">{categoryGroup(line.category_id)}</div>
@@ -187,9 +227,19 @@ export default function BudgetTab({
               {/* The .cell-label spans are hidden once the header row is
                   visible; on a narrow screen the row stacks and they are
                   the only thing naming each figure. */}
-              <div className="num">
+              <div className="num spent-cell">
                 <span className="cell-label">{t('budget.spent')}</span>
-                {formatMoney(line.spent)}
+                <span className="spent-value">{formatMoney(line.spent)}</span>
+                <button
+                  type="button"
+                  className="spend-add"
+                  aria-expanded={spendFor === line.category_id}
+                  aria-label={`${t('budget.logSpending')} — ${categoryName(line.category_id)}`}
+                  title={t('budget.logSpending')}
+                  onClick={() => openSpend(line.category_id)}
+                >
+                  +
+                </button>
               </div>
               <div className={`num ${line.remaining < 0 ? 'negative' : 'positive'}`}>
                 <span className="cell-label">{t('budget.remaining')}</span>
@@ -201,8 +251,44 @@ export default function BudgetTab({
                 {t('budget.remove')}
               </button>
             </div>
+            {spendFor === line.category_id && (
+              <form className="spend-form" onSubmit={(e) => logSpending(e, line.category_id)}>
+                <label className="field">
+                  <span className="field-label">{t('budget.spendAmount')}</span>
+                  <div className="field-input">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      min="0"
+                      autoFocus
+                      value={spendDraft.amount}
+                      onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })}
+                    />
+                  </div>
+                </label>
+                <label className="field">
+                  <span className="field-label">{t('transactions.description')}</span>
+                  <div className="field-input">
+                    <input
+                      value={spendDraft.description}
+                      placeholder={categoryName(line.category_id)}
+                      onChange={(e) => setSpendDraft({ ...spendDraft, description: e.target.value })}
+                    />
+                  </div>
+                </label>
+                <button className="btn" type="submit">{t('budget.save')}</button>
+                <button className="btn secondary" type="button" onClick={() => setSpendFor(null)}>
+                  {t('confirm.cancel')}
+                </button>
+              </form>
+            )}
+            </React.Fragment>
           ))}
         </div>
+      )}
+      {categories.items.length > 0 && (
+        <p className="field-label">{t('budget.spentHint')}</p>
       )}
 
       <form className="form-grid" onSubmit={addCategory}>

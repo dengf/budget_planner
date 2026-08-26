@@ -247,6 +247,26 @@ table.data tr:last-child td { border-bottom: none; }
    row stacks on a narrow screen. */
 .cell-label { display: none; }
 
+/* "Spent" is derived from transactions, so it needs a way in from here --
+   otherwise the column looks broken to anyone who hasn't found the
+   Transactions tab. */
+.spent-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.spend-add {
+  flex: none;
+  width: 24px; height: 24px; line-height: 1;
+  border: 1px solid var(--input-border); border-radius: 6px;
+  background: var(--surface); color: var(--muted);
+  font-size: 1rem; cursor: pointer;
+}
+.spend-add:hover { color: var(--ink); border-color: var(--accent); }
+.spend-add[aria-expanded='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.spend-form {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; align-items: end;
+  padding: 12px; margin-bottom: 8px;
+  background: var(--panel-alt); border-radius: 10px;
+}
+
 @media (max-width: 720px) {
   .category-head { display: none; }
   .category-row {
@@ -263,6 +283,12 @@ table.data tr:last-child td { border-bottom: none; }
   .category-row .btn { grid-column: 1 / -1; justify-self: start; padding-left: 0; }
   .cell-label { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); }
   .category-row .num { display: flex; flex-direction: column; align-items: flex-start; }
+  /* Label on its own line, then the figure and the + button side by side.
+     Scoped through .category-row to outrank the `.category-row .num`
+     flex-column rule above, which would otherwise push + onto its own
+     line. */
+  .category-row .spent-cell { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; }
+  .category-row .spent-cell .cell-label { grid-column: 1 / -1; }
   .planned-input { flex-direction: column; align-items: stretch; padding: 4px 8px; }
   .planned-input input { text-align: left; }
 }

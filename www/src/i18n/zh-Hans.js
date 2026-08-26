@@ -48,6 +48,9 @@ export default {
   'budget.remove': '删除',
 
   'budget.addCommon': '添加常用分类',
+  'budget.logSpending': '记一笔支出',
+  'budget.spendAmount': '支出金额',
+  'budget.spentHint': '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
 
   'cat.group.home': '居家',

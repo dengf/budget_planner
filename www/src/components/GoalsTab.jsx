@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
-import { monthsBetween } from '../month';
+import { monthsBetween, todayIso } from '../month';
 import BlossomProgress from './BlossomProgress';
 import NumberField from './NumberField';
 
@@ -18,7 +18,7 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
     async function run() {
       if (!wasmModule?.goal_progress || !wasmModule?.required_contribution) return;
       const p = await wasmModule.goal_progress({ current_amount: goal.current_amount, target_amount: goal.target_amount });
-      const months = monthsBetween(new Date().toISOString().slice(0, 10), goal.target_date);
+      const months = monthsBetween(todayIso(), goal.target_date);
       const c = await wasmModule.required_contribution({
         target_amount: goal.target_amount,
         current_amount: goal.current_amount,

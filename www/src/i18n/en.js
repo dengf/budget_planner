@@ -52,6 +52,9 @@ export default {
   'budget.remove': 'Remove',
 
   'budget.addCommon': 'Add common categories',
+  'budget.logSpending': 'Log spending',
+  'budget.spendAmount': 'Amount spent',
+  'budget.spentHint': 'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
 
   'cat.group.home': 'Home',
