@@ -66,7 +66,7 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
         )}
         {milestoneMsg && <span className="goal-milestone">{milestoneMsg}</span>}
       </div>
-      <form className="field-input" style={{ width: 120 }} onSubmit={addFunds}>
+      <form className="field-input goal-add-form" onSubmit={addFunds}>
         <input
           type="number"
           step="any"

@@ -213,6 +213,24 @@ table.data { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 table.data th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 table.data td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); }
 table.data tr:last-child td { border-bottom: none; }
+
+/* A table wider than its panel used to just spill out and get clipped by
+   the viewport -- the Amount column on Transactions, on a phone, was
+   genuinely unreadable, not merely tight. This is the floor: nothing is
+   ever inaccessible, even on the widest table (Recurring expenses, six
+   columns). */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 640px) {
+  /* Every cell stays on one line -- a date wrapping to three lines
+     ("2026-" / "08-" / "27") was most of a mobile row's height, times
+     every row. `.table-scroll` above is what makes this safe: a
+     description too long to fit is a horizontal swipe away instead of
+     wrapping, rather than the clipped-and-unreachable state this table
+     was in before that wrapper existed. */
+  table.data { font-size: 0.82rem; }
+  table.data th, table.data td { padding: 7px 8px; white-space: nowrap; }
+}
 .num { font-variant-numeric: tabular-nums; text-align: right; }
 .negative { color: var(--negative); }
 .positive { color: var(--positive); }
@@ -222,7 +240,8 @@ table.data tr:last-child td { border-bottom: none; }
 .error { background: var(--negative-bg); border: 1px solid var(--negative-border); border-radius: 8px; padding: 10px 14px; color: var(--negative); font-size: 0.88rem; }
 
 /* Goal cards -- the blossom is the progress bar. */
-.goal-card { background: var(--panel-alt); border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: center; }
+.goal-card { background: var(--panel-alt); border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.goal-add-form { width: 120px; flex: none; }
 .goal-blossom { flex: none; width: 64px; height: 64px; }
 .goal-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .goal-name { font-weight: 700; font-size: 1rem; }
@@ -347,29 +366,62 @@ table.data tr:last-child td { border-bottom: none; }
 }
 
 @media (max-width: 720px) {
-  .category-head { display: none; }
+  /* A category used to run 8-9 stacked lines on a phone (name, group,
+     progress, a "PLANNED" label row then the input, a "SPENT" label row
+     then value+button, a "REMAINING" label row then value, and Remove on
+     its own full-width row) -- fourteen of those is most of the screen's
+     worth of scrolling before you see anything else. This reflows the
+     same elements onto three compact rows: name+Remove share a line,
+     Planned is one line (label beside the field, not above it), and
+     Spent/Remaining pair up as two short label-plus-value lines instead
+     of four.
+     Column headers only make sense against a table's full-width row,
+     which no longer exists on a phone. */
+  /* Compound selector so this reliably outranks `.category-row`'s own
+     `display: grid` below -- both are single-class selectors of equal
+     specificity, and source order alone made this lose once already. */
+  .category-row.category-head { display: none; }
   .category-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 12px;
-    padding: 12px 0;
-    align-items: baseline;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 10px;
+    padding: 10px 0;
+    align-items: start;
   }
-  /* Name and the planned field each take the full width -- the input
-     needs the room -- with the two read-only figures paired underneath,
-     each carrying its own label now that the header is gone. */
-  .category-row > :first-child { grid-column: 1 / -1; }
-  .planned-input { grid-column: 1 / -1; }
-  .category-row .btn { grid-column: 1 / -1; justify-self: start; padding-left: 0; }
-  .cell-label { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); }
-  .category-row .num { display: flex; flex-direction: column; align-items: flex-start; }
-  /* Label on its own line, then the figure and the + button side by side.
-     Scoped through .category-row to outrank the `.category-row .num`
-     flex-column rule above, which would otherwise push + onto its own
-     line. */
-  .category-row .spent-cell { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; }
-  .category-row .spent-cell .cell-label { grid-column: 1 / -1; }
-  .planned-input { flex-direction: column; align-items: stretch; padding: 4px 8px; }
+  .category-row > :first-child { grid-column: 1; grid-row: 1; }
+  /* Remove moves up beside the name instead of holding its own row --
+     and shrinks, since a per-row action taken once in a while shouldn't
+     out-weigh the figures people actually look at. */
+  .category-row .btn {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    padding: 2px 0;
+    font-size: 0.75rem;
+    color: var(--muted-2);
+    background: transparent;
+  }
+  .planned-input { grid-column: 1 / -1; grid-row: 2; padding: 6px 10px; }
   .planned-input input { text-align: left; }
+  /* Inline rather than its own line above the value -- "Spent S$120" on
+     one line, not a "SPENT" heading followed by "S$120" underneath it. */
+  .cell-label { display: inline; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-2); }
+  .category-row .spent-cell { grid-column: 1; grid-row: 3; justify-content: flex-start; }
+  .category-row > .num:not(.spent-cell) {
+    grid-column: 2;
+    grid-row: 3;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+    justify-content: flex-end;
+    /* Right-aligned reads fine for a short figure, but "Borrowed S$7.45
+       from next month" wraps to several lines, and right-aligned wrapped
+       text is ragged-left and harder to read than left-aligned. */
+    text-align: left;
+  }
 }
 
 .report-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -440,4 +492,16 @@ table.data tr:last-child td { border-bottom: none; }
      here put the planned field and both figures on separate lines with
      nothing naming them -- three anonymous numbers under each category. */
   .app-header { flex-direction: column; align-items: flex-start; }
+
+  /* The intro/headline/panel chrome above the fold is identical on every
+     tab and was costing a full screen of scrolling before any actual
+     content on a phone. Tightened, not cut -- the privacy sentence stays,
+     it just stops taking three lines of its own. */
+  .intro { gap: 4px; }
+  .intro-lede { font-size: 0.95rem; }
+  .intro-privacy { font-size: 0.82rem; }
+  .headline { padding: 8px 12px; font-size: 0.88rem; }
+  .panel { padding: 16px; gap: 12px; }
+  .app-main { gap: 16px; padding: 16px 0 48px; }
+  .commitments-toggle { margin: 0 0 10px; font-size: 0.88rem; }
 }

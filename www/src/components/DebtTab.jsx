@@ -62,28 +62,30 @@ export default function DebtTab({ wasmModule, region, newId, confirm, debts }) {
       {debts.items.length === 0 ? (
         <p className="empty-state">{t('debt.noDebts')}</p>
       ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('debt.name')}</th>
-              <th>{t('debt.balance')}</th>
-              <th>{t('debt.apr')}</th>
-              <th>{t('debt.minPayment')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {debts.items.map((d) => (
-              <tr key={d.id}>
-                <td>{d.name}</td>
-                <td className="num">{formatMoney(d.balance)}</td>
-                <td className="num">{d.apr_percent.toFixed(2)}%</td>
-                <td className="num">{formatMoney(d.min_payment)}</td>
-                <td><button className="btn ghost" onClick={() => removeDebt(d)}>{t('budget.remove')}</button></td>
+        <div className="table-scroll">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('debt.name')}</th>
+                <th>{t('debt.balance')}</th>
+                <th>{t('debt.apr')}</th>
+                <th>{t('debt.minPayment')}</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {debts.items.map((d) => (
+                <tr key={d.id}>
+                  <td>{d.name}</td>
+                  <td className="num">{formatMoney(d.balance)}</td>
+                  <td className="num">{d.apr_percent.toFixed(2)}%</td>
+                  <td className="num">{formatMoney(d.min_payment)}</td>
+                  <td><button className="btn ghost" onClick={() => removeDebt(d)}>{t('budget.remove')}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <form className="form-grid" onSubmit={addDebt}>
@@ -125,26 +127,28 @@ export default function DebtTab({ wasmModule, region, newId, confirm, debts }) {
                 monthsToDebtFree={plan.months_to_debt_free}
                 formatMoney={formatMoney}
               />
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('debt.name')}</th>
-                    <th>{t('debt.payment')}</th>
-                    <th>{t('debt.interest')}</th>
-                    <th>{t('debt.balanceRemaining')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {firstMonthRows.map((row) => (
-                    <tr key={row.debt_id}>
-                      <td>{debtName(row.debt_id)}</td>
-                      <td className="num">{formatMoney(row.payment)}</td>
-                      <td className="num">{formatMoney(row.interest)}</td>
-                      <td className="num">{formatMoney(row.remaining_balance)}</td>
+              <div className="table-scroll">
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>{t('debt.name')}</th>
+                      <th>{t('debt.payment')}</th>
+                      <th>{t('debt.interest')}</th>
+                      <th>{t('debt.balanceRemaining')}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {firstMonthRows.map((row) => (
+                      <tr key={row.debt_id}>
+                        <td>{debtName(row.debt_id)}</td>
+                        <td className="num">{formatMoney(row.payment)}</td>
+                        <td className="num">{formatMoney(row.interest)}</td>
+                        <td className="num">{formatMoney(row.remaining_balance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </>

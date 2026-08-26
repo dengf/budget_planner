@@ -142,32 +142,34 @@ export default function TransactionsTab({
           {visibleTransactions.length === 0 ? (
             <p className="empty-state">{t('transactions.noneThisMonth')}</p>
           ) : (
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('transactions.date')}</th>
-                  <th>{t('transactions.description')}</th>
-                  <th>{t('transactions.category')}</th>
-                  <th>{t('transactions.amount')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {[...visibleTransactions]
-                  .sort((a, b) => (a.date < b.date ? 1 : -1))
-                  .map((tx) => (
-                    <tr key={tx.id}>
-                      <td>{tx.date}</td>
-                      <td>{tx.description}</td>
-                      <td>{categoryName(tx.category_id)}</td>
-                      <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
-                      <td>
-                        <button className="btn ghost" onClick={() => removeTransaction(tx)}>{t('budget.remove')}</button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t('transactions.date')}</th>
+                    <th>{t('transactions.description')}</th>
+                    <th>{t('transactions.category')}</th>
+                    <th>{t('transactions.amount')}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...visibleTransactions]
+                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+                    .map((tx) => (
+                      <tr key={tx.id}>
+                        <td>{tx.date}</td>
+                        <td>{tx.description}</td>
+                        <td>{categoryName(tx.category_id)}</td>
+                        <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
+                        <td>
+                          <button className="btn ghost" onClick={() => removeTransaction(tx)}>{t('budget.remove')}</button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       )}
@@ -237,26 +239,28 @@ export default function TransactionsTab({
       {rules.items.length === 0 ? (
         <p className="empty-state">{t('transactions.noRules')}</p>
       ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('transactions.ruleKeyword')}</th>
-              <th>{t('transactions.category')}</th>
-              <th>{t('transactions.rulePriority')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rules.items.map((r) => (
-              <tr key={r.id}>
-                <td>{r.keyword}</td>
-                <td>{categoryName(r.category_id)}</td>
-                <td className="num">{r.priority}</td>
-                <td><button className="btn ghost" onClick={() => removeRule(r)}>{t('budget.remove')}</button></td>
+        <div className="table-scroll">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('transactions.ruleKeyword')}</th>
+                <th>{t('transactions.category')}</th>
+                <th>{t('transactions.rulePriority')}</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rules.items.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.keyword}</td>
+                  <td>{categoryName(r.category_id)}</td>
+                  <td className="num">{r.priority}</td>
+                  <td><button className="btn ghost" onClick={() => removeRule(r)}>{t('budget.remove')}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <form className="form-grid" onSubmit={addRule}>
         <label className="field">
@@ -283,30 +287,32 @@ export default function TransactionsTab({
       {recurring.items.length === 0 ? (
         <p className="empty-state">{t('recurring.none')}</p>
       ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('recurring.description')}</th>
-              <th>{t('transactions.category')}</th>
-              <th>{t('budget.planned')}</th>
-              <th>{t('recurring.cadence')}</th>
-              <th>{t('recurring.anchorDate')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {recurring.items.map((r) => (
-              <tr key={r.id}>
-                <td>{r.description}</td>
-                <td>{categoryName(r.category_id)}</td>
-                <td className="num">{formatMoney(r.amount)}</td>
-                <td>{t(`freq.${r.cadence}`)}</td>
-                <td>{r.anchor_date}</td>
-                <td><button className="btn ghost" onClick={() => removeRecurring(r)}>{t('budget.remove')}</button></td>
+        <div className="table-scroll">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('recurring.description')}</th>
+                <th>{t('transactions.category')}</th>
+                <th>{t('budget.planned')}</th>
+                <th>{t('recurring.cadence')}</th>
+                <th>{t('recurring.anchorDate')}</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {recurring.items.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.description}</td>
+                  <td>{categoryName(r.category_id)}</td>
+                  <td className="num">{formatMoney(r.amount)}</td>
+                  <td>{t(`freq.${r.cadence}`)}</td>
+                  <td>{r.anchor_date}</td>
+                  <td><button className="btn ghost" onClick={() => removeRecurring(r)}>{t('budget.remove')}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <form className="form-grid" onSubmit={addRecurring}>
         <label className="field">

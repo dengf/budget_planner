@@ -127,52 +127,58 @@ export default function ReportTab({
       <h2>{t('report.title')}</h2>
       <p className="panel-subtitle">{t('report.subtitle')} · {monthLabel(month, locale)}</p>
 
-      <table className="data">
-        <thead>
-          <tr>
-            <th>{t('budget.categoryName')}</th>
-            <th>{t('budget.planned')}</th>
-            <th>{t('budget.spent')}</th>
-            <th>{t('budget.remaining')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((l) => (
-            <tr key={l.category_id}>
-              <td>{categoryName(l.category_id)}</td>
-              <td className="num">{formatMoney(l.planned)}</td>
-              <td className="num">{formatMoney(l.spent)}</td>
-              <td className={`num ${l.remaining < 0 ? 'negative' : 'positive'}`}>{formatMoney(l.remaining)}</td>
+      <div className="table-scroll">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>{t('budget.categoryName')}</th>
+              <th>{t('budget.planned')}</th>
+              <th>{t('budget.spent')}</th>
+              <th>{t('budget.remaining')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {lines.map((l) => (
+              <tr key={l.category_id}>
+                <td>{categoryName(l.category_id)}</td>
+                <td className="num">{formatMoney(l.planned)}</td>
+                <td className="num">{formatMoney(l.spent)}</td>
+                <td className={`num ${l.remaining < 0 ? 'negative' : 'positive'}`}>{formatMoney(l.remaining)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {goals.items.length > 0 && (
         <>
           <h2>{t('goals.title')}</h2>
-          <table className="data">
-            <thead><tr><th>{t('goals.name')}</th><th>{t('goals.current')}</th><th>{t('goals.target')}</th></tr></thead>
-            <tbody>
-              {goals.items.map((g) => (
-                <tr key={g.id}><td>{g.name}</td><td className="num">{formatMoney(g.current_amount)}</td><td className="num">{formatMoney(g.target_amount)}</td></tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="data">
+              <thead><tr><th>{t('goals.name')}</th><th>{t('goals.current')}</th><th>{t('goals.target')}</th></tr></thead>
+              <tbody>
+                {goals.items.map((g) => (
+                  <tr key={g.id}><td>{g.name}</td><td className="num">{formatMoney(g.current_amount)}</td><td className="num">{formatMoney(g.target_amount)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
       {debts.items.length > 0 && (
         <>
           <h2>{t('debt.title')}</h2>
-          <table className="data">
-            <thead><tr><th>{t('debt.name')}</th><th>{t('debt.balance')}</th><th>{t('debt.minPayment')}</th></tr></thead>
-            <tbody>
-              {debts.items.map((d) => (
-                <tr key={d.id}><td>{d.name}</td><td className="num">{formatMoney(d.balance)}</td><td className="num">{formatMoney(d.min_payment)}</td></tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="data">
+              <thead><tr><th>{t('debt.name')}</th><th>{t('debt.balance')}</th><th>{t('debt.minPayment')}</th></tr></thead>
+              <tbody>
+                {debts.items.map((d) => (
+                  <tr key={d.id}><td>{d.name}</td><td className="num">{formatMoney(d.balance)}</td><td className="num">{formatMoney(d.min_payment)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
