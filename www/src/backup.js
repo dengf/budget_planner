@@ -14,9 +14,10 @@
 
 export const EXPORT_FORMAT = 'meifio.budget_planner.v1';
 
-/** The six persisted collections, in dependency order: categories exist
- *  before the transactions and plan rows that reference them. */
-export const COLLECTIONS = ['categories', 'rules', 'transactions', 'goals', 'debts'];
+/** The seven persisted collections, in dependency order: categories exist
+ *  before the transactions, recurring expenses and plan rows that
+ *  reference them. */
+export const COLLECTIONS = ['categories', 'rules', 'transactions', 'goals', 'debts', 'recurring'];
 
 function isRecordArray(value) {
   return Array.isArray(value) && value.every((r) => r && typeof r === 'object' && typeof r.id === 'string');

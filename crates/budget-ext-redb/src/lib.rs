@@ -30,7 +30,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use budget_ports::{
     BudgetPlanRecord, BudgetStore, CategorizationRuleRecord, CategoryRecord, DebtRecord,
-    GoalRecord, StoreError, TransactionRecord,
+    GoalRecord, RecurringExpenseRecord, StoreError, TransactionRecord,
 };
 
 /// Shared [`BudgetStore`] implementation over an already-open
@@ -171,6 +171,14 @@ collection!(
     delete_rule_impl,
     CategorizationRuleRecord
 );
+collection!(
+    RECURRING_EXPENSES,
+    "recurring_expenses",
+    save_recurring_expense_impl,
+    list_recurring_expenses_impl,
+    delete_recurring_expense_impl,
+    RecurringExpenseRecord
+);
 
 #[async_trait(?Send)]
 impl BudgetStore for RedbBudgetStore {
@@ -239,5 +247,18 @@ impl BudgetStore for RedbBudgetStore {
     }
     async fn delete_rule(&self, id: &str) -> Result<(), StoreError> {
         delete_rule_impl(self, id).await
+    }
+
+    async fn save_recurring_expense(
+        &self,
+        record: RecurringExpenseRecord,
+    ) -> Result<(), StoreError> {
+        save_recurring_expense_impl(self, record).await
+    }
+    async fn list_recurring_expenses(&self) -> Result<Vec<RecurringExpenseRecord>, StoreError> {
+        list_recurring_expenses_impl(self).await
+    }
+    async fn delete_recurring_expense(&self, id: &str) -> Result<(), StoreError> {
+        delete_recurring_expense_impl(self, id).await
     }
 }

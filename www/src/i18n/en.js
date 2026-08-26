@@ -131,6 +131,18 @@ export default {
   'transactions.addRule': 'Add rule',
   'transactions.applyRules': 'Apply rules to uncategorized',
   'transactions.noRules': 'No rules yet.',
+  'recurring.title': 'Recurring expenses',
+  'recurring.hint': 'Rent, subscriptions, anything on a schedule. Set one up once and see it coming before it posts.',
+  'recurring.none': 'No recurring expenses set up yet.',
+  'recurring.description': 'Description',
+  'recurring.amount': 'Amount per occurrence',
+  'recurring.cadence': 'Repeats',
+  'recurring.anchorDate': 'One real due date',
+  'recurring.anchorHint': "Pick any one real occurrence — this month's rent day, this month's bill date. Weekly and fortnightly expenses count actual calendar dates from it, so a 5-Friday month is counted as 5, not rounded down to 4.",
+  'recurring.add': 'Add recurring expense',
+  'recurring.upcomingTitle': 'Upcoming this month',
+  'recurring.upcomingHint': "What's scheduled to come due, so you can plan for it before it happens rather than after.",
+  'recurring.addToPlanned': 'Add to planned',
   'transactions.showAllMonths': 'Show all months',
   'transactions.noneThisMonth': 'No transactions this month.',
 
@@ -195,7 +207,8 @@ export default {
   'err.emptyCsv': 'That file has nothing to import.',
   'err.columnOutOfRange': 'That column mapping points past the end of a row.',
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
-  'err.categoryInUse': '"{name}" is used by {count} transactions — recategorize them before removing it.',
+  'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",
+  'err.categoryInUse': '"{name}" is used by {count} transactions or recurring expenses — recategorize them before removing it.',
 
   'errors.dismiss': 'Dismiss',
 
@@ -205,6 +218,7 @@ export default {
   'confirm.removeTransaction': 'Remove "{description}"?',
   'confirm.removeRule': 'Remove the rule for "{keyword}"?',
   'confirm.removeGoal': 'Remove "{name}"? Its saved progress goes with it.',
+  'confirm.removeRecurring': 'Stop tracking "{description}"? It will no longer show as upcoming.',
   'confirm.removeDebt': 'Remove "{name}" from the payoff plan?',
 
   'data.title': 'Your data',

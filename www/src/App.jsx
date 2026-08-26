@@ -106,6 +106,12 @@ export function AppShell({ wasmModule }) {
   const rules = useCollection(wasmModule, 'list_rules', 'save_rule', 'delete_rule');
   const goals = useCollection(wasmModule, 'list_goals', 'save_goal', 'delete_goal');
   const debts = useCollection(wasmModule, 'list_debts', 'save_debt', 'delete_debt');
+  const recurring = useCollection(
+    wasmModule,
+    'list_recurring_expenses',
+    'save_recurring_expense',
+    'delete_recurring_expense',
+  );
   const budgetPlan = useCollection(
     wasmModule,
     'list_budget_plan',
@@ -129,14 +135,21 @@ export function AppShell({ wasmModule }) {
    * transaction, a plan row is this app's own bookkeeping -- "this
    * month's planned amount for category X" -- fully regenerated the next
    * time someone types an amount, not user content that would be lost.
+   *
+   * A recurring expense pointed at the category is blocked on for the
+   * same reason as a transaction: it is a standing bill someone set up on
+   * purpose, and losing which category it belonged to is the same
+   * dangling-reference bug, just for spending that hasn't happened yet.
    */
   const removeCategory = useCallback(
     async (id) => {
-      const inUse = transactions.items.filter((t) => t.category_id === id);
-      if (inUse.length > 0) {
+      const inUseTransactions = transactions.items.filter((t) => t.category_id === id);
+      const inUseRecurring = recurring.items.filter((r) => r.category_id === id);
+      const inUseCount = inUseTransactions.length + inUseRecurring.length;
+      if (inUseCount > 0) {
         const category = categories.items.find((c) => c.id === id);
         setGuardResult({
-          error: t('err.categoryInUse', { name: category?.name ?? id, count: inUse.length }),
+          error: t('err.categoryInUse', { name: category?.name ?? id, count: inUseCount }),
         });
         return;
       }
@@ -147,7 +160,7 @@ export function AppShell({ wasmModule }) {
       if (planRow) await budgetPlan.remove(planRow.id);
       await categories.remove(id);
     },
-    [transactions.items, categories, budgetPlan, confirm, t],
+    [transactions.items, recurring.items, categories, budgetPlan, confirm, t],
   );
 
   /**
@@ -226,6 +239,7 @@ export function AppShell({ wasmModule }) {
         transactions,
         goals,
         debts,
+        recurring,
       };
       // Clear first, in reverse dependency order, so nothing is briefly
       // pointing at a category that has already gone.
@@ -264,7 +278,7 @@ export function AppShell({ wasmModule }) {
       rememberSeeded();
       return { imported: backup.count, month: backup.budgetPlan.month };
     },
-    [categories, rules, transactions, goals, debts, budgetPlan, month, confirm, t],
+    [categories, rules, transactions, goals, debts, recurring, budgetPlan, month, confirm, t],
   );
 
   const clearAllData = useCallback(async () => {
@@ -273,13 +287,13 @@ export function AppShell({ wasmModule }) {
     // Emptying everything is a decision, not a fresh install -- make sure
     // the first-run seeding can't undo it on the next load.
     rememberSeeded();
-    for (const collection of [transactions, budgetPlan, rules, goals, debts, categories]) {
+    for (const collection of [transactions, budgetPlan, rules, goals, debts, recurring, categories]) {
       for (const item of [...collection.items]) {
         // eslint-disable-next-line no-await-in-loop
         await collection.remove(item.id);
       }
     }
-  }, [transactions, budgetPlan, rules, goals, debts, categories, confirm, t]);
+  }, [transactions, budgetPlan, rules, goals, debts, recurring, categories, confirm, t]);
 
   const ActivePanel = TABS[activeTab];
 
@@ -310,6 +324,7 @@ export function AppShell({ wasmModule }) {
             rules={rules}
             goals={goals}
             debts={debts}
+            recurring={recurring}
             budgetPlan={budgetPlan}
             clearAllData={clearAllData}
             importData={importData}

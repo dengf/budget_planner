@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::error::StoreError;
 use crate::records::{
     BudgetPlanRecord, CategorizationRuleRecord, CategoryRecord, DebtRecord, GoalRecord,
-    TransactionRecord,
+    RecurringExpenseRecord, TransactionRecord,
 };
 
 /// Local persistence for everything the budget planner keeps: categories,
@@ -48,4 +48,11 @@ pub trait BudgetStore {
     async fn save_rule(&self, record: CategorizationRuleRecord) -> Result<(), StoreError>;
     async fn list_rules(&self) -> Result<Vec<CategorizationRuleRecord>, StoreError>;
     async fn delete_rule(&self, id: &str) -> Result<(), StoreError>;
+
+    async fn save_recurring_expense(
+        &self,
+        record: RecurringExpenseRecord,
+    ) -> Result<(), StoreError>;
+    async fn list_recurring_expenses(&self) -> Result<Vec<RecurringExpenseRecord>, StoreError>;
+    async fn delete_recurring_expense(&self, id: &str) -> Result<(), StoreError>;
 }

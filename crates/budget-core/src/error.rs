@@ -48,4 +48,7 @@ pub enum BudgetError {
 
     #[error("column mapping refers to a column that doesn't exist: {0}")]
     ColumnOutOfRange(String),
+
+    #[error("a recurring expense's amount must be positive, got {0}")]
+    InvalidRecurringAmount(String),
 }

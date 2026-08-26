@@ -270,6 +270,28 @@ table.data tr:last-child td { border-bottom: none; }
 
 .commitments-table { margin-bottom: 8px; }
 
+/* Upcoming this month: what's scheduled to come due, so it's visible
+   before it posts rather than only after -- see recurring.rs's doc
+   comment for the specific complaint this answers. */
+.upcoming-panel { background: var(--panel-alt); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
+.upcoming-title { margin: 0 0 2px; font-size: 0.98rem; }
+.upcoming-totals { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.upcoming-total-row { display: flex; align-items: center; gap: 12px; }
+.upcoming-total-name { flex: 1; font-weight: 600; }
+.upcoming-total-amount { font-variant-numeric: tabular-nums; color: var(--muted); }
+.upcoming-add { padding: 6px 12px; font-size: 0.82rem; }
+.upcoming-list { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 6px; }
+.upcoming-list li { display: flex; gap: 12px; font-size: 0.85rem; color: var(--muted); }
+.upcoming-list li.past { opacity: 0.55; }
+.upcoming-date { font-variant-numeric: tabular-nums; flex: none; width: 88px; }
+.upcoming-desc { flex: 1; }
+.upcoming-amount { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .upcoming-total-row { flex-wrap: wrap; }
+  .upcoming-list li { flex-wrap: wrap; }
+}
+
 /* Spending chart: horizontal bars, longest first, with a marker at each
    category's planned amount so a bar reads as over/under at a glance
    rather than needing the figure beside it. */

@@ -273,6 +273,39 @@ pub struct BudgetPlanEntryDto {
     pub planned: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecurringExpenseDto {
+    pub id: String,
+    pub description: String,
+    pub category_id: String,
+    pub amount: f64,
+    pub cadence: String,
+    pub anchor_date: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OccurrencesParams {
+    pub recurring: Vec<RecurringExpenseDto>,
+    pub month: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OccurrenceDto {
+    pub recurring_id: String,
+    pub category_id: String,
+    pub description: String,
+    pub amount: f64,
+    pub date: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct OccurrencesResult {
+    pub occurrences: Vec<OccurrenceDto>,
+    pub totals_by_category: Vec<AmountResultDto>,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SaveResult {
     pub id: Option<String>,

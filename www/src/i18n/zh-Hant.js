@@ -125,6 +125,18 @@ export default {
   'transactions.addRule': '新增規則',
   'transactions.applyRules': '將規則套用到未分類帳目',
   'transactions.noRules': '還沒有規則。',
+  'recurring.title': '定期支出',
+  'recurring.hint': '房租、訂閱、任何按週期發生的支出。設定一次，就能在它發生之前提前看到。',
+  'recurring.none': '還沒有設定定期支出。',
+  'recurring.description': '說明',
+  'recurring.amount': '每次金額',
+  'recurring.cadence': '週期',
+  'recurring.anchorDate': '一個真實的到期日',
+  'recurring.anchorHint': '選擇任意一次真實發生的日期——本月的房租日、本月的帳單日。每週或每兩週一次的支出會按真實日曆計算，五個星期五的月份會算作 5 次，而不是四捨五入為 4 次。',
+  'recurring.add': '新增定期支出',
+  'recurring.upcomingTitle': '本月即將到期',
+  'recurring.upcomingHint': '即將到期的支出——提前規劃，而不是事後才發現。',
+  'recurring.addToPlanned': '計入計劃金額',
   'transactions.showAllMonths': '顯示所有月份',
   'transactions.noneThisMonth': '本月沒有帳目記錄。',
 
@@ -188,7 +200,8 @@ export default {
   'err.emptyCsv': '該檔案沒有可匯入的內容。',
   'err.columnOutOfRange': '欄位對應指向了超出該列範圍的欄。',
   'err.badImportFile': '該檔案不是預算規劃匯出的備份——未做任何變更。',
-  'err.categoryInUse': '「{name}」被 {count} 筆帳目使用——請先為它們重新分類，再刪除該分類。',
+  'err.invalidRecurringAmount': '該金額無效（收到 {value}）。',
+  'err.categoryInUse': '「{name}」被 {count} 筆帳目或定期支出使用——請先為它們重新分類，再刪除該分類。',
 
   'errors.dismiss': '關閉',
 
@@ -198,6 +211,7 @@ export default {
   'confirm.removeTransaction': '刪除「{description}」？',
   'confirm.removeRule': '刪除關於「{keyword}」的規則？',
   'confirm.removeGoal': '刪除「{name}」？已儲蓄的進度也會一併刪除。',
+  'confirm.removeRecurring': '停止追蹤「{description}」？它將不再顯示在即將到期清單中。',
   'confirm.removeDebt': '將「{name}」從還債計劃中刪除？',
 
   'data.title': '您的資料',

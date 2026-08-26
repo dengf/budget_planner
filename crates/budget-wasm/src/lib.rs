@@ -10,6 +10,7 @@
 //! - [`goals`] -- `goal_progress`, `milestone_crossed`, `required_contribution`
 //! - [`debt`] -- `build_payoff_plan`
 //! - [`presets`] -- `preset_categories`
+//! - [`recurring`] -- `recurring_occurrences`
 //! - [`storage`] (wasm32 only) -- `init_storage` plus save/list/delete for
 //!   each of the six persisted collections, backed by
 //!   `budget-ext-redb`'s wasm/IndexedDB-persisted store. Gated to wasm32
@@ -30,6 +31,7 @@ pub mod dto;
 pub mod goals;
 pub mod message;
 pub mod presets;
+pub mod recurring;
 pub mod rules;
 #[cfg(target_arch = "wasm32")]
 pub mod storage;
@@ -41,13 +43,14 @@ pub use debt::build_payoff_plan;
 pub use goals::{goal_progress, milestone_crossed, required_contribution};
 pub use message::Message;
 pub use presets::preset_categories;
+pub use recurring::recurring_occurrences;
 pub use rules::apply_rules;
 #[cfg(target_arch = "wasm32")]
 pub use storage::{
-    delete_budget_plan_entry, delete_category, delete_debt, delete_goal, delete_rule,
-    delete_transaction, init_storage, list_budget_plan, list_categories, list_debts, list_goals,
-    list_rules, list_transactions, save_budget_plan_entry, save_category, save_debt, save_goal,
-    save_rule, save_transaction,
+    delete_budget_plan_entry, delete_category, delete_debt, delete_goal, delete_recurring_expense,
+    delete_rule, delete_transaction, init_storage, list_budget_plan, list_categories, list_debts,
+    list_goals, list_recurring_expenses, list_rules, list_transactions, save_budget_plan_entry,
+    save_category, save_debt, save_goal, save_recurring_expense, save_rule, save_transaction,
 };
 pub use transaction::spend_by_category;
 

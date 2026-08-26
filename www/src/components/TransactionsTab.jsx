@@ -7,7 +7,18 @@ import NumberField from './NumberField';
 
 const DEFAULT_MAPPING = { date_col: 0, description_col: 1, amount_col: 2, credit_col: null, has_header: true };
 
-export default function TransactionsTab({ wasmModule, region, newId, confirm, categories, transactions, rules }) {
+const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
+
+export default function TransactionsTab({
+  wasmModule,
+  region,
+  newId,
+  confirm,
+  categories,
+  transactions,
+  rules,
+  recurring,
+}) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const thisMonth = useMemo(() => currentMonth(), []);
@@ -18,6 +29,13 @@ export default function TransactionsTab({ wasmModule, region, newId, confirm, ca
   const [mapping, setMapping] = useState(DEFAULT_MAPPING);
   const [importResult, setImportResult] = useState(null);
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
+  const [recurringDraft, setRecurringDraft] = useState({
+    description: '',
+    category_id: '',
+    amount: '',
+    cadence: 'monthly',
+    anchor_date: '',
+  });
 
   const addTransaction = async (e) => {
     e.preventDefault();
@@ -80,6 +98,26 @@ export default function TransactionsTab({ wasmModule, region, newId, confirm, ca
   const removeRule = async (rule) => {
     const ok = await confirm(t('confirm.removeRule', { keyword: rule.keyword }));
     if (ok) await rules.remove(rule.id);
+  };
+
+  const addRecurring = async (e) => {
+    e.preventDefault();
+    if (!recurringDraft.description.trim() || !recurringDraft.category_id) return;
+    if (!recurringDraft.amount || !recurringDraft.anchor_date) return;
+    await recurring.save({
+      id: newId(),
+      description: recurringDraft.description,
+      category_id: recurringDraft.category_id,
+      amount: Number(recurringDraft.amount),
+      cadence: recurringDraft.cadence,
+      anchor_date: recurringDraft.anchor_date,
+    });
+    setRecurringDraft({ description: '', category_id: '', amount: '', cadence: 'monthly', anchor_date: '' });
+  };
+
+  const removeRecurring = async (item) => {
+    const ok = await confirm(t('confirm.removeRecurring', { description: item.description }));
+    if (ok) await recurring.remove(item.id);
   };
 
   // Defaults to the current month so the list stays short and fast to scan
@@ -239,6 +277,87 @@ export default function TransactionsTab({ wasmModule, region, newId, confirm, ca
         <button className="btn" type="submit">{t('transactions.addRule')}</button>
         <button className="btn secondary" type="button" onClick={applyRules}>{t('transactions.applyRules')}</button>
       </form>
+
+      <h2>{t('recurring.title')}</h2>
+      <p className="panel-subtitle">{t('recurring.hint')}</p>
+      {recurring.items.length === 0 ? (
+        <p className="empty-state">{t('recurring.none')}</p>
+      ) : (
+        <table className="data">
+          <thead>
+            <tr>
+              <th>{t('recurring.description')}</th>
+              <th>{t('transactions.category')}</th>
+              <th>{t('budget.planned')}</th>
+              <th>{t('recurring.cadence')}</th>
+              <th>{t('recurring.anchorDate')}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {recurring.items.map((r) => (
+              <tr key={r.id}>
+                <td>{r.description}</td>
+                <td>{categoryName(r.category_id)}</td>
+                <td className="num">{formatMoney(r.amount)}</td>
+                <td>{t(`freq.${r.cadence}`)}</td>
+                <td>{r.anchor_date}</td>
+                <td><button className="btn ghost" onClick={() => removeRecurring(r)}>{t('budget.remove')}</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <form className="form-grid" onSubmit={addRecurring}>
+        <label className="field">
+          <span className="field-label">{t('recurring.description')}</span>
+          <div className="field-input">
+            <input
+              value={recurringDraft.description}
+              onChange={(e) => setRecurringDraft({ ...recurringDraft, description: e.target.value })}
+            />
+          </div>
+        </label>
+        <label className="field">
+          <span className="field-label">{t('transactions.category')}</span>
+          <select
+            className="field-select"
+            value={recurringDraft.category_id}
+            onChange={(e) => setRecurringDraft({ ...recurringDraft, category_id: e.target.value })}
+          >
+            <option value="">—</option>
+            {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <NumberField
+          label={t('recurring.amount')}
+          value={recurringDraft.amount}
+          onChange={(v) => setRecurringDraft({ ...recurringDraft, amount: v })}
+          grouped
+        />
+        <label className="field">
+          <span className="field-label">{t('recurring.cadence')}</span>
+          <select
+            className="field-select"
+            value={recurringDraft.cadence}
+            onChange={(e) => setRecurringDraft({ ...recurringDraft, cadence: e.target.value })}
+          >
+            {CADENCES.map((c) => <option key={c} value={c}>{t(`freq.${c}`)}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span className="field-label">{t('recurring.anchorDate')}</span>
+          <div className="field-input">
+            <input
+              type="date"
+              value={recurringDraft.anchor_date}
+              onChange={(e) => setRecurringDraft({ ...recurringDraft, anchor_date: e.target.value })}
+            />
+          </div>
+        </label>
+        <button className="btn" type="submit">{t('recurring.add')}</button>
+      </form>
+      <p className="field-label">{t('recurring.anchorHint')}</p>
     </div>
   );
 }

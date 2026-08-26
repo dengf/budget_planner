@@ -51,6 +51,16 @@ pub struct DebtRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecurringExpenseRecord {
+    pub id: String,
+    pub description: String,
+    pub category_id: String,
+    pub amount: String,
+    pub cadence: String,
+    pub anchor_date: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CategorizationRuleRecord {
     pub id: String,
     pub keyword: String,

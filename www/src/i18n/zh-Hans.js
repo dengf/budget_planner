@@ -125,6 +125,18 @@ export default {
   'transactions.addRule': '添加规则',
   'transactions.applyRules': '将规则应用到未分类账目',
   'transactions.noRules': '还没有规则。',
+  'recurring.title': '定期支出',
+  'recurring.hint': '房租、订阅、任何按周期发生的支出。设置一次，就能在它发生之前提前看到。',
+  'recurring.none': '还没有设置定期支出。',
+  'recurring.description': '说明',
+  'recurring.amount': '每次金额',
+  'recurring.cadence': '周期',
+  'recurring.anchorDate': '一个真实的到期日',
+  'recurring.anchorHint': '选择任意一次真实发生的日期——本月的房租日、本月的账单日。每周或每两周一次的支出会按真实日历计算，五个星期五的月份会算作 5 次，而不是四舍五入为 4 次。',
+  'recurring.add': '添加定期支出',
+  'recurring.upcomingTitle': '本月即将到期',
+  'recurring.upcomingHint': '即将到期的支出——提前规划，而不是事后才发现。',
+  'recurring.addToPlanned': '计入计划金额',
   'transactions.showAllMonths': '显示所有月份',
   'transactions.noneThisMonth': '本月没有账目记录。',
 
@@ -188,7 +200,8 @@ export default {
   'err.emptyCsv': '该文件没有可导入的内容。',
   'err.columnOutOfRange': '列映射指向了超出该行范围的列。',
   'err.badImportFile': '该文件不是预算规划导出的备份——未做任何更改。',
-  'err.categoryInUse': '“{name}”被 {count} 笔账目使用——请先给它们重新分类，再删除该分类。',
+  'err.invalidRecurringAmount': '该金额无效（收到 {value}）。',
+  'err.categoryInUse': '“{name}”被 {count} 笔账目或定期支出使用——请先给它们重新分类，再删除该分类。',
 
   'errors.dismiss': '关闭',
 
@@ -198,6 +211,7 @@ export default {
   'confirm.removeTransaction': '删除“{description}”？',
   'confirm.removeRule': '删除关于“{keyword}”的规则？',
   'confirm.removeGoal': '删除“{name}”？已储蓄的进度也会一并删除。',
+  'confirm.removeRecurring': '停止追踪“{description}”？它将不再显示在即将到期列表中。',
   'confirm.removeDebt': '将“{name}”从还债计划中删除？',
 
   'data.title': '您的数据',

@@ -34,6 +34,7 @@ export default function BudgetTab({
   budgetPlan,
   goals,
   debts,
+  recurring,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
@@ -45,6 +46,7 @@ export default function BudgetTab({
   const [spendFor, setSpendFor] = useState(null);
   const [spendDraft, setSpendDraft] = useState({ amount: '', description: '' });
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
+  const [upcoming, setUpcoming] = useState(null);
 
   useEffect(() => {
     saveIncome(month, income);
@@ -207,6 +209,41 @@ export default function BudgetTab({
     await budgetPlan.save({ id, month, category_id: categoryId, planned: Number(amount) || 0 });
   };
 
+  /**
+   * Every date this month a recurring expense is due -- rent, a
+   * subscription, anything on a schedule -- computed in Rust so a weekly
+   * bill genuinely counts 4 or 5 occurrences depending on the real
+   * calendar rather than a flat estimate (see budget-calc::recurring's
+   * doc comment for the actual user complaint this answers: wanting to
+   * see scheduled expenses *before* they post, not after).
+   */
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!wasmModule?.recurring_occurrences || !(recurring?.items?.length > 0)) {
+        setUpcoming(null);
+        return;
+      }
+      const result = await wasmModule.recurring_occurrences({
+        recurring: recurring.items,
+        month,
+      });
+      if (!cancelled) setUpcoming(result);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [wasmModule, recurring?.items, month]);
+
+  /** Adds a recurring category's expected total on top of whatever is
+   *  already planned for it -- the one-click "help solve it" action, not
+   *  just a number to notice and go type in by hand. */
+  const addUpcomingToPlanned = async (categoryId, amount) => {
+    const currentPlanned = budgetPlan.items.find((p) => p.category_id === categoryId)?.planned ?? 0;
+    await savePlanned(categoryId, currentPlanned + amount);
+  };
+
   const days = daysLeftInMonth();
   const summary = result?.summary;
   const unassigned = summary?.unassigned ?? 0;
@@ -289,6 +326,37 @@ export default function BudgetTab({
             </div>
           </div>
         </>
+      )}
+
+      {upcoming && upcoming.occurrences.length > 0 && (
+        <div className="upcoming-panel">
+          <h3 className="upcoming-title">{t('recurring.upcomingTitle')}</h3>
+          <p className="panel-subtitle">{t('recurring.upcomingHint')}</p>
+          <div className="upcoming-totals">
+            {upcoming.totals_by_category.map((total) => (
+              <div className="upcoming-total-row" key={total.category_id}>
+                <span className="upcoming-total-name">{categoryName(total.category_id)}</span>
+                <span className="upcoming-total-amount">{formatMoney(total.amount)}</span>
+                <button
+                  type="button"
+                  className="btn secondary upcoming-add"
+                  onClick={() => addUpcomingToPlanned(total.category_id, total.amount)}
+                >
+                  {t('recurring.addToPlanned')}
+                </button>
+              </div>
+            ))}
+          </div>
+          <ul className="upcoming-list">
+            {upcoming.occurrences.map((o, i) => (
+              <li key={`${o.recurring_id}-${o.date}-${i}`} className={o.date < todayIso() ? 'past' : ''}>
+                <span className="upcoming-date">{o.date}</span>
+                <span className="upcoming-desc">{o.description}</span>
+                <span className="upcoming-amount">{formatMoney(o.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {categories.items.length === 0 ? (

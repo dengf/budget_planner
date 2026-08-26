@@ -11,17 +11,17 @@ use std::rc::Rc;
 
 use budget_ports::{
     BudgetPlanRecord, BudgetStore, CategorizationRuleRecord, CategoryRecord, DebtRecord,
-    GoalRecord, TransactionRecord,
+    GoalRecord, RecurringExpenseRecord, TransactionRecord,
 };
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{
-    decimal_to_f64, decimal_to_string, f64_to_decimal, percent_to_rate, rate_to_percent,
-    string_to_decimal, to_js,
+    cadence_name, decimal_to_f64, decimal_to_string, f64_to_decimal, parse_cadence,
+    percent_to_rate, rate_to_percent, string_to_decimal, to_js,
 };
 use crate::dto::{
-    BudgetPlanEntryDto, CategoryDto, DebtRecordDto, DeleteResult, GoalDto, RuleDto, SaveResult,
-    TransactionDto,
+    BudgetPlanEntryDto, CategoryDto, DebtRecordDto, DeleteResult, GoalDto, RecurringExpenseDto,
+    RuleDto, SaveResult, TransactionDto,
 };
 
 thread_local! {
@@ -579,6 +579,100 @@ pub async fn delete_rule(id: String) -> JsValue {
         }
     };
     match store.delete_rule(&id).await {
+        Ok(()) => to_js(&DeleteResult {
+            success: true,
+            error: None,
+        }),
+        Err(e) => to_js(&DeleteResult {
+            success: false,
+            error: Some(e.to_string()),
+        }),
+    }
+}
+
+// ---- recurring expenses -------------------------------------------------
+
+#[wasm_bindgen]
+pub async fn save_recurring_expense(dto: JsValue) -> JsValue {
+    let Ok(dto) = serde_wasm_bindgen::from_value::<RecurringExpenseDto>(dto) else {
+        return to_js(&SaveResult {
+            error: Some(crate::message::Message::bad_request().text),
+            ..Default::default()
+        });
+    };
+    let Some(amount) = f64_to_decimal(dto.amount) else {
+        return to_js(&SaveResult {
+            error: Some(crate::message::Message::bad_request().text),
+            ..Default::default()
+        });
+    };
+    let record = RecurringExpenseRecord {
+        id: dto.id.clone(),
+        description: dto.description,
+        category_id: dto.category_id,
+        amount: decimal_to_string(amount),
+        cadence: cadence_name(parse_cadence(Some(&dto.cadence))).to_string(),
+        anchor_date: dto.anchor_date,
+    };
+    let store = match get_store() {
+        Ok(s) => s,
+        Err(e) => {
+            return to_js(&SaveResult {
+                error: Some(e),
+                ..Default::default()
+            })
+        }
+    };
+    match store.save_recurring_expense(record).await {
+        Ok(()) => to_js(&SaveResult {
+            id: Some(dto.id),
+            error: None,
+        }),
+        Err(e) => to_js(&SaveResult {
+            error: Some(e.to_string()),
+            ..Default::default()
+        }),
+    }
+}
+
+#[wasm_bindgen]
+pub async fn list_recurring_expenses() -> JsValue {
+    let store = match get_store() {
+        Ok(s) => s,
+        Err(_) => return to_js(&Vec::<RecurringExpenseDto>::new()),
+    };
+    match store.list_recurring_expenses().await {
+        Ok(records) => to_js(
+            &records
+                .into_iter()
+                .filter_map(|r| {
+                    Some(RecurringExpenseDto {
+                        id: r.id,
+                        description: r.description,
+                        category_id: r.category_id,
+                        amount: decimal_to_f64(string_to_decimal(&r.amount)?),
+                        cadence: r.cadence,
+                        anchor_date: r.anchor_date,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        ),
+        Err(_) => to_js(&Vec::<RecurringExpenseDto>::new()),
+    }
+}
+
+#[wasm_bindgen]
+pub async fn delete_recurring_expense(id: String) -> JsValue {
+    let store = match get_store() {
+        Ok(s) => s,
+        Err(e) => {
+            return to_js(&DeleteResult {
+                error: Some(e),
+                success: false,
+            })
+        }
+    };
+    match store.delete_recurring_expense(&id).await {
         Ok(()) => to_js(&DeleteResult {
             success: true,
             error: None,

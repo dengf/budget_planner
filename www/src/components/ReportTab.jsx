@@ -16,6 +16,7 @@ export default function ReportTab({
   budgetPlan,
   goals,
   debts,
+  recurring,
   clearAllData,
   importData,
 }) {
@@ -83,6 +84,7 @@ export default function ReportTab({
       rules: rules.items,
       goals: goals.items,
       debts: debts.items,
+      recurring: recurring.items,
       // Only the currently loaded month -- budget-plan rows are fetched
       // per month, and this app has no "every month" listing to export.
       budget_plan: { month, entries: budgetPlan.items },

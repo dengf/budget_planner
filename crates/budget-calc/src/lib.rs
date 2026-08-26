@@ -9,6 +9,7 @@ pub mod csv_import;
 pub mod debt;
 pub mod goals;
 pub mod presets;
+pub mod recurring;
 pub mod rules;
 pub mod transaction;
 
@@ -19,5 +20,8 @@ pub use goals::{
     milestone_crossed, petals_filled, progress_ratio, required_contribution, Goal, Milestone,
 };
 pub use presets::{for_region, PresetCategory};
+pub use recurring::{
+    occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
+};
 pub use rules::{apply_rules, CategorizationRule};
 pub use transaction::{spend_by_category, Transaction};

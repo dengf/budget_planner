@@ -80,6 +80,9 @@ impl From<&BudgetError> for Message {
             BudgetError::InvalidMinPayment(v) => {
                 Message::with_value("err.invalidMinPayment", v.clone(), text)
             }
+            BudgetError::InvalidRecurringAmount(v) => {
+                Message::with_value("err.invalidRecurringAmount", v.clone(), text)
+            }
             BudgetError::PayoffBudgetTooSmall {
                 minimums,
                 available,
@@ -142,6 +145,7 @@ mod tests {
             BudgetError::InvalidDebtBalance("1".into()),
             BudgetError::InvalidDebtRate("1".into()),
             BudgetError::InvalidMinPayment("1".into()),
+            BudgetError::InvalidRecurringAmount("1".into()),
             BudgetError::PayoffBudgetTooSmall {
                 minimums: "1".into(),
                 available: "1".into(),
@@ -175,6 +179,7 @@ mod no_debug_formatted_errors {
         ("goals.rs", include_str!("goals.rs")),
         ("debt.rs", include_str!("debt.rs")),
         ("presets.rs", include_str!("presets.rs")),
+        ("recurring.rs", include_str!("recurring.rs")),
         // include_str! reads the file regardless of the target the crate is
         // compiled for -- only the `pub mod storage;` declaration in lib.rs
         // is cfg-gated to wasm32, so this line is safe to keep unconditional.
