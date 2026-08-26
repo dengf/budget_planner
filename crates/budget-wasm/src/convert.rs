@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use wasm_bindgen::prelude::*;
 
 use budget_calc::Strategy;
-use budget_core::Cadence;
+use budget_core::{Cadence, Region};
 
 /// Serializes a result for JavaScript, JSON-compatible so a Rust map
 /// becomes a plain JS object rather than a `Map` -- see mortgage-wasm's
@@ -85,6 +85,24 @@ pub fn parse_cadence(cadence: Option<&str>) -> Cadence {
     }
 }
 
+pub fn region_name(region: Region) -> &'static str {
+    match region {
+        Region::Us => "US",
+        Region::Sg => "SG",
+    }
+}
+
+/// Falls back to US on anything unrecognized, matching `region.js`'s own
+/// `DEFAULT_REGION` -- the region string is produced by our frontend, not
+/// typed by a user, so an unknown value is a bug to survive rather than
+/// an input to validate.
+pub fn parse_region(region: Option<&str>) -> Region {
+    match region.map(str::to_uppercase).as_deref() {
+        Some("SG") => Region::Sg,
+        _ => Region::Us,
+    }
+}
+
 pub fn strategy_name(strategy: Strategy) -> &'static str {
     match strategy {
         Strategy::Snowball => "snowball",
@@ -122,6 +140,22 @@ mod tests {
         for strategy in [Strategy::Snowball, Strategy::Avalanche] {
             assert_eq!(parse_strategy(Some(strategy_name(strategy))), strategy);
         }
+    }
+
+    #[test]
+    fn every_region_survives_a_round_trip() {
+        for region in [Region::Us, Region::Sg] {
+            assert_eq!(parse_region(Some(region_name(region))), region);
+        }
+    }
+
+    #[test]
+    fn an_unknown_region_falls_back_rather_than_failing() {
+        assert_eq!(parse_region(None), Region::Us);
+        assert_eq!(parse_region(Some("XX")), Region::Us);
+        // Case-insensitive: the frontend sends "SG", but a hand-built URL
+        // or a stored lowercase value shouldn't silently become US.
+        assert_eq!(parse_region(Some("sg")), Region::Sg);
     }
 
     #[test]

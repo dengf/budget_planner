@@ -19,6 +19,17 @@ pub struct CategoryDto {
     pub group: String,
 }
 
+/// A suggested starter category. Carries the i18n key *and* the English
+/// fallback for the same reason `Message` does: the UI composes the name
+/// it actually stores, in the reader's language.
+#[derive(Debug, Clone, Serialize)]
+pub struct PresetCategoryDto {
+    pub key: String,
+    pub name: String,
+    pub group_key: String,
+    pub group: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct AmountEntryDto {
     pub category_id: String,

@@ -65,6 +65,33 @@ export default function BudgetTab({ wasmModule, region, month, categories, remov
     setNewCategory({ name: '', group: '' });
   };
 
+  /**
+   * Inserts the region's starter set, translated.
+   *
+   * `budget-calc::presets` owns *which* categories a region gets and
+   * hands back i18n keys; this composes the name actually stored, in the
+   * reader's language, so a Chinese budget doesn't open with English
+   * category names. Skipping a preset whose name is already present is a
+   * referential check against in-memory state -- host-layer, same
+   * category as `region.js` -- not a rule the core should own.
+   */
+  const addCommonCategories = async () => {
+    if (!wasmModule?.preset_categories) return;
+    const presets = (await wasmModule.preset_categories(region)) ?? [];
+    const taken = new Set(categories.items.map((c) => c.name.trim().toLowerCase()));
+    for (const preset of presets) {
+      const name = t(preset.key);
+      if (taken.has(name.trim().toLowerCase())) continue;
+      taken.add(name.trim().toLowerCase());
+      const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
+      // Sequential rather than Promise.all: each save is one IndexedDB
+      // write through the same store handle, and the list they land in
+      // reads better in the order the presets are declared.
+      // eslint-disable-next-line no-await-in-loop
+      await categories.save({ id, name, group: t(preset.group_key) });
+    }
+  };
+
   const savePlanned = async (categoryId, amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === categoryId);
     const id = existing?.id ?? (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`);
@@ -173,7 +200,11 @@ export default function BudgetTab({ wasmModule, region, month, categories, remov
           </div>
         </label>
         <button className="btn" type="submit">{t('budget.addCategory')}</button>
+        <button className="btn secondary" type="button" onClick={addCommonCategories}>
+          {t('budget.addCommon')}
+        </button>
       </form>
+      <p className="field-label">{t('budget.commonHint')}</p>
     </div>
   );
 }

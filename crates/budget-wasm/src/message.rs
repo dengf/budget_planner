@@ -174,6 +174,7 @@ mod no_debug_formatted_errors {
         ("csv_import.rs", include_str!("csv_import.rs")),
         ("goals.rs", include_str!("goals.rs")),
         ("debt.rs", include_str!("debt.rs")),
+        ("presets.rs", include_str!("presets.rs")),
         // include_str! reads the file regardless of the target the crate is
         // compiled for -- only the `pub mod storage;` declaration in lib.rs
         // is cfg-gated to wasm32, so this line is safe to keep unconditional.

@@ -9,6 +9,7 @@
 //! - [`csv_import`] -- `import_csv`
 //! - [`goals`] -- `goal_progress`, `milestone_crossed`, `required_contribution`
 //! - [`debt`] -- `build_payoff_plan`
+//! - [`presets`] -- `preset_categories`
 //! - [`storage`] (wasm32 only) -- `init_storage` plus save/list/delete for
 //!   each of the six persisted collections, backed by
 //!   `budget-ext-redb`'s wasm/IndexedDB-persisted store. Gated to wasm32
@@ -28,6 +29,7 @@ pub mod debt;
 pub mod dto;
 pub mod goals;
 pub mod message;
+pub mod presets;
 pub mod rules;
 #[cfg(target_arch = "wasm32")]
 pub mod storage;
@@ -38,6 +40,7 @@ pub use csv_import::import_csv;
 pub use debt::build_payoff_plan;
 pub use goals::{goal_progress, milestone_crossed, required_contribution};
 pub use message::Message;
+pub use presets::preset_categories;
 pub use rules::apply_rules;
 #[cfg(target_arch = "wasm32")]
 pub use storage::{
