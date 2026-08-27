@@ -4,7 +4,6 @@ import Intro from './components/Intro';
 import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { detectRegion, rememberRegion } from './region';
-import { hasSeeded, rememberSeeded } from './seeded';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { saveIncome } from './income';
@@ -189,32 +188,38 @@ export function AppShell({ wasmModule }) {
       // eslint-disable-next-line no-await-in-loop
       await categories.save({ id: newId(), name, group: t(preset.group_key) });
     }
-    rememberSeeded();
   }, [wasmModule, region, categories, newId, t]);
 
   /**
-   * A brand-new budget opens with the starter categories already in it,
-   * rather than on a blank page with a button to press.
+   * A budget with zero categories opens with the starter set already in
+   * it, rather than on a blank page with a button to press -- true on a
+   * genuine first run, and true again of any later fresh load that finds
+   * the list empty, for the same reason: an empty category list is never
+   * actually the useful state to land on.
    *
-   * Gated on `hasSeeded()` rather than on the list merely being empty:
-   * someone who deletes every category, or uses "clear all data", has
-   * said something, and finding the presets back on the next load would
-   * be the app overriding them. `seedingRef` covers the same tick, before
-   * the first save has landed in `items`.
+   * `seedingRef` makes this decision exactly once *per mount*, the moment
+   * `categories` finishes its first load, whichever way it goes. That is
+   * what stops "Clear all data" or deleting the last category from being
+   * undone instantly, in the same session -- the effect re-runs on every
+   * change to `items.length`, and without the ref already tripped it
+   * would refill the list the moment it emptied. It says nothing about
+   * the *next* time the app is opened: a fresh load (a fresh ref) that
+   * finds nothing there gets the defaults back every time.
+   *
+   * An earlier version tried to remember "already seeded" permanently
+   * (localStorage, surviving a reload) so a deliberate clear stayed
+   * cleared forever. That meant a browser that reached empty by any path
+   * other than one it seeded and cleared itself -- someone who tried the
+   * app, wandered into "Clear all data" once, and came back later -- had
+   * no way back to a working budget except finding the manual "Add
+   * common categories" button on their own. Occasionally re-seeding a
+   * list someone genuinely wanted to stay empty is the cheaper mistake.
    */
   const seedingRef = useRef(false);
   useEffect(() => {
-    if (!categories.loaded || seedingRef.current || hasSeeded()) return;
+    if (!categories.loaded || seedingRef.current) return;
     seedingRef.current = true;
-    if (categories.items.length > 0) {
-      // Already has categories, so this browser is not on its first run.
-      // Recording that matters as much as seeding does: without it, a
-      // budget created before this flag existed would get the presets
-      // dumped back in the moment its owner cleared their data.
-      rememberSeeded();
-      return;
-    }
-    addCommonCategories();
+    if (categories.items.length === 0) addCommonCategories();
   }, [categories.loaded, categories.items.length, addCommonCategories]);
 
   /**
@@ -274,9 +279,6 @@ export function AppShell({ wasmModule }) {
         saveIncome(backup.income.month, backup.income.amount);
       }
 
-      // The file is the person's data now, so first-run seeding must not
-      // run again on top of it.
-      rememberSeeded();
       return { imported: backup.count, month: backup.budgetPlan.month };
     },
     [categories, rules, transactions, goals, debts, recurring, budgetPlan, month, confirm, t],
@@ -285,9 +287,6 @@ export function AppShell({ wasmModule }) {
   const clearAllData = useCallback(async () => {
     const ok = await confirm(t('data.clearConfirm'));
     if (!ok) return;
-    // Emptying everything is a decision, not a fresh install -- make sure
-    // the first-run seeding can't undo it on the next load.
-    rememberSeeded();
     for (const collection of [transactions, budgetPlan, rules, goals, debts, recurring, categories]) {
       for (const item of [...collection.items]) {
         // eslint-disable-next-line no-await-in-loop
