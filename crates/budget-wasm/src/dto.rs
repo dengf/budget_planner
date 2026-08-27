@@ -122,6 +122,18 @@ pub struct AmountResultDto {
     pub amount: f64,
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DailySpendResult {
+    pub totals: Vec<DateAmountDto>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DateAmountDto {
+    pub date: String,
+    pub amount: f64,
+}
+
 // ---- CSV import -----------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

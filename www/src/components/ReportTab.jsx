@@ -5,6 +5,9 @@ import { monthLabel } from '../month';
 import { loadIncome } from '../income';
 import { EXPORT_FORMAT } from '../backup';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
+import { daysInMonth } from '../month';
+import PieChart from './PieChart';
+import DailySpendChart from './DailySpendChart';
 
 export default function ReportTab({
   wasmModule,
@@ -23,17 +26,38 @@ export default function ReportTab({
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [lines, setLines] = useState([]);
+  const [dailyTotals, setDailyTotals] = useState([]);
   const [recipients, setRecipients] = useState('');
   const income = loadIncome(month);
   const [importResult, setImportResult] = useState(null);
 
+  const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
+
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!wasmModule?.spend_by_category || !wasmModule?.build_month) return;
+      if (
+        !wasmModule?.spend_by_category ||
+        !wasmModule?.income_by_category ||
+        !wasmModule?.daily_spend ||
+        !wasmModule?.build_month
+      )
+        return;
       const monthTx = transactions.items.filter((tx) => tx.date?.startsWith(month));
-      const spendResult = await wasmModule.spend_by_category({ transactions: monthTx });
-      const spent = (spendResult?.totals ?? []).map((r) => ({ category_id: r.category_id, amount: r.amount }));
+      // Same split as BudgetTab: an income category's "actual" is what it
+      // received, an expense category's is what it cost -- summing the
+      // wrong side would report $0 for every income category, same as
+      // the bug this fixed there.
+      const [spendResult, incomeResult, dailyResult] = await Promise.all([
+        wasmModule.spend_by_category({ transactions: monthTx }),
+        wasmModule.income_by_category({ transactions: monthTx }),
+        wasmModule.daily_spend({ transactions: monthTx }),
+      ]);
+      if (!cancelled) setDailyTotals(dailyResult?.totals ?? []);
+      const spent = [
+        ...(spendResult?.totals ?? []).filter((row) => !isIncome(row.category_id)),
+        ...(incomeResult?.totals ?? []).filter((row) => isIncome(row.category_id)),
+      ].map((r) => ({ category_id: r.category_id, amount: r.amount }));
       // Every known category, defaulting to 0 planned -- NOT budgetPlan.items
       // alone. `build_month` only returns lines for categories it is given a
       // planned entry for, so building this list from saved plan rows drops
@@ -56,6 +80,17 @@ export default function ReportTab({
   }, [wasmModule, budgetPlan.items, categories.items, transactions.items, month, income]);
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
+
+  // Two separate breakdowns, not one chart trying to show both
+  // directions of money -- `l.spent` already holds whichever of
+  // spend/income applies per category (see the fetch effect above), so
+  // this just needs to route each category to the side it belongs on.
+  const expenseSlices = lines
+    .filter((l) => !isIncome(l.category_id) && l.spent > 0)
+    .map((l) => ({ id: l.category_id, label: categoryName(l.category_id), value: l.spent }));
+  const incomeSlices = lines
+    .filter((l) => isIncome(l.category_id) && l.spent > 0)
+    .map((l) => ({ id: l.category_id, label: categoryName(l.category_id), value: l.spent }));
 
   const addresses = parseRecipients(recipients);
   const rejected = addresses.filter((a) => !looksLikeAddress(a));
@@ -133,21 +168,54 @@ export default function ReportTab({
             <tr>
               <th>{t('budget.categoryName')}</th>
               <th>{t('budget.planned')}</th>
-              <th>{t('budget.spent')}</th>
+              <th>{t('budget.actual')}</th>
               <th>{t('budget.remaining')}</th>
             </tr>
           </thead>
           <tbody>
-            {lines.map((l) => (
-              <tr key={l.category_id}>
-                <td>{categoryName(l.category_id)}</td>
-                <td className="num">{formatMoney(l.planned)}</td>
-                <td className="num">{formatMoney(l.spent)}</td>
-                <td className={`num ${l.remaining < 0 ? 'negative' : 'positive'}`}>{formatMoney(l.remaining)}</td>
-              </tr>
-            ))}
+            {lines.map((l) => {
+              // Same reframing as the Budget tab: `remaining >= 0` is
+              // always fine regardless of direction (nothing planned,
+              // nothing happened, or still on track). Only a *negative*
+              // remaining differs by direction -- overspending for an
+              // expense category (bad, red) versus income landing ahead
+              // of plan for an income one (good) -- the same raw number
+              // reads oppositely depending on which side of the ledger
+              // it's on.
+              const isGoodNews = l.remaining >= 0 || isIncome(l.category_id);
+              return (
+                <tr key={l.category_id}>
+                  <td>{categoryName(l.category_id)}</td>
+                  <td className="num">{formatMoney(l.planned)}</td>
+                  <td className="num">{formatMoney(l.spent)}</td>
+                  <td className={`num ${isGoodNews ? 'positive' : 'negative'}`}>{formatMoney(l.remaining)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+
+      <DailySpendChart
+        totals={dailyTotals}
+        month={month}
+        daysInMonth={daysInMonth(month)}
+        formatMoney={formatMoney}
+      />
+
+      <div className="report-pies">
+        <PieChart
+          title={t('chart.expenseBreakdown')}
+          items={expenseSlices}
+          formatMoney={formatMoney}
+          ariaLabel={t('chart.expenseBreakdownAria', { month: monthLabel(month, locale) })}
+        />
+        <PieChart
+          title={t('chart.incomeBreakdown')}
+          items={incomeSlices}
+          formatMoney={formatMoney}
+          ariaLabel={t('chart.incomeBreakdownAria', { month: monthLabel(month, locale) })}
+        />
       </div>
 
       {goals.items.length > 0 && (

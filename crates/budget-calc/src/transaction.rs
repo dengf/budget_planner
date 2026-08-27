@@ -93,6 +93,31 @@ pub fn income_by_category(transactions: &[Transaction]) -> Vec<(String, Decimal)
     totals
 }
 
+/// Total spending per day, across every expense transaction regardless of
+/// category -- unlike `spend_by_category`, an uncategorized transaction
+/// still counts here, since a day's total should reflect money that left,
+/// not whether it has been filed away yet. Sorted by date ascending: the
+/// timeseries chart this feeds needs that order, and a plain running total
+/// wouldn't give it for free.
+pub fn daily_spend(transactions: &[Transaction]) -> Vec<(String, Decimal)> {
+    let mut totals: Vec<(String, Decimal)> = Vec::new();
+    for t in transactions {
+        if t.amount.is_sign_positive() {
+            continue;
+        }
+        let spend = -t.amount;
+        match totals.iter_mut().find(|(date, _)| date == &t.date) {
+            Some((_, total)) => *total += spend,
+            None => totals.push((t.date.clone(), spend)),
+        }
+    }
+    for (_, total) in &mut totals {
+        *total = round_currency(*total);
+    }
+    totals.sort_by(|a, b| a.0.cmp(&b.0));
+    totals
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,5 +161,56 @@ mod tests {
     fn income_by_category_excludes_an_uncategorized_transaction() {
         let txs = vec![t("mystery deposit", dec!(10), None)];
         assert_eq!(income_by_category(&txs), vec![]);
+    }
+
+    fn d(date: &str, desc: &str, amount: Decimal, category: Option<&str>) -> Transaction {
+        let mut tx = Transaction::new("id", date, desc, amount);
+        tx.category_id = category.map(str::to_string);
+        tx
+    }
+
+    #[test]
+    fn daily_spend_sums_only_the_negative_side_per_day() {
+        let txs = vec![
+            d("2026-08-01", "coffee", dec!(-5), Some("dining")),
+            d("2026-08-01", "lunch", dec!(-15), Some("dining")),
+            d("2026-08-01", "salary", dec!(3000), Some("dining")), // income excluded
+            d("2026-08-02", "dinner", dec!(-20), Some("dining")),
+        ];
+        assert_eq!(
+            daily_spend(&txs),
+            vec![
+                ("2026-08-01".to_string(), dec!(20)),
+                ("2026-08-02".to_string(), dec!(20))
+            ]
+        );
+    }
+
+    #[test]
+    fn daily_spend_includes_an_uncategorized_transaction() {
+        let txs = vec![d("2026-08-01", "mystery", dec!(-10), None)];
+        assert_eq!(
+            daily_spend(&txs),
+            vec![("2026-08-01".to_string(), dec!(10))]
+        );
+    }
+
+    #[test]
+    fn daily_spend_is_sorted_by_date_ascending_regardless_of_input_order() {
+        let txs = vec![
+            d("2026-08-15", "late", dec!(-3), None),
+            d("2026-08-01", "early", dec!(-1), None),
+            d("2026-08-08", "mid", dec!(-2), None),
+        ];
+        let dates: Vec<String> = daily_spend(&txs)
+            .into_iter()
+            .map(|(date, _)| date)
+            .collect();
+        assert_eq!(dates, vec!["2026-08-01", "2026-08-08", "2026-08-15"]);
+    }
+
+    #[test]
+    fn daily_spend_on_no_transactions_is_empty() {
+        assert_eq!(daily_spend(&[]), vec![]);
     }
 }

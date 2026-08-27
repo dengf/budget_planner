@@ -47,6 +47,7 @@ export function createUnavailableModule() {
     build_month: unavailable,
     spend_by_category: unavailable,
     income_by_category: unavailable,
+    daily_spend: unavailable,
     apply_rules: unavailable,
     import_csv: unavailable,
     detect_csv_columns: () => ({ mapping: null }),

@@ -44,3 +44,9 @@ export function monthLabel(monthStr, locale = 'en') {
   const d = new Date(y, (m || 1) - 1, 1);
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'long' });
 }
+
+/** Day count for a `YYYY-MM` string -- the day-0-of-next-month trick. */
+export function daysInMonth(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Date(y, m || 1, 0).getDate();
+}

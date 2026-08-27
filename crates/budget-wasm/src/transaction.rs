@@ -3,7 +3,10 @@
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{decimal_to_f64, f64_to_decimal, to_js};
-use crate::dto::{AmountResultDto, SpendByCategoryParams, SpendByCategoryResult, TransactionDto};
+use crate::dto::{
+    AmountResultDto, DailySpendResult, DateAmountDto, SpendByCategoryParams, SpendByCategoryResult,
+    TransactionDto,
+};
 use crate::message::Message;
 
 fn from_dto(dto: &TransactionDto) -> Option<budget_calc::Transaction> {
@@ -63,6 +66,28 @@ pub fn income_by_category(params: JsValue) -> JsValue {
     to_js(&match parse_transactions(params) {
         Ok(transactions) => totals_result(budget_calc::income_by_category(&transactions)),
         Err(message) => SpendByCategoryResult {
+            error: Some(message.text),
+            ..Default::default()
+        },
+    })
+}
+
+/// Total spend per day, for the within-month timeseries chart -- see
+/// `budget_calc::daily_spend`.
+#[wasm_bindgen]
+pub fn daily_spend(params: JsValue) -> JsValue {
+    to_js(&match parse_transactions(params) {
+        Ok(transactions) => DailySpendResult {
+            totals: budget_calc::daily_spend(&transactions)
+                .into_iter()
+                .map(|(date, amount)| DateAmountDto {
+                    date,
+                    amount: decimal_to_f64(amount),
+                })
+                .collect(),
+            error: None,
+        },
+        Err(message) => DailySpendResult {
             error: Some(message.text),
             ..Default::default()
         },
