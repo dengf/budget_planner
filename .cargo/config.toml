@@ -1,0 +1,13 @@
+# Wasm SIMD (the "simd128" MVP proposal, stable and supported by every
+# evergreen browser since 2021-2022 -- not the newer "relaxed-simd") is
+# opt-in at compile time: rten-simd's fast wasm32 kernels
+# (rten-simd-0.24.0/src/dispatch.rs) are gated behind
+# `#[cfg(target_feature = "simd128")]` and silently fall back to scalar
+# code without this. OCR inference is exactly the tensor/matrix-multiply
+# work that gate exists for, so this was previously the difference
+# between rten's fast and slow paths, unnoticed, on every scan.
+#
+# Scoped to the wasm32 target only -- native `cargo test`/`clippy`/`fmt`
+# (which build for the host) never see this and are unaffected.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

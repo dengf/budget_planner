@@ -12,53 +12,59 @@
 // loads at startup, not just a separate Rust crate -- `ocrs`/`rten` pull
 // in a full ML tensor runtime that dwarfed the budgeting math it used to
 // ship alongside (3.7MB vs ~800KB once split; see that crate's own doc
-// comment). `loadOcrModule` below `import()`s it lazily, so the ~3MB
-// engine only downloads the first time someone actually opens "Take a
-// photo" or "Upload PDF", never on an ordinary budgeting visit.
+// comment). It only downloads the first time someone actually opens
+// "Take a photo" or "Upload PDF", never on an ordinary budgeting visit.
+//
+// It also only ever runs inside `ocrWorker.js`, not here. A real scan
+// was a multi-second synchronous Rust call that froze the whole tab --
+// reported live, no scrolling or clicks worked for 20-40+ seconds on
+// ordinary hardware. Every function below talks to that worker instead
+// of the wasm module directly; see its own doc comment for the rest of
+// the story.
 
-const OCR_MODEL_PATHS = {
-  detection: 'ocr/text-detection.rten',
-  recognition: 'ocr/text-recognition.rten',
-};
+let worker = null;
+let nextId = 1;
+const pending = new Map();
 
-let ocrModulePromise = null;
-
-// Mirrors index.js's initWasm: fetch the glue module, run its default
-// init (which fetches and instantiates the .wasm binary), cache the
-// result so a second scan in the same session doesn't redo either.
-function loadOcrModule() {
-  if (!ocrModulePromise) {
-    ocrModulePromise = import('../pkg-ocr').then(async (wasm) => {
-      if (wasm.default) await wasm.default();
-      return wasm;
-    });
-  }
-  return ocrModulePromise;
+function getWorker() {
+  if (worker) return worker;
+  worker = new Worker(new URL('./ocrWorker.js', import.meta.url));
+  worker.onmessage = (event) => {
+    const { id, ok, result, error } = event.data;
+    const call = pending.get(id);
+    if (!call) return; // already settled, or from a worker instance we've moved past
+    pending.delete(id);
+    if (ok) call.resolve(result);
+    else call.reject(new Error(error));
+  };
+  // A worker-level crash (e.g. the wasm failed to load at all) has no `id`
+  // to route to a specific call -- fail every call still waiting rather
+  // than leaving them hanging forever.
+  worker.onerror = (event) => {
+    for (const call of pending.values()) call.reject(new Error(event.message));
+    pending.clear();
+  };
+  return worker;
 }
 
-let modelBytesPromise = null;
-
-async function fetchBytes(path) {
-  const res = await fetch(path);
-  if (!res.ok) throw new Error(`could not fetch ${path}: ${res.status}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-// Fetched once per page load and kept in memory -- a second scan in the
-// same session shouldn't re-download the ~12MB of model data again.
-function loadOcrModels() {
-  if (!modelBytesPromise) {
-    modelBytesPromise = Promise.all([
-      fetchBytes(OCR_MODEL_PATHS.detection),
-      fetchBytes(OCR_MODEL_PATHS.recognition),
-    ]);
-  }
-  return modelBytesPromise;
+function callWorker(type, payload, transfer) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    getWorker().postMessage({ id, type, ...payload }, transfer);
+  });
 }
 
 function isPdf(file) {
   return file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
 }
+
+// A modern phone photo can be 12+ megapixels -- far more detail than
+// printed receipt text needs, and OCR inference cost scales with pixel
+// count. Capping the long side before it ever reaches the worker (or the
+// canvas readback below) cuts both the postMessage payload and the
+// actual compute; small images pass through untouched.
+const MAX_IMAGE_DIMENSION = 1800;
 
 // Browser-native decode: draws the file into an offscreen canvas and
 // reads back raw pixels. Not a library -- the same category of host call
@@ -67,19 +73,22 @@ function isPdf(file) {
 // take plain RGB.
 async function imageToRgb(file) {
   const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
   const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(bitmap, 0, 0);
-  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  const { data } = ctx.getImageData(0, 0, width, height);
   const rgb = new Uint8Array((data.length / 4) * 3);
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
     rgb[j] = data[i];
     rgb[j + 1] = data[i + 1];
     rgb[j + 2] = data[i + 2];
   }
-  return { rgb, width: canvas.width, height: canvas.height };
+  return { rgb, width, height };
 }
 
 /**
@@ -94,11 +103,9 @@ async function imageToRgb(file) {
  * silently returning nothing.
  */
 export async function extractReceiptText(file) {
-  const ocrModule = await loadOcrModule();
-
   if (isPdf(file)) {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const result = await ocrModule.extract_pdf_text(bytes);
+    const result = await callWorker('pdf', { bytes }, [bytes.buffer]);
     if (result?.error) return { text: '', calcError: result };
     if (!result.text.trim()) {
       return { text: '', calcError: { error: 'pdfNotSupported', error_message: { code: 'transactions.receiptPdfNotSupported', params: {}, text: '' } } };
@@ -106,18 +113,14 @@ export async function extractReceiptText(file) {
     return { text: result.text, calcError: null };
   }
 
-  const [[detectionModel, recognitionModel], { rgb, width, height }] = await Promise.all([
-    loadOcrModels(),
-    imageToRgb(file),
-  ]);
-  const result = await ocrModule.run_ocr(detectionModel, recognitionModel, rgb, width, height);
+  const { rgb, width, height } = await imageToRgb(file);
+  const result = await callWorker('ocr', { imageRgb: rgb, width, height }, [rgb.buffer]);
   if (result?.error) return { text: '', calcError: result };
   return { text: result.text, calcError: null };
 }
 
 /** The amount/date/description heuristics over OCR/PDF-extracted text --
- * see `budget_calc::receipt` -- bound in the same lazily-loaded module. */
+ * see `budget_calc::receipt` -- bound in the same worker. */
 export async function parseReceiptText(text) {
-  const ocrModule = await loadOcrModule();
-  return ocrModule.parse_receipt_text(text);
+  return callWorker('parse', { text });
 }
