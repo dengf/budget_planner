@@ -161,6 +161,21 @@ One branch per round of work, focused commits, then a PR with a Summary
 and Test plan. **Do not self-merge** — wait for approval. Verify
 `state == "MERGED"` before deleting any branch.
 
+### Tunneling a local preview for the user to look at
+
+Use **`cloudflared tunnel --url http://localhost:3002`** (the dev
+server's port, per `webpack.config.js`), not `localtunnel`/`lt`.
+`cloudflared`'s quick tunnel (`*.trycloudflare.com`, no account or config
+needed) opens straight to the app; `localtunnel` interposes its own
+"Tunnel website ahead!" interstitial that requires typing in a shown IP
+address before every first visit from a given network, which is exactly
+the kind of avoidable step to skip when the point is a quick look. Read
+the assigned `https://*.trycloudflare.com` URL from `cloudflared`'s own
+stdout (`INF ... Your quick Tunnel has been created! ... https://...`)
+rather than guessing it. `devServer.allowedHosts: 'all'` in
+`webpack.config.js` is already set to accept a tunnel's Host header, for
+either tool.
+
 **Never push to a remote, or run `gh repo create`, without the user asking
 in that exact moment** — a plan having said the repo would be public is
 not the same as permission to publish it. Build, commit and test locally;

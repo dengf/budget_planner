@@ -8,18 +8,26 @@ pub mod category;
 pub mod csv_import;
 pub mod debt;
 pub mod goals;
+pub mod ocr;
+pub mod pdf_text;
 pub mod presets;
+pub mod receipt;
 pub mod recurring;
 pub mod rules;
 pub mod transaction;
 
 pub use category::{build_month, summarize_month, Category, CategoryLine, MonthSummary};
-pub use csv_import::{import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow};
+pub use csv_import::{
+    detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,
+};
 pub use debt::{build_plan, Debt, PayoffMonth, PayoffPlan, Strategy};
 pub use goals::{
     milestone_crossed, petals_filled, progress_ratio, required_contribution, Goal, Milestone,
 };
+pub use ocr::run_ocr;
+pub use pdf_text::extract_pdf_text;
 pub use presets::{for_region, PresetCategory};
+pub use receipt::{parse_receipt_text, ParsedReceipt};
 pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };

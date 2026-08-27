@@ -4,8 +4,8 @@ use wasm_bindgen::prelude::*;
 
 use crate::convert::{decimal_to_f64, new_record_id, to_js};
 use crate::dto::{
-    ColumnMappingDto, ImportCsvParams, ImportCsvResult, ImportedTransactionDto, SkippedRowDto,
-    TransactionDto,
+    ColumnMappingDto, DetectColumnsResult, ImportCsvParams, ImportCsvResult,
+    ImportedTransactionDto, SkippedRowDto, TransactionDto,
 };
 use crate::message::Message;
 
@@ -17,6 +17,28 @@ fn mapping_from_dto(dto: ColumnMappingDto) -> budget_calc::ColumnMapping {
         credit_col: dto.credit_col,
         has_header: dto.has_header,
     }
+}
+
+fn mapping_to_dto(mapping: budget_calc::ColumnMapping) -> ColumnMappingDto {
+    ColumnMappingDto {
+        date_col: mapping.date_col,
+        description_col: mapping.description_col,
+        amount_col: mapping.amount_col,
+        credit_col: mapping.credit_col,
+        has_header: mapping.has_header,
+    }
+}
+
+/// Guesses a column mapping from the CSV's header row, so the common
+/// case needs no manual setup -- see `budget_calc::detect_columns`.
+/// `mapping: null` in the result means it couldn't confidently guess;
+/// the frontend falls back to its own manual defaults, already visible
+/// for exactly this case.
+#[wasm_bindgen]
+pub fn detect_csv_columns(csv_text: &str) -> JsValue {
+    to_js(&DetectColumnsResult {
+        mapping: budget_calc::detect_columns(csv_text).map(mapping_to_dto),
+    })
 }
 
 #[wasm_bindgen]

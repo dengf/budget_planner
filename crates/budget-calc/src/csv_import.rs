@@ -18,7 +18,7 @@ use crate::transaction::Transaction;
 /// Which column of the CSV holds what. 0-indexed. A bank's own export
 /// column order is never assumed -- the person (or a future auto-detect
 /// pass) tells this module where to look.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ColumnMapping {
     pub date_col: usize,
     pub description_col: usize,
@@ -54,10 +54,79 @@ pub struct SkippedRow {
     pub reason: String,
 }
 
+/// Header names `detect_columns` recognizes for each role, lowercase.
+const DATE_HEADERS: [&str; 5] = [
+    "date",
+    "transaction date",
+    "posted date",
+    "trans date",
+    "value date",
+];
+const DESCRIPTION_HEADERS: [&str; 7] = [
+    "description",
+    "memo",
+    "payee",
+    "merchant",
+    "details",
+    "narrative",
+    "transaction description",
+];
+const AMOUNT_HEADERS: [&str; 3] = ["amount", "amt", "transaction amount"];
+const DEBIT_HEADERS: [&str; 4] = ["debit", "withdrawal", "money out", "debit amount"];
+const CREDIT_HEADERS: [&str; 4] = ["credit", "deposit", "money in", "credit amount"];
+
+/// The first header cell (case-insensitive, trimmed) matching one of
+/// `keywords`, if any.
+fn find_column(headers: &[String], keywords: &[&str]) -> Option<usize> {
+    headers
+        .iter()
+        .position(|h| keywords.contains(&h.trim().to_lowercase().as_str()))
+}
+
+/// Guesses a `ColumnMapping` from the CSV's header row, the way a person
+/// reading the same row by eye would: matching common bank/card export
+/// column names ("Date", "Memo", "Debit"/"Credit", ...) rather than
+/// assuming a fixed column order. Returns `None` -- never a wrong guess
+/// -- when the first row doesn't look like a header at all, or doesn't
+/// contain enough recognizable columns to build a usable mapping;
+/// `TransactionsTab` falls back to its own manual defaults in that case,
+/// so nothing is lost by trying this first.
+pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .from_reader(csv_text.as_bytes());
+    let first_row = reader.records().next()?.ok()?;
+    let headers: Vec<String> = first_row.iter().map(str::to_string).collect();
+
+    let date_col = find_column(&headers, &DATE_HEADERS)?;
+    let description_col = find_column(&headers, &DESCRIPTION_HEADERS)?;
+
+    if let Some(amount_col) = find_column(&headers, &AMOUNT_HEADERS) {
+        return Some(ColumnMapping {
+            date_col,
+            description_col,
+            amount_col,
+            credit_col: None,
+            has_header: true,
+        });
+    }
+
+    let debit_col = find_column(&headers, &DEBIT_HEADERS)?;
+    let credit_col = find_column(&headers, &CREDIT_HEADERS)?;
+    Some(ColumnMapping {
+        date_col,
+        description_col,
+        amount_col: debit_col,
+        credit_col: Some(credit_col),
+        has_header: true,
+    })
+}
+
 /// Common thousands separators and a currency symbol prefix/suffix a bank
 /// export might include even in a numeric-looking column, plus the
 /// parenthesized-negative convention some accounting exports use.
-fn parse_amount(raw: &str) -> Option<Decimal> {
+pub(crate) fn parse_amount(raw: &str) -> Option<Decimal> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -188,6 +257,54 @@ pub fn import_csv(
 mod tests {
     use super::*;
     use rust_decimal_macros::dec;
+
+    #[test]
+    fn detects_a_standard_single_amount_header() {
+        let m = detect_columns("Date,Description,Amount\n2026-08-01,COFFEE,-3.50\n").unwrap();
+        assert_eq!(m.date_col, 0);
+        assert_eq!(m.description_col, 1);
+        assert_eq!(m.amount_col, 2);
+        assert_eq!(m.credit_col, None);
+        assert!(m.has_header);
+    }
+
+    #[test]
+    fn detects_headers_in_a_different_order() {
+        let m = detect_columns("Amount,Memo,Transaction Date\n").unwrap();
+        assert_eq!(m.date_col, 2);
+        assert_eq!(m.description_col, 1);
+        assert_eq!(m.amount_col, 0);
+    }
+
+    #[test]
+    fn detects_a_split_debit_credit_header() {
+        let m = detect_columns("Transaction Date,Payee,Debit,Credit\n").unwrap();
+        assert_eq!(m.date_col, 0);
+        assert_eq!(m.description_col, 1);
+        assert_eq!(m.amount_col, 2, "debit column stands in for amount_col");
+        assert_eq!(m.credit_col, Some(3));
+    }
+
+    #[test]
+    fn matches_headers_case_insensitively() {
+        let m = detect_columns("DATE,description,AMOUNT\n").unwrap();
+        assert_eq!((m.date_col, m.description_col, m.amount_col), (0, 1, 2));
+    }
+
+    #[test]
+    fn gives_up_when_no_recognizable_headers_exist() {
+        assert_eq!(detect_columns("Col1,Col2,Col3\n"), None);
+    }
+
+    #[test]
+    fn gives_up_on_an_empty_file_rather_than_panicking() {
+        assert_eq!(detect_columns(""), None);
+    }
+
+    #[test]
+    fn a_missing_amount_and_debit_credit_pair_gives_up() {
+        assert_eq!(detect_columns("Date,Description,Balance\n"), None);
+    }
 
     fn ids() -> impl FnMut() -> String {
         let mut n = 0;

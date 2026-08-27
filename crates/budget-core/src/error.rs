@@ -51,4 +51,19 @@ pub enum BudgetError {
 
     #[error("a recurring expense's amount must be positive, got {0}")]
     InvalidRecurringAmount(String),
+
+    #[error("the PDF has no bytes to read")]
+    EmptyPdf,
+
+    #[error("could not read this PDF: {0}")]
+    UnreadablePdf(String),
+
+    #[error("the image has no bytes to read")]
+    EmptyImage,
+
+    #[error("could not load the OCR model: {0}")]
+    OcrModelLoadFailed(String),
+
+    #[error("could not read text from this image: {0}")]
+    OcrFailed(String),
 }

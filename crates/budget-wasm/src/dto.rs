@@ -121,13 +121,18 @@ pub struct AmountResultDto {
 
 // ---- CSV import -----------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnMappingDto {
     pub date_col: usize,
     pub description_col: usize,
     pub amount_col: usize,
     pub credit_col: Option<usize>,
     pub has_header: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DetectColumnsResult {
+    pub mapping: Option<ColumnMappingDto>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -154,6 +159,36 @@ pub struct ImportCsvResult {
     pub skipped: Vec<SkippedRowDto>,
     pub error: Option<String>,
     pub error_message: Option<Message>,
+}
+
+// ---- receipt capture --------------------------------------------------
+//
+// Byte payloads (a PDF, a photo, an OCR model) cross as direct `&[u8]`
+// wasm-bindgen parameters rather than fields on a serde_wasm_bindgen
+// params struct -- see budget-wasm/src/receipt.rs's doc comment for why:
+// routing multi-megabyte buffers through serde_wasm_bindgen would encode
+// every byte as a JS array element instead of a typed array.
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ExtractPdfTextResult {
+    pub text: String,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct RunOcrResult {
+    pub text: String,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ParseReceiptTextResult {
+    pub description: Option<String>,
+    pub amount: Option<f64>,
+    pub date: Option<String>,
+    pub is_income: bool,
 }
 
 // ---- goals ----------------------------------------------------------------

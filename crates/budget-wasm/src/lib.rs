@@ -6,11 +6,14 @@
 //! - [`category`] -- `build_month`
 //! - [`transaction`] -- `spend_by_category`
 //! - [`rules`] -- `apply_rules`
-//! - [`csv_import`] -- `import_csv`
+//! - [`csv_import`] -- `import_csv`, `detect_csv_columns`
 //! - [`goals`] -- `goal_progress`, `milestone_crossed`, `required_contribution`
 //! - [`debt`] -- `build_payoff_plan`
 //! - [`presets`] -- `preset_categories`
 //! - [`recurring`] -- `recurring_occurrences`
+//! - [`pdf_text`] -- `extract_pdf_text`
+//! - [`ocr`] -- `run_ocr`
+//! - [`receipt`] -- `parse_receipt_text`
 //! - [`storage`] (wasm32 only) -- `init_storage` plus save/list/delete for
 //!   each of the six persisted collections, backed by
 //!   `budget-ext-redb`'s wasm/IndexedDB-persisted store. Gated to wasm32
@@ -30,7 +33,10 @@ pub mod debt;
 pub mod dto;
 pub mod goals;
 pub mod message;
+pub mod ocr;
+pub mod pdf_text;
 pub mod presets;
+pub mod receipt;
 pub mod recurring;
 pub mod rules;
 #[cfg(target_arch = "wasm32")]
@@ -38,11 +44,14 @@ pub mod storage;
 pub mod transaction;
 
 pub use category::build_month;
-pub use csv_import::import_csv;
+pub use csv_import::{detect_csv_columns, import_csv};
 pub use debt::build_payoff_plan;
 pub use goals::{goal_progress, milestone_crossed, required_contribution};
 pub use message::Message;
+pub use ocr::run_ocr;
+pub use pdf_text::extract_pdf_text;
 pub use presets::preset_categories;
+pub use receipt::parse_receipt_text;
 pub use recurring::recurring_occurrences;
 pub use rules::apply_rules;
 #[cfg(target_arch = "wasm32")]

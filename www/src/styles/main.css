@@ -147,8 +147,67 @@ body {
 .panel h2 { margin: 0; font-size: 1.1rem; }
 .panel-subtitle { margin: -8px 0 0; color: var(--muted); font-size: 0.85rem; }
 
+/* Marks where one distinct feature ends and the next begins inside a
+   panel that stacks several of them (Transactions: manual add, receipt
+   capture, CSV import, rules, recurring) -- a rule, not just the panel's
+   own flex gap, so the eye has something to catch on between forms that
+   would otherwise all read as one long list of fields. */
+.panel h2.section-start { padding-top: 20px; border-top: 1px solid var(--line-soft); }
+
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.8rem; color: var(--muted); }
+.field-label.with-icon { display: inline-flex; align-items: center; gap: 6px; }
+.field-icon { width: 15px; height: 15px; flex: none; }
+
+/* Manual column mapping for CSV import -- closed by default since
+   detect_columns (budget-calc) gets the common case right without it;
+   opens on its own only when detection couldn't confidently guess. */
+.csv-columns summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  list-style: none;
+}
+.csv-columns summary::-webkit-details-marker { display: none; }
+.csv-columns summary::before { content: '▸ '; }
+.csv-columns[open] summary::before { content: '▾ '; }
+.csv-columns .form-grid { margin-top: 12px; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A live camera viewfinder takes the whole screen, the same way a
+   native camera app does -- an inline embed on a long scrolling form
+   would be a cramped, unfamiliar way to frame a photo. */
+.camera-live { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; }
+.camera-video { flex: 1; width: 100%; min-height: 0; object-fit: cover; background: #000; }
+.camera-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.7);
+}
+.camera-controls .btn.secondary { background: rgba(255, 255, 255, 0.15); color: #fff; }
+.camera-shutter {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid var(--accent);
+  padding: 0;
+}
+.camera-shutter:active { background: var(--accent); }
 .field-check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
 .field-check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 
@@ -186,6 +245,10 @@ body {
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: none;
   border-radius: 8px;
   padding: 10px 16px;
@@ -195,6 +258,13 @@ body {
   background: var(--accent);
   color: var(--accent-ink);
 }
+/* A <label> standing in for a file-picker button (see ReceiptCapture's
+   PDF upload, TransactionsTab's CSV upload) needs the same look as a
+   <button class="btn"> -- browsers render an unstyled <input
+   type="file"> with its own "Choose File" text, which duplicates
+   whatever the label next to it already says, so the input stays
+   present for its native picker/keyboard behaviour but visually hidden. */
+label.btn { cursor: pointer; }
 .btn.secondary { background: var(--panel-alt); color: var(--ink); }
 .btn.ghost { background: transparent; color: var(--muted); padding: 6px 10px; }
 .btn.danger { background: transparent; color: var(--negative); padding: 6px 10px; }

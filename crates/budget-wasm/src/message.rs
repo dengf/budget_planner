@@ -103,6 +103,15 @@ impl From<&BudgetError> for Message {
             BudgetError::ColumnOutOfRange(v) => {
                 Message::with_value("err.columnOutOfRange", v.clone(), text)
             }
+            BudgetError::EmptyPdf => Message::bare("err.emptyPdf", text),
+            BudgetError::UnreadablePdf(v) => {
+                Message::with_value("err.unreadablePdf", v.clone(), text)
+            }
+            BudgetError::EmptyImage => Message::bare("err.emptyImage", text),
+            BudgetError::OcrModelLoadFailed(v) => {
+                Message::with_value("err.ocrModelLoadFailed", v.clone(), text)
+            }
+            BudgetError::OcrFailed(v) => Message::with_value("err.ocrFailed", v.clone(), text),
         }
     }
 }
@@ -157,6 +166,11 @@ mod tests {
             },
             BudgetError::EmptyCsv,
             BudgetError::ColumnOutOfRange("1".into()),
+            BudgetError::EmptyPdf,
+            BudgetError::UnreadablePdf("1".into()),
+            BudgetError::EmptyImage,
+            BudgetError::OcrModelLoadFailed("1".into()),
+            BudgetError::OcrFailed("1".into()),
         ];
         let codes: std::collections::BTreeSet<_> =
             all.iter().map(|e| Message::from(e).code).collect();
@@ -180,6 +194,9 @@ mod no_debug_formatted_errors {
         ("debt.rs", include_str!("debt.rs")),
         ("presets.rs", include_str!("presets.rs")),
         ("recurring.rs", include_str!("recurring.rs")),
+        ("ocr.rs", include_str!("ocr.rs")),
+        ("pdf_text.rs", include_str!("pdf_text.rs")),
+        ("receipt.rs", include_str!("receipt.rs")),
         // include_str! reads the file regardless of the target the crate is
         // compiled for -- only the `pub mod storage;` declaration in lib.rs
         // is cfg-gated to wasm32, so this line is safe to keep unconditional.
