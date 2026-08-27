@@ -9,14 +9,26 @@
 // main/worker boundary: `receiptCapture.js` posts bytes in, this posts
 // text back, and the main thread stays responsive throughout.
 //
-// Root-relative paths (not the page-relative ones `receiptCapture.js`
-// used when it ran on the main thread): a Worker's own script URL is its
-// base for a relative fetch, not the page's, and this bundle can end up
-// nested under a different path than the page depending on the build.
-
+// Resolved against this worker's own runtime location (`self.location`),
+// not a root-relative or page-relative path: a leading `/ocr/...` broke
+// in production because GitHub Pages serves this app from a subpath
+// (/budget_planner/, not domain root) -- root-relative landed one level
+// too high and 404'd, invisibly on localhost since that's served at
+// actual root. This worker's compiled chunk and the ocr/ static folder
+// both land in the same output directory (see webpack.config.js), so a
+// path relative to the worker's real final URL lands correctly
+// regardless of what subpath the site as a whole is served under.
+//
+// Deliberately `self.location.href`, not `import.meta.url`: webpack 5
+// treats `new URL(literal, import.meta.url)` as a static asset import
+// and tries to bundle whatever the literal names -- the .rten files
+// aren't part of the module graph (they're copied from static/ by
+// CopyWebpackPlugin, not imported), so that pattern fails the build
+// outright rather than just resolving wrong at runtime. `self.location`
+// is a plain runtime value webpack has no reason to inspect.
 const OCR_MODEL_PATHS = {
-  detection: '/ocr/text-detection.rten',
-  recognition: '/ocr/text-recognition.rten',
+  detection: new URL('ocr/text-detection.rten', self.location.href),
+  recognition: new URL('ocr/text-recognition.rten', self.location.href),
 };
 
 let wasmPromise = null;
