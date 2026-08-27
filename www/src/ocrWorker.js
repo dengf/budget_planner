@@ -1,13 +1,29 @@
 // Runs receipt OCR and PDF text extraction off the main thread.
 //
-// `budget-wasm-ocr`'s bindings are synchronous Rust calls -- a real scan
-// blocked the entire tab for 20-40+ seconds on ordinary hardware (worse on
-// a phone), reported live: no scrolling, no clicks, no repaint, the whole
-// page looked crashed even though it was still working. Wasm-bindgen's
-// `--target web` glue works identically inside a Worker (fetch and
-// wasm instantiation are both available here), so this file is the whole
+// Two independent wasm modules, `budget-wasm-ocr` and `budget-wasm-pdf`,
+// each `import()`ed lazily and only the first time its own message type
+// actually arrives -- a photo scan never triggers the `pkg-pdf` download,
+// and a PDF upload never triggers `pkg-ocr`'s (which is the larger of the
+// two, since it carries the `ocrs`/`rten` ML runtime). They used to be
+// one combined module; splitting them stopped either path paying for the
+// other's weight -- see budget-wasm-ocr/src/lib.rs and
+// budget-wasm-pdf/src/lib.rs for the measured sizes.
+//
+// Both bindings are synchronous Rust calls -- a real scan blocked the
+// entire tab for 20-40+ seconds on ordinary hardware (worse on a phone),
+// reported live: no scrolling, no clicks, no repaint, the whole page
+// looked crashed even though it was still working. Wasm-bindgen's
+// `--target web` glue works identically inside a Worker (fetch and wasm
+// instantiation are both available here), so this file is the whole
 // main/worker boundary: `receiptCapture.js` posts bytes in, this posts
 // text back, and the main thread stays responsive throughout.
+//
+// `parse_receipt_text` is deliberately NOT handled here -- it's plain
+// text parsing with no heavy dependency, bound instead in the
+// always-loaded core module and called directly from the main thread
+// (see `ReceiptCapture.jsx`). Routing it through this worker would have
+// meant loading whichever of the two lazy modules happened to have it,
+// for no benefit.
 //
 // Resolved against this worker's own runtime location (`self.location`),
 // not a root-relative or page-relative path: a leading `/ocr/...` broke
@@ -31,7 +47,8 @@ const OCR_MODEL_PATHS = {
   recognition: new URL('ocr/text-recognition.rten', self.location.href),
 };
 
-let wasmPromise = null;
+let ocrWasmPromise = null;
+let pdfWasmPromise = null;
 let modelBytesPromise = null;
 
 async function fetchBytes(path) {
@@ -40,14 +57,24 @@ async function fetchBytes(path) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-function loadWasm() {
-  if (!wasmPromise) {
-    wasmPromise = import('../pkg-ocr').then(async (wasm) => {
+function loadOcrWasm() {
+  if (!ocrWasmPromise) {
+    ocrWasmPromise = import('../pkg-ocr').then(async (wasm) => {
       if (wasm.default) await wasm.default();
       return wasm;
     });
   }
-  return wasmPromise;
+  return ocrWasmPromise;
+}
+
+function loadPdfWasm() {
+  if (!pdfWasmPromise) {
+    pdfWasmPromise = import('../pkg-pdf').then(async (wasm) => {
+      if (wasm.default) await wasm.default();
+      return wasm;
+    });
+  }
+  return pdfWasmPromise;
 }
 
 // Fetched once per worker lifetime -- a second scan in the same session
@@ -65,16 +92,15 @@ function loadModels() {
 self.onmessage = async (event) => {
   const { id, type } = event.data;
   try {
-    const wasm = await loadWasm();
     let result;
     if (type === 'ocr') {
+      const wasm = await loadOcrWasm();
       const [detectionModel, recognitionModel] = await loadModels();
       const { imageRgb, width, height } = event.data;
       result = wasm.run_ocr(detectionModel, recognitionModel, imageRgb, width, height);
     } else if (type === 'pdf') {
+      const wasm = await loadPdfWasm();
       result = wasm.extract_pdf_text(event.data.bytes);
-    } else if (type === 'parse') {
-      result = wasm.parse_receipt_text(event.data.text);
     } else {
       throw new Error(`ocrWorker: unknown message type "${type}"`);
     }

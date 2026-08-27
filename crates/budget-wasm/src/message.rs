@@ -12,9 +12,10 @@ pub use budget_core::Message;
 /// module for the full rationale (a `serde_wasm_bindgen::Error`'s `Debug`
 /// rendering is a live JS stack trace).
 ///
-/// Scans only this crate's own binding files -- `budget-wasm-ocr` runs
-/// the identical guard over its own three, since bindings split across
-/// crates need the check applied per crate, not once globally.
+/// Scans only this crate's own binding files -- `budget-wasm-ocr` and
+/// `budget-wasm-pdf` each run the identical guard over their own single
+/// binding, since bindings split across crates need the check applied
+/// per crate, not once globally.
 #[cfg(test)]
 mod no_debug_formatted_errors {
     const BINDINGS: &[(&str, &str)] = &[
@@ -25,6 +26,7 @@ mod no_debug_formatted_errors {
         ("goals.rs", include_str!("goals.rs")),
         ("debt.rs", include_str!("debt.rs")),
         ("presets.rs", include_str!("presets.rs")),
+        ("receipt.rs", include_str!("receipt.rs")),
         ("recurring.rs", include_str!("recurring.rs")),
         // include_str! reads the file regardless of the target the crate is
         // compiled for -- only the `pub mod storage;` declaration in lib.rs

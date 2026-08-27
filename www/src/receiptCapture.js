@@ -1,26 +1,37 @@
-// Turns a picked receipt file into plain text, then hands that text to
-// `budget-wasm-ocr` for every actual decision (amount/date/description
-// heuristics, OCR itself, PDF text extraction). This module's own job is
-// exactly the browser I/O nothing else can do: decode an image via
-// canvas (native, no library -- see CLAUDE.md's rule on where a thing
-// goes), read a PDF's bytes, and fetch this app's own vendored OCR model
-// files. Never a third-party library, never a CDN, never uploads
-// anything -- see the receipt-capture plan addendum for why OCR runs as
-// a Rust/wasm engine (`ocrs`) rather than a JS one.
+// Turns a picked receipt file into plain text: OCR (`budget-wasm-ocr`)
+// for a photographed receipt, `pdf-extract` (`budget-wasm-pdf`) for a
+// PDF's text layer. This module's own job is exactly the browser I/O
+// nothing else can do: decode an image via canvas (native, no library --
+// see CLAUDE.md's rule on where a thing goes), read a PDF's bytes, and
+// fetch this app's own vendored OCR model files. Never a third-party
+// library, never a CDN, never uploads anything -- see the receipt-capture
+// plan addendum for why OCR runs as a Rust/wasm engine (`ocrs`) rather
+// than a JS one.
 //
-// `budget-wasm-ocr` is a *separate* wasm module from the one `index.js`
-// loads at startup, not just a separate Rust crate -- `ocrs`/`rten` pull
-// in a full ML tensor runtime that dwarfed the budgeting math it used to
-// ship alongside (3.7MB vs ~800KB once split; see that crate's own doc
-// comment). It only downloads the first time someone actually opens
-// "Take a photo" or "Upload PDF", never on an ordinary budgeting visit.
+// Turning that text into a draft transaction (amount/date/description
+// heuristics) is a separate step this module does NOT do -- see
+// `ReceiptCapture.jsx`, which calls the always-loaded core module's
+// `parse_receipt_text` directly rather than going through either lazy
+// module or `ocrWorker.js` below, since that parsing has no heavy
+// dependency and doesn't need either.
 //
-// It also only ever runs inside `ocrWorker.js`, not here. A real scan
+// `budget-wasm-ocr` and `budget-wasm-pdf` are two *separate* wasm modules
+// from the one `index.js` loads at startup, not just separate Rust crates
+// -- `ocrs`/`rten` (OCR) and `pdf-extract` (PDF) each pull in real weight
+// (see each crate's own doc comment) that dwarfed the budgeting math they
+// used to ship alongside, and that were bundled together with each other
+// until a size audit found each one paying for the other's dependency
+// chain despite the two paths never running in the same session. Each
+// only downloads the first time someone actually takes that specific
+// path -- a photo scan never fetches `pkg-pdf`, a PDF upload never
+// fetches `pkg-ocr` -- never on an ordinary budgeting visit.
+//
+// Both also only ever run inside `ocrWorker.js`, not here. A real scan
 // was a multi-second synchronous Rust call that froze the whole tab --
 // reported live, no scrolling or clicks worked for 20-40+ seconds on
 // ordinary hardware. Every function below talks to that worker instead
-// of the wasm module directly; see its own doc comment for the rest of
-// the story.
+// of either wasm module directly; see its own doc comment for the rest
+// of the story.
 
 let worker = null;
 let nextId = 1;
@@ -117,10 +128,4 @@ export async function extractReceiptText(file) {
   const result = await callWorker('ocr', { imageRgb: rgb, width, height }, [rgb.buffer]);
   if (result?.error) return { text: '', calcError: result };
   return { text: result.text, calcError: null };
-}
-
-/** The amount/date/description heuristics over OCR/PDF-extracted text --
- * see `budget_calc::receipt` -- bound in the same worker. */
-export async function parseReceiptText(text) {
-  return callWorker('parse', { text });
 }

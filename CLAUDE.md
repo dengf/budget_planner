@@ -27,27 +27,56 @@ than one that is visibly broken.
 | `budget-ports` / `budget-ext-redb` | Persistence port + redb/IndexedDB adapter |
 | `budget-wasm` | Bridge only. Parse `JsValue`, call `budget-calc`, serialize back |
 | `budget-wasm-ocr` | Bridge only, same rule — but a *separate* wasm module (see below) |
+| `budget-wasm-pdf` | Bridge only, same rule — a *third*, independent wasm module (see below) |
 | `www/` | Layout, input, formatting for display, i18n |
 
-### Two wasm modules, not one
+### Three wasm modules, not one
 
-`budget-wasm-ocr` exists purely to keep `budget-wasm`'s download small.
+`budget-wasm-ocr` and `budget-wasm-pdf` exist purely to keep
+`budget-wasm`'s download small, and to keep each other's weight off a
+session that only takes one of the two receipt-capture paths.
+
 `ocrs`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
-of the wasm payload — 3.7MB with them compiled in, ~800KB without —
-despite most sessions never opening "Take a photo" or "Upload PDF".
-`budget-calc`'s `receipt-capture` Cargo feature (default off, enabled only
-by `budget-wasm-ocr`) keeps `ocrs`/`rten`/`pdf-extract` out of
-`budget-wasm`'s dependency graph entirely, not just unreached at runtime.
-`www/src/receiptCapture.js` `import()`s `pkg-ocr` lazily, the first time
-the receipt-capture UI actually opens.
+of the wasm payload — 3.7MB with them compiled into the main crate,
+~800KB without — despite most sessions never opening "Take a photo" or
+"Upload PDF". They were originally split into one combined
+`budget-wasm-ocr` crate alongside `pdf-extract`. A later size audit
+(`twiggy top` on an unstripped build) found `pdf-extract`'s own dependency
+chain (`lopdf`, `encoding_rs`, `miniz_oxide`, `sha2`) was a real, separable
+fraction of that combined crate — roughly a fifth of it, traced to a
+single data segment of glyph-name and text-encoding tables — despite being
+irrelevant to OCR, and vice versa. A photo scan and a PDF upload are
+independent user paths that never both run in one session, so bundling
+them meant either path always paid for the other's weight. Splitting PDF
+extraction into its own `budget-wasm-pdf` crate dropped the OCR-only
+download from ~2.9MB to ~1.9MB, and a PDF-only session now downloads
+~1.0MB instead of the same ~2.9MB.
+
+`budget-calc`'s `ocr` and `pdf-text` Cargo features (both default off,
+each enabled by exactly one of the two crates) keep `ocrs`/`rten` and
+`pdf-extract` respectively out of `budget-wasm`'s dependency graph
+entirely, not just unreached at runtime, and out of each other's.
+`www/src/ocrWorker.js` `import()`s `pkg-ocr` or `pkg-pdf` lazily, only the
+first time its own message type (`'ocr'` or `'pdf'`) actually arrives.
+
+`parse_receipt_text` (the amount/date/description heuristics that run on
+whichever module's extracted text) is bound in the main `budget-wasm`
+crate instead of either lazy one — it's plain text/`Decimal` parsing with
+no heavy dependency, so there's no size reason to duplicate it across two
+lazy modules or route it through a worker `import()` neither path may have
+triggered yet. `ReceiptCapture.jsx` calls it directly on the main thread
+via the always-loaded `wasmModule`.
 
 If a future dependency is similarly heavy and similarly rarely used,
 follow this pattern rather than adding it to `budget-calc` unconditionally:
 a Cargo feature gating the heavy crate, a new thin `budget-wasm-*` binding
 crate that enables it, and a lazy `import()` in the one JS entry point that
-needs it. `Message` (the wasm-boundary error convention) lives in
-`budget-core`, not either wasm crate, specifically so two wasm-bindgen
-crates mapping `BudgetError` never duplicate that mapping — see
+needs it. If two such features are genuinely independent (never both
+needed in the same user action), give each its own crate rather than
+bundling them — the OCR/PDF history above is the cautionary example.
+`Message` (the wasm-boundary error convention) lives in `budget-core`, not
+any of the three wasm crates, specifically so multiple wasm-bindgen crates
+mapping `BudgetError` never duplicate that mapping — see
 `budget-core/src/message.rs`'s own doc comment.
 
 Business logic is anything where a second implementation could give a
@@ -143,18 +172,22 @@ gets skipped, so ask it explicitly.
   relying on the slower `www-build` job to exercise it indirectly; run it
   locally before trusting a green native build.
 - **`npm run build` does not rebuild the wasm.** Run `npm run build:wasm`
-  first, or you are testing the previous `pkg/` and `pkg-ocr/`.
+  first, or you are testing the previous `pkg/`, `pkg-ocr/` and `pkg-pdf/`.
 - **`cargo build -p budget-wasm --target wasm32-unknown-unknown` alone
-  does not prove `budget-wasm-ocr` compiles.** They're separate crates
-  with separate wasm-pack builds (`npm run build:wasm:core` /
-  `build:wasm:ocr`); CI's `wasm32` job checks both, and a local check
-  should too before trusting either build. `cargo build --workspace`
-  unifies `budget-calc`'s `receipt-capture` feature across every member
-  being built together (since `budget-wasm-ocr` requests it), which masks
-  whether `budget-wasm` alone still excludes it — the only way to confirm
-  the size split still holds is `cd crates/budget-wasm && wasm-pack build
-  --target web --out-dir ../../www/pkg` in isolation and checking
-  `budget_wasm_bg.wasm`'s size directly.
+  does not prove `budget-wasm-ocr` or `budget-wasm-pdf` compiles.** All
+  three are separate crates with separate wasm-pack builds (`npm run
+  build:wasm:core` / `build:wasm:ocr` / `build:wasm:pdf`); CI's `wasm32`
+  job checks all three, and a local check should too before trusting any
+  one build. `cargo build --workspace` unifies `budget-calc`'s `ocr` and
+  `pdf-text` features across every member being built together (since
+  `budget-wasm-ocr` and `budget-wasm-pdf` each request one), which masks
+  whether `budget-wasm` alone still excludes both, and whether
+  `budget-wasm-ocr`/`budget-wasm-pdf` still exclude each other's feature
+  — the only way to confirm the size split still holds is building each
+  of the three in isolation (`cd crates/budget-wasm && wasm-pack build
+  --target web --out-dir ../../www/pkg`, and the equivalent for the other
+  two into `pkg-ocr`/`pkg-pdf`) and checking each `*_bg.wasm`'s size
+  directly.
 - **jsdom has no `localStorage`** on `window` or as a bare global; every
   storage path (`region.js`, `income.js`) runs into its catch block under
   test unless the test stands up a fake.

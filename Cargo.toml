@@ -15,6 +15,7 @@ members = [
     "crates/budget-ext-redb",
     "crates/budget-wasm",
     "crates/budget-wasm-ocr",
+    "crates/budget-wasm-pdf",
 ]
 resolver = "2"
 

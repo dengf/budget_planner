@@ -1,6 +1,6 @@
 [package]
-name = "budget-wasm-ocr"
-description = "Lazily-loaded WebAssembly bindings for receipt OCR"
+name = "budget-wasm-pdf"
+description = "Lazily-loaded WebAssembly bindings for PDF receipt text extraction"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -17,7 +17,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 budget-core = { workspace = true }
-budget-calc = { workspace = true, features = ["ocr"] }
+budget-calc = { workspace = true, features = ["pdf-text"] }
 
 wasm-bindgen = "0.2"
 serde = { workspace = true }

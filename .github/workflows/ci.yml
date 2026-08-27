@@ -71,12 +71,16 @@ jobs:
         run: cargo build -p budget-wasm --target wasm32-unknown-unknown
 
       # budget-wasm-ocr pulls in ocrs/rten (an ML tensor runtime) behind
-      # budget-calc's `receipt-capture` feature -- the one place this repo
-      # documented as a real wasm32 compile risk (native `cargo build`
-      # would not catch a wasm-only break in that dependency graph), so it
-      # gets the same explicit wasm32 check as the main crate.
+      # budget-calc's `ocr` feature, and budget-wasm-pdf pulls in
+      # pdf-extract behind `pdf-text` -- the one place this repo documented
+      # as a real wasm32 compile risk (native `cargo build` would not catch
+      # a wasm-only break in either dependency graph), so both get the same
+      # explicit wasm32 check as the main crate.
       - name: cargo build -p budget-wasm-ocr --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm-ocr --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-pdf --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-pdf --target wasm32-unknown-unknown
 
   coverage:
     name: cargo llvm-cov (coverage gate)

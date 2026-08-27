@@ -17,12 +17,16 @@ pdf-extract = { version = "0.12.0", optional = true }
 rten = { version = "0.24.0", optional = true }
 
 [features]
-# `ocrs`/`rten` pull in a full ML tensor runtime -- see
-# budget-wasm-ocr/src/lib.rs for the measured size this keeps out of the
-# main wasm build. Off by default so `budget-wasm` (and any other crate
-# that just wants the budgeting math) never compiles it in; only
-# `budget-wasm-ocr` enables this.
-receipt-capture = ["dep:ocrs", "dep:pdf-extract", "dep:rten"]
+# Two independent features, not one `receipt-capture` bundle: a photo
+# scan needs `ocrs`/`rten` (a full ML tensor runtime) and never touches
+# `pdf-extract`; a PDF upload is the reverse. Bundling them meant
+# `budget-wasm-pdf`'s users downloaded OCR's ~2MB they'd never run, and
+# vice versa -- see budget-wasm-ocr/src/lib.rs and budget-wasm-pdf/src/lib.rs
+# for the measured sizes this split keeps out of each other. Both off by
+# default so `budget-wasm` (and any other crate that just wants the
+# budgeting math) never compiles either in.
+ocr = ["dep:ocrs", "dep:rten"]
+pdf-text = ["dep:pdf-extract"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

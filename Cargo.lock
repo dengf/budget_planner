@@ -216,7 +216,19 @@ dependencies = [
  "budget-calc",
  "budget-core",
  "console_error_panic_hook",
- "rust_decimal",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "budget-wasm-pdf"
+version = "0.1.0"
+dependencies = [
+ "budget-calc",
+ "budget-core",
+ "console_error_panic_hook",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

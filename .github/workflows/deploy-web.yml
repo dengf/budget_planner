@@ -7,6 +7,7 @@ on:
       - 'www/**'
       - 'crates/budget-wasm/**'
       - 'crates/budget-wasm-ocr/**'
+      - 'crates/budget-wasm-pdf/**'
       - 'crates/budget-calc/**'
       - 'crates/budget-core/**'
       - 'crates/budget-ports/**'
