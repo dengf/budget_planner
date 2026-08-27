@@ -210,6 +210,7 @@ export default function TransactionsTab({
           value={draft.amount}
           onChange={(v) => setDraft({ ...draft, amount: v })}
           grouped
+          signed
         />
         <label className="field">
           <span className="field-label">{t('transactions.category')}</span>

@@ -240,6 +240,25 @@ body {
 .field-input input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
 .field-suffix { color: var(--muted-2); font-size: 0.8rem; white-space: nowrap; }
 
+/* A keyboard-independent way to set a transaction's sign -- some mobile
+   keyboards (iOS Safari's `inputMode="decimal"` pad, reported live) have
+   no minus key at all, so typing alone can't reach a negative amount on
+   every device. */
+.sign-toggle {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.sign-toggle.negative { color: var(--negative); border-color: var(--negative-border); background: var(--negative-bg); }
+.sign-toggle.positive { color: var(--positive); border-color: var(--positive-border); background: var(--positive-bg); }
+
 .field-select {
   background: var(--surface);
   border: 1px solid var(--input-border);

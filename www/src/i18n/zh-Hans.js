@@ -112,6 +112,8 @@ export default {
   'transactions.directionMismatchExpense': '{category}是支出分类，但金额是正数，会被计为收入，不会显示为支出。是不是想输入 {flipped}？',
   'transactions.directionMismatchIncome': '{category}是收入分类，但金额是负数，会被计为支出，不会显示为收入。是不是想输入 {flipped}？',
   'transactions.useFlippedAmount': '改用 {flipped}',
+  'transactions.switchToIncome': '切换为收入（目前是支出）',
+  'transactions.switchToSpending': '切换为支出（目前是收入）',
   'transactions.category': '分类',
   'transactions.uncategorized': '未分类',
   'transactions.add': '添加',

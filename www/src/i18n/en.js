@@ -116,6 +116,8 @@ export default {
   'transactions.directionMismatchExpense': '{category} is an expense category, but a positive amount counts as income and won’t show up as spending. Did you mean {flipped}?',
   'transactions.directionMismatchIncome': '{category} is an income category, but a negative amount counts as spending and won’t show up as income. Did you mean {flipped}?',
   'transactions.useFlippedAmount': 'Use {flipped}',
+  'transactions.switchToIncome': 'Switch to income (currently spending)',
+  'transactions.switchToSpending': 'Switch to spending (currently income)',
   'transactions.category': 'Category',
   'transactions.uncategorized': 'Uncategorized',
   'transactions.add': 'Add',

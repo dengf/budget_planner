@@ -135,6 +135,7 @@ export default function ReceiptCapture({ wasmModule, newId, categories, rules, t
               value={draft.amount}
               onChange={(v) => setDraft({ ...draft, amount: v })}
               grouped
+              signed
             />
             <label className="field">
               <span className="field-label">{t('transactions.category')}</span>
