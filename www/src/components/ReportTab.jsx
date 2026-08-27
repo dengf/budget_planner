@@ -8,6 +8,7 @@ import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import { daysInMonth } from '../month';
 import PieChart from './PieChart';
 import DailySpendChart from './DailySpendChart';
+import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 
 export default function ReportTab({
   wasmModule,
@@ -26,6 +27,7 @@ export default function ReportTab({
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(region);
   const [lines, setLines] = useState([]);
+  const [savingsLine, setSavingsLine] = useState(null);
   const [dailyTotals, setDailyTotals] = useState([]);
   const [recipients, setRecipients] = useState('');
   const income = loadIncome(month);
@@ -79,6 +81,28 @@ export default function ReportTab({
     };
   }, [wasmModule, budgetPlan.items, categories.items, transactions.items, month, income]);
 
+  // Same Savings computation as BudgetTab: income minus every real expense
+  // category's actual this month. Kept out of `lines` (and so out of both
+  // pie charts below) since Savings isn't a category money was spent from
+  // or received into -- it's the residual of the two.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!wasmModule?.build_savings_line || lines.length === 0) {
+        if (!cancelled) setSavingsLine(null);
+        return;
+      }
+      const planned = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
+      const expense = totalExpenseActual(lines, isIncome, () => false);
+      const built = await wasmModule.build_savings_line({ planned, income, total_expense_actual: expense });
+      if (!cancelled) setSavingsLine(built?.line ?? null);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [wasmModule, lines, budgetPlan.items, income]);
+
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
 
   // Two separate breakdowns, not one chart trying to show both
@@ -99,7 +123,10 @@ export default function ReportTab({
     const rows = lines
       .map((l) => `${categoryName(l.category_id)}: ${formatMoney(l.spent)} of ${formatMoney(l.planned)}`)
       .join('\n');
-    return `${t('report.title')} — ${monthLabel(month, locale)}\n\n${rows}\n\n${t('report.generatedBy')}`;
+    const savingsRow = savingsLine
+      ? `\n${t('budget.savings')}: ${formatMoney(savingsLine.spent)} of ${formatMoney(savingsLine.planned)}`
+      : '';
+    return `${t('report.title')} — ${monthLabel(month, locale)}\n\n${rows}${savingsRow}\n\n${t('report.generatedBy')}`;
   };
 
   const send = () => {
@@ -192,6 +219,14 @@ export default function ReportTab({
                 </tr>
               );
             })}
+            {savingsLine && (
+              <tr className="report-savings-row">
+                <td>{t('budget.savings')}</td>
+                <td className="num">{formatMoney(savingsLine.planned)}</td>
+                <td className="num">{formatMoney(savingsLine.spent)}</td>
+                <td className="num positive">{formatMoney(savingsLine.remaining)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

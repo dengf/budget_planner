@@ -8,9 +8,9 @@ pub mod category;
 pub mod csv_import;
 pub mod debt;
 pub mod goals;
-#[cfg(feature = "receipt-capture")]
+#[cfg(feature = "ocr")]
 pub mod ocr;
-#[cfg(feature = "receipt-capture")]
+#[cfg(feature = "pdf-text")]
 pub mod pdf_text;
 pub mod presets;
 pub mod receipt;
@@ -18,7 +18,10 @@ pub mod recurring;
 pub mod rules;
 pub mod transaction;
 
-pub use category::{build_month, summarize_month, Category, CategoryLine, MonthSummary};
+pub use category::{
+    build_month, build_savings_line, summarize_month, Category, CategoryLine, MonthSummary,
+    SAVINGS_CATEGORY_ID,
+};
 pub use csv_import::{
     detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,
 };
@@ -26,9 +29,9 @@ pub use debt::{build_plan, Debt, PayoffMonth, PayoffPlan, Strategy};
 pub use goals::{
     milestone_crossed, petals_filled, progress_ratio, required_contribution, Goal, Milestone,
 };
-#[cfg(feature = "receipt-capture")]
+#[cfg(feature = "ocr")]
 pub use ocr::run_ocr;
-#[cfg(feature = "receipt-capture")]
+#[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
 pub use presets::{for_region, PresetCategory};
 pub use receipt::{parse_receipt_text, ParsedReceipt};

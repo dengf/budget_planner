@@ -14,6 +14,7 @@ import {
   saveIncludeCommitments,
 } from '../commitments';
 import { monthsBetween } from '../month';
+import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -47,6 +48,7 @@ export default function BudgetTab({
   const [spendDraft, setSpendDraft] = useState({ amount: '', description: '' });
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
   const [upcoming, setUpcoming] = useState(null);
+  const [savingsResult, setSavingsResult] = useState(null);
 
   useEffect(() => {
     saveIncome(month, income);
@@ -132,6 +134,49 @@ export default function BudgetTab({
     goals?.items,
     debts?.items,
   ]);
+
+  /**
+   * The Savings row's line: income minus every real expense category's
+   * actual this month. Computed as its own `build_savings_line` call
+   * rather than folded into `build_month` above, since it isn't a
+   * category `build_month` knows about -- there's no `Category` record
+   * and nothing is ever categorized against it (see savings.js).
+   */
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!wasmModule?.build_savings_line || !result?.summary) {
+        setSavingsResult(null);
+        return;
+      }
+      const planned = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
+      const expense = totalExpenseActual(result.lines ?? [], isIncome, isCommitmentId);
+      const built = await wasmModule.build_savings_line({
+        planned,
+        income: result.summary.income,
+        total_expense_actual: expense,
+      });
+      if (!cancelled) setSavingsResult(built);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [wasmModule, result, budgetPlan.items, categories.items]);
+
+  const savingsLine = savingsResult?.line;
+
+  /** Same reading as `remainingCell` for an income category: a Savings
+   *  row that saved more than its target is good news, styled the same
+   *  as "received more than planned" rather than a warning. Falling
+   *  short just shows the plain amount still to go, like any other
+   *  category's remaining. */
+  const savingsRemainingCell = (line) => {
+    if (line.remaining >= 0) {
+      return { className: 'positive', text: formatMoney(line.remaining) };
+    }
+    return { className: 'positive', text: t('budget.receivedMore', { amount: formatMoney(-line.remaining) }) };
+  };
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
   const categoryGroup = (id) => categories.items.find((c) => c.id === id)?.group ?? '';
@@ -332,6 +377,7 @@ export default function BudgetTab({
       </label>
 
       {result?.error && <CalcError result={result} />}
+      {savingsResult?.error && <CalcError result={savingsResult} />}
 
       {summary && (
         <>
@@ -403,7 +449,7 @@ export default function BudgetTab({
         </div>
       )}
 
-      {categories.items.length === 0 ? (
+      {categories.items.length === 0 && !savingsLine ? (
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
         <div className="category-table">
@@ -527,6 +573,42 @@ export default function BudgetTab({
             </React.Fragment>
             );
           })}
+          {savingsLine && (
+            <React.Fragment>
+            <div className="category-row-divider" role="separator" />
+            <div className="category-row category-row-savings">
+              <div>
+                <div className="category-name">{t('budget.savings')}</div>
+                <div className="category-group">{t('budget.savingsHint')}</div>
+              </div>
+              <div className="field-input planned-input">
+                <span className="cell-label">{t('budget.planned')}</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  aria-label={`${t('budget.planned')} — ${t('budget.savings')}`}
+                  placeholder="0"
+                  value={plannedDraft[SAVINGS_CATEGORY_ID] ?? (savingsLine.planned || '')}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setPlannedDraft((d) => ({ ...d, [SAVINGS_CATEGORY_ID]: raw }));
+                    savePlanned(SAVINGS_CATEGORY_ID, raw);
+                  }}
+                />
+              </div>
+              <div className="num spent-cell">
+                <span className="cell-label">{t('budget.savingsActual')}</span>
+                <span className="spent-value">{formatMoney(savingsLine.spent)}</span>
+              </div>
+              <div className={`num ${savingsRemainingCell(savingsLine).className}`}>
+                <span className="cell-label">{t('budget.remaining')}</span>
+                {savingsRemainingCell(savingsLine).text}
+              </div>
+              <div />
+            </div>
+            </React.Fragment>
+          )}
         </div>
       )}
       {categories.items.length > 0 && (

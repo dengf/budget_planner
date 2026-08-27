@@ -82,6 +82,9 @@ export default {
   'budget.incomeAmount': '收入金額',
   'budget.spentHint': '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
+  'budget.savings': '儲蓄',
+  'budget.savingsHint': '收入減去所有支出——實際存下的錢',
+  'budget.savingsActual': '已儲蓄',
 
   'cat.group.income': '收入',
   'cat.group.expense': '支出',

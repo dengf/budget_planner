@@ -21,14 +21,17 @@
 //! `JsValue`, calls into `budget-calc` or `budget-ext-redb`, and
 //! serializes the result back. See CLAUDE.md.
 //!
-//! Receipt OCR and PDF-text-extraction bindings (`run_ocr`,
-//! `extract_pdf_text`, `parse_receipt_text`) live in the sibling
-//! `budget-wasm-ocr` crate instead, compiled to a separate `.wasm` file
-//! that `www/src/receiptCapture.js` only loads the first time someone
-//! opens the receipt-capture UI. `ocrs`/`rten` pull in a full ML tensor
-//! runtime that was most of this crate's wasm payload despite most
-//! sessions never touching that feature -- see `budget-wasm-ocr`'s own
-//! doc comment for the measured size.
+//! Receipt OCR (`run_ocr`) and PDF text extraction (`extract_pdf_text`)
+//! live in the sibling `budget-wasm-ocr` and `budget-wasm-pdf` crates
+//! instead, each compiled to its own separate `.wasm` file that
+//! `www/src/receiptCapture.js` only loads the first time someone actually
+//! takes that path (a photo scan never downloads the PDF crate's weight,
+//! and vice versa). `ocrs`/`rten` and `pdf-extract` respectively are why
+//! -- see each crate's own doc comment for the measured size. This
+//! crate's own [`receipt`] module, by contrast, is `parse_receipt_text`:
+//! plain text/`Decimal` parsing with no heavy dependency, so it lives
+//! here in the always-loaded core instead of duplicated in both lazy
+//! crates.
 
 use wasm_bindgen::prelude::*;
 
@@ -40,18 +43,20 @@ pub mod dto;
 pub mod goals;
 pub mod message;
 pub mod presets;
+pub mod receipt;
 pub mod recurring;
 pub mod rules;
 #[cfg(target_arch = "wasm32")]
 pub mod storage;
 pub mod transaction;
 
-pub use category::build_month;
+pub use category::{build_month, build_savings_line};
 pub use csv_import::{detect_csv_columns, import_csv};
 pub use debt::build_payoff_plan;
 pub use goals::{goal_progress, milestone_crossed, required_contribution};
 pub use message::Message;
 pub use presets::preset_categories;
+pub use receipt::parse_receipt_text;
 pub use recurring::recurring_occurrences;
 pub use rules::apply_rules;
 #[cfg(target_arch = "wasm32")]
@@ -83,11 +88,7 @@ mod bridge_coverage {
         ),
         (
             "pdf_text",
-            "bridged in the sibling budget-wasm-ocr crate, not here -- see this crate's lib.rs doc comment",
-        ),
-        (
-            "receipt",
-            "bridged in the sibling budget-wasm-ocr crate, not here -- see this crate's lib.rs doc comment",
+            "bridged in the sibling budget-wasm-pdf crate, not here -- see this crate's lib.rs doc comment",
         ),
     ];
 

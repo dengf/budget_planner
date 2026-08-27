@@ -74,6 +74,31 @@ pub struct BuildMonthResult {
     pub error_message: Option<Message>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct BuildSavingsLineParams {
+    pub planned: f64,
+    pub income: f64,
+    pub total_expense_actual: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct BuildSavingsLineResult {
+    pub line: Option<CategoryLineDto>,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+// ---- receipt capture (text parsing only -- OCR/PDF extraction bindings
+// live in the sibling budget-wasm-ocr/budget-wasm-pdf crates) -----------
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ParseReceiptTextResult {
+    pub description: Option<String>,
+    pub amount: Option<f64>,
+    pub date: Option<String>,
+    pub is_income: bool,
+}
+
 // ---- transactions & rules -----------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

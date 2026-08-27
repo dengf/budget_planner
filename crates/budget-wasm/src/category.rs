@@ -3,7 +3,10 @@
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{f64_to_decimal, to_js};
-use crate::dto::{BuildMonthParams, BuildMonthResult, CategoryLineDto, MonthSummaryDto};
+use crate::dto::{
+    BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
+    CategoryLineDto, MonthSummaryDto,
+};
 use crate::message::Message;
 
 #[wasm_bindgen]
@@ -80,6 +83,60 @@ fn build_month_impl(params: JsValue) -> BuildMonthResult {
         Err(e) => {
             let message = Message::from(&e);
             BuildMonthResult {
+                error: Some(message.text.clone()),
+                error_message: Some(message),
+                ..Default::default()
+            }
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn build_savings_line(params: JsValue) -> JsValue {
+    to_js(&build_savings_line_impl(params))
+}
+
+fn build_savings_line_impl(params: JsValue) -> BuildSavingsLineResult {
+    let params: BuildSavingsLineParams = match serde_wasm_bindgen::from_value(params) {
+        Ok(p) => p,
+        Err(_) => {
+            let message = Message::bad_request();
+            return BuildSavingsLineResult {
+                error: Some(message.text.clone()),
+                error_message: Some(message),
+                ..Default::default()
+            };
+        }
+    };
+
+    let (Some(planned), Some(income), Some(total_expense_actual)) = (
+        f64_to_decimal(params.planned),
+        f64_to_decimal(params.income),
+        f64_to_decimal(params.total_expense_actual),
+    ) else {
+        let message = Message::bad_request();
+        return BuildSavingsLineResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
+    };
+
+    match budget_calc::build_savings_line(planned, income, total_expense_actual) {
+        Ok(l) => BuildSavingsLineResult {
+            line: Some(CategoryLineDto {
+                category_id: l.category_id,
+                planned: crate::convert::decimal_to_f64(l.planned),
+                rollover: crate::convert::decimal_to_f64(l.rollover),
+                spent: crate::convert::decimal_to_f64(l.spent),
+                remaining: crate::convert::decimal_to_f64(l.remaining),
+            }),
+            error: None,
+            error_message: None,
+        },
+        Err(e) => {
+            let message = Message::from(&e);
+            BuildSavingsLineResult {
                 error: Some(message.text.clone()),
                 error_message: Some(message),
                 ..Default::default()

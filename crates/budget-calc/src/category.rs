@@ -132,6 +132,43 @@ pub fn build_month(
         .collect())
 }
 
+/// The synthetic category id the Savings row uses for its planned-amount
+/// storage -- never a real `Category` record (see `build_savings_line`'s
+/// own doc comment for why), so nothing else validates this id against
+/// `budget-ports`' categories table. `www/src/savings.js` defines the
+/// identical literal; the two must stay in sync the same way
+/// `commitments.js`'s `GOAL_PREFIX`/`DEBT_PREFIX` already are frontend-
+/// only synthetic ids `build_month` treats opaquely.
+pub const SAVINGS_CATEGORY_ID: &str = "__savings__";
+
+/// The Savings row's line for one month. Unlike every other category,
+/// its actual isn't summed from its own transactions -- there are none,
+/// since Savings is never a category a transaction can be filed under --
+/// it's the residual of what's left once every expense category's actual
+/// is subtracted from income: literally what got saved, not what someone
+/// remembered to log against a Savings bucket by hand.
+///
+/// Reuses `build_line`'s own planned-minus-actual arithmetic (with
+/// rollover fixed at zero, same simplification every other category
+/// currently has -- see CLAUDE.md) rather than a second formula that
+/// could drift from it.
+pub fn build_savings_line(
+    planned: Decimal,
+    income: Decimal,
+    total_expense_actual: Decimal,
+) -> BudgetResult<CategoryLine> {
+    if planned.is_sign_negative() {
+        return Err(BudgetError::NegativePlannedAmount(planned.to_string()));
+    }
+    let actual = income - total_expense_actual;
+    Ok(build_line(
+        SAVINGS_CATEGORY_ID.to_string(),
+        planned,
+        Decimal::ZERO,
+        actual,
+    ))
+}
+
 /// The month's headline numbers: total planned, total spent, and how much
 /// of income is still unassigned -- the number a true zero-based budget
 /// drives to zero.
@@ -228,5 +265,41 @@ mod tests {
         let lines = build_month(&planned, &[], &[]).unwrap();
         let summary = summarize_month(dec!(2000), &lines);
         assert_eq!(summary.unassigned, dec!(0));
+    }
+
+    #[test]
+    fn savings_actual_is_income_minus_total_expense_actual() {
+        let line = build_savings_line(dec!(500), dec!(3000), dec!(2200)).unwrap();
+        assert_eq!(line.spent, dec!(800));
+        assert_eq!(line.category_id, SAVINGS_CATEGORY_ID);
+    }
+
+    #[test]
+    fn saving_more_than_planned_gives_a_negative_remaining_same_as_income_running_ahead() {
+        // Planned to save 500, actually saved 800 -- exceeding the target,
+        // which reads as good news the same way an income category
+        // running ahead of plan does elsewhere in this app.
+        let line = build_savings_line(dec!(500), dec!(3000), dec!(2200)).unwrap();
+        assert_eq!(line.remaining, dec!(-300));
+    }
+
+    #[test]
+    fn falling_short_of_the_savings_target_gives_a_positive_remaining() {
+        // Planned to save 500, expenses ate into it -- only 200 actually left.
+        let line = build_savings_line(dec!(500), dec!(3000), dec!(2800)).unwrap();
+        assert_eq!(line.spent, dec!(200));
+        assert_eq!(line.remaining, dec!(300));
+    }
+
+    #[test]
+    fn spending_more_than_income_gives_a_negative_savings_actual() {
+        let line = build_savings_line(dec!(0), dec!(2000), dec!(2500)).unwrap();
+        assert_eq!(line.spent, dec!(-500));
+    }
+
+    #[test]
+    fn a_negative_savings_target_is_rejected_same_as_any_other_category() {
+        let err = build_savings_line(dec!(-1), dec!(2000), dec!(1000)).unwrap_err();
+        assert_eq!(err, BudgetError::NegativePlannedAmount("-1".to_string()));
     }
 }

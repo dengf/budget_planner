@@ -86,6 +86,9 @@ export default {
   'budget.incomeAmount': 'Amount received',
   'budget.spentHint': 'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
+  'budget.savings': 'Savings',
+  'budget.savingsHint': 'Income minus every expense — what actually got saved',
+  'budget.savingsActual': 'Saved',
 
   'cat.group.income': 'Income',
   'cat.group.expense': 'Expense',

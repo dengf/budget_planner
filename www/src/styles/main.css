@@ -347,6 +347,14 @@ table.data tr:last-child td { border-bottom: none; }
 
 .category-row { display: grid; grid-template-columns: 1.4fr 0.9fr 0.9fr 1.1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .category-row:last-child { border-bottom: none; }
+/* Separates Savings from every real category above it -- Savings is
+   always the last row in the table, never sorted in among the others. */
+.category-row-divider { height: 1px; margin: 4px 0 6px; background: var(--line); border: none; }
+.category-row-savings { font-weight: 600; }
+/* Same "always last, set apart" treatment in the printable Report's plain
+   table -- a heavier top border stands in for the grid layout's divider
+   div, since a table row can't host one directly. */
+.report-savings-row td { font-weight: 600; border-top: 2px solid var(--line); }
 .category-name { font-weight: 600; }
 .category-group { color: var(--muted-2); font-size: 0.75rem; }
 
