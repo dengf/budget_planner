@@ -55,9 +55,6 @@ export function createUnavailableModule() {
     milestone_crossed: unavailable,
     required_contribution: unavailable,
     build_payoff_plan: unavailable,
-    extract_pdf_text: unavailable,
-    run_ocr: unavailable,
-    parse_receipt_text: () => ({ description: null, amount: null, date: null, is_income: false }),
     new_id: () => `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
 
     init_storage: async () => {},

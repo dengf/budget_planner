@@ -4,10 +4,13 @@
 www/node_modules/
 www/dist/
 www/pkg/
+www/pkg-ocr/
 
 # wasm-pack
 crates/budget-wasm/pkg/
 crates/budget-wasm/target/
+crates/budget-wasm-ocr/pkg/
+crates/budget-wasm-ocr/target/
 
 .DS_Store
 __pycache__/

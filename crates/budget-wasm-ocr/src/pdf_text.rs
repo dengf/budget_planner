@@ -7,11 +7,11 @@
 //! one as a JS array element -- fine for the small structured params
 //! every other binding takes, wasteful for a multi-megabyte file.
 
+use budget_core::Message;
 use wasm_bindgen::prelude::*;
 
 use crate::convert::to_js;
 use crate::dto::ExtractPdfTextResult;
-use crate::message::Message;
 
 #[wasm_bindgen]
 pub fn extract_pdf_text(bytes: &[u8]) -> JsValue {

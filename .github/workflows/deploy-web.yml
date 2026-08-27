@@ -6,6 +6,7 @@ on:
     paths:
       - 'www/**'
       - 'crates/budget-wasm/**'
+      - 'crates/budget-wasm-ocr/**'
       - 'crates/budget-calc/**'
       - 'crates/budget-core/**'
       - 'crates/budget-ports/**'

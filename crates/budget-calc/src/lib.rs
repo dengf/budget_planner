@@ -8,7 +8,9 @@ pub mod category;
 pub mod csv_import;
 pub mod debt;
 pub mod goals;
+#[cfg(feature = "receipt-capture")]
 pub mod ocr;
+#[cfg(feature = "receipt-capture")]
 pub mod pdf_text;
 pub mod presets;
 pub mod receipt;
@@ -24,7 +26,9 @@ pub use debt::{build_plan, Debt, PayoffMonth, PayoffPlan, Strategy};
 pub use goals::{
     milestone_crossed, petals_filled, progress_ratio, required_contribution, Goal, Milestone,
 };
+#[cfg(feature = "receipt-capture")]
 pub use ocr::run_ocr;
+#[cfg(feature = "receipt-capture")]
 pub use pdf_text::extract_pdf_text;
 pub use presets::{for_region, PresetCategory};
 pub use receipt::{parse_receipt_text, ParsedReceipt};

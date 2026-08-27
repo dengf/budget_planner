@@ -14,6 +14,7 @@ members = [
     "crates/budget-ports",
     "crates/budget-ext-redb",
     "crates/budget-wasm",
+    "crates/budget-wasm-ocr",
 ]
 resolver = "2"
 

@@ -6,11 +6,11 @@
 //! the small structured params `serde_wasm_bindgen` is used for
 //! elsewhere in this crate.
 
+use budget_core::Message;
 use wasm_bindgen::prelude::*;
 
 use crate::convert::to_js;
 use crate::dto::RunOcrResult;
-use crate::message::Message;
 
 #[wasm_bindgen]
 pub fn run_ocr(

@@ -26,7 +26,29 @@ than one that is visibly broken.
 | `budget-calc` | Every calculation: allocation, rules, CSV import, goals, debt payoff |
 | `budget-ports` / `budget-ext-redb` | Persistence port + redb/IndexedDB adapter |
 | `budget-wasm` | Bridge only. Parse `JsValue`, call `budget-calc`, serialize back |
+| `budget-wasm-ocr` | Bridge only, same rule — but a *separate* wasm module (see below) |
 | `www/` | Layout, input, formatting for display, i18n |
+
+### Two wasm modules, not one
+
+`budget-wasm-ocr` exists purely to keep `budget-wasm`'s download small.
+`ocrs`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
+of the wasm payload — 3.7MB with them compiled in, ~800KB without —
+despite most sessions never opening "Take a photo" or "Upload PDF".
+`budget-calc`'s `receipt-capture` Cargo feature (default off, enabled only
+by `budget-wasm-ocr`) keeps `ocrs`/`rten`/`pdf-extract` out of
+`budget-wasm`'s dependency graph entirely, not just unreached at runtime.
+`www/src/receiptCapture.js` `import()`s `pkg-ocr` lazily, the first time
+the receipt-capture UI actually opens.
+
+If a future dependency is similarly heavy and similarly rarely used,
+follow this pattern rather than adding it to `budget-calc` unconditionally:
+a Cargo feature gating the heavy crate, a new thin `budget-wasm-*` binding
+crate that enables it, and a lazy `import()` in the one JS entry point that
+needs it. `Message` (the wasm-boundary error convention) lives in
+`budget-core`, not either wasm crate, specifically so two wasm-bindgen
+crates mapping `BudgetError` never duplicate that mapping — see
+`budget-core/src/message.rs`'s own doc comment.
 
 Business logic is anything where a second implementation could give a
 different answer: arithmetic on money, thresholds, deriving one value from
@@ -121,7 +143,18 @@ gets skipped, so ask it explicitly.
   relying on the slower `www-build` job to exercise it indirectly; run it
   locally before trusting a green native build.
 - **`npm run build` does not rebuild the wasm.** Run `npm run build:wasm`
-  first, or you are testing the previous `pkg/`.
+  first, or you are testing the previous `pkg/` and `pkg-ocr/`.
+- **`cargo build -p budget-wasm --target wasm32-unknown-unknown` alone
+  does not prove `budget-wasm-ocr` compiles.** They're separate crates
+  with separate wasm-pack builds (`npm run build:wasm:core` /
+  `build:wasm:ocr`); CI's `wasm32` job checks both, and a local check
+  should too before trusting either build. `cargo build --workspace`
+  unifies `budget-calc`'s `receipt-capture` feature across every member
+  being built together (since `budget-wasm-ocr` requests it), which masks
+  whether `budget-wasm` alone still excludes it — the only way to confirm
+  the size split still holds is `cd crates/budget-wasm && wasm-pack build
+  --target web --out-dir ../../www/pkg` in isolation and checking
+  `budget_wasm_bg.wasm`'s size directly.
 - **jsdom has no `localStorage`** on `window` or as a bare global; every
   storage path (`region.js`, `income.js`) runs into its catch block under
   test unless the test stands up a fake.

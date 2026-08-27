@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
-import { extractReceiptText } from '../receiptCapture';
+import { extractReceiptText, parseReceiptText } from '../receiptCapture';
 import CalcError from './CalcError';
 import CameraCapture from './CameraCapture';
 import DirectionWarning from './DirectionWarning';
@@ -30,14 +30,14 @@ export default function ReceiptCapture({ wasmModule, newId, categories, rules, t
     setCalcError(null);
     setStatus('reading');
     try {
-      const { text, calcError: extractError } = await extractReceiptText(wasmModule, file);
+      const { text, calcError: extractError } = await extractReceiptText(file);
       if (extractError) {
         setCalcError(extractError);
         setStatus('idle');
         return;
       }
 
-      const parsed = await wasmModule.parse_receipt_text(text);
+      const parsed = await parseReceiptText(text);
       let category_id = '';
       if (parsed.description || parsed.amount != null) {
         const guess = await wasmModule.apply_rules({

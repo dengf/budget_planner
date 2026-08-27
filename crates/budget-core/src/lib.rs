@@ -6,11 +6,13 @@
 
 mod cadence;
 mod error;
+mod message;
 mod region;
 mod rounding;
 
 pub use cadence::Cadence;
 pub use error::BudgetError;
+pub use message::Message;
 pub use region::Region;
 pub use rounding::round_currency;
 
