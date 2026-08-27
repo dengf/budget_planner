@@ -86,23 +86,12 @@ fn find_column(headers: &[String], keywords: &[&str]) -> Option<usize> {
 /// Guesses a `ColumnMapping` from the CSV's header row, the way a person
 /// reading the same row by eye would: matching common bank/card export
 /// column names ("Date", "Memo", "Debit"/"Credit", ...) rather than
-/// assuming a fixed column order. Returns `None` -- never a wrong guess
-/// -- when the first row doesn't look like a header at all, or doesn't
-/// contain enough recognizable columns to build a usable mapping;
-/// `TransactionsTab` falls back to its own manual defaults in that case,
-/// so nothing is lost by trying this first.
-pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .flexible(true)
-        .from_reader(csv_text.as_bytes());
-    let first_row = reader.records().next()?.ok()?;
-    let headers: Vec<String> = first_row.iter().map(str::to_string).collect();
+/// assuming a fixed column order.
+fn detect_from_header(headers: &[String]) -> Option<ColumnMapping> {
+    let date_col = find_column(headers, &DATE_HEADERS)?;
+    let description_col = find_column(headers, &DESCRIPTION_HEADERS)?;
 
-    let date_col = find_column(&headers, &DATE_HEADERS)?;
-    let description_col = find_column(&headers, &DESCRIPTION_HEADERS)?;
-
-    if let Some(amount_col) = find_column(&headers, &AMOUNT_HEADERS) {
+    if let Some(amount_col) = find_column(headers, &AMOUNT_HEADERS) {
         return Some(ColumnMapping {
             date_col,
             description_col,
@@ -112,8 +101,8 @@ pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
         });
     }
 
-    let debit_col = find_column(&headers, &DEBIT_HEADERS)?;
-    let credit_col = find_column(&headers, &CREDIT_HEADERS)?;
+    let debit_col = find_column(headers, &DEBIT_HEADERS)?;
+    let credit_col = find_column(headers, &CREDIT_HEADERS)?;
     Some(ColumnMapping {
         date_col,
         description_col,
@@ -121,6 +110,161 @@ pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
         credit_col: Some(credit_col),
         has_header: true,
     })
+}
+
+const CONTENT_DATE_FORMATS: [&str; 6] = [
+    "%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y",
+];
+
+fn looks_like_a_date(raw: &str) -> bool {
+    let trimmed = raw.trim();
+    CONTENT_DATE_FORMATS
+        .iter()
+        .any(|fmt| chrono::NaiveDate::parse_from_str(trimmed, fmt).is_ok())
+}
+
+/// Deliberately narrower than `parse_amount` alone: a bare integer like
+/// "10294" parses fine as a `Decimal` but is exactly as likely to be a
+/// reference number as a whole-dollar amount, and unlike the header-name
+/// path (which trusts a column labeled "Amount" even with no header text
+/// to confirm it), content-sniffing has no such confirmation to fall
+/// back on -- so it requires a decimal point or currency symbol before
+/// it will call a column "money". Known, deliberate gap: a real
+/// whole-dollar-only export with no header row won't be picked up by
+/// this path (the header-name path still handles it fine when a header
+/// exists).
+fn looks_like_an_amount(raw: &str) -> bool {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let has_currency_marking = trimmed.contains('.')
+        || trimmed
+            .chars()
+            .any(|c| !c.is_ascii_digit() && !c.is_ascii_whitespace() && c != '-');
+    has_currency_marking && parse_amount(trimmed).is_some()
+}
+
+/// A real debit/credit split has, on nearly every sampled row, at most
+/// one side filled -- a debit and a credit landing in the same row would
+/// mean two unrelated amount-shaped columns that just happen to both
+/// look like money, not an actual split pair. Not a strict 100%: the
+/// sample includes row 0, which is both-filled on every genuine header
+/// (its two column labels are never blank), so requiring every row would
+/// make this reject the very shape it exists to recognize.
+fn is_debit_credit_shaped(a: &[&str], b: &[&str]) -> bool {
+    if a.is_empty() {
+        return false;
+    }
+    let single_sided = a
+        .iter()
+        .zip(b)
+        .filter(|(x, y)| x.trim().is_empty() || y.trim().is_empty())
+        .count();
+    single_sided as f64 / a.len() as f64 >= 0.8
+}
+
+/// Falls back to sniffing each column's actual values when the header
+/// (if any) doesn't use a recognized name for any role -- an export in
+/// another language, an unusual label, or no header row at all. Reads
+/// the sample the way a person skimming unfamiliar rows would: "this
+/// column's all dates," "this one's all money." A column needs a
+/// majority of the sample to agree before it's trusted with a role, and
+/// this bails entirely -- `None`, not a guess -- on genuine ambiguity
+/// (more than one equally-plausible amount column with no debit/credit
+/// shape to it, or no column that reads as a date at all).
+fn detect_columns_from_content(rows: &[Vec<String>]) -> Option<ColumnMapping> {
+    const MIN_MATCH_RATIO: f64 = 0.6;
+
+    let width = rows.iter().map(Vec::len).max()?;
+    if width == 0 {
+        return None;
+    }
+
+    let column = |c: usize| -> Vec<&str> {
+        rows.iter()
+            .filter_map(|r| r.get(c))
+            .map(String::as_str)
+            .collect()
+    };
+    // A blank cell is inconclusive, not a strike against the column -- a
+    // debit/credit split is *supposed* to be roughly half-empty on each
+    // side, and scoring those blanks as mismatches would push a real
+    // split column below the confidence threshold precisely because it's
+    // shaped the way a split column should be.
+    let match_ratio = |cells: &[&str], matches: fn(&str) -> bool| -> f64 {
+        let non_blank: Vec<&&str> = cells.iter().filter(|c| !c.trim().is_empty()).collect();
+        if non_blank.is_empty() {
+            return 0.0;
+        }
+        non_blank.iter().filter(|c| matches(c)).count() as f64 / non_blank.len() as f64
+    };
+
+    let date_col = (0..width)
+        .filter(|&c| match_ratio(&column(c), looks_like_a_date) >= MIN_MATCH_RATIO)
+        .max_by(|&a, &b| {
+            match_ratio(&column(a), looks_like_a_date)
+                .total_cmp(&match_ratio(&column(b), looks_like_a_date))
+        })?;
+
+    let amount_candidates: Vec<usize> = (0..width)
+        .filter(|&c| {
+            c != date_col && match_ratio(&column(c), looks_like_an_amount) >= MIN_MATCH_RATIO
+        })
+        .collect();
+
+    let (amount_col, credit_col) = match amount_candidates.as_slice() {
+        [single] => (*single, None),
+        [a, b] if is_debit_credit_shaped(&column(*a), &column(*b)) => (*a, Some(*b)),
+        _ => return None,
+    };
+
+    let description_col = (0..width)
+        .filter(|&c| c != date_col && c != amount_col && Some(c) != credit_col)
+        .max_by_key(|&c| {
+            let cells = column(c);
+            cells.iter().map(|s| s.len()).sum::<usize>() / cells.len().max(1)
+        })?;
+
+    let first = rows.first()?;
+    // A header row's cells are labels, not values, so they fail the same
+    // date/amount checks that picked these columns in the first place --
+    // that mismatch is the signal that row 0 should be skipped on import.
+    let has_header = !first.get(date_col).is_some_and(|v| looks_like_a_date(v))
+        || !first
+            .get(amount_col)
+            .is_some_and(|v| looks_like_an_amount(v));
+
+    Some(ColumnMapping {
+        date_col,
+        description_col,
+        amount_col,
+        credit_col,
+        has_header,
+    })
+}
+
+/// Guesses a `ColumnMapping` for `csv_text`, trying the header row's
+/// column names first (the common case for a real bank/card export) and
+/// falling back to sniffing the data itself when that doesn't confidently
+/// resolve. Returns `None` -- never a wrong guess -- when neither pass
+/// can confidently place every required column; `TransactionsTab` falls
+/// back to its own manual defaults in that case, so nothing is lost by
+/// trying this first.
+pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .from_reader(csv_text.as_bytes());
+    let rows: Vec<Vec<String>> = reader
+        .records()
+        .take(11) // a possible header, plus up to 10 data rows to sample
+        .filter_map(|r| r.ok())
+        .map(|r| r.iter().map(str::to_string).collect())
+        .collect();
+
+    let first_row = rows.first()?;
+    detect_from_header(first_row).or_else(|| detect_columns_from_content(&rows))
 }
 
 /// Common thousands separators and a currency symbol prefix/suffix a bank
@@ -304,6 +448,65 @@ mod tests {
     #[test]
     fn a_missing_amount_and_debit_credit_pair_gives_up() {
         assert_eq!(detect_columns("Date,Description,Balance\n"), None);
+    }
+
+    #[test]
+    fn content_sniffing_detects_columns_in_a_headerless_export() {
+        let csv =
+            "2026-08-01,STARBUCKS,-5.50\n2026-08-02,SALARY,3000.00\n2026-08-03,RENT,-1500.00\n";
+        let m = detect_columns(csv).unwrap();
+        assert_eq!(m.date_col, 0);
+        assert_eq!(m.description_col, 1);
+        assert_eq!(m.amount_col, 2);
+        assert_eq!(m.credit_col, None);
+        assert!(!m.has_header);
+    }
+
+    #[test]
+    fn content_sniffing_recovers_when_header_names_are_unrecognized() {
+        let csv = "Wann,Was,Betrag\n2026-08-01,KAFFEE,-3.50\n2026-08-02,GEHALT,3000.00\n2026-08-03,MIETE,-1200.00\n";
+        let m = detect_columns(csv).unwrap();
+        assert_eq!(m.date_col, 0);
+        assert_eq!(m.description_col, 1);
+        assert_eq!(m.amount_col, 2);
+        assert!(
+            m.has_header,
+            "the header row's own cells don't look like a date or amount"
+        );
+    }
+
+    #[test]
+    fn content_sniffing_detects_a_debit_credit_shape() {
+        // More rows than the other fixtures deliberately: a real split
+        // column is only ever about half filled, so a small sample makes
+        // the header row's own non-matching text a bigger fraction of
+        // what's left -- exactly the shape `detect_columns`'s real 10-row
+        // sample is built to be robust against.
+        let csv = "Datum,Text,Soll,Haben\n\
+                   2026-08-01,KAFFEE,3.50,\n\
+                   2026-08-02,GEHALT,,3000.00\n\
+                   2026-08-03,MIETE,1200.00,\n\
+                   2026-08-04,BUS,4.00,\n\
+                   2026-08-05,BONUS,,500.00\n\
+                   2026-08-06,STROM,89.00,\n";
+        let m = detect_columns(csv).unwrap();
+        assert_eq!(m.amount_col, 2);
+        assert_eq!(m.credit_col, Some(3));
+    }
+
+    #[test]
+    fn a_plain_reference_number_column_is_not_mistaken_for_an_amount() {
+        let csv = "Wann,Was,Ref,Betrag\n2026-08-01,KAFFEE,10293,-3.50\n2026-08-02,GEHALT,10294,3000.00\n2026-08-03,MIETE,10295,-1200.00\n";
+        let m = detect_columns(csv).unwrap();
+        assert_eq!(m.amount_col, 3);
+    }
+
+    #[test]
+    fn genuinely_ambiguous_content_still_gives_up() {
+        // Two columns that both look like independent amounts on the same
+        // rows, not a debit/credit shape -- no confident single guess.
+        let csv = "Wann,Was,A,B\n2026-08-01,X,3.50,7.25\n2026-08-02,Y,4.10,8.00\n2026-08-03,Z,5.00,9.99\n";
+        assert_eq!(detect_columns(csv), None);
     }
 
     fn ids() -> impl FnMut() -> String {
