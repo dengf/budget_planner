@@ -245,7 +245,14 @@ export default function TransactionsTab({
         </p>
       )}
 
-      <details className="csv-columns" open={csvText !== '' && !columnsDetected}>
+      {/* Only exists in the DOM at all once there's an actual reason for
+          it -- a file picked and detection couldn't confidently place
+          every column. A permanently-present toggle (even collapsed)
+          read as "the manual fields weren't really removed" to someone
+          skimming the page, which defeats the point just as surely as
+          leaving them expanded would have. */}
+      {csvText && !columnsDetected && (
+      <details className="csv-columns" open>
         <summary>{t('transactions.mapColumns')}</summary>
         <div className="form-grid">
           <label className="field">
@@ -266,6 +273,7 @@ export default function TransactionsTab({
           </label>
         </div>
       </details>
+      )}
 
       <div className="form-grid">
         <button className="btn" type="button" onClick={runImport} disabled={!csvText}>{t('transactions.import')}</button>
