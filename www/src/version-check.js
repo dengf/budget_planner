@@ -43,7 +43,7 @@ async function deployedBuildId() {
  * URL the cache has never seen instead. `replace` rather than `assign` so
  * the stale page doesn't become a back-button destination.
  */
-function reloadOnto(deployedId) {
+export function reloadOnto(deployedId) {
   // If we already reloaded for this id and are somehow still stale,
   // something is wrong upstream — stop rather than loop.
   if (sessionStorage.getItem(RELOAD_GUARD_KEY) === deployedId) {

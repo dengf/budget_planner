@@ -3,6 +3,8 @@
 export default {
   'app.title': 'Budget Planner',
   'app.loading': 'Loading…',
+  'app.updateAvailable': "A new version of Budget Planner is ready.",
+  'app.reload': 'Reload',
   'app.byline': '— a {logo} app',
   'app.language': 'Language',
   'app.region': 'Region',

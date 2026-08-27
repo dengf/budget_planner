@@ -5,6 +5,7 @@ import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { detectRegion, rememberRegion } from './region';
 import { hasSeeded, rememberSeeded } from './seeded';
+import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { saveIncome } from './income';
 import { currentMonth } from './month';
@@ -333,6 +334,7 @@ export function AppShell({ wasmModule }) {
       </main>
       <CalcErrorPortal result={guardResult} />
       {confirmDialog}
+      <UpdateBanner />
     </div>
   );
 }

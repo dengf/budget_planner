@@ -459,6 +459,12 @@ table.data tr:last-child td { border-bottom: none; }
   font-size: 1.1rem; line-height: 1; padding: 2px 4px; flex: none;
 }
 
+/* A new deploy being available isn't an error -- the base .toast is
+   styled red for CalcError's failures, so this overrides to a neutral
+   tone and gives the Reload button room next to the dismiss ×. */
+.update-toast { background: var(--panel-alt); border-color: var(--line); color: var(--ink); }
+.update-toast .btn { flex: none; padding: 6px 12px; font-size: 0.82rem; }
+
 /* Confirm dialog */
 .confirm-backdrop {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);

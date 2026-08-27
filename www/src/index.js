@@ -27,8 +27,19 @@ export function getWasmModule() {
   return wasmModule;
 }
 
+// A stale-but-visible tab can't be reloaded out from under someone (see
+// version-check.js's own doc comment on why), so the only way to close
+// that gap is to tell them -- otherwise a deploy that landed while their
+// tab stayed open and focused is invisible to them indefinitely, not just
+// for the ten minutes GitHub Pages caches HTML for. This runs before
+// React mounts, so the event carries the news to whichever component
+// ends up listening rather than assuming one exists yet.
+function notifyStaleVersion(buildId) {
+  window.dispatchEvent(new CustomEvent('bp:stale-version', { detail: { buildId } }));
+}
+
 async function main() {
-  startVersionCheck();
+  startVersionCheck({ onStale: notifyStaleVersion });
 
   const wasm = await initWasm();
   wasmModule = wasm;

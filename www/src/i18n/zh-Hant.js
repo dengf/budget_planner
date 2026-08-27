@@ -2,6 +2,8 @@
 export default {
   'app.title': '預算規劃',
   'app.loading': '載入中…',
+  'app.updateAvailable': '預算規劃已有新版本。',
+  'app.reload': '重新整理',
   'app.byline': '— {logo} 出品',
   'app.language': '語言',
   'app.region': '地區',
