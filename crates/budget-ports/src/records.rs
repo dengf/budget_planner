@@ -11,6 +11,11 @@ pub struct CategoryRecord {
     pub id: String,
     pub name: String,
     pub group: String,
+    /// Added after this record shape was already in use -- `#[serde(default)]`
+    /// so a category saved before this field existed deserializes as an
+    /// expense category (`false`) rather than failing to load at all.
+    #[serde(default)]
+    pub is_income: bool,
 }
 
 /// One category's planned amount for one month. `month` is `YYYY-MM`.

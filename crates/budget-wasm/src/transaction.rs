@@ -1,4 +1,4 @@
-//! `spend_by_category`.
+//! `spend_by_category`, `income_by_category`.
 
 use wasm_bindgen::prelude::*;
 
@@ -17,42 +17,54 @@ fn from_dto(dto: &TransactionDto) -> Option<budget_calc::Transaction> {
     Some(t)
 }
 
-#[wasm_bindgen]
-pub fn spend_by_category(params: JsValue) -> JsValue {
-    to_js(&spend_by_category_impl(params))
+/// Shared by both bindings below: parse the params, then the
+/// transactions inside them -- the two ways this can fail (unparseable
+/// `JsValue`, or a transaction whose `f64` amount isn't finite) produce
+/// the same `bad_request` either function would report on its own.
+fn parse_transactions(params: JsValue) -> Result<Vec<budget_calc::Transaction>, Message> {
+    let params: SpendByCategoryParams =
+        serde_wasm_bindgen::from_value(params).map_err(|_| Message::bad_request())?;
+    params
+        .transactions
+        .iter()
+        .map(from_dto)
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(Message::bad_request)
 }
 
-fn spend_by_category_impl(params: JsValue) -> SpendByCategoryResult {
-    let params: SpendByCategoryParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return SpendByCategoryResult {
-                error: Some(message.text),
-                ..Default::default()
-            };
-        }
-    };
-
-    let Some(transactions): Option<Vec<_>> = params.transactions.iter().map(from_dto).collect()
-    else {
-        let message = Message::bad_request();
-        return SpendByCategoryResult {
-            error: Some(message.text),
-            ..Default::default()
-        };
-    };
-
-    let totals = budget_calc::spend_by_category(&transactions)
-        .into_iter()
-        .map(|(category_id, amount)| AmountResultDto {
-            category_id,
-            amount: decimal_to_f64(amount),
-        })
-        .collect();
-
+fn totals_result(totals: Vec<(String, rust_decimal::Decimal)>) -> SpendByCategoryResult {
     SpendByCategoryResult {
-        totals,
+        totals: totals
+            .into_iter()
+            .map(|(category_id, amount)| AmountResultDto {
+                category_id,
+                amount: decimal_to_f64(amount),
+            })
+            .collect(),
         error: None,
     }
+}
+
+#[wasm_bindgen]
+pub fn spend_by_category(params: JsValue) -> JsValue {
+    to_js(&match parse_transactions(params) {
+        Ok(transactions) => totals_result(budget_calc::spend_by_category(&transactions)),
+        Err(message) => SpendByCategoryResult {
+            error: Some(message.text),
+            ..Default::default()
+        },
+    })
+}
+
+/// The positive-side counterpart to `spend_by_category`, for
+/// `Category.is_income` categories -- see `budget_calc::income_by_category`.
+#[wasm_bindgen]
+pub fn income_by_category(params: JsValue) -> JsValue {
+    to_js(&match parse_transactions(params) {
+        Ok(transactions) => totals_result(budget_calc::income_by_category(&transactions)),
+        Err(message) => SpendByCategoryResult {
+            error: Some(message.text),
+            ..Default::default()
+        },
+    })
 }

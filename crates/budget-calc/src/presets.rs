@@ -1,4 +1,4 @@
-//! Starter category sets, per region.
+//! Starter categories: one universal set, not a per-region one.
 //!
 //! A first-run budget with no categories is a blank page, and the blank
 //! page is where people give up -- naming a dozen categories from memory
@@ -6,12 +6,19 @@
 //! lines most households actually have, offered as a starting point to
 //! rename or delete, never imposed.
 //!
-//! **Why this lives in Rust rather than a JS constant.** Which categories
-//! a market gets is domain content that differs by ruleset: an SG budget
-//! has S&CC and a parents' allowance where a US one has health insurance
-//! premiums. That is "choosing between rulesets" in CLAUDE.md's sense --
-//! a second implementation could give a different answer -- so it is
-//! tested here rather than drifting in a `.jsx` file.
+//! This list replaced an earlier US/SG-specific pair after real-user
+//! feedback: the income/expense taxonomy below (five income sources,
+//! nine expense categories, an "Other" catch-all on each side) isn't
+//! region-flavoured the way the old set was (S&CC, a parents' allowance),
+//! so `for_region` now hands back the same set regardless of region --
+//! kept as a function, not simplified to a constant, so a genuinely
+//! region-specific line item has somewhere to go later without another
+//! signature change rippling through `budget-wasm` and `www/`.
+//!
+//! **Why this lives in Rust rather than a JS constant.** Even a universal
+//! taxonomy is a specific choice -- which nine expense buckets, in what
+//! words -- that a second implementation could make differently. See
+//! CLAUDE.md's "choosing between rulesets" rule.
 //!
 //! **Why a key and not a name.** Same convention as `budget-wasm`'s
 //! `Message`: what crosses the boundary is a code plus an English
@@ -29,78 +36,97 @@ pub struct PresetCategory {
     pub name: &'static str,
     pub group_key: &'static str,
     pub group: &'static str,
+    pub is_income: bool,
 }
 
-const HOME: (&str, &str) = ("cat.group.home", "Home");
-const FOOD: (&str, &str) = ("cat.group.food", "Food");
-const TRANSPORT: (&str, &str) = ("cat.group.transport", "Transport");
-const HEALTH: (&str, &str) = ("cat.group.health", "Health");
-const FAMILY: (&str, &str) = ("cat.group.family", "Family");
-const PERSONAL: (&str, &str) = ("cat.group.personal", "Personal");
-const MONEY: (&str, &str) = ("cat.group.money", "Money");
+const INCOME: (&str, &str) = ("cat.group.income", "Income");
+const EXPENSE: (&str, &str) = ("cat.group.expense", "Expense");
 
 const fn preset(
     key: &'static str,
     name: &'static str,
     group: (&'static str, &'static str),
+    is_income: bool,
 ) -> PresetCategory {
     PresetCategory {
         key,
         name,
         group_key: group.0,
         group: group.1,
+        is_income,
     }
 }
 
-const US: &[PresetCategory] = &[
-    preset("cat.rentOrMortgage", "Rent or mortgage", HOME),
-    preset("cat.utilities", "Utilities", HOME),
-    preset("cat.internetPhone", "Internet & phone", HOME),
-    preset("cat.groceries", "Groceries", FOOD),
-    preset("cat.eatingOut", "Eating out", FOOD),
-    preset("cat.carFuel", "Car & fuel", TRANSPORT),
-    preset("cat.publicTransport", "Public transport", TRANSPORT),
-    preset("cat.healthInsurance", "Health insurance", HEALTH),
-    preset("cat.medicalPharmacy", "Medical & pharmacy", HEALTH),
-    preset("cat.subscriptions", "Subscriptions", PERSONAL),
-    preset("cat.funLeisure", "Fun & leisure", PERSONAL),
-    preset("cat.savings", "Savings", MONEY),
-    preset("cat.debtPayments", "Debt payments", MONEY),
-];
-
-/// Singapore's set differs in four places, all of them real rather than
-/// cosmetic: utilities are billed alongside S&CC, a household is far more
-/// likely to budget public transport and ride-hailing than a car, health
-/// cover is an integrated-shield-style policy rather than a US-style
-/// premium, and a monthly allowance to parents is a mainstream budget
-/// line here in a way it is not in the US set.
-const SG: &[PresetCategory] = &[
-    preset("cat.rentOrMortgage", "Rent or mortgage", HOME),
-    preset("cat.utilitiesScc", "Utilities & S&CC", HOME),
-    preset("cat.internetMobile", "Internet & mobile", HOME),
-    preset("cat.groceries", "Groceries", FOOD),
-    preset("cat.hawkerEatingOut", "Hawker & eating out", FOOD),
+/// Five ways a household's money tends to come in, from a paycheck
+/// through to a tax refund. Named "Other Income" rather than the bare
+/// "Others" of the original feedback -- this app's category list is
+/// flat (no group headers in the picker itself), and two categories both
+/// literally named "Others" would be indistinguishable there, and would
+/// collide in the auto-seed step besides (`addCommonCategories` dedupes
+/// by name).
+const INCOME_CATEGORIES: &[PresetCategory] = &[
     preset(
-        "cat.publicTransportGrab",
-        "Public transport & Grab",
-        TRANSPORT,
+        "cat.primaryEarnedIncome",
+        "Primary Earned Income",
+        INCOME,
+        true,
     ),
-    preset("cat.carFuel", "Car & fuel", TRANSPORT),
-    preset("cat.insurance", "Insurance", HEALTH),
-    preset("cat.medicalDental", "Medical & dental", HEALTH),
-    preset("cat.parentsAllowance", "Parents' allowance", FAMILY),
-    preset("cat.subscriptions", "Subscriptions", PERSONAL),
-    preset("cat.funLeisure", "Fun & leisure", PERSONAL),
-    preset("cat.savings", "Savings", MONEY),
-    preset("cat.debtPayments", "Debt payments", MONEY),
+    preset(
+        "cat.selfEmploymentBusiness",
+        "Self-Employment & Business",
+        INCOME,
+        true,
+    ),
+    preset(
+        "cat.investmentCapitalIncome",
+        "Investment & Capital Income",
+        INCOME,
+        true,
+    ),
+    preset(
+        "cat.governmentSupplemental",
+        "Government & Supplemental",
+        INCOME,
+        true,
+    ),
+    preset("cat.otherIncome", "Other Income", INCOME, true),
 ];
 
-/// The starter categories to offer a first-time budget in `region`.
-pub fn for_region(region: Region) -> &'static [PresetCategory] {
-    match region {
-        Region::Us => US,
-        Region::Sg => SG,
-    }
+const EXPENSE_CATEGORIES: &[PresetCategory] = &[
+    preset("cat.housing", "Housing", EXPENSE, false),
+    preset("cat.utilities", "Utilities", EXPENSE, false),
+    preset("cat.foodGroceries", "Food & Groceries", EXPENSE, false),
+    preset("cat.transportation", "Transportation", EXPENSE, false),
+    preset(
+        "cat.healthcareInsurance",
+        "Healthcare & Insurance",
+        EXPENSE,
+        false,
+    ),
+    preset("cat.debtServicing", "Debt Servicing", EXPENSE, false),
+    preset(
+        "cat.personalLifestyle",
+        "Personal & Lifestyle",
+        EXPENSE,
+        false,
+    ),
+    preset(
+        "cat.familyDependents",
+        "Family & Dependents",
+        EXPENSE,
+        false,
+    ),
+    preset("cat.otherExpenses", "Other Expenses", EXPENSE, false),
+];
+
+/// The starter categories to offer a first-time budget. `region` is
+/// unused today -- see the module doc for why the parameter stays.
+pub fn for_region(_region: Region) -> Vec<PresetCategory> {
+    INCOME_CATEGORIES
+        .iter()
+        .chain(EXPENSE_CATEGORIES)
+        .copied()
+        .collect()
 }
 
 #[cfg(test)]
@@ -123,13 +149,28 @@ mod tests {
     }
 
     #[test]
-    fn no_region_offers_the_same_category_twice() {
+    fn no_category_is_offered_twice() {
         for region in EVERY_REGION {
             let mut keys: Vec<_> = for_region(region).iter().map(|p| p.key).collect();
             let before = keys.len();
             keys.sort_unstable();
             keys.dedup();
             assert_eq!(before, keys.len(), "{region:?} repeats a category key");
+        }
+    }
+
+    #[test]
+    fn no_two_categories_share_a_display_name() {
+        // The category picker is a flat list with no group headers, so a
+        // repeated name (the literal "Others" in the original feedback)
+        // would be indistinguishable there, and would collide in
+        // `addCommonCategories`'s name-based dedup.
+        for region in EVERY_REGION {
+            let mut names: Vec<_> = for_region(region).iter().map(|p| p.name).collect();
+            let before = names.len();
+            names.sort_unstable();
+            names.dedup();
+            assert_eq!(before, names.len(), "{region:?} repeats a category name");
         }
     }
 
@@ -141,7 +182,7 @@ mod tests {
         for region in EVERY_REGION {
             for p in for_region(region) {
                 assert!(
-                    Category::new("id", p.name, p.group).is_ok(),
+                    Category::new("id", p.name, p.group, p.is_income).is_ok(),
                     "{} is not a valid category name",
                     p.name
                 );
@@ -163,23 +204,36 @@ mod tests {
     }
 
     #[test]
-    fn singapore_is_not_just_a_copy_of_the_us_set() {
-        let us: Vec<_> = for_region(Region::Us).iter().map(|p| p.key).collect();
-        let sg: Vec<_> = for_region(Region::Sg).iter().map(|p| p.key).collect();
-        assert_ne!(us, sg);
-        assert!(sg.contains(&"cat.parentsAllowance"));
-        assert!(!us.contains(&"cat.parentsAllowance"));
+    fn both_regions_currently_return_the_same_universal_set() {
+        // Documents the current reality (see the module doc) rather than
+        // asserting it can never change -- if a genuinely region-specific
+        // line item is added later, update this test to say so, don't
+        // just delete it.
+        assert_eq!(for_region(Region::Us), for_region(Region::Sg));
     }
 
     #[test]
-    fn both_regions_share_the_categories_that_are_genuinely_universal() {
-        for key in ["cat.rentOrMortgage", "cat.groceries", "cat.savings"] {
-            for region in EVERY_REGION {
-                assert!(
-                    for_region(region).iter().any(|p| p.key == key),
-                    "{region:?} is missing {key}"
-                );
-            }
+    fn five_income_categories_and_nine_expense_categories() {
+        let presets = for_region(Region::Us);
+        let income = presets.iter().filter(|p| p.group == "Income").count();
+        let expense = presets.iter().filter(|p| p.group == "Expense").count();
+        assert_eq!(income, 5);
+        assert_eq!(expense, 9);
+    }
+
+    #[test]
+    fn is_income_always_agrees_with_the_group_it_was_declared_under() {
+        // The two are set independently at each `preset(...)` call site --
+        // this catches a copy-paste that flipped one without the other.
+        for p in for_region(Region::Us) {
+            assert_eq!(
+                p.is_income,
+                p.group == "Income",
+                "{} has is_income={} but group={:?}",
+                p.name,
+                p.is_income,
+                p.group
+            );
         }
     }
 }

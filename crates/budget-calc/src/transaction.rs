@@ -66,6 +66,33 @@ pub fn spend_by_category(transactions: &[Transaction]) -> Vec<(String, Decimal)>
     totals
 }
 
+/// Income per category: the mirror image of `spend_by_category`, summing
+/// the positive side of this month's transactions instead of the
+/// negative. Exists for `Category.is_income` categories -- "how much of
+/// what I planned to earn actually landed" is a different question from
+/// "how much of what I planned to spend actually went out", and needed
+/// its own total rather than overloading `spend_by_category`'s, which a
+/// category flagged `is_income` should never draw from (that would silently
+/// report $0 for every income category, since none of its transactions
+/// are negative).
+pub fn income_by_category(transactions: &[Transaction]) -> Vec<(String, Decimal)> {
+    let mut totals: Vec<(String, Decimal)> = Vec::new();
+    for t in transactions {
+        let Some(id) = &t.category_id else { continue };
+        if t.amount.is_sign_negative() {
+            continue;
+        }
+        match totals.iter_mut().find(|(cid, _)| cid == id) {
+            Some((_, total)) => *total += t.amount,
+            None => totals.push((id.clone(), t.amount)),
+        }
+    }
+    for (_, total) in &mut totals {
+        *total = round_currency(*total);
+    }
+    totals
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,5 +119,22 @@ mod tests {
     fn an_uncategorized_transaction_is_excluded_rather_than_pooled() {
         let txs = vec![t("mystery", dec!(-10), None)];
         assert_eq!(spend_by_category(&txs), vec![]);
+    }
+
+    #[test]
+    fn income_by_category_sums_only_the_positive_side() {
+        let txs = vec![
+            t("salary", dec!(3000), Some("salary")),
+            t("bonus", dec!(500), Some("salary")),
+            t("rent", dec!(-2000), Some("salary")), // spending never counts as income
+        ];
+        let income = income_by_category(&txs);
+        assert_eq!(income, vec![("salary".to_string(), dec!(3500))]);
+    }
+
+    #[test]
+    fn income_by_category_excludes_an_uncategorized_transaction() {
+        let txs = vec![t("mystery deposit", dec!(10), None)];
+        assert_eq!(income_by_category(&txs), vec![]);
     }
 }

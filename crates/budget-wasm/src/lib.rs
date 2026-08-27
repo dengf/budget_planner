@@ -4,7 +4,7 @@
 //! grouped by responsibility --
 //!
 //! - [`category`] -- `build_month`
-//! - [`transaction`] -- `spend_by_category`
+//! - [`transaction`] -- `spend_by_category`, `income_by_category`
 //! - [`rules`] -- `apply_rules`
 //! - [`csv_import`] -- `import_csv`, `detect_csv_columns`
 //! - [`goals`] -- `goal_progress`, `milestone_crossed`, `required_contribution`
@@ -61,7 +61,7 @@ pub use storage::{
     list_goals, list_recurring_expenses, list_rules, list_transactions, save_budget_plan_entry,
     save_category, save_debt, save_goal, save_recurring_expense, save_rule, save_transaction,
 };
-pub use transaction::spend_by_category;
+pub use transaction::{income_by_category, spend_by_category};
 
 /// A new locally-generated record id, for the frontend to assign before
 /// calling any `save_*` storage function -- see `convert::new_record_id`.

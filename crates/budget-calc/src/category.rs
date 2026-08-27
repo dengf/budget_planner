@@ -16,9 +16,17 @@ pub struct Category {
     pub id: String,
     pub name: String,
     /// Free-form, used for the printable report's grouping and the
-    /// region-specific presets (`presets::for_region`) -- never matched on
-    /// for behaviour, only for display order.
+    /// starter presets (`presets::for_region`) -- never matched on for
+    /// behaviour, only for display order.
     pub group: String,
+    /// Which side of the ledger this category belongs to. Unlike `group`,
+    /// this one *is* matched on for behaviour: it's how the frontend
+    /// decides whether a category's "actual" comes from
+    /// `transaction::spend_by_category` or `transaction::income_by_category`
+    /// -- `build_month` itself stays ignorant of it, same as `group`, since
+    /// it only ever sees a category id paired with a plain amount.
+    #[serde(default)]
+    pub is_income: bool,
 }
 
 impl Category {
@@ -26,6 +34,7 @@ impl Category {
         id: impl Into<String>,
         name: impl Into<String>,
         group: impl Into<String>,
+        is_income: bool,
     ) -> BudgetResult<Self> {
         let name = name.into();
         if name.trim().is_empty() {
@@ -35,6 +44,7 @@ impl Category {
             id: id.into(),
             name,
             group: group.into(),
+            is_income,
         })
     }
 }
@@ -152,8 +162,22 @@ mod tests {
     #[test]
     fn a_blank_category_name_is_rejected() {
         assert_eq!(
-            Category::new("c1", "  ", "Living"),
+            Category::new("c1", "  ", "Living", false),
             Err(BudgetError::BlankCategoryName)
+        );
+    }
+
+    #[test]
+    fn a_category_carries_the_income_flag_it_was_given() {
+        assert!(
+            !Category::new("c1", "Rent", "Home", false)
+                .unwrap()
+                .is_income
+        );
+        assert!(
+            Category::new("c2", "Salary", "Income", true)
+                .unwrap()
+                .is_income
         );
     }
 

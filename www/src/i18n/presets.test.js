@@ -44,8 +44,8 @@ describe('category presets', () => {
     // declared would otherwise make this whole file silently vacuous.
     const keys = presetKeys();
     expect(keys.length).toBeGreaterThan(15);
-    expect(keys).toContain('cat.groceries');
-    expect(keys).toContain('cat.group.food');
+    expect(keys).toContain('cat.foodGroceries');
+    expect(keys).toContain('cat.group.expense');
   });
 
   it.each([

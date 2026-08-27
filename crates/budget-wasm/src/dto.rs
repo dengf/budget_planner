@@ -17,6 +17,8 @@ pub struct CategoryDto {
     pub id: String,
     pub name: String,
     pub group: String,
+    #[serde(default)]
+    pub is_income: bool,
 }
 
 /// A suggested starter category. Carries the i18n key *and* the English
@@ -28,6 +30,7 @@ pub struct PresetCategoryDto {
     pub name: String,
     pub group_key: String,
     pub group: String,
+    pub is_income: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

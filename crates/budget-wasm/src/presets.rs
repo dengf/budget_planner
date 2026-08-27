@@ -14,6 +14,7 @@ pub fn preset_categories(region: Option<String>) -> JsValue {
     let presets: Vec<PresetCategoryDto> = budget_calc::for_region(parse_region(region.as_deref()))
         .iter()
         .map(|p| PresetCategoryDto {
+            is_income: p.is_income,
             key: p.key.to_string(),
             name: p.name.to_string(),
             group_key: p.group_key.to_string(),

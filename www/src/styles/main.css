@@ -172,7 +172,14 @@ body {
 .csv-columns summary::-webkit-details-marker { display: none; }
 .csv-columns summary::before { content: '▸ '; }
 .csv-columns[open] summary::before { content: '▾ '; }
-.csv-columns .form-grid { margin-top: 12px; }
+/* <details> only hides its content via the user-agent stylesheet, which
+   an author rule always overrides regardless of specificity -- .form-grid's
+   own `display: grid` (needed everywhere else it's used) was silently
+   winning over the browser's native collapse, so the "closed" state was
+   closed in name only and every column field stayed visible underneath.
+   Toggling display explicitly here is what actually hides it. */
+.csv-columns .form-grid { display: none; margin-top: 12px; }
+.csv-columns[open] .form-grid { display: grid; }
 
 .visually-hidden {
   position: absolute;

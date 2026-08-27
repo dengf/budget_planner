@@ -40,7 +40,7 @@ export default function BudgetTab({
   const formatMoney = makeFormatMoney(region);
   const [income, setIncome] = useState(() => loadIncome(month));
   const [result, setResult] = useState(null);
-  const [newCategory, setNewCategory] = useState({ name: '', group: '' });
+  const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
   const [plannedDraft, setPlannedDraft] = useState({});
   // Which category's "log spending" row is open, and what's typed in it.
   const [spendFor, setSpendFor] = useState(null);
@@ -57,12 +57,27 @@ export default function BudgetTab({
     [transactions.items, month],
   );
 
+  const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
+
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!wasmModule?.spend_by_category || !wasmModule?.build_month) return;
-      const spendResult = await wasmModule.spend_by_category({ transactions: monthTransactions });
-      const spent = (spendResult?.totals ?? []).map((t) => ({ category_id: t.category_id, amount: t.amount }));
+      if (!wasmModule?.spend_by_category || !wasmModule?.income_by_category || !wasmModule?.build_month) return;
+      // Two separate totals, one per side of the ledger -- an income
+      // category's "actual" is what it received (the positive side of its
+      // transactions), an expense category's is what it cost (the negative
+      // side). Each result set is filtered to the categories that actually
+      // belong on that side before merging, so a stray transaction
+      // categorized against the wrong kind of category can't leak its
+      // total into a line it doesn't belong on.
+      const [spendResult, incomeResult] = await Promise.all([
+        wasmModule.spend_by_category({ transactions: monthTransactions }),
+        wasmModule.income_by_category({ transactions: monthTransactions }),
+      ]);
+      const spent = [
+        ...(spendResult?.totals ?? []).filter((row) => !isIncome(row.category_id)),
+        ...(incomeResult?.totals ?? []).filter((row) => isIncome(row.category_id)),
+      ].map((t) => ({ category_id: t.category_id, amount: t.amount }));
       // Every known category gets a planned line, defaulting to 0 -- not
       // only the ones with a saved plan entry. Otherwise a category
       // freshly added this session has nothing to type an amount into: it
@@ -163,24 +178,31 @@ export default function BudgetTab({
     e.preventDefault();
     if (!newCategory.name.trim()) return;
     const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
-    await categories.save({ id, name: newCategory.name, group: newCategory.group || 'General' });
-    setNewCategory({ name: '', group: '' });
+    await categories.save({
+      id,
+      name: newCategory.name,
+      group: newCategory.group || (newCategory.isIncome ? t('cat.group.income') : 'General'),
+      is_income: newCategory.isIncome,
+    });
+    setNewCategory({ name: '', group: '', isIncome: false });
   };
 
   /**
-   * Records spending against a category without leaving this tab.
+   * Records spending -- or, against an income category, income -- without
+   * leaving this tab.
    *
-   * "Spent" is derived -- `budget-calc::spend_by_category` sums this
-   * month's negative transactions -- so the only way to move it was the
+   * "Spent"/"Received" is derived -- `budget-calc::spend_by_category` and
+   * `income_by_category` sum this month's negative or positive
+   * transactions respectively -- so the only way to move it was the
    * Transactions tab, which nothing here said. This writes an ordinary
    * transaction; the Transactions tab lists it and can edit or delete it
    * exactly as if it had been typed there.
    *
-   * The field asks for a spend amount and stores it negated, because
-   * negative-is-spending is the storage convention (a bank export's own,
-   * see Transaction::amount). Asking people to type a minus sign to
-   * record an expense is the kind of trap that produces a confidently
-   * wrong budget: type 50 for lunch without it and it books as income.
+   * The field asks for a plain positive amount and this applies the sign,
+   * because asking a person to type a minus sign to record an expense (or
+   * to remember an income category is the one place they shouldn't) is
+   * the kind of trap that produces a confidently wrong budget: type 50 for
+   * lunch without it and it books as income.
    */
   const logSpending = async (e, categoryId) => {
     e.preventDefault();
@@ -191,7 +213,7 @@ export default function BudgetTab({
       id,
       date: todayIso(),
       description: spendDraft.description.trim() || categoryName(categoryId),
-      amount: -magnitude,
+      amount: isIncome(categoryId) ? magnitude : -magnitude,
       category_id: categoryId,
     });
     setSpendDraft({ amount: '', description: '' });
@@ -242,6 +264,28 @@ export default function BudgetTab({
   const addUpcomingToPlanned = async (categoryId, amount) => {
     const currentPlanned = budgetPlan.items.find((p) => p.category_id === categoryId)?.planned ?? 0;
     await savePlanned(categoryId, currentPlanned + amount);
+  };
+
+  /**
+   * What the Remaining cell says and how it's styled -- three existing
+   * expense-side cases (still exactly the wording/colour they were),
+   * plus two income-side ones that read the same negative `remaining`
+   * the opposite way: for an expense category running negative means
+   * overspending (bad, red, "borrowed"); for an income category it means
+   * more came in than was planned for (good, never red).
+   */
+  const remainingCell = (line) => {
+    if (line.remaining >= 0) {
+      return { className: 'positive', text: formatMoney(line.remaining) };
+    }
+    if (isIncome(line.category_id)) {
+      return line.planned > 0
+        ? { className: 'positive', text: t('budget.receivedMore', { amount: formatMoney(-line.remaining) }) }
+        : { className: 'positive', text: t('budget.unplannedIncome', { amount: formatMoney(-line.remaining) }) };
+    }
+    return line.planned > 0
+      ? { className: 'negative', text: t('budget.borrowed', { amount: formatMoney(-line.remaining) }) }
+      : { className: 'muted-note', text: t('budget.unbudgetedSpend') };
   };
 
   const days = daysLeftInMonth();
@@ -368,11 +412,14 @@ export default function BudgetTab({
           <div className="category-row category-head">
             <div>{t('budget.categoryName')}</div>
             <div className="num">{t('budget.planned')}</div>
-            <div className="num">{t('budget.spent')}</div>
+            <div className="num">{t('budget.actual')}</div>
             <div className="num">{t('budget.remaining')}</div>
             <div />
           </div>
-          {orderedLines.map((line) => (
+          {orderedLines.map((line) => {
+            const incomeRow = isIncome(line.category_id);
+            const remaining = remainingCell(line);
+            return (
             <React.Fragment key={line.category_id}>
             <div className="category-row">
               <div>
@@ -381,7 +428,9 @@ export default function BudgetTab({
                 {/* How far through the plan this category is, without
                     reading three numbers and doing the division. Only
                     once a plan exists -- a full bar on planned 0 would
-                    read as "done" when it means "unbudgeted". */}
+                    read as "done" when it means "unbudgeted". Exceeding
+                    plan is only styled as a warning on the expense side --
+                    an income category clearing its plan is good news. */}
                 {line.planned > 0 && (
                   <div
                     className="progress"
@@ -393,7 +442,7 @@ export default function BudgetTab({
                     })}
                   >
                     <span
-                      className={line.spent > line.planned ? 'progress-fill over' : 'progress-fill'}
+                      className={!incomeRow && line.spent > line.planned ? 'progress-fill over' : 'progress-fill'}
                       style={{ width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%` }}
                     />
                   </div>
@@ -422,31 +471,22 @@ export default function BudgetTab({
                   visible; on a narrow screen the row stacks and they are
                   the only thing naming each figure. */}
               <div className="num spent-cell">
-                <span className="cell-label">{t('budget.spent')}</span>
+                <span className="cell-label">{t(incomeRow ? 'budget.received' : 'budget.spent')}</span>
                 <span className="spent-value">{formatMoney(line.spent)}</span>
                 <button
                   type="button"
                   className="spend-add"
                   aria-expanded={spendFor === line.category_id}
-                  aria-label={`${t('budget.logSpending')} — ${categoryName(line.category_id)}`}
-                  title={t('budget.logSpending')}
+                  aria-label={`${t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')} — ${categoryName(line.category_id)}`}
+                  title={t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')}
                   onClick={() => openSpend(line.category_id)}
                 >
                   +
                 </button>
               </div>
-              {/* "Borrowed from next month" only makes sense against a
-                  plan that existed. With planned still 0 nothing was
-                  borrowed -- the category simply hasn't been budgeted --
-                  and saying otherwise made the app's characteristic
-                  phrase nonsense on every expense in a fresh budget. */}
-              <div className={`num ${line.remaining < 0 ? (line.planned > 0 ? 'negative' : 'muted-note') : 'positive'}`}>
+              <div className={`num ${remaining.className}`}>
                 <span className="cell-label">{t('budget.remaining')}</span>
-                {line.remaining >= 0
-                  ? formatMoney(line.remaining)
-                  : line.planned > 0
-                    ? t('budget.borrowed', { amount: formatMoney(-line.remaining) })
-                    : t('budget.unbudgetedSpend')}
+                {remaining.text}
               </div>
               <button className="btn ghost" onClick={() => removeCategory(line.category_id)}>
                 {t('budget.remove')}
@@ -455,7 +495,7 @@ export default function BudgetTab({
             {spendFor === line.category_id && (
               <form className="spend-form" onSubmit={(e) => logSpending(e, line.category_id)}>
                 <label className="field">
-                  <span className="field-label">{t('budget.spendAmount')}</span>
+                  <span className="field-label">{t(incomeRow ? 'budget.incomeAmount' : 'budget.spendAmount')}</span>
                   <div className="field-input">
                     <input
                       type="number"
@@ -485,7 +525,8 @@ export default function BudgetTab({
               </form>
             )}
             </React.Fragment>
-          ))}
+            );
+          })}
         </div>
       )}
       {categories.items.length > 0 && (
@@ -517,7 +558,14 @@ export default function BudgetTab({
         </div>
       )}
 
-      <SpendChart lines={orderedLines} categoryName={categoryName} formatMoney={formatMoney} />
+      {/* Where the money went, not where it came from -- an income
+          category with a big "actual" would otherwise show up as the
+          largest bar in a chart titled "where the month's money went". */}
+      <SpendChart
+        lines={orderedLines.filter((l) => !isIncome(l.category_id))}
+        categoryName={categoryName}
+        formatMoney={formatMoney}
+      />
 
       <form className="form-grid" onSubmit={addCategory}>
         <label className="field">
@@ -531,6 +579,14 @@ export default function BudgetTab({
           <div className="field-input">
             <input value={newCategory.group} onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })} />
           </div>
+        </label>
+        <label className="field field-check">
+          <input
+            type="checkbox"
+            checked={newCategory.isIncome}
+            onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
+          />
+          <span>{t('budget.categoryIsIncome')}</span>
         </label>
         <button className="btn" type="submit">{t('budget.addCategory')}</button>
         <button className="btn secondary" type="button" onClick={addCommonCategories}>

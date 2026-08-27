@@ -35,6 +35,7 @@ mod tests {
             id: id.to_string(),
             name: name.to_string(),
             group: "Living".to_string(),
+            is_income: false,
         }
     }
 
