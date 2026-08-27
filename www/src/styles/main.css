@@ -356,6 +356,24 @@ table.data tr:last-child td { border-bottom: none; }
 .import-button input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .import-error { color: var(--negative); font-size: 0.85rem; }
 
+/* Advisory, not blocking -- a suggestion to fix a likely typo, so it reads
+   as caution (gold, the same token milestones already use for attention)
+   rather than an error. */
+.direction-warning {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+.direction-warning .btn.ghost { padding: 2px 8px; border: 1px solid var(--gold); color: var(--gold); }
+
 .commitments-toggle { margin: 4px 0 16px; }
 
 /* Per-category progress: how far through the plan this month is, at a

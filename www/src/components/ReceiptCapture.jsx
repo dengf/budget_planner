@@ -3,6 +3,7 @@ import { useI18n } from '../i18n';
 import { extractReceiptText } from '../receiptCapture';
 import CalcError from './CalcError';
 import CameraCapture from './CameraCapture';
+import DirectionWarning from './DirectionWarning';
 import { PdfIcon } from './icons';
 import NumberField from './NumberField';
 
@@ -17,7 +18,7 @@ const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
  * pre-filled, fully editable form and nothing saves until "Add" is
  * pressed. See the receipt-capture plan addendum for the full design.
  */
-export default function ReceiptCapture({ wasmModule, newId, categories, rules, transactions }) {
+export default function ReceiptCapture({ wasmModule, newId, categories, rules, transactions, formatMoney }) {
   const { t } = useI18n();
   const [status, setStatus] = useState('idle'); // idle | reading | review
   const [draft, setDraft] = useState(EMPTY_DRAFT);
@@ -145,6 +146,12 @@ export default function ReceiptCapture({ wasmModule, newId, categories, rules, t
             <button className="btn" type="submit">{t('transactions.add')}</button>
             <button className="btn secondary" type="button" onClick={discard}>{t('confirm.cancel')}</button>
           </form>
+          <DirectionWarning
+            amount={draft.amount}
+            category={categories.items.find((c) => c.id === draft.category_id)}
+            formatMoney={formatMoney}
+            onUseFlipped={(flipped) => setDraft({ ...draft, amount: String(flipped) })}
+          />
         </>
       )}
     </>

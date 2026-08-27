@@ -3,6 +3,7 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { currentMonth } from '../month';
 import CalcError from './CalcError';
+import DirectionWarning from './DirectionWarning';
 import { SpreadsheetIcon } from './icons';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
@@ -220,6 +221,12 @@ export default function TransactionsTab({
         <button className="btn" type="submit">{t('transactions.add')}</button>
       </form>
       <p className="field-label">{t('transactions.amountHint')}</p>
+      <DirectionWarning
+        amount={draft.amount}
+        category={categories.items.find((c) => c.id === draft.category_id)}
+        formatMoney={formatMoney}
+        onUseFlipped={(flipped) => setDraft({ ...draft, amount: String(flipped) })}
+      />
 
       <ReceiptCapture
         wasmModule={wasmModule}
@@ -227,6 +234,7 @@ export default function TransactionsTab({
         categories={categories}
         rules={rules}
         transactions={transactions}
+        formatMoney={formatMoney}
       />
 
       <h2 className="section-start">{t('transactions.importTitle')}</h2>
