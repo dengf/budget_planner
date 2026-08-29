@@ -50,3 +50,12 @@ export function daysInMonth(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
   return new Date(y, m || 1, 0).getDate();
 }
+
+/** A `YYYY-MM` string shifted by `delta` whole months (negative goes
+ *  back). Pure calendar arithmetic, same as `currentMonth` -- reads no
+ *  data and decides no budgeting rule, just lets a screen page through
+ *  months. */
+export function shiftMonth(monthStr, delta) {
+  const [y, m] = monthStr.split('-').map(Number);
+  return currentMonth(new Date(y, (m || 1) - 1 + delta, 1));
+}

@@ -415,10 +415,32 @@ table.data tr:last-child td { border-bottom: none; }
    always the last row in the table, never sorted in among the others. */
 .category-row-divider { height: 1px; margin: 4px 0 6px; background: var(--line); border: none; }
 .category-row-savings { font-weight: 600; }
-/* Same "always last, set apart" treatment in the printable Report's plain
-   table -- a heavier top border stands in for the grid layout's divider
-   div, since a table row can't host one directly. */
-.report-savings-row td { font-weight: 600; border-top: 2px solid var(--line); }
+
+/* Dashboard category table: a subtotal row closes out each of the
+   income/expense blocks, followed by a clearly visible rule -- heavier
+   than the hairline `table.data td` border every ordinary row already
+   gets, so the two blocks read as genuinely separate groups rather than
+   one long undifferentiated list. Bold type alone read as barely
+   different from an ordinary row at a glance; a tinted background and an
+   accent-colored left edge make it a distinct callout the eye catches
+   scanning down the table, the same way `.headline`/`.stat` already
+   stand out from plain text elsewhere in this app. */
+.dash-table-total td {
+  font-weight: 700;
+  font-size: 0.95rem;
+  /* Plain --panel-alt sits only a few RGB units off --panel in dark mode
+     -- too close to read as a highlight next to it. Blending in a slice
+     of --accent keeps the tint theme-consistent (it already differs
+     between light/dark) while giving real contrast either way. */
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-alt));
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: none;
+}
+.dash-table-total td:first-child { border-radius: 8px 0 0 8px; border-left: 3px solid var(--accent); padding-left: 8px; }
+.dash-table-total td:last-child { border-radius: 0 8px 8px 0; }
+.dash-table-divider td { padding: 6px 10px; border-bottom: none; }
+.dash-table-divider-line { height: 2px; background: var(--line); border-radius: 1px; }
 .category-name { font-weight: 600; }
 .category-group { color: var(--muted-2); font-size: 0.75rem; }
 .category-description { color: var(--muted-2); font-size: 0.75rem; margin-top: 2px; line-height: 1.3; }
@@ -642,15 +664,82 @@ table.data tr:last-child td { border-bottom: none; }
 .chart-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted-2); font-variant-numeric: tabular-nums; }
 .chart-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
 
-.pie-chart-body { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+/* justify-content: center means the svg+legend pair sits centered as a
+   compact group in the card, not pinned to the left with the legend
+   stretching to soak up whatever width is left over -- .pie-legend and
+   .pie-empty-hint both cap their own growth below so centering the group
+   actually has room to show, rather than one of them expanding to fill
+   the card and re-creating a left-pinned layout by another route. */
+.pie-chart-body { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
 .pie-svg { width: 140px; height: 140px; flex: none; }
-.pie-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 180px; }
+.pie-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 0 1 220px; min-width: 180px; }
 .pie-legend li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
 .pie-legend i { width: 10px; height: 10px; border-radius: 5px; flex: none; }
 .pie-legend-label { flex: 1; color: var(--ink); }
 .pie-legend-value { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pie-legend-pct { color: var(--muted-2); font-variant-numeric: tabular-nums; width: 3ch; text-align: right; }
 .report-pies { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+
+/* The donut hole's center text -- SVG text has no line-height, so the two
+   lines are placed by hand via the x/y passed from PieChart rather than
+   stacked with CSS. */
+.pie-donut-label { font-size: 9px; fill: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.pie-donut-value { font-size: 15px; font-weight: 700; fill: var(--ink); }
+
+/* The empty-state ring shown before there's anything to chart -- muted
+   enough to read as "nothing here yet" rather than a real, single-color
+   category. */
+.pie-empty-ring { fill: var(--muted-2); opacity: 0.35; }
+.pie-empty-hint { flex: 0 1 220px; min-width: 180px; margin: 0; }
+
+/* Dashboard landing tab -- month header, over/under-budget banner, and
+   the income/spent summary cards above the existing report content. */
+.dash-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dash-header h2 { flex: 1; min-width: 0; }
+.dash-month-nav { display: flex; align-items: center; gap: 4px; }
+.dash-month-label {
+  min-width: 9ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  font-weight: 600;
+}
+/* Real tap targets, not a small glyph with padding that only measures big
+   on paper -- this is a button someone reaches for on a phone as often as
+   on a desktop. */
+.dash-month-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.dash-month-btn:hover { border-color: var(--accent); }
+
+.dash-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--positive-bg);
+  border: 1px solid var(--positive-border);
+}
+.dash-status-over { background: var(--negative-bg); border-color: var(--negative-border); }
+.dash-status-headline { font-weight: 700; color: var(--positive); }
+.dash-status-over .dash-status-headline { color: var(--negative); }
+.dash-status-detail { font-size: 0.85rem; color: var(--muted); }
+
+.dash-summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.dash-card { background: var(--panel-alt); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.dash-card-label { font-size: 0.78rem; color: var(--muted); }
+.dash-card-value { font-size: 1.4rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dash-card-income .dash-card-value { color: var(--positive); }
+.dash-card-spent .dash-card-value { color: var(--negative); }
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
    failure is noticeable regardless of scroll position and can be dismissed. */
@@ -701,7 +790,7 @@ table.data tr:last-child td { border-bottom: none; }
 .data-management-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 @media print {
-  .app-header, .app-tabs, .app-switches, .report-actions, .no-print { display: none !important; }
+  .app-header, .app-tabs, .app-switches, .report-actions, .no-print, .dash-month-btn { display: none !important; }
   body { background: #fff; color: #111; }
   .panel { border: none; background: #fff; }
   /* .chart's background/text are dark-theme tokens that .panel's own
@@ -710,6 +799,21 @@ table.data tr:last-child td { border-bottom: none; }
   .chart { background: #fff; border: 1px solid #ddd; }
   .pie-legend-label { color: #111; }
   .pie-legend-value, .pie-legend-pct { color: #555; }
+  /* Same reasoning as .chart above -- the summary cards and status
+     banner use dark-theme panel tokens too. */
+  .dash-card, .dash-status { background: #fff; border: 1px solid #ddd; }
+  .dash-card-value, .dash-status-headline { color: #111; }
+  .dash-card-income .dash-card-value { color: #1f7a3d; }
+  .dash-card-spent .dash-card-value { color: #b3261e; }
+  .dash-status-over .dash-status-headline { color: #b3261e; }
+  .dash-status-detail, .dash-card-label { color: #555; }
+  .pie-donut-value { fill: #111; }
+  .pie-donut-label { fill: #555; }
+  .pie-empty-ring { fill: #ccc; }
+  .pie-empty-hint { color: #555; }
+  /* Same reasoning again -- the table's Total/Savings rows use the same
+     accent-tinted dark-theme background. */
+  .dash-table-total td { background: #eef1f5; border-left-color: #2f6fe0; }
 }
 
 @media (max-width: 640px) {

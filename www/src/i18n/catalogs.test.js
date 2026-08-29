@@ -88,13 +88,13 @@ describe('translate', () => {
 // character in that range, so its presence is proof of a mis-encoded write.
 const MOJIBAKE = /[-ÿ]/;
 const CJK = /[　-〿一-鿿＀-￯]/;
-const PROSE = /^(intro|meta|report)\./;
+const PROSE = /^(intro|meta|dashboard)\./;
 
 // An email address example is the same shape in every locale -- same
 // category as untranslated-strings.test.js's BRAND exemption for
 // 'meifio': identical everywhere, so a Chinese catalog carrying the
 // English placeholder verbatim is correct, not a missed translation.
-const PROSE_EXEMPT = new Set(['report.recipientsPlaceholder']);
+const PROSE_EXEMPT = new Set(['dashboard.recipientsPlaceholder']);
 
 describe('catalog encoding', () => {
   it.each(Object.keys(TRANSLATIONS))('%s survived the file round-trip intact', (locale) => {

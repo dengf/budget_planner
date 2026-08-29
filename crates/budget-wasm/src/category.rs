@@ -75,6 +75,7 @@ fn build_month_impl(params: JsValue) -> BuildMonthResult {
                     total_planned: crate::convert::decimal_to_f64(summary.total_planned),
                     total_spent: crate::convert::decimal_to_f64(summary.total_spent),
                     unassigned: crate::convert::decimal_to_f64(summary.unassigned),
+                    unspent: crate::convert::decimal_to_f64(summary.unspent),
                 }),
                 error: None,
                 error_message: None,

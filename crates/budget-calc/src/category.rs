@@ -186,6 +186,11 @@ pub struct MonthSummary {
     pub total_planned: Decimal,
     pub total_spent: Decimal,
     pub unassigned: Decimal,
+    /// Income minus what has actually been spent this month -- unlike
+    /// `unassigned` (income minus what's *planned*), this tracks the plan
+    /// against real transactions. Negative means spending has already run
+    /// past income, regardless of what was planned.
+    pub unspent: Decimal,
 }
 
 pub fn summarize_month(income: Decimal, lines: &[CategoryLine]) -> MonthSummary {
@@ -196,6 +201,7 @@ pub fn summarize_month(income: Decimal, lines: &[CategoryLine]) -> MonthSummary 
         total_planned: round_currency(total_planned),
         total_spent: round_currency(total_spent),
         unassigned: round_currency(income - total_planned),
+        unspent: round_currency(income - total_spent),
     }
 }
 
@@ -273,6 +279,24 @@ mod tests {
         let lines = build_month(&planned, &[], &[]).unwrap();
         let summary = summarize_month(dec!(2000), &lines);
         assert_eq!(summary.unassigned, dec!(0));
+    }
+
+    #[test]
+    fn unspent_is_income_minus_total_spent() {
+        let planned = vec![("dining".to_string(), dec!(200)), ("rent".to_string(), dec!(1500))];
+        let spent = vec![("dining".to_string(), dec!(150)), ("rent".to_string(), dec!(1500))];
+        let lines = build_month(&planned, &[], &spent).unwrap();
+        let summary = summarize_month(dec!(2000), &lines);
+        assert_eq!(summary.unspent, dec!(350));
+    }
+
+    #[test]
+    fn spending_past_income_gives_a_negative_unspent() {
+        let planned = vec![("dining".to_string(), dec!(200))];
+        let spent = vec![("dining".to_string(), dec!(600))];
+        let lines = build_month(&planned, &[], &spent).unwrap();
+        let summary = summarize_month(dec!(500), &lines);
+        assert_eq!(summary.unspent, dec!(-100));
     }
 
     #[test]

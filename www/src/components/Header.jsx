@@ -5,11 +5,11 @@ import MeifioMark from './MeifioMark';
 const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
 
 const TABS = [
+  { id: 'dashboard', key: 'nav.dashboard' },
   { id: 'budget', key: 'nav.budget' },
   { id: 'transactions', key: 'nav.transactions' },
   { id: 'goals', key: 'nav.goals' },
   { id: 'debt', key: 'nav.debt' },
-  { id: 'report', key: 'nav.report' },
 ];
 
 export default function Header({ activeTab, onTabChange, currencySymbol, onCurrencySymbolChange }) {

@@ -68,6 +68,7 @@ pub struct MonthSummaryDto {
     pub total_planned: f64,
     pub total_spent: f64,
     pub unassigned: f64,
+    pub unspent: f64,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]

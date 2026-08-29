@@ -12,18 +12,18 @@ import { currentMonth } from './month';
 // Code-split: a visitor logging one transaction shouldn't download the
 // debt-payoff engine's UI too. Each tab's component (and everything it
 // imports) only loads the first time its tab is opened.
+const DashboardTab = React.lazy(() => import('./components/DashboardTab'));
 const BudgetTab = React.lazy(() => import('./components/BudgetTab'));
 const TransactionsTab = React.lazy(() => import('./components/TransactionsTab'));
 const GoalsTab = React.lazy(() => import('./components/GoalsTab'));
 const DebtTab = React.lazy(() => import('./components/DebtTab'));
-const ReportTab = React.lazy(() => import('./components/ReportTab'));
 
 const TABS = {
+  dashboard: DashboardTab,
   budget: BudgetTab,
   transactions: TransactionsTab,
   goals: GoalsTab,
   debt: DebtTab,
-  report: ReportTab,
 };
 
 /**
@@ -94,7 +94,7 @@ function TabFallback() {
 }
 
 export function AppShell({ wasmModule }) {
-  const [activeTab, setActiveTab] = useState('budget');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [currencySymbol, setCurrencySymbol] = useState(() => loadCurrencySymbol());
   const [month] = useState(() => currentMonth());
   const { t } = useI18n();
@@ -124,7 +124,7 @@ export function AppShell({ wasmModule }) {
 
   /**
    * A deleted category used to leave its raw id string on screen wherever
-   * a transaction still pointed at it (BudgetTab and ReportTab's
+   * a transaction still pointed at it (BudgetTab and DashboardTab's
    * `categoryName()` both fell back to the id itself). Blocking the
    * delete when a transaction references the category closes that off at
    * the source rather than patching every place a category name gets
