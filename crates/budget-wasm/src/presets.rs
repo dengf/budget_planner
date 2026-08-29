@@ -19,6 +19,8 @@ pub fn preset_categories(region: Option<String>) -> JsValue {
             name: p.name.to_string(),
             group_key: p.group_key.to_string(),
             group: p.group.to_string(),
+            description_key: p.description_key.to_string(),
+            description: p.description.to_string(),
         })
         .collect();
     to_js(&presets)

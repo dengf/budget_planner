@@ -27,6 +27,12 @@ pub struct Category {
     /// it only ever sees a category id paired with a plain amount.
     #[serde(default)]
     pub is_income: bool,
+    /// Free-form guidance on what belongs in this category -- populated
+    /// from `presets::for_region` on a starter category, blank on a
+    /// hand-typed one. `#[serde(default)]` so a category saved before
+    /// this field existed still loads.
+    #[serde(default)]
+    pub description: String,
 }
 
 impl Category {
@@ -35,6 +41,7 @@ impl Category {
         name: impl Into<String>,
         group: impl Into<String>,
         is_income: bool,
+        description: impl Into<String>,
     ) -> BudgetResult<Self> {
         let name = name.into();
         if name.trim().is_empty() {
@@ -44,6 +51,7 @@ impl Category {
             id: id.into(),
             name,
             group: group.into(),
+            description: description.into(),
             is_income,
         })
     }
@@ -199,7 +207,7 @@ mod tests {
     #[test]
     fn a_blank_category_name_is_rejected() {
         assert_eq!(
-            Category::new("c1", "  ", "Living", false),
+            Category::new("c1", "  ", "Living", false, ""),
             Err(BudgetError::BlankCategoryName)
         );
     }
@@ -207,12 +215,12 @@ mod tests {
     #[test]
     fn a_category_carries_the_income_flag_it_was_given() {
         assert!(
-            !Category::new("c1", "Rent", "Home", false)
+            !Category::new("c1", "Rent", "Home", false, "")
                 .unwrap()
                 .is_income
         );
         assert!(
-            Category::new("c2", "Salary", "Income", true)
+            Category::new("c2", "Salary", "Income", true, "")
                 .unwrap()
                 .is_income
         );

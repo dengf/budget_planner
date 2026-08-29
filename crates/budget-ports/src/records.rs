@@ -16,6 +16,9 @@ pub struct CategoryRecord {
     /// expense category (`false`) rather than failing to load at all.
     #[serde(default)]
     pub is_income: bool,
+    /// Same back-compat reasoning as `is_income` above.
+    #[serde(default)]
+    pub description: String,
 }
 
 /// One category's planned amount for one month. `month` is `YYYY-MM`.

@@ -186,7 +186,13 @@ export function AppShell({ wasmModule }) {
       // write through the same store handle, and the list they land in
       // reads better in the order the presets are declared.
       // eslint-disable-next-line no-await-in-loop
-      await categories.save({ id: newId(), name, group: t(preset.group_key), is_income: preset.is_income });
+      await categories.save({
+        id: newId(),
+        name,
+        group: t(preset.group_key),
+        is_income: preset.is_income,
+        description: t(preset.description_key),
+      });
     }
   }, [wasmModule, region, categories, newId, t]);
 

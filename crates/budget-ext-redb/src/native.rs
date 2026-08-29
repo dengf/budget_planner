@@ -36,6 +36,7 @@ mod tests {
             name: name.to_string(),
             group: "Living".to_string(),
             is_income: false,
+            description: String::new(),
         }
     }
 

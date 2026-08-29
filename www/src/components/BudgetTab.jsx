@@ -180,6 +180,7 @@ export default function BudgetTab({
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
   const categoryGroup = (id) => categories.items.find((c) => c.id === id)?.group ?? '';
+  const categoryDescription = (id) => categories.items.find((c) => c.id === id)?.description ?? '';
 
   /**
    * Grouped for display, alphabetically within each group.
@@ -197,6 +198,13 @@ export default function BudgetTab({
     return [...(result?.lines ?? [])]
       .filter((l) => !isCommitmentId(l.category_id))
       .sort((a, b) => {
+        // Income first, as its own block, regardless of where "Income"
+        // and "Expense" happen to fall alphabetically in the reader's
+        // language -- `is_income` is the real signal, `group` (below) is
+        // only for ordering within a side.
+        const aIncome = isIncome(a.category_id);
+        const bIncome = isIncome(b.category_id);
+        if (aIncome !== bIncome) return aIncome ? -1 : 1;
         const byGroup = collator.compare(categoryGroup(a.category_id), categoryGroup(b.category_id));
         return byGroup !== 0
           ? byGroup
@@ -462,15 +470,32 @@ export default function BudgetTab({
             <div className="num">{t('budget.remaining')}</div>
             <div />
           </div>
-          {orderedLines.map((line) => {
+          {orderedLines.map((line, i) => {
             const incomeRow = isIncome(line.category_id);
             const remaining = remainingCell(line);
+            // A section header once at the top of the income block and
+            // once at the top of the expense block -- `orderedLines` is
+            // already sorted income-first, so the boundary is just the
+            // one spot the flag flips.
+            const startsNewSection = i === 0 || incomeRow !== isIncome(orderedLines[i - 1].category_id);
             return (
             <React.Fragment key={line.category_id}>
+            {startsNewSection && (
+              <div className="category-section-header">
+                {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
+              </div>
+            )}
             <div className="category-row">
               <div>
                 <div className="category-name">{categoryName(line.category_id)}</div>
                 <div className="category-group">{categoryGroup(line.category_id)}</div>
+                {/* Mei's (a CPA) examples of what belongs here -- present
+                    on a preset category, blank on a hand-typed one, so
+                    this only ever adds information, never an empty line
+                    that reads as broken. */}
+                {categoryDescription(line.category_id) && (
+                  <div className="category-description">{categoryDescription(line.category_id)}</div>
+                )}
                 {/* How far through the plan this category is, without
                     reading three numbers and doing the division. Only
                     once a plan exists -- a full bar on planned 0 would

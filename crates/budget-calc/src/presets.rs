@@ -15,6 +15,13 @@
 //! region-specific line item has somewhere to go later without another
 //! signature change rippling through `budget-wasm` and `www/`.
 //!
+//! Both the taxonomy and each category's `description` come from Mei, a
+//! CPA -- her list is the authoritative source for what belongs where,
+//! down to the wording. Descriptions carry through to `Category` and stay
+//! visible as a standing hint (not just shown once at seed time), so
+//! "does this receipt go under Personal & Lifestyle or Family &
+//! Dependents" has an answer on-screen instead of relying on memory.
+//!
 //! **Why this lives in Rust rather than a JS constant.** Even a universal
 //! taxonomy is a specific choice -- which nine expense buckets, in what
 //! words -- that a second implementation could make differently. See
@@ -37,16 +44,28 @@ pub struct PresetCategory {
     pub group_key: &'static str,
     pub group: &'static str,
     pub is_income: bool,
+    /// i18n key for `description`, following the same key-plus-fallback
+    /// convention as `key`/`name` above.
+    pub description_key: &'static str,
+    /// What belongs in this category, in a CPA's own words -- the list
+    /// this whole module is sourced from (see the module doc). Shown as
+    /// a standing hint under the category, not just at seed time, so it
+    /// keeps earning its keep the next time someone can't remember which
+    /// bucket a receipt goes in.
+    pub description: &'static str,
 }
 
 const INCOME: (&str, &str) = ("cat.group.income", "Income");
 const EXPENSE: (&str, &str) = ("cat.group.expense", "Expense");
 
+#[allow(clippy::too_many_arguments)]
 const fn preset(
     key: &'static str,
     name: &'static str,
     group: (&'static str, &'static str),
     is_income: bool,
+    description_key: &'static str,
+    description: &'static str,
 ) -> PresetCategory {
     PresetCategory {
         key,
@@ -54,6 +73,8 @@ const fn preset(
         group_key: group.0,
         group: group.1,
         is_income,
+        description_key,
+        description,
     }
 }
 
@@ -70,53 +91,116 @@ const INCOME_CATEGORIES: &[PresetCategory] = &[
         "Primary Earned Income",
         INCOME,
         true,
+        "cat.primaryEarnedIncome.desc",
+        "Salary, wages, overtime pay, tips, and bonuses.",
     ),
     preset(
         "cat.selfEmploymentBusiness",
         "Self-Employment & Business",
         INCOME,
         true,
+        "cat.selfEmploymentBusiness.desc",
+        "Freelance revenue, gig work, consulting fees, and business profits.",
     ),
     preset(
         "cat.investmentCapitalIncome",
         "Investment & Capital Income",
         INCOME,
         true,
+        "cat.investmentCapitalIncome.desc",
+        "Rental income, dividends, interest, and capital gains.",
     ),
     preset(
         "cat.governmentSupplemental",
         "Government & Supplemental",
         INCOME,
         true,
+        "cat.governmentSupplemental.desc",
+        "Pension, Social Security, child support, alimony, and tax refunds.",
     ),
-    preset("cat.otherIncome", "Other Income", INCOME, true),
+    preset(
+        "cat.otherIncome",
+        "Other Income",
+        INCOME,
+        true,
+        "cat.otherIncome.desc",
+        "Any other income that doesn't fit the categories above.",
+    ),
 ];
 
 const EXPENSE_CATEGORIES: &[PresetCategory] = &[
-    preset("cat.housing", "Housing", EXPENSE, false),
-    preset("cat.utilities", "Utilities", EXPENSE, false),
-    preset("cat.foodGroceries", "Food & Groceries", EXPENSE, false),
-    preset("cat.transportation", "Transportation", EXPENSE, false),
+    preset(
+        "cat.housing",
+        "Housing",
+        EXPENSE,
+        false,
+        "cat.housing.desc",
+        "Rent or mortgage, property taxes, homeowner/rental insurance, HOA fees, repairs.",
+    ),
+    preset(
+        "cat.utilities",
+        "Utilities",
+        EXPENSE,
+        false,
+        "cat.utilities.desc",
+        "Electricity, gas, water/sewer, trash collection, internet, wifi, mobile phone.",
+    ),
+    preset(
+        "cat.foodGroceries",
+        "Food & Groceries",
+        EXPENSE,
+        false,
+        "cat.foodGroceries.desc",
+        "Groceries, household supplies, dining out, coffee/drinks.",
+    ),
+    preset(
+        "cat.transportation",
+        "Transportation",
+        EXPENSE,
+        false,
+        "cat.transportation.desc",
+        "Auto loan/lease, vehicle insurance, gas/EV charging, parking, tolls, transit passes, car maintenance.",
+    ),
     preset(
         "cat.healthcareInsurance",
         "Healthcare & Insurance",
         EXPENSE,
         false,
+        "cat.healthcareInsurance.desc",
+        "Health/dental/vision premiums, pharmacy copays, out-of-pocket medical bills, life insurance.",
     ),
-    preset("cat.debtServicing", "Debt Servicing", EXPENSE, false),
+    preset(
+        "cat.debtServicing",
+        "Debt Servicing",
+        EXPENSE,
+        false,
+        "cat.debtServicing.desc",
+        "Credit card balances, student loans, personal loans, medical debt payments.",
+    ),
     preset(
         "cat.personalLifestyle",
         "Personal & Lifestyle",
         EXPENSE,
         false,
+        "cat.personalLifestyle.desc",
+        "Clothing/shoes, personal care, gym memberships, streaming services, hobbies.",
     ),
     preset(
         "cat.familyDependents",
         "Family & Dependents",
         EXPENSE,
         false,
+        "cat.familyDependents.desc",
+        "Childcare, tuition, school supplies, extracurricular activities, pet care/vet bills.",
     ),
-    preset("cat.otherExpenses", "Other Expenses", EXPENSE, false),
+    preset(
+        "cat.otherExpenses",
+        "Other Expenses",
+        EXPENSE,
+        false,
+        "cat.otherExpenses.desc",
+        "Any other expense that doesn't fit the categories above.",
+    ),
 ];
 
 /// The starter categories to offer a first-time budget. `region` is
@@ -182,7 +266,7 @@ mod tests {
         for region in EVERY_REGION {
             for p in for_region(region) {
                 assert!(
-                    Category::new("id", p.name, p.group, p.is_income).is_ok(),
+                    Category::new("id", p.name, p.group, p.is_income, p.description).is_ok(),
                     "{} is not a valid category name",
                     p.name
                 );
@@ -235,5 +319,32 @@ mod tests {
                 p.group
             );
         }
+    }
+
+    #[test]
+    fn every_preset_has_a_description() {
+        // Mei's list is the point of this module -- a preset that lost
+        // its description on the way in would silently fall back to
+        // showing nothing, same failure mode a missing translation has.
+        for p in for_region(Region::Us) {
+            assert!(!p.description.is_empty(), "{} has no description", p.name);
+            assert!(
+                p.description_key.starts_with("cat.") && p.description_key.ends_with(".desc"),
+                "{} is not namespaced",
+                p.description_key
+            );
+        }
+    }
+
+    #[test]
+    fn no_description_key_is_offered_twice() {
+        let mut keys: Vec<_> = for_region(Region::Us)
+            .iter()
+            .map(|p| p.description_key)
+            .collect();
+        let before = keys.len();
+        keys.sort_unstable();
+        keys.dedup();
+        assert_eq!(before, keys.len(), "a description key repeats");
     }
 }

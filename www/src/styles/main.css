@@ -347,6 +347,19 @@ table.data tr:last-child td { border-bottom: none; }
 
 .category-row { display: grid; grid-template-columns: 1.4fr 0.9fr 0.9fr 1.1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .category-row:last-child { border-bottom: none; }
+/* Not a `.category-row` on purpose -- it's a full-width label, not a
+   grid row, and must survive the narrow-screen breakpoint that hides
+   `.category-head` (a real column header has nothing to say once rows
+   stack; this still does). */
+.category-section-header {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  font-weight: 600;
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--line);
+}
 /* Separates Savings from every real category above it -- Savings is
    always the last row in the table, never sorted in among the others. */
 .category-row-divider { height: 1px; margin: 4px 0 6px; background: var(--line); border: none; }
@@ -357,6 +370,7 @@ table.data tr:last-child td { border-bottom: none; }
 .report-savings-row td { font-weight: 600; border-top: 2px solid var(--line); }
 .category-name { font-weight: 600; }
 .category-group { color: var(--muted-2); font-size: 0.75rem; }
+.category-description { color: var(--muted-2); font-size: 0.75rem; margin-top: 2px; line-height: 1.3; }
 
 /* Unassigned leads the tab: reaching zero IS zero-based budgeting, so it
    gets the weight, and the derived figures below it are subordinate. */
