@@ -4,8 +4,8 @@ use chrono::{Datelike, Duration};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use budget_core::round_currency;
 use crate::date_util::{month_bounds, parse_date};
+use budget_core::round_currency;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
@@ -143,7 +143,9 @@ pub fn weekly_spend(transactions: &[Transaction], month: &str) -> Vec<(String, D
         if t.amount.is_sign_positive() {
             continue;
         }
-        let Some(date) = parse_date(&t.date) else { continue };
+        let Some(date) = parse_date(&t.date) else {
+            continue;
+        };
         if date < month_start || date > month_end {
             continue;
         }
@@ -158,7 +160,7 @@ pub fn weekly_spend(transactions: &[Transaction], month: &str) -> Vec<(String, D
     for (_, total) in &mut totals {
         *total = round_currency(*total);
     }
-    totals.sort_by(|a, b| a.0.cmp(&b.0));
+    totals.sort_by_key(|(date, _)| *date);
     totals
         .into_iter()
         .map(|(d, amt)| (d.format("%Y-%m-%d").to_string(), amt))

@@ -120,7 +120,9 @@ pub fn weekly_spend(params: JsValue) -> JsValue {
     })
 }
 
-fn parse_weekly_params(params: JsValue) -> Result<(Vec<budget_calc::Transaction>, String), Message> {
+fn parse_weekly_params(
+    params: JsValue,
+) -> Result<(Vec<budget_calc::Transaction>, String), Message> {
     let params: WeeklySpendParams =
         serde_wasm_bindgen::from_value(params).map_err(|_| Message::bad_request())?;
     let transactions = params

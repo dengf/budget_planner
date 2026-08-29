@@ -283,8 +283,14 @@ mod tests {
 
     #[test]
     fn unspent_is_income_minus_total_spent() {
-        let planned = vec![("dining".to_string(), dec!(200)), ("rent".to_string(), dec!(1500))];
-        let spent = vec![("dining".to_string(), dec!(150)), ("rent".to_string(), dec!(1500))];
+        let planned = vec![
+            ("dining".to_string(), dec!(200)),
+            ("rent".to_string(), dec!(1500)),
+        ];
+        let spent = vec![
+            ("dining".to_string(), dec!(150)),
+            ("rent".to_string(), dec!(1500)),
+        ];
         let lines = build_month(&planned, &[], &spent).unwrap();
         let summary = summarize_month(dec!(2000), &lines);
         assert_eq!(summary.unspent, dec!(350));
