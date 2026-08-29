@@ -185,16 +185,18 @@ export default function BudgetTab({
 
   const savingsLine = savingsResult?.line;
 
-  /** Same reading as `remainingCell` for an income category: a Savings
-   *  row that saved more than its target is good news, styled the same
-   *  as "received more than planned" rather than a warning. Falling
-   *  short just shows the plain amount still to go, like any other
-   *  category's remaining. */
+  /** Savings reads the opposite way `line.remaining` (planned minus
+   *  actual) does for every other category, so this shows actual minus
+   *  planned instead: meeting or beating the target is good news (green,
+   *  "received more" -- saved more than planned), falling short is a
+   *  plain negative amount still to go (red), the same polarity every
+   *  other category's remaining already uses. */
   const savingsRemainingCell = (line) => {
-    if (line.remaining >= 0) {
-      return { className: 'positive', text: formatMoney(line.remaining) };
+    const gap = line.spent - line.planned;
+    if (gap >= 0) {
+      return { className: 'positive', text: t('budget.receivedMore', { amount: formatMoney(gap) }) };
     }
-    return { className: 'positive', text: t('budget.receivedMore', { amount: formatMoney(-line.remaining) }) };
+    return { className: 'negative', text: formatMoney(gap) };
   };
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;

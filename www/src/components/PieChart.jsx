@@ -15,17 +15,39 @@ const CY = SIZE / 2;
 // dark screen background and the white page `window.print()` produces --
 // SpendChart/DebtChart only ever render on screen, so this is the first
 // chart that has to work in both.
+//
+// Anchored on meifio's plum (see meifio-brand/README.md's colour table,
+// #B01243 light / #F2547F dark) rather than an arbitrary hue -- index 0,
+// the biggest wedge since `wedges` is sorted by value descending, sits
+// closest to the brand hue (~344deg), each hand-tuned in lightness so
+// every entry lands close to a ~4.2:1 contrast ratio against both this
+// app's dark background (#0f1720) and print/light-mode white -- the same
+// "holds up on both" bar the old arbitrary palette was picked to clear,
+// not a new one. This deliberately does NOT touch `--accent` (see
+// main.css's own comment on why this app kept mortgage_calculator's
+// blue/green instead of meifio's plum) -- that's app-wide chrome, a
+// bigger call than one chart's palette.
+//
+// Ordering: most budgets only ever populate the first handful of these
+// ten, so stepping sequentially around the hue wheel (0, 36, 72deg...)
+// would put the categories people actually see next to each other in
+// value -- and next to each other in hue, the hardest pair to tell
+// apart. Instead this jumps by half the wheel (5 of 10) each step --
+// 0, 180, 36, 216, 72deg... -- so consecutive palette entries always
+// land at least 144deg apart. Whatever prefix of the list a given
+// chart actually uses is close to maximally spread, not just the full
+// set of ten.
 const PALETTE = [
-  '#4f8cff',
-  '#f59e0b',
-  '#22c55e',
-  '#ef4444',
-  '#a855f7',
-  '#06b6d4',
-  '#ec4899',
-  '#84cc16',
-  '#f97316',
-  '#64748b',
+  '#E52E5F',
+  '#118D6C',
+  '#CC5519',
+  '#1681B6',
+  '#888011',
+  '#656EEC',
+  '#498811',
+  '#A353EA',
+  '#118D22',
+  '#DA1BC0',
 ];
 
 function pointOnCircle(angle) {
@@ -39,11 +61,31 @@ function wedgePath(startAngle, endAngle) {
   return `M${CX},${CY} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${largeArc},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`;
 }
 
-// Radius of the punched-out hole in donut mode, as a fraction of R --
-// wide enough to hold two lines of centered text without the wedges
-// crowding in on it, narrow enough that the ring itself still reads as
-// the main shape rather than a thin band.
-const HOLE_R_RATIO = 0.62;
+// The chart's outer boundary follows meifio's blossom silhouette
+// (meifio-brand/svg/blossom.svg's own path, unmodified) instead of a
+// plain circle -- but only as a *clip shape*. The colored regions inside
+// it are still ordinary angle-proportional wedges from `wedgePath`
+// above, so this has nothing to do with category count: the blossom is
+// fixed at 5 petals, but any number of categories clips into the same
+// fixed outline. PETAL_D is the mark's single petal path, in its own
+// local space centered on (50,50); PETAL_ANGLES rotates 5 copies around
+// that center the same way blossom.svg's own <use> elements do.
+const PETAL_D = 'M50 50 C41 46 34 38 34 27 A16 16 0 1 1 66 27 C66 38 59 46 50 50 Z';
+// Distance from (50,50) to the petal tip (50,11) in PETAL_D's own local
+// units -- measured, not guessed, so `flowerScale` below maps that tip to
+// exactly R regardless of this path's coordinate scale.
+const NATURAL_PETAL_R = 39;
+const PETAL_ANGLES = [0, 72, 144, 216, 288];
+const flowerScale = R / NATURAL_PETAL_R;
+
+// Radius of the punched-out hole in donut mode, as a fraction of R.
+// Sampling PETAL_D shows the 5 petals separate into distinct lobes (with
+// gaps between them) outside local radius ~27 of 39, and overlap into a
+// plain solid disc inside that (27/39 ~= 0.69). A smaller hole trades
+// some of that outer, clearly-5-lobed band for more colored area overall
+// -- the innermost sliver of the ring sits in the solid-disc zone (looks
+// like a plain ring there), the rest still reads as a flower.
+const HOLE_R_RATIO = 0.6;
 
 let nextMaskId = 0;
 
@@ -101,6 +143,7 @@ export default function PieChart({
   // collide on a mask id, which would silently punch the wrong chart's
   // hole.
   const maskId = React.useMemo(() => `pie-donut-mask-${nextMaskId++}`, []);
+  const clipId = React.useMemo(() => `pie-flower-clip-${nextMaskId++}`, []);
 
   return (
     <figure className="chart pie-chart">
@@ -113,7 +156,16 @@ export default function PieChart({
               <circle cx={CX} cy={CY} r={R * HOLE_R_RATIO} fill="#000" />
             </mask>
           )}
-          <g mask={hollow ? `url(#${maskId})` : undefined}>
+          <clipPath id={clipId}>
+            {PETAL_ANGLES.map((deg) => (
+              <path
+                key={deg}
+                d={PETAL_D}
+                transform={`translate(${CX} ${CY}) scale(${flowerScale}) translate(-50 -50) rotate(${deg} 50 50)`}
+              />
+            ))}
+          </clipPath>
+          <g mask={hollow ? `url(#${maskId})` : undefined} clipPath={`url(#${clipId})`}>
             {isEmpty ? (
               <circle cx={CX} cy={CY} r={R} className="pie-empty-ring" />
             ) : (

@@ -151,7 +151,26 @@ body {
   outline: none;
 }
 
-.app-tabs { display: flex; gap: 6px; background: var(--panel-alt); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
+/* Sticky, not the whole `.app-header` -- the brand/language/currency row
+   above it stays in normal flow and scrolls away, so only the actual
+   navigation (this row) stays reachable without scrolling back up, on
+   both phone and desktop. `.app-header`'s own border-bottom belongs to
+   the header box, not this one, so it scrolls away with the brand row;
+   this pill's own opaque background is what keeps scrolled content from
+   showing through underneath it once it's stuck. */
+.app-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--panel-alt);
+  padding: 4px;
+  border-radius: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  position: sticky;
+  top: 8px;
+  z-index: 40;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
 .app-tab {
   border: none;
   background: transparent;
