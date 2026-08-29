@@ -17,6 +17,7 @@ use chrono::{Datelike, Duration, NaiveDate};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+use crate::date_util::{month_bounds, parse_date};
 use budget_core::{round_currency, BudgetError, BudgetResult, Cadence};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -67,26 +68,6 @@ pub struct Occurrence {
     pub amount: Decimal,
     /// ISO 8601 date this specific occurrence falls on.
     pub date: String,
-}
-
-fn parse_date(s: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-}
-
-/// `(first day, last day)` of a `YYYY-MM` month. `None` on a string that
-/// doesn't parse -- an unparseable anchor or month produces zero
-/// occurrences rather than a panic; see `occurrences_in_month`.
-fn month_bounds(month: &str) -> Option<(NaiveDate, NaiveDate)> {
-    let (year_str, month_str) = month.split_once('-')?;
-    let year: i32 = year_str.parse().ok()?;
-    let mon: u32 = month_str.parse().ok()?;
-    let start = NaiveDate::from_ymd_opt(year, mon, 1)?;
-    let next_start = if mon == 12 {
-        NaiveDate::from_ymd_opt(year + 1, 1, 1)?
-    } else {
-        NaiveDate::from_ymd_opt(year, mon + 1, 1)?
-    };
-    Some((start, next_start - Duration::days(1)))
 }
 
 /// The last valid day of `year`-`month` -- 28, 29, 30 or 31. Used to clamp

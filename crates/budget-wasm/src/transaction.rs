@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 use crate::convert::{decimal_to_f64, f64_to_decimal, to_js};
 use crate::dto::{
     AmountResultDto, DailySpendResult, DateAmountDto, SpendByCategoryParams, SpendByCategoryResult,
-    TransactionDto,
+    TransactionDto, WeeklySpendParams,
 };
 use crate::message::Message;
 
@@ -92,4 +92,44 @@ pub fn daily_spend(params: JsValue) -> JsValue {
             ..Default::default()
         },
     })
+}
+
+/// Total spend per ISO week within `month`, for the same chart's
+/// Daily/Weekly toggle -- see `budget_calc::weekly_spend`. Shares
+/// `DailySpendResult`'s shape with `daily_spend` above (a date-keyed
+/// total list plus an error) rather than a dedicated result type, the
+/// same way `spend_by_category` and `income_by_category` already share
+/// `SpendByCategoryResult`.
+#[wasm_bindgen]
+pub fn weekly_spend(params: JsValue) -> JsValue {
+    to_js(&match parse_weekly_params(params) {
+        Ok((transactions, month)) => DailySpendResult {
+            totals: budget_calc::weekly_spend(&transactions, &month)
+                .into_iter()
+                .map(|(date, amount)| DateAmountDto {
+                    date,
+                    amount: decimal_to_f64(amount),
+                })
+                .collect(),
+            error: None,
+        },
+        Err(message) => DailySpendResult {
+            error: Some(message.text),
+            ..Default::default()
+        },
+    })
+}
+
+fn parse_weekly_params(
+    params: JsValue,
+) -> Result<(Vec<budget_calc::Transaction>, String), Message> {
+    let params: WeeklySpendParams =
+        serde_wasm_bindgen::from_value(params).map_err(|_| Message::bad_request())?;
+    let transactions = params
+        .transactions
+        .iter()
+        .map(from_dto)
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(Message::bad_request)?;
+    Ok((transactions, params.month))
 }

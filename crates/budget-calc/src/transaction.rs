@@ -1,8 +1,10 @@
 //! Transactions and the summary math that feeds `category::build_month`.
 
+use chrono::{Datelike, Duration};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+use crate::date_util::{month_bounds, parse_date};
 use budget_core::round_currency;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -118,6 +120,53 @@ pub fn daily_spend(transactions: &[Transaction]) -> Vec<(String, Decimal)> {
     totals
 }
 
+/// Total spending per ISO week (Monday-start) within `month`, clipped to
+/// that month's own days -- mirrors `daily_spend`'s shape (a sparse list
+/// of buckets that had spending, not a zero-padded full calendar) and its
+/// calling convention (callers already pass only this month's own
+/// transactions, same as `daily_spend`'s callers do; a transaction
+/// outside `month` is defensively dropped rather than trusted).
+///
+/// The date returned per bucket is the *clipped* week-start: the later of
+/// (that week's real Monday, `month`'s first day) -- so a week that
+/// straddles two months keys off day 1 of `month` rather than a day
+/// belonging to the previous month. `www/src/month.js`'s `weeksInMonth`
+/// builds the matching clipped week-boundary list for the chart's x-axis
+/// using the identical rule; the two must never disagree about where a
+/// boundary week starts.
+pub fn weekly_spend(transactions: &[Transaction], month: &str) -> Vec<(String, Decimal)> {
+    let Some((month_start, month_end)) = month_bounds(month) else {
+        return Vec::new();
+    };
+    let mut totals: Vec<(chrono::NaiveDate, Decimal)> = Vec::new();
+    for t in transactions {
+        if t.amount.is_sign_positive() {
+            continue;
+        }
+        let Some(date) = parse_date(&t.date) else {
+            continue;
+        };
+        if date < month_start || date > month_end {
+            continue;
+        }
+        let monday = date - Duration::days(date.weekday().num_days_from_monday() as i64);
+        let bucket_start = monday.max(month_start);
+        let spend = -t.amount;
+        match totals.iter_mut().find(|(d, _)| *d == bucket_start) {
+            Some((_, total)) => *total += spend,
+            None => totals.push((bucket_start, spend)),
+        }
+    }
+    for (_, total) in &mut totals {
+        *total = round_currency(*total);
+    }
+    totals.sort_by_key(|(date, _)| *date);
+    totals
+        .into_iter()
+        .map(|(d, amt)| (d.format("%Y-%m-%d").to_string(), amt))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,5 +261,76 @@ mod tests {
     #[test]
     fn daily_spend_on_no_transactions_is_empty() {
         assert_eq!(daily_spend(&[]), vec![]);
+    }
+
+    #[test]
+    fn weekly_spend_sums_only_the_negative_side_per_week() {
+        let txs = vec![
+            d("2026-08-03", "coffee", dec!(-5), Some("dining")), // Mon, week of Aug 3
+            d("2026-08-04", "lunch", dec!(-15), Some("dining")), // Tue, same week
+            d("2026-08-03", "salary", dec!(3000), Some("dining")), // income excluded
+            d("2026-08-10", "dinner", dec!(-20), Some("dining")), // next week
+        ];
+        assert_eq!(
+            weekly_spend(&txs, "2026-08"),
+            vec![
+                ("2026-08-03".to_string(), dec!(20)),
+                ("2026-08-10".to_string(), dec!(20))
+            ]
+        );
+    }
+
+    #[test]
+    fn weekly_spend_clips_a_boundary_crossing_week_to_the_months_own_days() {
+        // 2026-03-01 is a Sunday; its real ISO week runs Mon 2026-02-23
+        // through Sun 2026-03-01. The bucket key must be the month's own
+        // first day (2026-03-01), not the February Monday.
+        let txs = vec![d("2026-03-01", "coffee", dec!(-4), Some("dining"))];
+        assert_eq!(
+            weekly_spend(&txs, "2026-03"),
+            vec![("2026-03-01".to_string(), dec!(4))]
+        );
+    }
+
+    #[test]
+    fn weekly_spend_excludes_a_transaction_outside_the_month() {
+        let txs = vec![d("2026-07-31", "leak", dec!(-9), Some("dining"))];
+        assert_eq!(weekly_spend(&txs, "2026-08"), vec![]);
+    }
+
+    #[test]
+    fn weekly_spend_is_sorted_by_week_start_ascending() {
+        let txs = vec![
+            d("2026-08-24", "late", dec!(-3), None),
+            d("2026-08-03", "early", dec!(-1), None),
+            d("2026-08-10", "mid", dec!(-2), None),
+        ];
+        let starts: Vec<String> = weekly_spend(&txs, "2026-08")
+            .into_iter()
+            .map(|(d, _)| d)
+            .collect();
+        assert_eq!(starts, vec!["2026-08-03", "2026-08-10", "2026-08-24"]);
+    }
+
+    #[test]
+    fn weekly_spend_includes_an_uncategorized_transaction() {
+        let txs = vec![d("2026-08-03", "mystery", dec!(-10), None)];
+        assert_eq!(
+            weekly_spend(&txs, "2026-08"),
+            vec![("2026-08-03".to_string(), dec!(10))]
+        );
+    }
+
+    #[test]
+    fn weekly_spend_on_no_transactions_is_empty() {
+        assert_eq!(weekly_spend(&[], "2026-08"), vec![]);
+    }
+
+    #[test]
+    fn weekly_spend_on_an_unparseable_month_is_empty_not_a_panic() {
+        assert_eq!(
+            weekly_spend(&[d("2026-08-03", "x", dec!(-1), None)], "not-a-month"),
+            vec![]
+        );
     }
 }
