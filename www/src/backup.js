@@ -1,6 +1,6 @@
 // The shape of the file "Export all data" writes and "Import" reads.
 //
-// Host-layer by the same reasoning as region.js: this is our own file
+// Host-layer by the same reasoning as currencySymbol.js: this is our own file
 // envelope, not a domain decision. The records inside were validated by
 // budget-calc on the way in and are round-tripped by the store unchanged,
 // so nothing here re-derives a figure. Contrast CSV import, which decides

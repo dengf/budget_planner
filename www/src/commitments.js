@@ -7,7 +7,7 @@
 // shipped. Turning it on is a statement that the same dollar shouldn't be
 // counted twice.
 //
-// A stored preference, so host-layer, exactly like region.js and
+// A stored preference, so host-layer, exactly like currencySymbol.js and
 // income.js. What each commitment is *worth* per month is still Rust's
 // answer (`required_contribution` for a goal, the debt's own minimum);
 // this only records whether to ask.

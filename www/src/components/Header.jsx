@@ -12,12 +12,7 @@ const TABS = [
   { id: 'report', key: 'nav.report' },
 ];
 
-const REGIONS = [
-  { id: 'US', label: 'US' },
-  { id: 'SG', label: 'SG' },
-];
-
-export default function Header({ activeTab, onTabChange, region, onRegionChange }) {
+export default function Header({ activeTab, onTabChange, currencySymbol, onCurrencySymbolChange }) {
   const { t, locale, setLocale } = useI18n();
 
   return (
@@ -48,20 +43,17 @@ export default function Header({ activeTab, onTabChange, region, onRegionChange 
           ))}
         </div>
 
-        {onRegionChange && (
-          <div className="app-regions" role="group" aria-label={t('app.region')}>
-            {REGIONS.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                className={r.id === region ? 'app-region active' : 'app-region'}
-                aria-pressed={r.id === region}
-                onClick={() => onRegionChange(r.id)}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
+        {onCurrencySymbolChange && (
+          <label className="app-currency">
+            <span className="app-currency-label">{t('app.currency')}</span>
+            <input
+              type="text"
+              className="app-currency-input"
+              value={currencySymbol}
+              maxLength={3}
+              onChange={(e) => onCurrencySymbolChange(e.target.value)}
+            />
+          </label>
         )}
       </div>
 

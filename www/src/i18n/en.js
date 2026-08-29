@@ -7,7 +7,7 @@ export default {
   'app.reload': 'Reload',
   'app.byline': '— a {logo} app',
   'app.language': 'Language',
-  'app.region': 'Region',
+  'app.currency': 'Currency',
   'meta.title': 'Budget Planner — zero-based budgeting, goals & debt payoff | meifio',
   'meta.description':
     'Zero-based budgeting, savings goals and debt payoff planning, with client-side CSV import. Runs entirely in your browser — your numbers never leave your device.',
@@ -125,6 +125,7 @@ export default {
 
 
   'transactions.title': 'Transactions',
+  'transactions.listTitle': 'All transactions',
   'transactions.addManual': 'Add a transaction',
   'transactions.date': 'Date',
   'transactions.description': 'Description',

@@ -89,9 +89,9 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
   );
 }
 
-export default function GoalsTab({ wasmModule, region, newId, confirm, goals }) {
+export default function GoalsTab({ wasmModule, currencySymbol, newId, confirm, goals }) {
   const { t } = useI18n();
-  const formatMoney = makeFormatMoney(region);
+  const formatMoney = makeFormatMoney(currencySymbol);
   const [draft, setDraft] = useState({ name: '', target_amount: '', target_date: '', cadence: 'monthly' });
 
   const addGoal = async (e) => {

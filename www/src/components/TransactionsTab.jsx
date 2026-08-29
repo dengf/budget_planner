@@ -14,7 +14,7 @@ const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
 export default function TransactionsTab({
   wasmModule,
-  region,
+  currencySymbol,
   newId,
   confirm,
   categories,
@@ -23,7 +23,7 @@ export default function TransactionsTab({
   recurring,
 }) {
   const { t } = useI18n();
-  const formatMoney = makeFormatMoney(region);
+  const formatMoney = makeFormatMoney(currencySymbol);
   const thisMonth = useMemo(() => currentMonth(), []);
   const [showAllMonths, setShowAllMonths] = useState(false);
 
@@ -153,82 +153,6 @@ export default function TransactionsTab({
     <div className="panel">
       <h2>{t('transactions.title')}</h2>
 
-      {transactions.items.length === 0 ? (
-        <p className="empty-state">{t('transactions.noTransactions')}</p>
-      ) : (
-        <>
-          <label className="field field-check">
-            <input type="checkbox" checked={showAllMonths} onChange={(e) => setShowAllMonths(e.target.checked)} />
-            <span>{t('transactions.showAllMonths')}</span>
-          </label>
-          {visibleTransactions.length === 0 ? (
-            <p className="empty-state">{t('transactions.noneThisMonth')}</p>
-          ) : (
-            <div className="table-scroll">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('transactions.date')}</th>
-                    <th>{t('transactions.description')}</th>
-                    <th>{t('transactions.category')}</th>
-                    <th>{t('transactions.amount')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...visibleTransactions]
-                    .sort((a, b) => (a.date < b.date ? 1 : -1))
-                    .map((tx) => (
-                      <tr key={tx.id}>
-                        <td>{tx.date}</td>
-                        <td>{tx.description}</td>
-                        <td>{categoryName(tx.category_id)}</td>
-                        <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
-                        <td>
-                          <button className="btn ghost" onClick={() => removeTransaction(tx)}>{t('budget.remove')}</button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
-      )}
-
-      <form className="form-grid" onSubmit={addTransaction}>
-        <label className="field">
-          <span className="field-label">{t('transactions.date')}</span>
-          <div className="field-input"><input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.description')}</span>
-          <div className="field-input"><input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
-        </label>
-        <NumberField
-          label={t('transactions.amount')}
-          value={draft.amount}
-          onChange={(v) => setDraft({ ...draft, amount: v })}
-          grouped
-          signed
-        />
-        <label className="field">
-          <span className="field-label">{t('transactions.category')}</span>
-          <select className="field-select" value={draft.category_id} onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}>
-            <option value="">{t('transactions.uncategorized')}</option>
-            {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </label>
-        <button className="btn" type="submit">{t('transactions.add')}</button>
-      </form>
-      <p className="field-label">{t('transactions.amountHint')}</p>
-      <DirectionWarning
-        amount={draft.amount}
-        category={categories.items.find((c) => c.id === draft.category_id)}
-        formatMoney={formatMoney}
-        onUseFlipped={(flipped) => setDraft({ ...draft, amount: String(flipped) })}
-      />
-
       <ReceiptCapture
         wasmModule={wasmModule}
         newId={newId}
@@ -295,6 +219,40 @@ export default function TransactionsTab({
           {importResult.skipped?.length ? ` · ${t('transactions.skippedCount', { count: importResult.skipped.length })}` : ''}
         </p>
       )}
+
+      <h2 className="section-start">{t('transactions.addManual')}</h2>
+      <form className="form-grid" onSubmit={addTransaction}>
+        <label className="field">
+          <span className="field-label">{t('transactions.date')}</span>
+          <div className="field-input"><input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></div>
+        </label>
+        <label className="field">
+          <span className="field-label">{t('transactions.description')}</span>
+          <div className="field-input"><input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
+        </label>
+        <NumberField
+          label={t('transactions.amount')}
+          value={draft.amount}
+          onChange={(v) => setDraft({ ...draft, amount: v })}
+          grouped
+          signed
+        />
+        <label className="field">
+          <span className="field-label">{t('transactions.category')}</span>
+          <select className="field-select" value={draft.category_id} onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}>
+            <option value="">{t('transactions.uncategorized')}</option>
+            {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <button className="btn" type="submit">{t('transactions.add')}</button>
+      </form>
+      <p className="field-label">{t('transactions.amountHint')}</p>
+      <DirectionWarning
+        amount={draft.amount}
+        category={categories.items.find((c) => c.id === draft.category_id)}
+        formatMoney={formatMoney}
+        onUseFlipped={(flipped) => setDraft({ ...draft, amount: String(flipped) })}
+      />
 
       <h2 className="section-start">{t('transactions.rulesTitle')}</h2>
       <p className="panel-subtitle">{t('transactions.rulesHint')}</p>
@@ -426,6 +384,51 @@ export default function TransactionsTab({
         <button className="btn" type="submit">{t('recurring.add')}</button>
       </form>
       <p className="field-label">{t('recurring.anchorHint')}</p>
+
+      <h2 className="section-start">{t('transactions.listTitle')}</h2>
+
+      {transactions.items.length === 0 ? (
+        <p className="empty-state">{t('transactions.noTransactions')}</p>
+      ) : (
+        <>
+          <label className="field field-check">
+            <input type="checkbox" checked={showAllMonths} onChange={(e) => setShowAllMonths(e.target.checked)} />
+            <span>{t('transactions.showAllMonths')}</span>
+          </label>
+          {visibleTransactions.length === 0 ? (
+            <p className="empty-state">{t('transactions.noneThisMonth')}</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t('transactions.date')}</th>
+                    <th>{t('transactions.description')}</th>
+                    <th>{t('transactions.category')}</th>
+                    <th>{t('transactions.amount')}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...visibleTransactions]
+                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+                    .map((tx) => (
+                      <tr key={tx.id}>
+                        <td>{tx.date}</td>
+                        <td>{tx.description}</td>
+                        <td>{categoryName(tx.category_id)}</td>
+                        <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
+                        <td>
+                          <button className="btn ghost" onClick={() => removeTransaction(tx)}>{t('budget.remove')}</button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -30,10 +30,9 @@ function sources() {
 /**
  * A run of letters containing a lowercase one -- a word rather than a code.
  *
- * Unit symbols and region codes are the same in every locale we ship: a
- * suffix of `S$` or `%` is not a translation failure, and the region toggle
- * genuinely reads "US" and "SG" in Chinese. `months` and `%/yr` are words
- * and are not.
+ * Unit symbols are the same in every locale we ship: a suffix of `S$` or
+ * `%` is not a translation failure. `months` and `%/yr` are words and are
+ * not.
  */
 const CARRIES_A_WORD = /[A-Za-z]*[a-z][A-Za-z]/;
 
@@ -51,7 +50,7 @@ const isCatalogKey = (text) => Object.hasOwn(en, text);
 /**
  * The brand name, which is a proper noun and identical in every locale.
  *
- * Same category as `US`, `SG` and `S$` above: the byline around it does
+ * Same category as `S$` above: the byline around it does
  * change -- "a meifio app" against "meifio 出品" -- and that sentence *is* in
  * the catalogs, as `app.byline`. Only the name itself is fixed. Matched
  * exactly, so "meifio app" would still be a finding.

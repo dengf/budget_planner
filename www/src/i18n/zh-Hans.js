@@ -6,7 +6,7 @@ export default {
   'app.reload': '刷新',
   'app.byline': '— {logo} 出品',
   'app.language': '语言',
-  'app.region': '地区',
+  'app.currency': '货币',
   'meta.title': '预算规划 — 零基预算、储蓄目标与还债计划 | meifio',
   'meta.description': '零基预算、储蓄目标与还债计划，支持本地导入银行账单。完全在浏览器中运行——您的数据不会离开您的设备。',
   'meta.ogTitle': '预算规划 — meifio 出品',
@@ -121,6 +121,7 @@ export default {
 
 
   'transactions.title': '账目',
+  'transactions.listTitle': '所有账目',
   'transactions.addManual': '添加一笔账目',
   'transactions.date': '日期',
   'transactions.description': '说明',

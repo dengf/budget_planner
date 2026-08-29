@@ -13,7 +13,10 @@
   --surface: #0f1720;
   --ink: #e6edf3;
   --muted: #9fb0c3;
-  --muted-2: #5c6b7d;
+  /* Was #5c6b7d -- ~3.16:1 on --panel, under WCAG AA's 4.5:1 floor for the
+     normal-size text this token is actually used on (column headers, cell
+     labels, Remove links). #7a8ca0 clears 4.5:1 with a small margin. */
+  --muted-2: #7a8ca0;
   --byline: #9aa7b4;
   --line: #223;
   --line-soft: #1a2433;
@@ -39,7 +42,10 @@
     --surface: #ffffff;
     --ink: #16202b;
     --muted: #5a6b7d;
-    --muted-2: #8492a3;
+    /* Was #8492a3 -- ~3.17:1 on white, same AA failure as the dark value
+       above but needs to move darker here instead of lighter. #667484
+       clears 4.5:1. */
+    --muted-2: #667484;
     --byline: #6b7a8a;
     --line: #dde3ea;
     --line-soft: #e7ebf0;
@@ -99,13 +105,20 @@ body {
 .app-byline:hover, .app-byline:focus-visible { color: var(--ink); }
 .meifio-mark { width: auto; display: block; color: var(--ink); vertical-align: middle; }
 
-.app-switches { display: flex; gap: 10px; }
-.app-regions { display: flex; gap: 2px; background: var(--panel-alt); padding: 3px; border-radius: 8px; }
+.app-switches { display: flex; gap: 10px; flex-wrap: wrap; }
+/* gap was 2px -- adjacent pills sat close enough that a finger could easily
+   land on the wrong one; 6px gives real separation between tap targets. */
+.app-regions { display: flex; gap: 6px; background: var(--panel-alt); padding: 3px; border-radius: 8px; }
 .app-region {
   border: none;
   background: transparent;
   color: var(--muted);
   padding: 6px 10px;
+  /* min-height (not height) so the button still grows with its content --
+     border-box from the global reset means padding is included, not added
+     on top. */
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.8rem;
@@ -113,12 +126,38 @@ body {
 }
 .app-region.active { background: var(--accent); color: var(--accent-ink); }
 
-.app-tabs { display: flex; gap: 4px; background: var(--panel-alt); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
+/* Replaces the old US/SG region toggle -- a free-form symbol someone types
+   once covers more currencies than a two-option picker ever did, and this
+   app carries no other region-flavoured behavior for a toggle to justify. */
+.app-currency {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-alt);
+  padding: 3px 10px;
+  border-radius: 8px;
+  min-height: 44px;
+  cursor: text;
+}
+.app-currency-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.app-currency-input {
+  width: 40px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+}
+
+.app-tabs { display: flex; gap: 6px; background: var(--panel-alt); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
 .app-tab {
   border: none;
   background: transparent;
   color: var(--muted);
   padding: 8px 16px;
+  min-height: 44px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -221,6 +260,7 @@ body {
 .field-input {
   display: flex;
   align-items: center;
+  min-height: 44px;
   background: var(--surface);
   border: 1px solid var(--input-border);
   border-radius: 8px;
@@ -246,8 +286,11 @@ body {
    every device. */
 .sign-toggle {
   flex: none;
-  width: 28px;
-  height: 28px;
+  /* Was 28px -- still short of a full 44px since it sits nested inside the
+     44px-tall .field-input alongside the amount input itself, but this is
+     a big step up in the actual hit area (28x28 -> 36x36, ~65% more). */
+  width: 36px;
+  height: 36px;
   border-radius: 6px;
   border: 1px solid var(--input-border);
   background: var(--panel-alt);
@@ -265,6 +308,7 @@ body {
   border-radius: 8px;
   color: var(--ink);
   padding: 10px;
+  min-height: 44px;
   font-size: 0.95rem;
 }
 
@@ -278,6 +322,7 @@ body {
   border: none;
   border-radius: 8px;
   padding: 10px 16px;
+  min-height: 44px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -292,8 +337,14 @@ body {
    present for its native picker/keyboard behaviour but visually hidden. */
 label.btn { cursor: pointer; }
 .btn.secondary { background: var(--panel-alt); color: var(--ink); }
-.btn.ghost { background: transparent; color: var(--muted); padding: 6px 10px; }
-.btn.danger { background: transparent; color: var(--negative); padding: 6px 10px; }
+/* Ghost/danger are the small inline "Remove"/dismiss links used throughout
+   tables and rows, not primary actions -- they keep their own compact
+   sizing rather than inheriting .btn's 44px floor, which would blow out
+   the row height of every table in the app. Their own contexts (the
+   mobile .category-row rule below, in particular) size them up where a
+   phone is actually the reasonable case to plan for. */
+.btn.ghost { background: transparent; color: var(--muted); padding: 6px 10px; min-height: auto; }
+.btn.danger { background: transparent; color: var(--negative); padding: 6px 10px; min-height: auto; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
@@ -474,7 +525,12 @@ table.data tr:last-child td { border-bottom: none; }
 .category-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); padding-bottom: 6px; }
 
 /* The planned field sits inside a row rather than a form-grid, so it
-   needs to be shorter than a standalone .field-input. */
+   needs to be shorter than a standalone .field-input -- the new 44px
+   .field-input floor is for standalone form fields (Add transaction, Add
+   rule, ...), not this dense per-category row repeated a dozen-plus times
+   down the Budget tab, where the actual constraint is scanning many rows
+   at once rather than tapping any single one precisely. */
+.planned-input { min-height: auto; }
 .planned-input input { padding: 6px 4px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Redundant while the header row is visible; the only labelling once the
@@ -525,15 +581,21 @@ table.data tr:last-child td { border-bottom: none; }
     align-items: start;
   }
   .category-row > :first-child { grid-column: 1; grid-row: 1; }
-  /* Remove moves up beside the name instead of holding its own row --
-     and shrinks, since a per-row action taken once in a while shouldn't
-     out-weigh the figures people actually look at. */
+  /* Remove moves up beside the name instead of holding its own row, and
+     its label stays small -- a per-row action taken once in a while
+     shouldn't out-weigh the figures people actually look at. The tap
+     target itself still gets real room though: this is a phone-width
+     rule, and a small label with no padding used to measure an actual
+     18px-tall hit box (confirmed via getBoundingClientRect, not just
+     eyeballed), well under the ~44px floor for anything meant to be
+     tapped rather than clicked with a mouse. */
   .category-row .btn {
     grid-column: 2;
     grid-row: 1;
     justify-self: end;
     align-self: start;
-    padding: 2px 0;
+    min-height: 44px;
+    padding: 4px 8px;
     font-size: 0.75rem;
     color: var(--muted-2);
     background: transparent;
@@ -544,6 +606,12 @@ table.data tr:last-child td { border-bottom: none; }
      one line, not a "SPENT" heading followed by "S$120" underneath it. */
   .cell-label { display: inline; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-2); }
   .category-row .spent-cell { grid-column: 1; grid-row: 3; justify-content: flex-start; }
+  /* Was a flat 24x24 everywhere -- fine for a mouse, too small for the
+     finger that's doing the tapping on a phone-width layout like this
+     one. Desktop's dense 5-column row keeps the smaller size above; this
+     row has already reflowed to a single wide column by this point, so
+     there's room to grow without crowding anything else in it. */
+  .category-row .spend-add { width: 44px; height: 44px; font-size: 1.1rem; }
   .category-row > .num:not(.spent-cell) {
     grid-column: 2;
     grid-row: 3;

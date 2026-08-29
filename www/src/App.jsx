@@ -3,7 +3,7 @@ import Header from './components/Header';
 import Intro from './components/Intro';
 import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
-import { detectRegion, rememberRegion } from './region';
+import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { saveIncome } from './income';
@@ -95,7 +95,7 @@ function TabFallback() {
 
 export function AppShell({ wasmModule }) {
   const [activeTab, setActiveTab] = useState('budget');
-  const [region, setRegion] = useState(() => detectRegion());
+  const [currencySymbol, setCurrencySymbol] = useState(() => loadCurrencySymbol());
   const [month] = useState(() => currentMonth());
   const { t } = useI18n();
   const [confirm, confirmDialog] = useConfirm();
@@ -164,18 +164,17 @@ export function AppShell({ wasmModule }) {
   );
 
   /**
-   * Inserts the region's starter set, translated.
+   * Inserts the starter set, translated.
    *
-   * `budget-calc::presets` owns *which* categories a region gets and
-   * hands back i18n keys; this composes the name actually stored, in the
-   * reader's language, so a Chinese budget doesn't open with English
-   * category names. Skipping a preset whose name is already present is a
-   * referential check against in-memory state -- host-layer, same
-   * category as `region.js` -- not a rule the core should own.
+   * `budget-calc::presets` hands back i18n keys; this composes the name
+   * actually stored, in the reader's language, so a Chinese budget
+   * doesn't open with English category names. Skipping a preset whose
+   * name is already present is a referential check against in-memory
+   * state -- host-layer, not a rule the core should own.
    */
   const addCommonCategories = useCallback(async () => {
     if (!wasmModule?.preset_categories) return;
-    const presets = (await wasmModule.preset_categories(region)) ?? [];
+    const presets = (await wasmModule.preset_categories()) ?? [];
     const taken = new Set(categories.items.map((c) => c.name.trim().toLowerCase()));
     for (const preset of presets) {
       const name = t(preset.key);
@@ -194,7 +193,7 @@ export function AppShell({ wasmModule }) {
         description: t(preset.description_key),
       });
     }
-  }, [wasmModule, region, categories, newId, t]);
+  }, [wasmModule, categories, newId, t]);
 
   /**
    * A budget with zero categories opens with the starter set already in
@@ -308,10 +307,10 @@ export function AppShell({ wasmModule }) {
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        region={region}
-        onRegionChange={(next) => {
-          rememberRegion(next);
-          setRegion(next);
+        currencySymbol={currencySymbol}
+        onCurrencySymbolChange={(next) => {
+          saveCurrencySymbol(next);
+          setCurrencySymbol(next);
         }}
       />
       <main className="app-main">
@@ -319,7 +318,7 @@ export function AppShell({ wasmModule }) {
         <Suspense fallback={<TabFallback />}>
           <ActivePanel
             wasmModule={wasmModule}
-            region={region}
+            currencySymbol={currencySymbol}
             month={month}
             newId={newId}
             confirm={confirm}

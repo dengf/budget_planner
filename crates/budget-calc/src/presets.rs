@@ -1,4 +1,4 @@
-//! Starter categories: one universal set, not a per-region one.
+//! Starter categories: one universal set.
 //!
 //! A first-run budget with no categories is a blank page, and the blank
 //! page is where people give up -- naming a dozen categories from memory
@@ -9,11 +9,10 @@
 //! This list replaced an earlier US/SG-specific pair after real-user
 //! feedback: the income/expense taxonomy below (five income sources,
 //! nine expense categories, an "Other" catch-all on each side) isn't
-//! region-flavoured the way the old set was (S&CC, a parents' allowance),
-//! so `for_region` now hands back the same set regardless of region --
-//! kept as a function, not simplified to a constant, so a genuinely
-//! region-specific line item has somewhere to go later without another
-//! signature change rippling through `budget-wasm` and `www/`.
+//! region-flavoured the way the old set was (S&CC, a parents' allowance).
+//! The app's region/market concept was removed outright afterwards --
+//! nothing else in this codebase needed it either, so there was no reason
+//! left to carry a `Region` parameter through here just for this.
 //!
 //! Both the taxonomy and each category's `description` come from Mei, a
 //! CPA -- her list is the authoritative source for what belongs where,
@@ -32,8 +31,6 @@
 //! fallback, never pre-composed prose. The UI composes the actual stored
 //! name in the reader's language, so a Chinese user's budget opens with
 //! Chinese category names rather than English ones they have to retype.
-
-use budget_core::Region;
 
 /// One suggested category: an i18n key for the UI to translate, plus the
 /// English text to fall back on if that key is ever missing.
@@ -203,9 +200,8 @@ const EXPENSE_CATEGORIES: &[PresetCategory] = &[
     ),
 ];
 
-/// The starter categories to offer a first-time budget. `region` is
-/// unused today -- see the module doc for why the parameter stays.
-pub fn for_region(_region: Region) -> Vec<PresetCategory> {
+/// The starter categories to offer a first-time budget.
+pub fn starter_categories() -> Vec<PresetCategory> {
     INCOME_CATEGORIES
         .iter()
         .chain(EXPENSE_CATEGORIES)
@@ -218,29 +214,23 @@ mod tests {
     use super::*;
     use crate::Category;
 
-    const EVERY_REGION: [Region; 2] = [Region::Us, Region::Sg];
-
     #[test]
-    fn every_region_gets_a_usable_starter_set() {
-        for region in EVERY_REGION {
-            let presets = for_region(region);
-            assert!(
-                presets.len() >= 8,
-                "{region:?} offers only {} categories -- too few to save anyone the typing",
-                presets.len()
-            );
-        }
+    fn offers_a_usable_starter_set() {
+        let presets = starter_categories();
+        assert!(
+            presets.len() >= 8,
+            "offers only {} categories -- too few to save anyone the typing",
+            presets.len()
+        );
     }
 
     #[test]
     fn no_category_is_offered_twice() {
-        for region in EVERY_REGION {
-            let mut keys: Vec<_> = for_region(region).iter().map(|p| p.key).collect();
-            let before = keys.len();
-            keys.sort_unstable();
-            keys.dedup();
-            assert_eq!(before, keys.len(), "{region:?} repeats a category key");
-        }
+        let mut keys: Vec<_> = starter_categories().iter().map(|p| p.key).collect();
+        let before = keys.len();
+        keys.sort_unstable();
+        keys.dedup();
+        assert_eq!(before, keys.len(), "repeats a category key");
     }
 
     #[test]
@@ -249,13 +239,11 @@ mod tests {
         // repeated name (the literal "Others" in the original feedback)
         // would be indistinguishable there, and would collide in
         // `addCommonCategories`'s name-based dedup.
-        for region in EVERY_REGION {
-            let mut names: Vec<_> = for_region(region).iter().map(|p| p.name).collect();
-            let before = names.len();
-            names.sort_unstable();
-            names.dedup();
-            assert_eq!(before, names.len(), "{region:?} repeats a category name");
-        }
+        let mut names: Vec<_> = starter_categories().iter().map(|p| p.name).collect();
+        let before = names.len();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(before, names.len(), "repeats a category name");
     }
 
     #[test]
@@ -263,15 +251,13 @@ mod tests {
         // The English fallback has to survive the same validation a
         // hand-typed name does, or a preset could insert a record that
         // Category::new would have rejected.
-        for region in EVERY_REGION {
-            for p in for_region(region) {
-                assert!(
-                    Category::new("id", p.name, p.group, p.is_income, p.description).is_ok(),
-                    "{} is not a valid category name",
-                    p.name
-                );
-                assert!(!p.key.is_empty() && !p.group_key.is_empty());
-            }
+        for p in starter_categories() {
+            assert!(
+                Category::new("id", p.name, p.group, p.is_income, p.description).is_ok(),
+                "{} is not a valid category name",
+                p.name
+            );
+            assert!(!p.key.is_empty() && !p.group_key.is_empty());
         }
     }
 
@@ -279,26 +265,15 @@ mod tests {
     fn every_preset_key_is_namespaced_for_the_catalogs() {
         // The frontend test that pairs these against en.js keys off this
         // prefix; a preset that skipped it would silently go untranslated.
-        for region in EVERY_REGION {
-            for p in for_region(region) {
-                assert!(p.key.starts_with("cat."), "{} is not namespaced", p.key);
-                assert!(p.group_key.starts_with("cat.group."));
-            }
+        for p in starter_categories() {
+            assert!(p.key.starts_with("cat."), "{} is not namespaced", p.key);
+            assert!(p.group_key.starts_with("cat.group."));
         }
     }
 
     #[test]
-    fn both_regions_currently_return_the_same_universal_set() {
-        // Documents the current reality (see the module doc) rather than
-        // asserting it can never change -- if a genuinely region-specific
-        // line item is added later, update this test to say so, don't
-        // just delete it.
-        assert_eq!(for_region(Region::Us), for_region(Region::Sg));
-    }
-
-    #[test]
     fn five_income_categories_and_nine_expense_categories() {
-        let presets = for_region(Region::Us);
+        let presets = starter_categories();
         let income = presets.iter().filter(|p| p.group == "Income").count();
         let expense = presets.iter().filter(|p| p.group == "Expense").count();
         assert_eq!(income, 5);
@@ -309,7 +284,7 @@ mod tests {
     fn is_income_always_agrees_with_the_group_it_was_declared_under() {
         // The two are set independently at each `preset(...)` call site --
         // this catches a copy-paste that flipped one without the other.
-        for p in for_region(Region::Us) {
+        for p in starter_categories() {
             assert_eq!(
                 p.is_income,
                 p.group == "Income",
@@ -326,7 +301,7 @@ mod tests {
         // Mei's list is the point of this module -- a preset that lost
         // its description on the way in would silently fall back to
         // showing nothing, same failure mode a missing translation has.
-        for p in for_region(Region::Us) {
+        for p in starter_categories() {
             assert!(!p.description.is_empty(), "{} has no description", p.name);
             assert!(
                 p.description_key.starts_with("cat.") && p.description_key.ends_with(".desc"),
@@ -338,7 +313,7 @@ mod tests {
 
     #[test]
     fn no_description_key_is_offered_twice() {
-        let mut keys: Vec<_> = for_region(Region::Us)
+        let mut keys: Vec<_> = starter_categories()
             .iter()
             .map(|p| p.description_key)
             .collect();

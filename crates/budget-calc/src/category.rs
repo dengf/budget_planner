@@ -16,8 +16,8 @@ pub struct Category {
     pub id: String,
     pub name: String,
     /// Free-form, used for the printable report's grouping and the
-    /// starter presets (`presets::for_region`) -- never matched on for
-    /// behaviour, only for display order.
+    /// starter presets (`presets::starter_categories`) -- never matched on
+    /// for behaviour, only for display order.
     pub group: String,
     /// Which side of the ledger this category belongs to. Unlike `group`,
     /// this one *is* matched on for behaviour: it's how the frontend
@@ -28,8 +28,8 @@ pub struct Category {
     #[serde(default)]
     pub is_income: bool,
     /// Free-form guidance on what belongs in this category -- populated
-    /// from `presets::for_region` on a starter category, blank on a
-    /// hand-typed one. `#[serde(default)]` so a category saved before
+    /// from `presets::starter_categories` on a starter category, blank on
+    /// a hand-typed one. `#[serde(default)]` so a category saved before
     /// this field existed still loads.
     #[serde(default)]
     pub description: String,

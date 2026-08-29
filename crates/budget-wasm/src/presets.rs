@@ -2,16 +2,14 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::convert::{parse_region, to_js};
+use crate::convert::to_js;
 use crate::dto::PresetCategoryDto;
 
-/// The starter categories for a region, as `{key, name, group_key, group}`
-/// records. No error path: an unrecognized region falls back to the
-/// default rather than failing, since an unknown region string is a
-/// frontend bug, not something a user can type.
+/// The starter categories to offer a first-time budget, as
+/// `{key, name, group_key, group}` records.
 #[wasm_bindgen]
-pub fn preset_categories(region: Option<String>) -> JsValue {
-    let presets: Vec<PresetCategoryDto> = budget_calc::for_region(parse_region(region.as_deref()))
+pub fn preset_categories() -> JsValue {
+    let presets: Vec<PresetCategoryDto> = budget_calc::starter_categories()
         .iter()
         .map(|p| PresetCategoryDto {
             is_income: p.is_income,

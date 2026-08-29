@@ -5,9 +5,9 @@ import NumberField from './NumberField';
 import CalcError from './CalcError';
 import DebtChart from './DebtChart';
 
-export default function DebtTab({ wasmModule, region, newId, confirm, debts }) {
+export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, debts }) {
   const { t } = useI18n();
-  const formatMoney = makeFormatMoney(region);
+  const formatMoney = makeFormatMoney(currencySymbol);
   const [draft, setDraft] = useState({ name: '', balance: '', apr_percent: '', min_payment: '' });
   const [extraPayment, setExtraPayment] = useState(0);
   const [strategy, setStrategy] = useState('snowball');

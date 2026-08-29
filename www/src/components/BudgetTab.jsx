@@ -26,7 +26,7 @@ import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
  */
 export default function BudgetTab({
   wasmModule,
-  region,
+  currencySymbol,
   month,
   categories,
   removeCategory,
@@ -38,7 +38,7 @@ export default function BudgetTab({
   recurring,
 }) {
   const { t, locale } = useI18n();
-  const formatMoney = makeFormatMoney(region);
+  const formatMoney = makeFormatMoney(currencySymbol);
   const [income, setIncome] = useState(() => loadIncome(month));
   const [result, setResult] = useState(null);
   const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });

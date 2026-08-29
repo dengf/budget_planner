@@ -33,7 +33,7 @@ pub use goals::{
 pub use ocr::run_ocr;
 #[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
-pub use presets::{for_region, PresetCategory};
+pub use presets::{starter_categories, PresetCategory};
 pub use receipt::{parse_receipt_text, ParsedReceipt};
 pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,

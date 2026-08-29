@@ -1,7 +1,7 @@
 // This month's income is a number the person types, not something any
-// calculation here derives -- so it lives beside `region` as a stored
-// preference (localStorage), keyed per month, rather than as a
-// budget-calc concept. See region.js for the same pattern.
+// calculation here derives -- so it lives beside `currencySymbol` as a
+// stored preference (localStorage), keyed per month, rather than as a
+// budget-calc concept. See currencySymbol.js for the same pattern.
 
 function key(month) {
   return `bp:income:${month}`;
