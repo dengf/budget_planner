@@ -657,6 +657,11 @@ table.data tr:last-child td { border-bottom: none; }
    module the app is built around. */
 .chart { margin: 0; display: flex; flex-direction: column; gap: 10px; background: var(--panel-alt); border-radius: 12px; padding: 18px 20px; }
 .chart-title { font-size: 0.95rem; font-weight: 700; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+/* Reuses .app-region/.app-region.active from the header's language
+   toggle -- same two-state segmented-pill pattern, same 44px min tap
+   targets, just scoped to this chart instead of the page header. */
+.chart-granularity { display: flex; gap: 6px; background: var(--panel); padding: 3px; border-radius: 8px; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.78rem; color: var(--muted); }
 .chart-key { display: inline-flex; align-items: center; gap: 6px; }
 .chart-key i { width: 10px; height: 10px; border-radius: 5px; flex: none; }
@@ -695,7 +700,18 @@ table.data tr:last-child td { border-bottom: none; }
 /* Dashboard landing tab -- month header, over/under-budget banner, and
    the income/spent summary cards above the existing report content. */
 .dash-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.dash-header h2 { flex: 1; min-width: 0; }
+/* A `min-width: 0` here let the title shrink down to whatever sliver of
+   the row the picker left it, wrapping word-by-word (even letter-by-
+   letter) on a narrow phone instead of the whole title dropping to its
+   own line above the picker -- a real 375px bug, not just a desktop
+   assumption. A real minimum forces the flex-wrap itself to kick in. */
+.dash-header h2 { flex: 1 1 auto; min-width: 200px; }
+/* Transactions' month header reuses .dash-header's layout for its own
+   picker + "show all months" checkbox row. */
+.transactions-month-header { margin-bottom: 4px; }
+/* Not disabled -- still tappable while "all months" is checked, just
+   visually secondary since it isn't driving the list right now. */
+.transactions-picker-dimmed { opacity: 0.55; }
 .dash-month-nav { display: flex; align-items: center; gap: 4px; }
 .dash-month-label {
   min-width: 9ch;
@@ -719,6 +735,62 @@ table.data tr:last-child td { border-bottom: none; }
   cursor: pointer;
 }
 .dash-month-btn:hover { border-color: var(--accent); }
+
+/* The month label doubles as a button that opens the year+grid popup --
+   it needs to read like the existing label, not like a generic button. */
+.monthpicker-trigger { border: none; background: transparent; cursor: pointer; padding: 0; font: inherit; }
+
+.monthpicker-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 200;
+}
+.monthpicker-dialog {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 20px; max-width: 320px; width: 100%;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.monthpicker-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.monthpicker-title { font-weight: 700; }
+.monthpicker-year-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.monthpicker-year-label {
+  min-width: 5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+/* 3x4 grid, each cell a real 44x44+ tap target with room between them --
+   the same "row of small swatches" trap this workspace's phone-first
+   rules call out by name. */
+.monthpicker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.monthpicker-cell {
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+}
+.monthpicker-cell:hover { border-color: var(--accent); }
+.monthpicker-cell.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* A small dot marking "this is the real current month", visible whether
+   or not the cell is also the selected one. */
+.monthpicker-cell.today::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.monthpicker-today-btn { width: 100%; min-height: 44px; }
 
 .dash-status {
   display: flex;
@@ -790,7 +862,7 @@ table.data tr:last-child td { border-bottom: none; }
 .data-management-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 @media print {
-  .app-header, .app-tabs, .app-switches, .report-actions, .no-print, .dash-month-btn { display: none !important; }
+  .app-header, .app-tabs, .app-switches, .report-actions, .no-print, .dash-month-btn, .chart-granularity { display: none !important; }
   body { background: #fff; color: #111; }
   .panel { border: none; background: #fff; }
   /* .chart's background/text are dark-theme tokens that .panel's own

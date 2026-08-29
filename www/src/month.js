@@ -59,3 +59,45 @@ export function shiftMonth(monthStr, delta) {
   const [y, m] = monthStr.split('-').map(Number);
   return currentMonth(new Date(y, (m || 1) - 1 + delta, 1));
 }
+
+/** ISO weeks (Monday-start) touching `monthStr`, each clipped to that
+ *  month's own days -- the same boundary rule `budget-calc::weekly_spend`
+ *  uses (see its own doc comment): a week that straddles two months is
+ *  keyed off the viewed month's own first/last day, never a neighboring
+ *  month's. The two must never disagree about where a boundary week
+ *  starts, or the chart's bars and its axis labels would describe
+ *  different weeks. Returns `[{ start, end }, ...]` ascending, both
+ *  `YYYY-MM-DD`. */
+export function weeksInMonth(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  const monthStart = new Date(y, (m || 1) - 1, 1);
+  const monthEnd = new Date(y, m || 1, 0);
+  const isoOffset = (d) => (d.getDay() + 6) % 7; // Sun=0..Sat=6 -> Mon-start offset
+
+  const weeks = [];
+  let cursor = new Date(monthStart);
+  while (cursor <= monthEnd) {
+    const monday = new Date(cursor);
+    monday.setDate(monday.getDate() - isoOffset(monday));
+    const start = monday < monthStart ? monthStart : monday;
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    const end = sunday > monthEnd ? monthEnd : sunday;
+    weeks.push({ start: todayIso(start), end: todayIso(end) });
+    cursor = new Date(end);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return weeks;
+}
+
+/** A week's date range for display, e.g. "Mar 3–9". Plain
+ *  `toLocaleDateString` calls joined by hand, matching `monthLabel`'s
+ *  style rather than `Intl.DateTimeFormat.prototype.formatRange`, which
+ *  isn't as uniformly supported. */
+export function weekLabel(startIso, endIso, locale = 'en') {
+  const fmt = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+  };
+  return `${fmt(startIso)}–${fmt(endIso)}`;
+}

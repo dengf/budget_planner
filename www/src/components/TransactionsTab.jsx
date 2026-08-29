@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
-import { currentMonth } from '../month';
+import { monthLabel } from '../month';
 import CalcError from './CalcError';
 import DirectionWarning from './DirectionWarning';
+import MonthYearPicker from './MonthYearPicker';
 import { SpreadsheetIcon } from './icons';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
@@ -15,6 +16,9 @@ const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 export default function TransactionsTab({
   wasmModule,
   currencySymbol,
+  today,
+  viewMonth,
+  setViewMonth,
   newId,
   confirm,
   categories,
@@ -22,9 +26,8 @@ export default function TransactionsTab({
   rules,
   recurring,
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const thisMonth = useMemo(() => currentMonth(), []);
   const [showAllMonths, setShowAllMonths] = useState(false);
 
   const [draft, setDraft] = useState({ date: '', description: '', amount: '', category_id: '' });
@@ -142,12 +145,12 @@ export default function TransactionsTab({
     if (ok) await recurring.remove(item.id);
   };
 
-  // Defaults to the current month so the list stays short and fast to scan
+  // Defaults to the viewed month so the list stays short and fast to scan
   // as history accumulates; "show all" is one click away for anyone
   // reconciling further back.
   const visibleTransactions = showAllMonths
     ? transactions.items
-    : transactions.items.filter((tx) => tx.date?.startsWith(thisMonth));
+    : transactions.items.filter((tx) => tx.date?.startsWith(viewMonth));
 
   return (
     <div className="panel">
@@ -391,12 +394,24 @@ export default function TransactionsTab({
         <p className="empty-state">{t('transactions.noTransactions')}</p>
       ) : (
         <>
-          <label className="field field-check">
-            <input type="checkbox" checked={showAllMonths} onChange={(e) => setShowAllMonths(e.target.checked)} />
-            <span>{t('transactions.showAllMonths')}</span>
-          </label>
+          <div className="dash-header transactions-month-header">
+            {/* Kept interactive (not disabled) while "all months" is
+                checked -- picking a month here still narrows the list back
+                down the moment "all months" is unchecked. */}
+            <div className={showAllMonths ? 'transactions-picker-dimmed' : ''}>
+              <MonthYearPicker value={viewMonth} onChange={setViewMonth} todayMonth={today} locale={locale} />
+            </div>
+            <label className="field field-check">
+              <input type="checkbox" checked={showAllMonths} onChange={(e) => setShowAllMonths(e.target.checked)} />
+              <span>{t('transactions.showAllMonths')}</span>
+            </label>
+          </div>
           {visibleTransactions.length === 0 ? (
-            <p className="empty-state">{t('transactions.noneThisMonth')}</p>
+            <p className="empty-state">
+              {showAllMonths
+                ? t('transactions.noTransactions')
+                : t('transactions.noneInMonth', { month: monthLabel(viewMonth, locale) })}
+            </p>
           ) : (
             <div className="table-scroll">
               <table className="data">

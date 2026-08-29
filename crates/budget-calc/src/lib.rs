@@ -6,6 +6,7 @@
 
 pub mod category;
 pub mod csv_import;
+mod date_util;
 pub mod debt;
 pub mod goals;
 #[cfg(feature = "ocr")]
@@ -39,4 +40,4 @@ pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };
 pub use rules::{apply_rules, CategorizationRule};
-pub use transaction::{daily_spend, income_by_category, spend_by_category, Transaction};
+pub use transaction::{daily_spend, income_by_category, spend_by_category, weekly_spend, Transaction};

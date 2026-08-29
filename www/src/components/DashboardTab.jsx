@@ -1,28 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
-import { daysInMonth, monthLabel, shiftMonth } from '../month';
+import { daysInMonth, monthLabel } from '../month';
 import { loadIncome } from '../income';
 import { EXPORT_FORMAT } from '../backup';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import PieChart from './PieChart';
-import DailySpendChart from './DailySpendChart';
+import SpendOverTimeChart from './SpendOverTimeChart';
+import MonthYearPicker from './MonthYearPicker';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 
 /**
  * The landing tab: this month's headline numbers first, the full
- * category table and export/import tools below. `viewMonth` is its own
- * state, separate from the `month` prop (the app's real current month
- * used everywhere else) -- paging Dashboard back to a prior month browses
- * that month's own report without changing what "this month" means for
- * Budget/Goals/Debt. Print, email and export still describe `month` (see
- * their own comments below), matching what they did before this tab
- * could browse elsewhere.
+ * category table and export/import tools below. `viewMonth` is shared
+ * app-wide (App.jsx) -- paging Dashboard back to a prior month is the
+ * same month Budget/Transactions land on too. `budgetPlan.items` already
+ * tracks `viewMonth` (App.jsx fetches it keyed by `viewMonth`), so this
+ * tab reads it directly rather than keeping its own copy. Print, email
+ * and export still describe `today`, the real current month (see their
+ * own comments below) -- unlike everything else on this tab, those
+ * describe *this* month regardless of what's being browsed.
  */
 export default function DashboardTab({
   wasmModule,
   currencySymbol,
-  month,
+  today,
+  viewMonth,
+  setViewMonth,
   categories,
   transactions,
   rules,
@@ -35,40 +39,16 @@ export default function DashboardTab({
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const [viewMonth, setViewMonth] = useState(month);
-  const [viewBudgetPlan, setViewBudgetPlan] = useState(budgetPlan.items);
   const [lines, setLines] = useState([]);
   const [summary, setSummary] = useState(null);
   const [savingsLine, setSavingsLine] = useState(null);
   const [dailyTotals, setDailyTotals] = useState([]);
+  const [weeklyTotals, setWeeklyTotals] = useState([]);
   const [recipients, setRecipients] = useState('');
   const income = loadIncome(viewMonth);
   const [importResult, setImportResult] = useState(null);
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
-
-  // The current month's plan rows are already loaded as `budgetPlan.items`
-  // (App.jsx fetches them keyed by `month`), so browsing back to it reuses
-  // that prop instead of a redundant fetch. Any other month gets its own
-  // small `list_budget_plan` read -- the same storage call `budgetPlan`
-  // itself is built on, just for a month the rest of the app isn't
-  // otherwise looking at.
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (viewMonth === month) {
-        setViewBudgetPlan(budgetPlan.items);
-        return;
-      }
-      if (!wasmModule?.list_budget_plan) return;
-      const result = await wasmModule.list_budget_plan(viewMonth);
-      if (!cancelled) setViewBudgetPlan(Array.isArray(result) ? result : []);
-    }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [wasmModule, viewMonth, month, budgetPlan.items]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +57,7 @@ export default function DashboardTab({
         !wasmModule?.spend_by_category ||
         !wasmModule?.income_by_category ||
         !wasmModule?.daily_spend ||
+        !wasmModule?.weekly_spend ||
         !wasmModule?.build_month
       )
         return;
@@ -85,26 +66,30 @@ export default function DashboardTab({
       // received, an expense category's is what it cost -- summing the
       // wrong side would report $0 for every income category, same as
       // the bug this fixed there.
-      const [spendResult, incomeResult, dailyResult] = await Promise.all([
+      const [spendResult, incomeResult, dailyResult, weeklyResult] = await Promise.all([
         wasmModule.spend_by_category({ transactions: monthTx }),
         wasmModule.income_by_category({ transactions: monthTx }),
         wasmModule.daily_spend({ transactions: monthTx }),
+        wasmModule.weekly_spend({ transactions: monthTx, month: viewMonth }),
       ]);
-      if (!cancelled) setDailyTotals(dailyResult?.totals ?? []);
+      if (!cancelled) {
+        setDailyTotals(dailyResult?.totals ?? []);
+        setWeeklyTotals(weeklyResult?.totals ?? []);
+      }
       const spent = [
         ...(spendResult?.totals ?? []).filter((row) => !isIncome(row.category_id)),
         ...(incomeResult?.totals ?? []).filter((row) => isIncome(row.category_id)),
       ].map((r) => ({ category_id: r.category_id, amount: r.amount }));
-      // Every known category, defaulting to 0 planned -- NOT viewBudgetPlan
+      // Every known category, defaulting to 0 planned -- NOT budgetPlan.items
       // alone. `build_month` only returns lines for categories it is given a
       // planned entry for, so building this list from saved plan rows drops
       // every category that has spending but no typed budget. This is the
       // same trap CLAUDE.md documents for BudgetTab under "A new category
       // has no budget-plan entry until one is saved"; don't "simplify" this
-      // back to viewBudgetPlan alone.
+      // back to budgetPlan.items alone.
       const planned = categories.items.map((c) => ({
         category_id: c.id,
-        amount: viewBudgetPlan.find((p) => p.category_id === c.id)?.planned ?? 0,
+        amount: budgetPlan.items.find((p) => p.category_id === c.id)?.planned ?? 0,
       }));
       const built = await wasmModule.build_month({ income, planned, previous_remaining: [], spent });
       if (!cancelled) {
@@ -116,7 +101,7 @@ export default function DashboardTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, viewBudgetPlan, categories.items, transactions.items, viewMonth, income]);
+  }, [wasmModule, budgetPlan.items, categories.items, transactions.items, viewMonth, income]);
 
   // Same Savings computation as BudgetTab: income minus every real expense
   // category's actual this month. Kept out of `lines` (and so out of both
@@ -129,7 +114,7 @@ export default function DashboardTab({
         if (!cancelled) setSavingsLine(null);
         return;
       }
-      const planned = viewBudgetPlan.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
+      const planned = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
       const expense = totalExpenseActual(lines, isIncome, () => false);
       const built = await wasmModule.build_savings_line({ planned, income, total_expense_actual: expense });
       if (!cancelled) setSavingsLine(built?.line ?? null);
@@ -138,7 +123,7 @@ export default function DashboardTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, lines, viewBudgetPlan, income]);
+  }, [wasmModule, lines, budgetPlan.items, income]);
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
 
@@ -213,7 +198,18 @@ export default function DashboardTab({
   // Everything the app holds, as one file the person keeps themselves --
   // the only way to move data between devices or make a backup, since
   // there is no server this app could hold a copy on.
-  const exportData = () => {
+  //
+  // Always the app's real current month (`today`), not whatever month
+  // Dashboard happens to be browsing -- budget-plan rows are fetched per
+  // month, and this app has no "every month" listing to export.
+  // `budgetPlan.items` tracks `viewMonth` now (App.jsx), so when someone
+  // exports while browsing a different month, this fetches `today`'s plan
+  // on demand instead of trusting `budgetPlan.items` -- the same one-off
+  // `list_budget_plan` read this component used to do for an arbitrary
+  // browsed month, just aimed at `today` instead.
+  const exportData = async () => {
+    const todaysPlan =
+      viewMonth === today ? budgetPlan.items : ((await wasmModule?.list_budget_plan?.(today)) ?? []);
     const payload = {
       format: EXPORT_FORMAT,
       exported_at: new Date().toISOString(),
@@ -223,20 +219,17 @@ export default function DashboardTab({
       goals: goals.items,
       debts: debts.items,
       recurring: recurring.items,
-      // Always the app's real current month, not whatever month Dashboard
-      // happens to be browsing -- budget-plan rows are fetched per month,
-      // and this app has no "every month" listing to export.
-      budget_plan: { month, entries: budgetPlan.items },
+      budget_plan: { month: today, entries: todaysPlan },
       // Income lives in localStorage, not the store, so it has to be
       // named explicitly here. Leaving it out meant a restore came back
       // with every summary figure wrong until it was retyped.
-      income: { month, amount: loadIncome(month) },
+      income: { month: today, amount: loadIncome(today) },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `budget-planner-${month}.json`;
+    a.download = `budget-planner-${today}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -268,25 +261,7 @@ export default function DashboardTab({
     <div className="panel report dashboard">
       <div className="dash-header">
         <h2>{t('dashboard.title')}</h2>
-        <div className="dash-month-nav">
-          <button
-            type="button"
-            className="dash-month-btn"
-            aria-label={t('dashboard.prevMonth')}
-            onClick={() => setViewMonth((m) => shiftMonth(m, -1))}
-          >
-            ‹
-          </button>
-          <span className="dash-month-label">{monthLabel(viewMonth, locale)}</span>
-          <button
-            type="button"
-            className="dash-month-btn"
-            aria-label={t('dashboard.nextMonth')}
-            onClick={() => setViewMonth((m) => shiftMonth(m, 1))}
-          >
-            ›
-          </button>
-        </div>
+        <MonthYearPicker value={viewMonth} onChange={setViewMonth} todayMonth={today} locale={locale} />
       </div>
 
       {summary && hasIncome && (
@@ -393,11 +368,13 @@ export default function DashboardTab({
         </table>
       </div>
 
-      <DailySpendChart
-        totals={dailyTotals}
+      <SpendOverTimeChart
+        dailyTotals={dailyTotals}
+        weeklyTotals={weeklyTotals}
         month={viewMonth}
         daysInMonth={daysInMonth(viewMonth)}
         formatMoney={formatMoney}
+        locale={locale}
       />
 
       {goals.items.length > 0 && (

@@ -158,6 +158,12 @@ pub struct DailySpendResult {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct WeeklySpendParams {
+    pub transactions: Vec<TransactionDto>,
+    pub month: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DateAmountDto {
     pub date: String,

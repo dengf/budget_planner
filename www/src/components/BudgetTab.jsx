@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysLeftInMonth, monthLabel, todayIso } from '../month';
@@ -6,6 +6,7 @@ import { loadIncome, saveIncome } from '../income';
 import NumberField from './NumberField';
 import CalcError from './CalcError';
 import SpendChart from './SpendChart';
+import MonthYearPicker from './MonthYearPicker';
 import {
   DEBT_PREFIX,
   GOAL_PREFIX,
@@ -27,7 +28,9 @@ import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 export default function BudgetTab({
   wasmModule,
   currencySymbol,
-  month,
+  today,
+  viewMonth,
+  setViewMonth,
   categories,
   removeCategory,
   addCommonCategories,
@@ -39,7 +42,7 @@ export default function BudgetTab({
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const [income, setIncome] = useState(() => loadIncome(month));
+  const [income, setIncome] = useState(() => loadIncome(viewMonth));
   const [result, setResult] = useState(null);
   const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
   const [plannedDraft, setPlannedDraft] = useState({});
@@ -50,14 +53,30 @@ export default function BudgetTab({
   const [upcoming, setUpcoming] = useState(null);
   const [savingsResult, setSavingsResult] = useState(null);
 
+  // Income is keyed per month in storage, but `income` is one piece of
+  // local state -- switching `viewMonth` has to reload it for the newly
+  // viewed month rather than saving the *previous* month's figure under
+  // the new month's key. `loadedMonthRef` tells the two cases apart: a
+  // `viewMonth` this effect hasn't seen yet means "reload, don't save
+  // yet" (the `income` in scope still belongs to the month being left);
+  // once it matches, `income` changing means a real edit to save.
+  const loadedMonthRef = useRef(viewMonth);
   useEffect(() => {
-    saveIncome(month, income);
-  }, [month, income]);
+    if (loadedMonthRef.current !== viewMonth) {
+      loadedMonthRef.current = viewMonth;
+      setIncome(loadIncome(viewMonth));
+      return;
+    }
+    saveIncome(viewMonth, income);
+  }, [viewMonth, income]);
 
   const monthTransactions = useMemo(
-    () => transactions.items.filter((tx) => tx.date?.startsWith(month)),
-    [transactions.items, month],
+    () => transactions.items.filter((tx) => tx.date?.startsWith(viewMonth)),
+    [transactions.items, viewMonth],
   );
+
+  const isCurrentMonth = viewMonth === today;
+  const isPastMonth = viewMonth < today;
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
 
@@ -281,7 +300,7 @@ export default function BudgetTab({
   const savePlanned = async (categoryId, amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === categoryId);
     const id = existing?.id ?? (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`);
-    await budgetPlan.save({ id, month, category_id: categoryId, planned: Number(amount) || 0 });
+    await budgetPlan.save({ id, month: viewMonth, category_id: categoryId, planned: Number(amount) || 0 });
   };
 
   /**
@@ -301,7 +320,7 @@ export default function BudgetTab({
       }
       const result = await wasmModule.recurring_occurrences({
         recurring: recurring.items,
-        month,
+        month: viewMonth,
       });
       if (!cancelled) setUpcoming(result);
     }
@@ -309,7 +328,7 @@ export default function BudgetTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, recurring?.items, month]);
+  }, [wasmModule, recurring?.items, viewMonth]);
 
   /** Adds a recurring category's expected total on top of whatever is
    *  already planned for it -- the one-click "help solve it" action, not
@@ -354,8 +373,17 @@ export default function BudgetTab({
 
   return (
     <div className="panel">
-      <h2>{t('budget.title')} · {monthLabel(month, locale)}</h2>
-      <p className="headline">{t('budget.daysLeft', { days, month: monthLabel(month, locale) })}</p>
+      <div className="dash-header">
+        <h2>{t(isCurrentMonth ? 'budget.title' : 'budget.titleOtherMonth')} · {monthLabel(viewMonth, locale)}</h2>
+        <MonthYearPicker value={viewMonth} onChange={setViewMonth} todayMonth={today} locale={locale} />
+      </div>
+      <p className="headline">
+        {isCurrentMonth
+          ? t('budget.daysLeft', { days, month: monthLabel(viewMonth, locale) })
+          : isPastMonth
+            ? t('budget.viewingPastMonth')
+            : t('budget.viewingFutureMonth', { month: monthLabel(viewMonth, locale) })}
+      </p>
       {/* The method, stated once. Zero-based budgeting is the entire
           premise of this tab and the UI never said what it was. */}
       <p className="panel-subtitle">{t('budget.method')}</p>
@@ -426,7 +454,9 @@ export default function BudgetTab({
         </>
       )}
 
-      {upcoming && upcoming.occurrences.length > 0 && (
+      {/* Framed entirely around "upcoming" -- only meaningful looking at
+          the current or a future month, not one that's already over. */}
+      {!isPastMonth && upcoming && upcoming.occurrences.length > 0 && (
         <div className="upcoming-panel">
           <h3 className="upcoming-title">{t('recurring.upcomingTitle')}</h3>
           <p className="panel-subtitle">{t('recurring.upcomingHint')}</p>
@@ -544,16 +574,25 @@ export default function BudgetTab({
               <div className="num spent-cell">
                 <span className="cell-label">{t(incomeRow ? 'budget.received' : 'budget.spent')}</span>
                 <span className="spent-value">{formatMoney(line.spent)}</span>
-                <button
-                  type="button"
-                  className="spend-add"
-                  aria-expanded={spendFor === line.category_id}
-                  aria-label={`${t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')} — ${categoryName(line.category_id)}`}
-                  title={t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')}
-                  onClick={() => openSpend(line.category_id)}
-                >
-                  +
-                </button>
+                {/* Logging spending always dates the transaction "today" --
+                    doing that while viewing a different month would create
+                    a transaction that silently never shows up in the
+                    month on screen. Backfilling a past month, or planning
+                    ahead for a future one, goes through the Transactions
+                    tab's manual-add form instead, which takes an explicit
+                    date. */}
+                {isCurrentMonth && (
+                  <button
+                    type="button"
+                    className="spend-add"
+                    aria-expanded={spendFor === line.category_id}
+                    aria-label={`${t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')} — ${categoryName(line.category_id)}`}
+                    title={t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')}
+                    onClick={() => openSpend(line.category_id)}
+                  >
+                    +
+                  </button>
+                )}
               </div>
               <div className={`num ${remaining.className}`}>
                 <span className="cell-label">{t('budget.remaining')}</span>

@@ -96,7 +96,13 @@ function TabFallback() {
 export function AppShell({ wasmModule }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currencySymbol, setCurrencySymbol] = useState(() => loadCurrencySymbol());
-  const [month] = useState(() => currentMonth());
+  // `today` is the real, unchanging current month -- an anchor for "is the
+  // month on screen the real current one" comparisons. `viewMonth` is
+  // whatever month is actually being browsed/edited right now, shared
+  // across Dashboard/Budget/Transactions so picking a month in one tab
+  // is still picked when another tab opens.
+  const [today] = useState(() => currentMonth());
+  const [viewMonth, setViewMonth] = useState(today);
   const { t } = useI18n();
   const [confirm, confirmDialog] = useConfirm();
   const [guardResult, setGuardResult] = useState(null);
@@ -117,7 +123,7 @@ export function AppShell({ wasmModule }) {
     'list_budget_plan',
     'save_budget_plan_entry',
     'delete_budget_plan_entry',
-    month,
+    viewMonth,
   );
 
   const newId = useCallback(() => (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`), [wasmModule]);
@@ -274,7 +280,7 @@ export function AppShell({ wasmModule }) {
       // Only restore plan rows belonging to the month now on screen --
       // budgetPlan is a per-month collection, and writing another month's
       // rows into it would show them under the wrong heading.
-      if (backup.budgetPlan.month === month) {
+      if (backup.budgetPlan.month === viewMonth) {
         for (const entry of backup.budgetPlan.entries) {
           // eslint-disable-next-line no-await-in-loop
           await budgetPlan.save(entry);
@@ -286,7 +292,7 @@ export function AppShell({ wasmModule }) {
 
       return { imported: backup.count, month: backup.budgetPlan.month };
     },
-    [categories, rules, transactions, goals, debts, recurring, budgetPlan, month, confirm, t],
+    [categories, rules, transactions, goals, debts, recurring, budgetPlan, viewMonth, confirm, t],
   );
 
   const clearAllData = useCallback(async () => {
@@ -319,7 +325,9 @@ export function AppShell({ wasmModule }) {
           <ActivePanel
             wasmModule={wasmModule}
             currencySymbol={currencySymbol}
-            month={month}
+            today={today}
+            viewMonth={viewMonth}
+            setViewMonth={setViewMonth}
             newId={newId}
             confirm={confirm}
             categories={categories}
