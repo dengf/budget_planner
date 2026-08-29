@@ -161,12 +161,24 @@ export default function DashboardTab({
   const incomeTotals = sumLines(incomeLines);
   const expenseTotals = sumLines(expenseLines);
 
-  // Same reframing every category row already uses -- an income row is
-  // always good news regardless of remaining's sign, an expense row only
-  // when it hasn't gone negative -- applied once more to the group's own
-  // summed remaining.
+  // This table is the plain-numbers summary (BudgetTab is where planned
+  // income and its "received more than planned"/"unplanned income"
+  // framing actually get edited and explained). Here, an income row's
+  // Planned and Remaining would just be a $0.00 and a green negative
+  // number with no explanation of why negative is good -- confusing
+  // rather than informative, so income rows show Actual only.
   const categoryRow = (l) => {
-    const isGoodNews = l.remaining >= 0 || isIncome(l.category_id);
+    if (isIncome(l.category_id)) {
+      return (
+        <tr key={l.category_id}>
+          <td>{categoryName(l.category_id)}</td>
+          <td className="num">—</td>
+          <td className="num">{formatMoney(l.spent)}</td>
+          <td className="num">—</td>
+        </tr>
+      );
+    }
+    const isGoodNews = l.remaining >= 0;
     return (
       <tr key={l.category_id}>
         <td>{categoryName(l.category_id)}</td>
@@ -327,9 +339,9 @@ export default function DashboardTab({
               <>
                 <tr className="dash-table-total">
                   <td>{t('dashboard.totalIncome')}</td>
-                  <td className="num">{formatMoney(incomeTotals.planned)}</td>
+                  <td className="num">—</td>
                   <td className="num">{formatMoney(incomeTotals.spent)}</td>
-                  <td className="num positive">{formatMoney(incomeTotals.remaining)}</td>
+                  <td className="num">—</td>
                 </tr>
                 <tr className="dash-table-divider" aria-hidden="true">
                   <td colSpan={4}>
@@ -361,7 +373,9 @@ export default function DashboardTab({
                 <td>{t('budget.savings')}</td>
                 <td className="num">{formatMoney(savingsLine.planned)}</td>
                 <td className="num">{formatMoney(savingsLine.spent)}</td>
-                <td className="num positive">{formatMoney(savingsLine.remaining)}</td>
+                <td className={`num ${savingsLine.spent - savingsLine.planned >= 0 ? 'positive' : 'negative'}`}>
+                  {formatMoney(savingsLine.spent - savingsLine.planned)}
+                </td>
               </tr>
             )}
           </tbody>
