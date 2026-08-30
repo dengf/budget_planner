@@ -345,7 +345,10 @@ mod tests {
 
     #[test]
     fn spending_past_income_gives_a_negative_unspent() {
-        let planned = vec![("salary".to_string(), dec!(500)), ("dining".to_string(), dec!(200))];
+        let planned = vec![
+            ("salary".to_string(), dec!(500)),
+            ("dining".to_string(), dec!(200)),
+        ];
         let spent = vec![("dining".to_string(), dec!(600))];
         let lines = build_month(&planned, &[], &spent).unwrap();
         let summary = summarize_month(&lines, &["salary".to_string()]);
