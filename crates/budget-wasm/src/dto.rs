@@ -45,12 +45,18 @@ pub struct AmountEntryDto {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BuildMonthParams {
-    pub income: f64,
     pub planned: Vec<AmountEntryDto>,
     #[serde(default)]
     pub previous_remaining: Vec<AmountEntryDto>,
     #[serde(default)]
     pub spent: Vec<AmountEntryDto>,
+    /// Which entries in `planned` belong to income categories -- income
+    /// isn't a caller-supplied figure any more, it's derived in
+    /// `budget_calc::summarize_month` from these lines' own `planned`.
+    /// See that function's doc comment for why the classification is
+    /// host-supplied but the arithmetic on it lives in the core.
+    #[serde(default)]
+    pub income_category_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

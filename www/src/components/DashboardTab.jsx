@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
-import { loadIncome } from '../income';
 import { EXPORT_FORMAT } from '../backup';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import PieChart from './PieChart';
@@ -45,8 +44,8 @@ export default function DashboardTab({
   const [dailyTotals, setDailyTotals] = useState([]);
   const [weeklyTotals, setWeeklyTotals] = useState([]);
   const [recipients, setRecipients] = useState('');
-  const income = loadIncome(viewMonth);
   const [importResult, setImportResult] = useState(null);
+  const isCurrentMonth = viewMonth === today;
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
 
@@ -91,7 +90,16 @@ export default function DashboardTab({
         category_id: c.id,
         amount: budgetPlan.items.find((p) => p.category_id === c.id)?.planned ?? 0,
       }));
-      const built = await wasmModule.build_month({ income, planned, previous_remaining: [], spent });
+      // Income isn't stored separately any more -- `build_month` derives
+      // it in Rust from whichever of these `planned` entries belong to an
+      // income category (see BudgetTab's identical comment).
+      const incomeCategoryIds = categories.items.filter((c) => c.is_income).map((c) => c.id);
+      const built = await wasmModule.build_month({
+        planned,
+        previous_remaining: [],
+        spent,
+        income_category_ids: incomeCategoryIds,
+      });
       if (!cancelled) {
         setLines(built?.lines ?? []);
         setSummary(built?.summary ?? null);
@@ -101,7 +109,7 @@ export default function DashboardTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, budgetPlan.items, categories.items, transactions.items, viewMonth, income]);
+  }, [wasmModule, budgetPlan.items, categories.items, transactions.items, viewMonth]);
 
   // Same Savings computation as BudgetTab: income minus every real expense
   // category's actual this month. Kept out of `lines` (and so out of both
@@ -116,14 +124,18 @@ export default function DashboardTab({
       }
       const planned = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
       const expense = totalExpenseActual(lines, isIncome, () => false);
-      const built = await wasmModule.build_savings_line({ planned, income, total_expense_actual: expense });
+      const built = await wasmModule.build_savings_line({
+        planned,
+        income: summary?.income ?? 0,
+        total_expense_actual: expense,
+      });
       if (!cancelled) setSavingsLine(built?.line ?? null);
     }
     run();
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, lines, budgetPlan.items, income]);
+  }, [wasmModule, lines, budgetPlan.items, summary]);
 
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
 
@@ -231,11 +243,12 @@ export default function DashboardTab({
       goals: goals.items,
       debts: debts.items,
       recurring: recurring.items,
+      // No separate `income` field: income is the sum of whatever's
+      // planned against the income categories already included above
+      // (`categories` carries `is_income`, `budget_plan.entries` carries
+      // each category's planned amount) -- restoring both is restoring
+      // income, with nothing else to name explicitly.
       budget_plan: { month: today, entries: todaysPlan },
-      // Income lives in localStorage, not the store, so it has to be
-      // named explicitly here. Leaving it out meant a restore came back
-      // with every summary figure wrong until it was retyped.
-      income: { month: today, amount: loadIncome(today) },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -266,7 +279,7 @@ export default function DashboardTab({
     reader.readAsText(file);
   };
 
-  const hasIncome = income > 0;
+  const hasIncome = (summary?.income ?? 0) > 0;
   const isOverBudget = hasIncome && summary && summary.unspent < 0;
 
   return (
@@ -291,7 +304,7 @@ export default function DashboardTab({
 
       <div className="dash-summary-cards">
         <div className="dash-card dash-card-income">
-          <span className="dash-card-label">{t('budget.income')}</span>
+          <span className="dash-card-label">{isCurrentMonth ? t('budget.income') : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}</span>
           <span className="dash-card-value">{formatMoney(summary?.income ?? 0)}</span>
         </div>
         <div className="dash-card dash-card-spent">

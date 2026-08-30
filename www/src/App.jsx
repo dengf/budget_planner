@@ -6,7 +6,6 @@ import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
-import { saveIncome } from './income';
 import { currentMonth } from './month';
 
 // Code-split: a visitor logging one transaction shouldn't download the
@@ -177,11 +176,19 @@ export function AppShell({ wasmModule }) {
    * doesn't open with English category names. Skipping a preset whose
    * name is already present is a referential check against in-memory
    * state -- host-layer, not a rule the core should own.
+   *
+   * `existingItems` defaults to the live `categories.items`, but takes an
+   * explicit override for callers that just mutated categories themselves
+   * in the same tick (`clearAllData` below): `categories.items` here is a
+   * plain closure over this render's state, not a live view, so it still
+   * reads the pre-clear list until React re-renders -- passing `[]`
+   * directly is what keeps every preset from being wrongly skipped as
+   * "already taken."
    */
-  const addCommonCategories = useCallback(async () => {
+  const addCommonCategories = useCallback(async (existingItems = categories.items) => {
     if (!wasmModule?.preset_categories) return;
     const presets = (await wasmModule.preset_categories()) ?? [];
-    const taken = new Set(categories.items.map((c) => c.name.trim().toLowerCase()));
+    const taken = new Set(existingItems.map((c) => c.name.trim().toLowerCase()));
     for (const preset of presets) {
       const name = t(preset.key);
       const fingerprint = name.trim().toLowerCase();
@@ -209,22 +216,20 @@ export function AppShell({ wasmModule }) {
    * actually the useful state to land on.
    *
    * `seedingRef` makes this decision exactly once *per mount*, the moment
-   * `categories` finishes its first load, whichever way it goes. That is
-   * what stops "Clear all data" or deleting the last category from being
-   * undone instantly, in the same session -- the effect re-runs on every
-   * change to `items.length`, and without the ref already tripped it
-   * would refill the list the moment it emptied. It says nothing about
-   * the *next* time the app is opened: a fresh load (a fresh ref) that
-   * finds nothing there gets the defaults back every time.
+   * `categories` finishes its first load, whichever way it goes -- so
+   * deleting categories down to zero one at a time by hand doesn't refill
+   * the list out from under someone mid-edit. `clearAllData` below is the
+   * one deliberate exception: it calls `addCommonCategories` itself right
+   * after clearing, so a reset lands back on the same "starter set, not a
+   * blank page" state a fresh visitor gets, without waiting for a reload.
    *
-   * An earlier version tried to remember "already seeded" permanently
-   * (localStorage, surviving a reload) so a deliberate clear stayed
-   * cleared forever. That meant a browser that reached empty by any path
-   * other than one it seeded and cleared itself -- someone who tried the
-   * app, wandered into "Clear all data" once, and came back later -- had
-   * no way back to a working budget except finding the manual "Add
-   * common categories" button on their own. Occasionally re-seeding a
-   * list someone genuinely wanted to stay empty is the cheaper mistake.
+   * An earlier version left a full page reload as the only way back to
+   * the starter set after "Clear all data," reasoning that an explicit
+   * "Add common categories" button was reachable by hand. In practice
+   * that read as the button being broken -- a clear that doesn't restore
+   * anything looks identical to one that silently failed. Re-seeding
+   * immediately is the cheaper mistake versus leaving a deliberately
+   * emptied budget looking uninitialized.
    */
   const seedingRef = useRef(false);
   useEffect(() => {
@@ -286,9 +291,9 @@ export function AppShell({ wasmModule }) {
           await budgetPlan.save(entry);
         }
       }
-      if (backup.income && backup.income.month) {
-        saveIncome(backup.income.month, backup.income.amount);
-      }
+      // No separate income restore: income is derived from the categories
+      // and budget-plan entries just restored above (see DashboardTab's
+      // exportData for why the export itself carries nothing else).
 
       return { imported: backup.count, month: backup.budgetPlan.month };
     },
@@ -304,7 +309,15 @@ export function AppShell({ wasmModule }) {
         await collection.remove(item.id);
       }
     }
-  }, [transactions, budgetPlan, rules, goals, debts, recurring, categories, confirm, t]);
+    // Land back on the same starter-set state a fresh visitor gets,
+    // rather than an empty category list that looks uninitialized --
+    // see the `seedingRef` comment above for why this can't just rely
+    // on that effect re-running. `[]` explicitly, not the default
+    // `categories.items` -- the removal loop above just emptied it, but
+    // this closure's own `categories.items` still reads the pre-clear
+    // list until a re-render catches up.
+    await addCommonCategories([]);
+  }, [transactions, budgetPlan, rules, goals, debts, recurring, categories, confirm, t, addCommonCategories]);
 
   const ActivePanel = TABS[activeTab];
 

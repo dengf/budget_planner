@@ -50,14 +50,14 @@ export function readBackup(payload) {
     }
   }
 
-  const rawIncome = payload.income?.amount;
-  const income = Number.isFinite(Number(rawIncome)) ? Number(rawIncome) : null;
-
   return {
     ok: true,
     collections: Object.fromEntries(COLLECTIONS.map((name) => [name, payload[name] ?? []])),
     budgetPlan: { month: plan?.month ?? null, entries: plan?.entries ?? [] },
-    income: income === null ? null : { month: payload.income?.month ?? null, amount: income },
+    // A pre-derived-income export's `payload.income` field, if present, is
+    // simply ignored -- income is recomputed from `categories` (is_income)
+    // and `budgetPlan.entries` (planned amounts), both restored above, not
+    // read out of the file as its own figure any more.
     count:
       COLLECTIONS.reduce((n, name) => n + (payload[name]?.length ?? 0), 0) +
       (plan?.entries?.length ?? 0),

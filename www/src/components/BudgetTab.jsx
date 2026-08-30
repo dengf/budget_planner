@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysLeftInMonth, monthLabel, todayIso } from '../month';
-import { loadIncome, saveIncome } from '../income';
-import NumberField from './NumberField';
 import CalcError from './CalcError';
 import SpendChart from './SpendChart';
 import MonthYearPicker from './MonthYearPicker';
@@ -42,7 +40,6 @@ export default function BudgetTab({
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const [income, setIncome] = useState(() => loadIncome(viewMonth));
   const [result, setResult] = useState(null);
   const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
   const [plannedDraft, setPlannedDraft] = useState({});
@@ -52,23 +49,6 @@ export default function BudgetTab({
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
   const [upcoming, setUpcoming] = useState(null);
   const [savingsResult, setSavingsResult] = useState(null);
-
-  // Income is keyed per month in storage, but `income` is one piece of
-  // local state -- switching `viewMonth` has to reload it for the newly
-  // viewed month rather than saving the *previous* month's figure under
-  // the new month's key. `loadedMonthRef` tells the two cases apart: a
-  // `viewMonth` this effect hasn't seen yet means "reload, don't save
-  // yet" (the `income` in scope still belongs to the month being left);
-  // once it matches, `income` changing means a real edit to save.
-  const loadedMonthRef = useRef(viewMonth);
-  useEffect(() => {
-    if (loadedMonthRef.current !== viewMonth) {
-      loadedMonthRef.current = viewMonth;
-      setIncome(loadIncome(viewMonth));
-      return;
-    }
-    saveIncome(viewMonth, income);
-  }, [viewMonth, income]);
 
   const monthTransactions = useMemo(
     () => transactions.items.filter((tx) => tx.date?.startsWith(viewMonth)),
@@ -108,6 +88,11 @@ export default function BudgetTab({
         category_id: c.id,
         amount: budgetPlan.items.find((p) => p.category_id === c.id)?.planned ?? 0,
       }));
+      // Income isn't typed in separately any more -- `build_month`
+      // derives it in Rust from whichever of these `planned` entries
+      // belong to an income category, so the only thing this side needs
+      // to hand over is which ids those are.
+      const incomeCategoryIds = categories.items.filter((c) => c.is_income).map((c) => c.id);
 
       // Goals and debts, when the toggle is on, join the budget as
       // ordinary planned entries under synthetic ids. Deliberately not
@@ -136,7 +121,12 @@ export default function BudgetTab({
         }
       }
 
-      const built = await wasmModule.build_month({ income, planned, previous_remaining: [], spent });
+      const built = await wasmModule.build_month({
+        planned,
+        previous_remaining: [],
+        spent,
+        income_category_ids: incomeCategoryIds,
+      });
       if (!cancelled) setResult(built);
     }
     run();
@@ -145,7 +135,6 @@ export default function BudgetTab({
     };
   }, [
     wasmModule,
-    income,
     budgetPlan.items,
     categories.items,
     monthTransactions,
@@ -390,16 +379,6 @@ export default function BudgetTab({
           premise of this tab and the UI never said what it was. */}
       <p className="panel-subtitle">{t('budget.method')}</p>
 
-      <div className="form-grid">
-        <NumberField
-          label={t('budget.income')}
-          value={income}
-          onChange={(v) => setIncome(v === '' ? 0 : v)}
-          suffix={formatMoney(0).replace(/[\d.,]/g, '')}
-          grouped
-        />
-      </div>
-
       {/* Off by default: a goal or debt only claims part of this month's
           income once someone says so, not because the feature exists. */}
       <label className="field-check commitments-toggle">
@@ -441,7 +420,7 @@ export default function BudgetTab({
 
           <div className="stat-grid stat-grid-secondary">
             <div className="stat">
-              <span className="stat-label">{t('budget.income')}</span>
+              <span className="stat-label">{isCurrentMonth ? t('budget.income') : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}</span>
               <span className="stat-value">{formatMoney(summary.income)}</span>
             </div>
             <div className="stat">

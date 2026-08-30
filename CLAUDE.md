@@ -85,10 +85,16 @@ another, choosing between rulesets. Host layer is anything a wasm module
 cannot reach or has no domain content: reading `localStorage`/`FileReader`,
 DOM/layout/SVG geometry, number and date *formatting* for display.
 
-`www/src/region.js` and `www/src/income.js` are host-layer by design, not
-by omission — see their own doc comments for why: region here carries no
-regulatory ruleset the way mortgage_calculator's does, and income is a
-number the person types, not something derived.
+`www/src/currencySymbol.js` is host-layer by design, not by omission —
+see its own doc comment for why: it's a stored display preference, not a
+budget-calc concept (this app once had a US/SG "region" toggle behind it;
+that layer was removed as unneeded complexity, leaving just the symbol).
+Income used to be a similar case (a number typed into its own field,
+stored in `localStorage` via a since-removed `income.js`) but no longer
+is: it's now `budget_calc::summarize_month` deriving it from the income
+categories' own `planned` amounts, because getting that arithmetic
+right/wrong is exactly the kind of thing this rule exists to keep in the
+core rather than a frontend filter.
 
 ### Adding a calculation
 
@@ -189,8 +195,8 @@ gets skipped, so ask it explicitly.
   two into `pkg-ocr`/`pkg-pdf`) and checking each `*_bg.wasm`'s size
   directly.
 - **jsdom has no `localStorage`** on `window` or as a bare global; every
-  storage path (`region.js`, `income.js`) runs into its catch block under
-  test unless the test stands up a fake.
+  storage path (`currencySymbol.js`, `commitments.js`) runs into its catch
+  block under test unless the test stands up a fake.
 - **`wasm-opt` is off deliberately**, same measured tradeoff as
   mortgage_calculator's `mortgage-wasm/Cargo.toml` — see that crate's
   comment. Do not "fix" it here either.

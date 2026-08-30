@@ -182,8 +182,24 @@ pub fn build_savings_line(
 /// drives to zero.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MonthSummary {
+    /// The sum of every income category's own `planned` -- not a figure
+    /// anyone types in separately. Income categories are budgeted the
+    /// same way expense ones are (their own Planned field, e.g. "Salary:
+    /// 3500"); this is just that side of the ledger totaled up, kept in
+    /// lockstep with what's actually on the income rows rather than a
+    /// number that could silently disagree with them.
     pub income: Decimal,
+    /// Sum of `planned` across every *non-income* line -- the jobs income
+    /// gets assigned to. Income category lines are deliberately excluded:
+    /// an income category's own `planned` is where `income` above comes
+    /// from, and folding it back in here would double it, once as the
+    /// target and once as if it were also an assignment against that
+    /// target.
     pub total_planned: Decimal,
+    /// Sum of `spent` across every *non-income* line, for the same reason
+    /// `total_planned` excludes income lines: an income category's
+    /// `spent` is money *received*, not money spent, and counting it here
+    /// would inflate this figure by however much income had come in.
     pub total_spent: Decimal,
     pub unassigned: Decimal,
     /// Income minus what has actually been spent this month -- unlike
@@ -193,9 +209,34 @@ pub struct MonthSummary {
     pub unspent: Decimal,
 }
 
-pub fn summarize_month(income: Decimal, lines: &[CategoryLine]) -> MonthSummary {
-    let total_planned: Decimal = lines.iter().map(|l| l.planned).sum();
-    let total_spent: Decimal = lines.iter().map(|l| l.spent).sum();
+/// `income_category_ids`: which of `lines` belong to income categories --
+/// the classification itself is host-supplied (`Category::is_income`
+/// lives in the frontend's records; `CategoryLine`/`build_month` stay
+/// ignorant of it, same as `group`), but *what to do* with that
+/// classification -- derive `income` from those lines and exclude them
+/// from `total_planned`/`total_spent` -- is exactly the kind of
+/// arithmetic CLAUDE.md keeps in the core rather than a frontend filter,
+/// since getting it wrong produces a confidently wrong `unassigned`/
+/// `unspent` rather than a visible failure. See the fix that added this
+/// parameter: before it, an income category's own planned/received
+/// amounts were silently summed in on top of real expenses.
+pub fn summarize_month(lines: &[CategoryLine], income_category_ids: &[String]) -> MonthSummary {
+    let is_income_line = |id: &str| income_category_ids.iter().any(|i| i == id);
+    let income: Decimal = lines
+        .iter()
+        .filter(|l| is_income_line(&l.category_id))
+        .map(|l| l.planned)
+        .sum();
+    let total_planned: Decimal = lines
+        .iter()
+        .filter(|l| !is_income_line(&l.category_id))
+        .map(|l| l.planned)
+        .sum();
+    let total_spent: Decimal = lines
+        .iter()
+        .filter(|l| !is_income_line(&l.category_id))
+        .map(|l| l.spent)
+        .sum();
     MonthSummary {
         income: round_currency(income),
         total_planned: round_currency(total_planned),
@@ -265,25 +306,31 @@ mod tests {
     #[test]
     fn unassigned_is_income_minus_total_planned() {
         let planned = vec![
+            ("salary".to_string(), dec!(2000)),
             ("dining".to_string(), dec!(200)),
             ("rent".to_string(), dec!(1500)),
         ];
         let lines = build_month(&planned, &[], &[]).unwrap();
-        let summary = summarize_month(dec!(2000), &lines);
+        let summary = summarize_month(&lines, &["salary".to_string()]);
+        assert_eq!(summary.income, dec!(2000));
         assert_eq!(summary.unassigned, dec!(300));
     }
 
     #[test]
     fn a_fully_assigned_zero_based_budget_has_zero_unassigned() {
-        let planned = vec![("rent".to_string(), dec!(2000))];
+        let planned = vec![
+            ("salary".to_string(), dec!(2000)),
+            ("rent".to_string(), dec!(2000)),
+        ];
         let lines = build_month(&planned, &[], &[]).unwrap();
-        let summary = summarize_month(dec!(2000), &lines);
+        let summary = summarize_month(&lines, &["salary".to_string()]);
         assert_eq!(summary.unassigned, dec!(0));
     }
 
     #[test]
     fn unspent_is_income_minus_total_spent() {
         let planned = vec![
+            ("salary".to_string(), dec!(2000)),
             ("dining".to_string(), dec!(200)),
             ("rent".to_string(), dec!(1500)),
         ];
@@ -292,17 +339,57 @@ mod tests {
             ("rent".to_string(), dec!(1500)),
         ];
         let lines = build_month(&planned, &[], &spent).unwrap();
-        let summary = summarize_month(dec!(2000), &lines);
+        let summary = summarize_month(&lines, &["salary".to_string()]);
         assert_eq!(summary.unspent, dec!(350));
     }
 
     #[test]
     fn spending_past_income_gives_a_negative_unspent() {
-        let planned = vec![("dining".to_string(), dec!(200))];
+        let planned = vec![("salary".to_string(), dec!(500)), ("dining".to_string(), dec!(200))];
         let spent = vec![("dining".to_string(), dec!(600))];
         let lines = build_month(&planned, &[], &spent).unwrap();
-        let summary = summarize_month(dec!(500), &lines);
+        let summary = summarize_month(&lines, &["salary".to_string()]);
         assert_eq!(summary.unspent, dec!(-100));
+    }
+
+    #[test]
+    fn income_is_the_sum_of_every_income_categorys_own_planned_amount() {
+        let planned = vec![
+            ("salary".to_string(), dec!(3000)),
+            ("freelance".to_string(), dec!(500)),
+            ("rent".to_string(), dec!(1000)),
+        ];
+        let lines = build_month(&planned, &[], &[]).unwrap();
+        let summary = summarize_month(&lines, &["salary".to_string(), "freelance".to_string()]);
+        assert_eq!(summary.income, dec!(3500));
+    }
+
+    /// Regression test for a real bug: before `summarize_month` took
+    /// `income_category_ids`, an income category's own planned/received
+    /// amounts were summed straight into `total_planned`/`total_spent`
+    /// alongside real expenses -- so budgeting a salary category at 2000
+    /// and receiving it in full inflated "Total spent" by 2000 on top of
+    /// actual spending, and corrupted `unassigned`/`unspent` to match.
+    /// Caught live: a seeded budget showed "Total spent $9,440" against
+    /// $5,240 of real expenses, the gap being exactly the income
+    /// received that month.
+    #[test]
+    fn income_category_lines_are_excluded_from_total_planned_and_total_spent() {
+        let planned = vec![
+            ("salary".to_string(), dec!(2000)),
+            ("rent".to_string(), dec!(800)),
+        ];
+        let spent = vec![
+            ("salary".to_string(), dec!(2000)),
+            ("rent".to_string(), dec!(800)),
+        ];
+        let lines = build_month(&planned, &[], &spent).unwrap();
+        let summary = summarize_month(&lines, &["salary".to_string()]);
+        assert_eq!(summary.income, dec!(2000));
+        assert_eq!(summary.total_planned, dec!(800));
+        assert_eq!(summary.total_spent, dec!(800));
+        assert_eq!(summary.unassigned, dec!(1200));
+        assert_eq!(summary.unspent, dec!(1200));
     }
 
     #[test]

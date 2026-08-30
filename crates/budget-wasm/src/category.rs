@@ -47,18 +47,10 @@ fn build_month_impl(params: JsValue) -> BuildMonthResult {
             ..Default::default()
         };
     };
-    let Some(income) = f64_to_decimal(params.income) else {
-        let message = Message::bad_request();
-        return BuildMonthResult {
-            error: Some(message.text.clone()),
-            error_message: Some(message),
-            ..Default::default()
-        };
-    };
 
     match budget_calc::build_month(&planned, &previous, &spent) {
         Ok(lines) => {
-            let summary = budget_calc::summarize_month(income, &lines);
+            let summary = budget_calc::summarize_month(&lines, &params.income_category_ids);
             BuildMonthResult {
                 lines: lines
                     .into_iter()

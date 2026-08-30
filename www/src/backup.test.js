@@ -9,7 +9,6 @@ const valid = (over = {}) => ({
   goals: [],
   debts: [],
   budget_plan: { month: '2026-08', entries: [{ id: 'p1', month: '2026-08', category_id: 'c1', planned: 400 }] },
-  income: { month: '2026-08', amount: 3000 },
   ...over,
 });
 
@@ -18,8 +17,15 @@ describe('readBackup', () => {
     const result = readBackup(valid());
     expect(result.ok).toBe(true);
     expect(result.collections.categories).toHaveLength(1);
-    expect(result.income).toEqual({ month: '2026-08', amount: 3000 });
     expect(result.count).toBe(3);
+  });
+
+  it('tolerates an older file that still carries its own income field', () => {
+    // Income used to be exported as its own figure; a file from that era
+    // should still restore everything else rather than being rejected.
+    const result = readBackup(valid({ income: { month: '2026-08', amount: 3000 } }));
+    expect(result.ok).toBe(true);
+    expect(result.collections.categories).toHaveLength(1);
   });
 
   it('rejects anything without our format marker', () => {
@@ -51,14 +57,4 @@ describe('readBackup', () => {
     expect(result.collections.goals).toEqual([]);
   });
 
-  it('reports no income rather than zero when the file has none', () => {
-    // Zero is a real income figure someone might have saved; absent is
-    // not the same thing and must not overwrite what is already there.
-    const { income, ...withoutIncome } = valid();
-    expect(readBackup(withoutIncome).income).toBeNull();
-    expect(readBackup(valid({ income: { month: '2026-08', amount: 0 } })).income).toEqual({
-      month: '2026-08',
-      amount: 0,
-    });
-  });
 });
