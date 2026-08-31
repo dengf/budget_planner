@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { EXPORT_FORMAT } from '../backup';
 
@@ -32,6 +32,7 @@ export default function YourDataMenu({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Always the app's real current month (`today`), not whatever month is
   // being browsed -- budget-plan rows are fetched per month, and this
@@ -96,13 +97,38 @@ export default function YourDataMenu({
     <div className="data-menu">
       <button
         type="button"
-        className="app-tab"
+        className="app-tab data-menu-trigger"
         aria-haspopup="true"
         aria-expanded={open}
         onClick={openMenu}
       >
         {t('data.title')}
+        <svg
+          className="data-menu-caret"
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          aria-hidden="true"
+        >
+          <path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
+
+      {/* Deliberately NOT inside .data-menu-dialog (position: fixed) --
+          iOS Safari/Chrome (both WebKit) can silently fail to open the
+          native file picker for an <input type="file"> nested inside a
+          fixed-position ancestor. Living here, in normal flow, and
+          triggered via ref from a plain button in the dialog sidesteps
+          that; the trigger button still calls .click() synchronously
+          inside its own tap handler, which is what mobile Safari
+          requires to treat the picker-open as user-initiated. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        onChange={onImportFile}
+        style={{ display: 'none' }}
+      />
 
       {open && (
         <div className="data-menu-backdrop" role="presentation" onClick={() => setOpen(false)}>
@@ -132,10 +158,13 @@ export default function YourDataMenu({
               >
                 {t('data.export')}
               </button>
-              <label className="btn secondary import-button">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 {t('data.import')}
-                <input type="file" accept="application/json,.json" onChange={onImportFile} />
-              </label>
+              </button>
               <button
                 type="button"
                 className="btn danger"

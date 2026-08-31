@@ -494,8 +494,6 @@ table.data tr:last-child td { border-bottom: none; }
    failure -- nothing was overspent against a plan that doesn't exist. */
 .muted-note { color: var(--muted-2); }
 
-.import-button { position: relative; overflow: hidden; cursor: pointer; }
-.import-button input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .import-error { color: var(--negative); font-size: 0.85rem; }
 
 /* Advisory, not blocking -- a suggestion to fix a likely typo, so it reads
@@ -891,6 +889,15 @@ table.data tr:last-child td { border-bottom: none; }
    this codebase's convention of not sharing one generic popup class
    across unrelated components. */
 .data-menu { display: inline-flex; }
+/* A caret marks this as a dropdown, not a sixth tab -- the other five
+   nav buttons switch the main panel, this one opens a popup instead,
+   and nothing else in the row hints at that difference otherwise. */
+.data-menu-trigger { display: inline-flex; align-items: center; gap: 6px; }
+.data-menu-caret { flex: none; transition: transform 0.15s ease; }
+.data-menu-trigger[aria-expanded='true'] .data-menu-caret { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .data-menu-caret { transition: none; }
+}
 .data-menu-backdrop {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: center; justify-content: center;
