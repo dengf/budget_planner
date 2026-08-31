@@ -12,13 +12,17 @@ import { useI18n } from '../i18n';
  * once at the app root; every destructive action awaits it before acting.
  */
 export function useConfirm() {
-  const [state, setState] = useState(null); // { message, resolve }
+  const [state, setState] = useState(null); // { message, confirmLabel, resolve }
   const resolverRef = useRef(null);
 
-  const confirm = useCallback((message) => {
+  // `confirmLabel` names the action being confirmed -- "Remove" reads
+  // fine for deleting a category, but is actively misleading for
+  // replacing all data on import or wiping everything via Clear, so
+  // callers with a different action pass their own verb here.
+  const confirm = useCallback((message, confirmLabel) => {
     return new Promise((resolve) => {
       resolverRef.current = resolve;
-      setState({ message });
+      setState({ message, confirmLabel });
     });
   }, []);
 
@@ -29,13 +33,13 @@ export function useConfirm() {
   }, []);
 
   const dialog = state ? (
-    <ConfirmDialogView message={state.message} onAnswer={answer} />
+    <ConfirmDialogView message={state.message} confirmLabel={state.confirmLabel} onAnswer={answer} />
   ) : null;
 
   return [confirm, dialog];
 }
 
-function ConfirmDialogView({ message, onAnswer }) {
+function ConfirmDialogView({ message, confirmLabel, onAnswer }) {
   const { t } = useI18n();
   return (
     <div className="confirm-backdrop" role="presentation" onClick={() => onAnswer(false)}>
@@ -52,7 +56,7 @@ function ConfirmDialogView({ message, onAnswer }) {
             {t('confirm.cancel')}
           </button>
           <button className="btn danger" onClick={() => onAnswer(true)} autoFocus>
-            {t('confirm.remove')}
+            {confirmLabel ?? t('confirm.remove')}
           </button>
         </div>
       </div>

@@ -279,6 +279,7 @@ export default {
 
   'confirm.cancel': '取消',
   'confirm.remove': '刪除',
+  'confirm.replace': '取代',
   'confirm.removeCategory': '刪除「{name}」？本月為它計劃的金額也會一併刪除。',
   'confirm.removeTransaction': '刪除「{description}」？',
   'confirm.removeRule': '刪除關於「{keyword}」的規則？',

@@ -288,6 +288,7 @@ export default {
 
   'confirm.cancel': 'Cancel',
   'confirm.remove': 'Remove',
+  'confirm.replace': 'Replace',
   'confirm.removeCategory': 'Remove "{name}"? Its planned amount for this month goes with it.',
   'confirm.removeTransaction': 'Remove "{description}"?',
   'confirm.removeRule': 'Remove the rule for "{keyword}"?',

@@ -252,7 +252,7 @@ export function AppShell({ wasmModule }) {
       const backup = readBackup(payload);
       if (!backup.ok) return { error: t(backup.reason) };
 
-      const ok = await confirm(t('data.importConfirm', { count: backup.count }));
+      const ok = await confirm(t('data.importConfirm', { count: backup.count }), t('confirm.replace'));
       if (!ok) return null;
 
       const byName = {
@@ -301,7 +301,7 @@ export function AppShell({ wasmModule }) {
   );
 
   const clearAllData = useCallback(async () => {
-    const ok = await confirm(t('data.clearConfirm'));
+    const ok = await confirm(t('data.clearConfirm'), t('data.clearAll'));
     if (!ok) return;
     for (const collection of [transactions, budgetPlan, rules, goals, debts, recurring, categories]) {
       for (const item of [...collection.items]) {
