@@ -333,7 +333,6 @@ export function AppShell({ wasmModule }) {
         }}
       />
       <main className="app-main">
-        <Intro />
         <Suspense fallback={<TabFallback />}>
           <ActivePanel
             wasmModule={wasmModule}
@@ -356,6 +355,7 @@ export function AppShell({ wasmModule }) {
             importData={importData}
           />
         </Suspense>
+        <Intro />
       </main>
       <CalcErrorPortal result={guardResult} />
       {confirmDialog}
