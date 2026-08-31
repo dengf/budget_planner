@@ -36,7 +36,7 @@ than one that is visibly broken.
 `budget-wasm`'s download small, and to keep each other's weight off a
 session that only takes one of the two receipt-capture paths.
 
-`ocrs`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
+`ocrs-cjk`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
 of the wasm payload — 3.7MB with them compiled into the main crate,
 ~800KB without — despite most sessions never opening "Take a photo" or
 "Upload PDF". They were originally split into one combined
@@ -53,7 +53,7 @@ download from ~2.9MB to ~1.9MB, and a PDF-only session now downloads
 ~1.0MB instead of the same ~2.9MB.
 
 `budget-calc`'s `ocr` and `pdf-text` Cargo features (both default off,
-each enabled by exactly one of the two crates) keep `ocrs`/`rten` and
+each enabled by exactly one of the two crates) keep `ocrs-cjk`/`rten` and
 `pdf-extract` respectively out of `budget-wasm`'s dependency graph
 entirely, not just unreached at runtime, and out of each other's.
 `www/src/ocrWorker.js` `import()`s `pkg-ocr` or `pkg-pdf` lazily, only the

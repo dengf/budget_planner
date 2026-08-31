@@ -26,7 +26,7 @@
 //! instead, each compiled to its own separate `.wasm` file that
 //! `www/src/receiptCapture.js` only loads the first time someone actually
 //! takes that path (a photo scan never downloads the PDF crate's weight,
-//! and vice versa). `ocrs`/`rten` and `pdf-extract` respectively are why
+//! and vice versa). `ocrs-cjk`/`rten` and `pdf-extract` respectively are why
 //! -- see each crate's own doc comment for the measured size. This
 //! crate's own [`receipt`] module, by contrast, is `parse_receipt_text`:
 //! plain text/`Decimal` parsing with no heavy dependency, so it lives

@@ -5,7 +5,7 @@
 // see CLAUDE.md's rule on where a thing goes), read a PDF's bytes, and
 // fetch this app's own vendored OCR model files. Never a third-party
 // library, never a CDN, never uploads anything -- see the receipt-capture
-// plan addendum for why OCR runs as a Rust/wasm engine (`ocrs`) rather
+// plan addendum for why OCR runs as a Rust/wasm engine (`ocrs-cjk`) rather
 // than a JS one.
 //
 // Turning that text into a draft transaction (amount/date/description
@@ -17,7 +17,7 @@
 //
 // `budget-wasm-ocr` and `budget-wasm-pdf` are two *separate* wasm modules
 // from the one `index.js` loads at startup, not just separate Rust crates
-// -- `ocrs`/`rten` (OCR) and `pdf-extract` (PDF) each pull in real weight
+// -- `ocrs-cjk`/`rten` (OCR) and `pdf-extract` (PDF) each pull in real weight
 // (see each crate's own doc comment) that dwarfed the budgeting math they
 // used to ship alongside, and that were bundled together with each other
 // until a size audit found each one paying for the other's dependency
@@ -104,7 +104,7 @@ async function imageToRgb(file) {
 
 /**
  * Extracts plain text from a picked receipt file: `pdf-extract` (Rust)
- * for a PDF's text layer, `ocrs` (Rust) for a photographed receipt.
+ * for a PDF's text layer, `ocrs-cjk` (Rust) for a photographed receipt.
  * Neither path uploads the file anywhere -- both run entirely against
  * bytes already local to this tab.
  *

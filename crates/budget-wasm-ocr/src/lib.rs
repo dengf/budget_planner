@@ -1,13 +1,14 @@
 //! Lazily-loaded WebAssembly bindings for receipt OCR over a
 //! photographed receipt.
 //!
-//! Split out from `budget-wasm` because `ocrs`/`rten` (a full ML tensor
+//! Split out from `budget-wasm` because `ocrs-cjk`/`rten` (a full ML tensor
 //! runtime -- matrix multiply, SIMD, ONNX model loading, `rayon`) were
-//! most of that crate's wasm payload: 3.7MB with them compiled in,
-//! versus ~700KB for `budget-wasm` alone once they moved here -- paid on
+//! most of that crate's wasm payload: ~1.9MB with them compiled in
+//! (measured after the `ocrs` -> `ocrs-cjk` swap; the original `ocrs` was
+//! 3.7MB), versus ~700KB for `budget-wasm` alone once they moved here -- paid on
 //! every page load even though most sessions never open "Take a photo".
 //! `budget-calc`'s `ocr` feature (which this crate is the only one to
-//! enable) keeps `ocrs`/`rten` out of `budget-wasm`'s dependency graph
+//! enable) keeps `ocrs-cjk`/`rten` out of `budget-wasm`'s dependency graph
 //! entirely, not just unreached at runtime -- see that feature's own doc
 //! comment.
 //!

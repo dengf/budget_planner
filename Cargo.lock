@@ -141,12 +141,13 @@ dependencies = [
  "budget-core",
  "chrono",
  "csv",
- "ocrs",
+ "ocrs-cjk",
  "pdf-extract",
  "rten",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -790,10 +791,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "ocrs"
-version = "0.12.2"
+name = "ocrs-cjk"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5379fdd3f11522b5a2ff53017a189463dabf5d0a9c915cb3eb97fabec4ea11c"
+checksum = "5ba0c111878727cccf10df57e331487dc3e53ce49dff949f274df08548e378a9"
 dependencies = [
  "anyhow",
  "rayon",

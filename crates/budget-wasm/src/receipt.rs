@@ -2,7 +2,7 @@
 //!
 //! Lives here, not in either lazily-loaded receipt-capture crate: the
 //! amount/date/description heuristics in `budget_calc::receipt` are plain
-//! string and `Decimal` parsing -- no `ocrs`/`rten`/`pdf-extract`, so
+//! string and `Decimal` parsing -- no `ocrs-cjk`/`rten`/`pdf-extract`, so
 //! nothing about this binding needs the split. Putting it in the
 //! always-loaded core module instead means the OCR and PDF crates each
 //! call it via the main-thread `wasmModule` after their own worker call

@@ -4,7 +4,7 @@
 // each `import()`ed lazily and only the first time its own message type
 // actually arrives -- a photo scan never triggers the `pkg-pdf` download,
 // and a PDF upload never triggers `pkg-ocr`'s (which is the larger of the
-// two, since it carries the `ocrs`/`rten` ML runtime). They used to be
+// two, since it carries the `ocrs-cjk`/`rten` ML runtime). They used to be
 // one combined module; splitting them stopped either path paying for the
 // other's weight -- see budget-wasm-ocr/src/lib.rs and
 // budget-wasm-pdf/src/lib.rs for the measured sizes.
@@ -43,8 +43,8 @@
 // outright rather than just resolving wrong at runtime. `self.location`
 // is a plain runtime value webpack has no reason to inspect.
 const OCR_MODEL_PATHS = {
-  detection: new URL('ocr/text-detection.rten', self.location.href),
-  recognition: new URL('ocr/text-recognition.rten', self.location.href),
+  detection: new URL('ocr/ppocrv6-tiny-det.rten', self.location.href),
+  recognition: new URL('ocr/ppocrv6-tiny-rec.rten', self.location.href),
 };
 
 let ocrWasmPromise = null;
@@ -78,7 +78,7 @@ function loadPdfWasm() {
 }
 
 // Fetched once per worker lifetime -- a second scan in the same session
-// shouldn't re-download the ~12MB of model data again.
+// shouldn't re-download the ~6.3MB of model data again.
 function loadModels() {
   if (!modelBytesPromise) {
     modelBytesPromise = Promise.all([

@@ -12,20 +12,21 @@ rust_decimal = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
 csv = "1"
-ocrs = { version = "0.12.2", optional = true }
+ocrs-cjk = { version = "0.1.0", optional = true, default-features = false, features = ["rten"] }
 pdf-extract = { version = "0.12.0", optional = true }
 rten = { version = "0.24.0", optional = true }
+serde_json = { workspace = true, optional = true }
 
 [features]
 # Two independent features, not one `receipt-capture` bundle: a photo
-# scan needs `ocrs`/`rten` (a full ML tensor runtime) and never touches
+# scan needs `ocrs-cjk`/`rten` (a full ML tensor runtime) and never touches
 # `pdf-extract`; a PDF upload is the reverse. Bundling them meant
 # `budget-wasm-pdf`'s users downloaded OCR's ~2MB they'd never run, and
 # vice versa -- see budget-wasm-ocr/src/lib.rs and budget-wasm-pdf/src/lib.rs
 # for the measured sizes this split keeps out of each other. Both off by
 # default so `budget-wasm` (and any other crate that just wants the
 # budgeting math) never compiles either in.
-ocr = ["dep:ocrs", "dep:rten"]
+ocr = ["dep:ocrs-cjk", "dep:rten", "dep:serde_json"]
 pdf-text = ["dep:pdf-extract"]
 
 [dev-dependencies]
