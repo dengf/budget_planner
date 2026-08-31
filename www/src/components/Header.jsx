@@ -1,6 +1,7 @@
 import React from 'react';
 import { LOCALES, useI18n } from '../i18n';
 import MeifioMark from './MeifioMark';
+import YourDataMenu from './YourDataMenu';
 
 const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
 
@@ -12,7 +13,24 @@ const TABS = [
   { id: 'debt', key: 'nav.debt' },
 ];
 
-export default function Header({ activeTab, onTabChange, currencySymbol, onCurrencySymbolChange }) {
+export default function Header({
+  activeTab,
+  onTabChange,
+  currencySymbol,
+  onCurrencySymbolChange,
+  wasmModule,
+  today,
+  viewMonth,
+  categories,
+  transactions,
+  rules,
+  budgetPlan,
+  goals,
+  debts,
+  recurring,
+  clearAllData,
+  importData,
+}) {
   const { t, locale, setLocale } = useI18n();
 
   return (
@@ -75,6 +93,20 @@ export default function Header({ activeTab, onTabChange, currencySymbol, onCurre
             {t(tab.key)}
           </button>
         ))}
+        <YourDataMenu
+          wasmModule={wasmModule}
+          today={today}
+          viewMonth={viewMonth}
+          categories={categories}
+          transactions={transactions}
+          rules={rules}
+          budgetPlan={budgetPlan}
+          goals={goals}
+          debts={debts}
+          recurring={recurring}
+          clearAllData={clearAllData}
+          importData={importData}
+        />
       </nav>
     </>
   );

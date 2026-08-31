@@ -331,6 +331,18 @@ export function AppShell({ wasmModule }) {
           saveCurrencySymbol(next);
           setCurrencySymbol(next);
         }}
+        wasmModule={wasmModule}
+        today={today}
+        viewMonth={viewMonth}
+        categories={categories}
+        transactions={transactions}
+        rules={rules}
+        budgetPlan={budgetPlan}
+        goals={goals}
+        debts={debts}
+        recurring={recurring}
+        clearAllData={clearAllData}
+        importData={importData}
       />
       <main className="app-main">
         <Suspense fallback={<TabFallback />}>
@@ -351,8 +363,6 @@ export function AppShell({ wasmModule }) {
             debts={debts}
             recurring={recurring}
             budgetPlan={budgetPlan}
-            clearAllData={clearAllData}
-            importData={importData}
           />
         </Suspense>
         <Intro />

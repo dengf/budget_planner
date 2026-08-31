@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
-import { EXPORT_FORMAT } from '../backup';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import PieChart from './PieChart';
 import SpendOverTimeChart from './SpendOverTimeChart';
@@ -33,8 +32,6 @@ export default function DashboardTab({
   goals,
   debts,
   recurring,
-  clearAllData,
-  importData,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
@@ -44,7 +41,6 @@ export default function DashboardTab({
   const [dailyTotals, setDailyTotals] = useState([]);
   const [weeklyTotals, setWeeklyTotals] = useState([]);
   const [recipients, setRecipients] = useState('');
-  const [importResult, setImportResult] = useState(null);
   const isCurrentMonth = viewMonth === today;
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
@@ -219,66 +215,6 @@ export default function DashboardTab({
     window.location.href = mailtoUrl({ recipients, subject: t('dashboard.mailSubject'), body: bodyText() });
   };
 
-  // Everything the app holds, as one file the person keeps themselves --
-  // the only way to move data between devices or make a backup, since
-  // there is no server this app could hold a copy on.
-  //
-  // Always the app's real current month (`today`), not whatever month
-  // Dashboard happens to be browsing -- budget-plan rows are fetched per
-  // month, and this app has no "every month" listing to export.
-  // `budgetPlan.items` tracks `viewMonth` now (App.jsx), so when someone
-  // exports while browsing a different month, this fetches `today`'s plan
-  // on demand instead of trusting `budgetPlan.items` -- the same one-off
-  // `list_budget_plan` read this component used to do for an arbitrary
-  // browsed month, just aimed at `today` instead.
-  const exportData = async () => {
-    const todaysPlan =
-      viewMonth === today ? budgetPlan.items : ((await wasmModule?.list_budget_plan?.(today)) ?? []);
-    const payload = {
-      format: EXPORT_FORMAT,
-      exported_at: new Date().toISOString(),
-      categories: categories.items,
-      transactions: transactions.items,
-      rules: rules.items,
-      goals: goals.items,
-      debts: debts.items,
-      recurring: recurring.items,
-      // No separate `income` field: income is the sum of whatever's
-      // planned against the income categories already included above
-      // (`categories` carries `is_income`, `budget_plan.entries` carries
-      // each category's planned amount) -- restoring both is restoring
-      // income, with nothing else to name explicitly.
-      budget_plan: { month: today, entries: todaysPlan },
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `budget-planner-${today}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const onImportFile = (e) => {
-    const file = e.target.files?.[0];
-    // Reset immediately so picking the same file twice still fires a change.
-    e.target.value = '';
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let payload;
-      try {
-        payload = JSON.parse(String(reader.result ?? ''));
-      } catch {
-        setImportResult({ error: t('err.badImportFile') });
-        return;
-      }
-      const outcome = await importData(payload);
-      setImportResult(outcome);
-    };
-    reader.readAsText(file);
-  };
-
   const hasIncome = (summary?.income ?? 0) > 0;
   const isOverBudget = hasIncome && summary && summary.unspent < 0;
 
@@ -450,23 +386,6 @@ export default function DashboardTab({
         <button className="btn secondary" onClick={send} disabled={addresses.length === 0 || rejected.length > 0}>
           {t('dashboard.send')}
         </button>
-      </div>
-
-      <div className="data-management no-print">
-        <h2>{t('data.title')}</h2>
-        <p className="panel-subtitle">{t('data.exportHint')}</p>
-        <div className="data-management-actions">
-          <button className="btn secondary" onClick={exportData}>{t('data.export')}</button>
-          <label className="btn secondary import-button">
-            {t('data.import')}
-            <input type="file" accept="application/json,.json" onChange={onImportFile} />
-          </label>
-          <button className="btn danger" onClick={clearAllData}>{t('data.clearAll')}</button>
-        </div>
-        {importResult?.error && <p className="import-error" role="alert">{importResult.error}</p>}
-        {importResult?.imported != null && (
-          <p className="headline">{t('data.imported', { count: importResult.imported })}</p>
-        )}
       </div>
     </div>
   );

@@ -886,8 +886,32 @@ table.data tr:last-child td { border-bottom: none; }
    and needs to read as one. */
 .confirm-actions .btn.danger { background: var(--negative); color: #fff; padding: 10px 16px; }
 
-.data-management { display: flex; flex-direction: column; gap: 10px; }
-.data-management-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+/* "Your data" nav dropdown -- same backdrop+dialog pattern as
+   .monthpicker-backdrop/.confirm-backdrop, own namespaced classes per
+   this codebase's convention of not sharing one generic popup class
+   across unrelated components. */
+.data-menu { display: inline-flex; }
+.data-menu-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 200;
+}
+.data-menu-dialog {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px; max-width: 360px; width: 100%;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.data-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.data-menu-title { font-weight: 700; }
+/* Stacked, full-width actions -- unlike .confirm-actions' left/right
+   pair, these are three independent one-shot actions, not a choice
+   between two, so a vertical list reads clearer than a row. */
+.data-menu-actions { display: flex; flex-direction: column; gap: 10px; }
+.data-menu-actions .btn { width: 100%; }
+/* Same reasoning as .confirm-actions .btn.danger above -- "Clear all
+   data" is a standalone action here, not a small "Remove" link in a
+   table row, and needs a full 44px touch target like its siblings. */
+.data-menu-actions .btn.danger { background: var(--negative); color: #fff; padding: 10px 16px; min-height: 44px; }
 
 @media print {
   .app-header, .app-tabs, .app-switches, .report-actions, .no-print, .dash-month-btn, .chart-granularity { display: none !important; }
