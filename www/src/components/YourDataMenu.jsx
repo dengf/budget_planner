@@ -83,6 +83,13 @@ export default function YourDataMenu({
         return;
       }
       const outcome = await importData(payload);
+      // A successful replace closes the dialog, same as Export/Clear --
+      // an error stays open so the message is readable, and a cancel
+      // (outcome === null) leaves the dialog exactly as the person left it.
+      if (outcome?.imported != null) {
+        setOpen(false);
+        return;
+      }
       setImportResult(outcome);
     };
     reader.readAsText(file);
