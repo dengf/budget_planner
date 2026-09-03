@@ -3,7 +3,7 @@
 export default {
   'app.title': 'Budget Planner',
   'app.loading': 'Loading…',
-  'app.updateAvailable': "A new version of Budget Planner is ready.",
+  'app.updateAvailable': 'A new version of Budget Planner is ready.',
   'app.reload': 'Reload',
   'app.byline': '— a {logo} app',
   'app.language': 'Language',
@@ -19,7 +19,8 @@ export default {
   'nav.goals': 'Goals',
   'nav.debt': 'Debt payoff',
 
-  'intro.lede': 'A monthly budget, savings goals and a debt payoff plan — worked out where you can see the working.',
+  'intro.lede':
+    'A monthly budget, savings goals and a debt payoff plan — worked out where you can see the working.',
   'intro.privacy':
     'Everything is calculated in your browser. Nothing you type is sent anywhere, stored, or logged.',
   'intro.privacyDetail':
@@ -78,25 +79,30 @@ export default {
   'chart.noExpenseYet': 'Nothing logged yet — spending you add will show up here.',
   'chart.noIncomeYet': 'Nothing logged yet — income you add will show up here.',
   'chart.dailySpendTitle': 'Spending by day',
-  'chart.dailySpendAria': 'Chart of spending across the month, totalling {amount}, peaking on day {day}.',
+  'chart.dailySpendAria':
+    'Chart of spending across the month, totalling {amount}, peaking on day {day}.',
   'chart.dailySpendTotal': '{amount} spent this month, day by day',
   'chart.dayN': 'Day {n}',
   'chart.weeklySpendTitle': 'Spending by week',
-  'chart.weeklySpendAria': 'Chart of spending across the month, totalling {amount}, peaking the week of {week}.',
+  'chart.weeklySpendAria':
+    'Chart of spending across the month, totalling {amount}, peaking the week of {week}.',
   'chart.weeklySpendTotal': '{amount} spent this month, week by week',
   'chart.granularityGroup': 'Chart granularity',
   'chart.granularityDaily': 'Daily',
   'chart.granularityWeekly': 'Weekly',
   'budget.method': 'Zero-based: give every dollar a job until nothing is left unassigned.',
-  'budget.startWithIncome': 'Start here — plan how much you expect from each income category below.',
+  'budget.startWithIncome':
+    'Start here — plan how much you expect from each income category below.',
   'budget.assignPrompt': 'Now assign your {amount} across the categories below.',
   'budget.unbudgetedSpend': 'Not budgeted yet',
   'data.import': 'Import data',
-  'data.importConfirm': 'Replace everything in this app with the {count} records in that file? What is here now will be gone.',
+  'data.importConfirm':
+    'Replace everything in this app with the {count} records in that file? What is here now will be gone.',
   'data.imported': '{count} records restored.',
   'budget.spendAmount': 'Amount spent',
   'budget.incomeAmount': 'Amount received',
-  'budget.spentHint': 'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
+  'budget.spentHint':
+    'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
   'budget.savings': 'Savings',
   'budget.savingsHint': 'Income minus every expense — what actually got saved',
@@ -108,33 +114,41 @@ export default {
   'cat.primaryEarnedIncome': 'Primary Earned Income',
   'cat.primaryEarnedIncome.desc': 'Salary, wages, overtime pay, tips, and bonuses.',
   'cat.selfEmploymentBusiness': 'Self-Employment & Business',
-  'cat.selfEmploymentBusiness.desc': 'Freelance revenue, gig work, consulting fees, and business profits.',
+  'cat.selfEmploymentBusiness.desc':
+    'Freelance revenue, gig work, consulting fees, and business profits.',
   'cat.investmentCapitalIncome': 'Investment & Capital Income',
   'cat.investmentCapitalIncome.desc': 'Rental income, dividends, interest, and capital gains.',
   'cat.governmentSupplemental': 'Government & Supplemental',
-  'cat.governmentSupplemental.desc': 'Pension, Social Security, child support, alimony, and tax refunds.',
+  'cat.governmentSupplemental.desc':
+    'Pension, Social Security, child support, alimony, and tax refunds.',
   'cat.otherIncome': 'Other Income',
   'cat.otherIncome.desc': "Any other income that doesn't fit the categories above.",
 
   'cat.housing': 'Housing',
-  'cat.housing.desc': 'Rent or mortgage, property taxes, homeowner/rental insurance, HOA fees, repairs.',
+  'cat.housing.desc':
+    'Rent or mortgage, property taxes, homeowner/rental insurance, HOA fees, repairs.',
   'cat.utilities': 'Utilities',
-  'cat.utilities.desc': 'Electricity, gas, water/sewer, trash collection, internet, wifi, mobile phone.',
+  'cat.utilities.desc':
+    'Electricity, gas, water/sewer, trash collection, internet, wifi, mobile phone.',
   'cat.foodGroceries': 'Food & Groceries',
   'cat.foodGroceries.desc': 'Groceries, household supplies, dining out, coffee/drinks.',
   'cat.transportation': 'Transportation',
-  'cat.transportation.desc': 'Auto loan/lease, vehicle insurance, gas/EV charging, parking, tolls, transit passes, car maintenance.',
+  'cat.transportation.desc':
+    'Auto loan/lease, vehicle insurance, gas/EV charging, parking, tolls, transit passes, car maintenance.',
   'cat.healthcareInsurance': 'Healthcare & Insurance',
-  'cat.healthcareInsurance.desc': 'Health/dental/vision premiums, pharmacy copays, out-of-pocket medical bills, life insurance.',
+  'cat.healthcareInsurance.desc':
+    'Health/dental/vision premiums, pharmacy copays, out-of-pocket medical bills, life insurance.',
   'cat.debtServicing': 'Debt Servicing',
-  'cat.debtServicing.desc': 'Credit card balances, student loans, personal loans, medical debt payments.',
+  'cat.debtServicing.desc':
+    'Credit card balances, student loans, personal loans, medical debt payments.',
   'cat.personalLifestyle': 'Personal & Lifestyle',
-  'cat.personalLifestyle.desc': 'Clothing/shoes, personal care, gym memberships, streaming services, hobbies.',
+  'cat.personalLifestyle.desc':
+    'Clothing/shoes, personal care, gym memberships, streaming services, hobbies.',
   'cat.familyDependents': 'Family & Dependents',
-  'cat.familyDependents.desc': 'Childcare, tuition, school supplies, extracurricular activities, pet care/vet bills.',
+  'cat.familyDependents.desc':
+    'Childcare, tuition, school supplies, extracurricular activities, pet care/vet bills.',
   'cat.otherExpenses': 'Other Expenses',
   'cat.otherExpenses.desc': "Any other expense that doesn't fit the categories above.",
-
 
   'transactions.title': 'Transactions',
   'transactions.listTitle': 'All transactions',
@@ -143,8 +157,10 @@ export default {
   'transactions.description': 'Description',
   'transactions.amount': 'Amount',
   'transactions.amountHint': 'Negative for spending, positive for income',
-  'transactions.directionMismatchExpense': '{category} is an expense category, but a positive amount counts as income and won’t show up as spending. Did you mean {flipped}?',
-  'transactions.directionMismatchIncome': '{category} is an income category, but a negative amount counts as spending and won’t show up as income. Did you mean {flipped}?',
+  'transactions.directionMismatchExpense':
+    '{category} is an expense category, but a positive amount counts as income and won’t show up as spending. Did you mean {flipped}?',
+  'transactions.directionMismatchIncome':
+    '{category} is an income category, but a negative amount counts as spending and won’t show up as income. Did you mean {flipped}?',
   'transactions.useFlippedAmount': 'Use {flipped}',
   'transactions.switchToIncome': 'Switch to income (currently spending)',
   'transactions.switchToSpending': 'Switch to spending (currently income)',
@@ -184,20 +200,24 @@ export default {
   'transactions.receiptReading': 'Reading receipt…',
   'transactions.receiptReviewHint': "OCR isn't perfect — check these before adding.",
   'transactions.receiptIncomeHint': 'Looks like a refund or credit — check the sign on the amount.',
-  'transactions.receiptExtractFailed': "Couldn't read that file. Try a clearer photo or a different file.",
+  'transactions.receiptExtractFailed':
+    "Couldn't read that file. Try a clearer photo or a different file.",
   'transactions.receiptPdfNotSupported':
     "This PDF doesn't have readable text — try a photo of the receipt instead.",
   'recurring.title': 'Recurring expenses',
-  'recurring.hint': 'Rent, subscriptions, anything on a schedule. Set one up once and see it coming before it posts.',
+  'recurring.hint':
+    'Rent, subscriptions, anything on a schedule. Set one up once and see it coming before it posts.',
   'recurring.none': 'No recurring expenses set up yet.',
   'recurring.description': 'Description',
   'recurring.amount': 'Amount per occurrence',
   'recurring.cadence': 'Repeats',
   'recurring.anchorDate': 'One real due date',
-  'recurring.anchorHint': "Pick any one real occurrence — this month's rent day, this month's bill date. Weekly and fortnightly expenses count actual calendar dates from it, so a 5-Friday month is counted as 5, not rounded down to 4.",
+  'recurring.anchorHint':
+    "Pick any one real occurrence — this month's rent day, this month's bill date. Weekly and fortnightly expenses count actual calendar dates from it, so a 5-Friday month is counted as 5, not rounded down to 4.",
   'recurring.add': 'Add recurring expense',
   'recurring.upcomingTitle': 'Upcoming this month',
-  'recurring.upcomingHint': "What's scheduled to come due, so you can plan for it before it happens rather than after.",
+  'recurring.upcomingHint':
+    "What's scheduled to come due, so you can plan for it before it happens rather than after.",
   'recurring.addToPlanned': 'Add to planned',
   'transactions.showAllMonths': 'Show all months',
   'transactions.noneInMonth': 'No transactions in {month}.',
@@ -279,10 +299,13 @@ export default {
   'err.unreadablePdf': "That PDF couldn't be read ({value}). Try a photo of the receipt instead.",
   'err.emptyImage': 'That photo has no image data.',
   'err.ocrModelLoadFailed': "The receipt-reading engine couldn't load ({value}). Try again.",
-  'err.ocrFailed': "Couldn't read any text from that photo ({value}). Try a clearer photo, or add the transaction by hand.",
+  'err.ocrFailed':
+    "Couldn't read any text from that photo ({value}). Try a clearer photo, or add the transaction by hand.",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
+  'err.importFailed': "Couldn't read that file. Try again.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",
-  'err.categoryInUse': '"{name}" is used by {count} transactions or recurring expenses — recategorize them before removing it.',
+  'err.categoryInUse':
+    '"{name}" is used by {count} transactions or recurring expenses — recategorize them before removing it.',
 
   'errors.dismiss': 'Dismiss',
 
@@ -300,12 +323,19 @@ export default {
   'data.exportHint': 'Download everything you have entered as a single JSON file.',
   'data.export': 'Export all data',
   'data.clearAll': 'Clear all data',
-  'data.clearConfirm': 'Delete everything — every category, transaction, rule, goal and debt? This cannot be undone.',
+  'data.clearConfirm':
+    'Delete everything — every category, transaction, rule, goal and debt? This cannot be undone.',
+  'data.lastExported': 'Last exported {date}.',
+  'data.neverExported': "You haven't exported a backup yet.",
+  'data.syncTip':
+    'Tip: choose a folder your other devices already sync, like iCloud Drive or Dropbox, to carry your budget between them.',
+  'data.exportFailed': "Couldn't save the file. Try again.",
 
   'chart.debtTitle': 'Payoff over time',
   'chart.remainingBalance': 'Remaining balance',
   'chart.interestToDate': 'Interest paid to date',
-  'chart.debtAria': 'Chart of the remaining balance declining to zero over {months} months, with {interest} paid in interest along the way.',
+  'chart.debtAria':
+    'Chart of the remaining balance declining to zero over {months} months, with {interest} paid in interest along the way.',
   'chart.monthN': 'Month {n}',
   'chart.sharedScale': 'Scale: {min} to {max}',
 };
