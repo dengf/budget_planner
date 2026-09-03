@@ -45,7 +45,6 @@ export default function DashboardTab({
   const [recipients, setRecipients] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [goalProgress, setGoalProgress] = useState({});
-  const isCurrentMonth = viewMonth === today;
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
 
@@ -335,28 +334,16 @@ export default function DashboardTab({
         </div>
       )}
 
-      <div className="dash-summary-cards">
-        <div className="dash-card dash-card-income">
-          <span className="dash-card-label">
-            {isCurrentMonth
-              ? t('budget.income')
-              : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}
-          </span>
-          <span className="dash-card-value">{formatMoney(summary?.income ?? 0)}</span>
-        </div>
-        <div className="dash-card dash-card-spent">
-          <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
-          <span className="dash-card-value">{formatMoney(expenseTotals.spent)}</span>
-        </div>
-        {savingsLine && (
+      {savingsLine && (
+        <div className="dash-summary-cards">
           <div className="dash-card">
             <span className="dash-card-label">{t('budget.savings')}</span>
             <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
               {formatMoney(savingsLine.spent)}
             </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="dash-breakdowns">
         <div>
@@ -366,6 +353,7 @@ export default function DashboardTab({
             formatMoney={formatMoney}
             ariaLabel={t('chart.expenseBreakdownAria', { month: monthLabel(viewMonth, locale) })}
             hint={t('dashboard.bubbleHint')}
+            totalLabel={formatMoney(expenseTotals.spent)}
             emptyHint={t('chart.noExpenseYet')}
             selectedId={selectedCategoryId}
             onSelect={setSelectedCategoryId}
@@ -378,7 +366,7 @@ export default function DashboardTab({
             items={incomeSlices}
             formatMoney={formatMoney}
             ariaLabel={t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) })}
-            hint={t('dashboard.bubbleHint')}
+            totalLabel={formatMoney(summary?.income ?? 0)}
             emptyHint={t('chart.noIncomeYet')}
             selectedId={selectedCategoryId}
             onSelect={setSelectedCategoryId}

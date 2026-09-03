@@ -33,7 +33,18 @@ const PCT_LABEL_MIN_D = 72;
  * the small "tap a bubble to see details" line -- the per-bubble
  * `aria-label` covers screen-reader discovery, but this brand-new
  * interaction pattern also needs a visible cue for a sighted first-time
- * user (this app's own "obvious to use" rule).
+ * user (this app's own "obvious to use" rule). It's optional and meant to
+ * be passed to only one of the two charts Dashboard renders side by side
+ * -- the same instruction under both reads as a repeated sentence, not a
+ * second piece of information.
+ *
+ * `totalLabel`, also optional, is the whole-month total for this
+ * breakdown (Dashboard passes its already-computed `expenseTotals.spent`/
+ * `summary.income`, not a sum of `items` -- those two can differ, e.g. a
+ * category with net-negative spend is excluded from the bubbles but still
+ * counted in the real total). Shown next to the title instead of in a
+ * separate summary card, since this chart's heading already *is* that
+ * total's label.
  */
 export default function BubbleChart({
   title,
@@ -41,6 +52,7 @@ export default function BubbleChart({
   formatMoney,
   ariaLabel,
   hint,
+  totalLabel,
   emptyHint,
   selectedId,
   onSelect,
@@ -52,8 +64,11 @@ export default function BubbleChart({
 
   return (
     <figure className="chart bubble-chart">
-      <figcaption className="chart-title">{title}</figcaption>
-      {!isEmpty && <p className="chart-note bubble-hint">{hint}</p>}
+      <div className="chart-header">
+        <figcaption className="chart-title">{title}</figcaption>
+        {totalLabel != null && <span className="chart-total">{totalLabel}</span>}
+      </div>
+      {!isEmpty && hint && <p className="chart-note bubble-hint">{hint}</p>}
       {isEmpty ? (
         <>
           <div className="bubble-grid">
