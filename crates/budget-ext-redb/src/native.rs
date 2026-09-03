@@ -37,6 +37,7 @@ mod tests {
             group: "Living".to_string(),
             is_income: false,
             description: String::new(),
+            preset_key: None,
         }
     }
 

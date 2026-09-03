@@ -3,6 +3,7 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
+import CategoryBadge from './CategoryBadge';
 import PieChart from './PieChart';
 import SpendOverTimeChart from './SpendOverTimeChart';
 import MonthYearPicker from './MonthYearPicker';
@@ -118,7 +119,8 @@ export default function DashboardTab({
         if (!cancelled) setSavingsLine(null);
         return;
       }
-      const planned = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
+      const planned =
+        budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
       const expense = totalExpenseActual(lines, isIncome, () => false);
       const built = await wasmModule.build_savings_line({
         planned,
@@ -133,18 +135,33 @@ export default function DashboardTab({
     };
   }, [wasmModule, lines, budgetPlan.items, summary]);
 
+  const categoryFor = (id) => categories.items.find((c) => c.id === id);
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
 
   // Two separate breakdowns, not one chart trying to show both
   // directions of money -- `l.spent` already holds whichever of
   // spend/income applies per category (see the fetch effect above), so
   // this just needs to route each category to the side it belongs on.
+  // `preset_key` rides along so PieChart can color each wedge the same
+  // way CategoryBadge colors that category everywhere else (see
+  // categoryVisuals.js's categoryColor) -- chart and lists agreeing on
+  // color is the whole point of this pass.
   const expenseSlices = lines
     .filter((l) => !isIncome(l.category_id) && l.spent > 0)
-    .map((l) => ({ id: l.category_id, label: categoryName(l.category_id), value: l.spent }));
+    .map((l) => ({
+      id: l.category_id,
+      label: categoryName(l.category_id),
+      value: l.spent,
+      preset_key: categoryFor(l.category_id)?.preset_key,
+    }));
   const incomeSlices = lines
     .filter((l) => isIncome(l.category_id) && l.spent > 0)
-    .map((l) => ({ id: l.category_id, label: categoryName(l.category_id), value: l.spent }));
+    .map((l) => ({
+      id: l.category_id,
+      label: categoryName(l.category_id),
+      value: l.spent,
+      preset_key: categoryFor(l.category_id)?.preset_key,
+    }));
   // The donut's own total, not `summary.total_spent` -- that figure sums
   // every line's `spent` regardless of income/expense, so it includes
   // income categories' received amounts too (see BudgetTab's identical
@@ -169,31 +186,47 @@ export default function DashboardTab({
   const incomeTotals = sumLines(incomeLines);
   const expenseTotals = sumLines(expenseLines);
 
-  // This table is the plain-numbers summary (BudgetTab is where planned
+  // This card is the plain-numbers summary (BudgetTab is where planned
   // income and its "received more than planned"/"unplanned income"
-  // framing actually get edited and explained). Here, an income row's
+  // framing actually get edited and explained). Here, an income card's
   // Planned and Remaining would just be a $0.00 and a green negative
   // number with no explanation of why negative is good -- confusing
-  // rather than informative, so income rows show Actual only.
-  const categoryRow = (l) => {
-    if (isIncome(l.category_id)) {
-      return (
-        <tr key={l.category_id}>
-          <td>{categoryName(l.category_id)}</td>
-          <td className="num">—</td>
-          <td className="num">{formatMoney(l.spent)}</td>
-          <td className="num">—</td>
-        </tr>
-      );
-    }
+  // rather than informative, so income cards show Actual only.
+  const categoryCard = (l) => {
+    const income = isIncome(l.category_id);
     const isGoodNews = l.remaining >= 0;
     return (
-      <tr key={l.category_id}>
-        <td>{categoryName(l.category_id)}</td>
-        <td className="num">{formatMoney(l.planned)}</td>
-        <td className="num">{formatMoney(l.spent)}</td>
-        <td className={`num ${isGoodNews ? 'positive' : 'negative'}`}>{formatMoney(l.remaining)}</td>
-      </tr>
+      <div className="dash-category-card money-card" key={l.category_id}>
+        <div className="category-name">
+          <CategoryBadge category={categoryFor(l.category_id)} />
+          {categoryName(l.category_id)}
+        </div>
+        <div className="dash-card-stats">
+          {income ? (
+            <span className="dash-stat">
+              <span className="cell-label">{t('budget.actual')}</span>
+              <span className="num">{formatMoney(l.spent)}</span>
+            </span>
+          ) : (
+            <>
+              <span className="dash-stat">
+                <span className="cell-label">{t('budget.planned')}</span>
+                <span className="num">{formatMoney(l.planned)}</span>
+              </span>
+              <span className="dash-stat">
+                <span className="cell-label">{t('budget.actual')}</span>
+                <span className="num">{formatMoney(l.spent)}</span>
+              </span>
+              <span className="dash-stat">
+                <span className="cell-label">{t('budget.remaining')}</span>
+                <span className={`num ${isGoodNews ? 'positive' : 'negative'}`}>
+                  {formatMoney(l.remaining)}
+                </span>
+              </span>
+            </>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -202,7 +235,10 @@ export default function DashboardTab({
 
   const bodyText = () => {
     const rows = lines
-      .map((l) => `${categoryName(l.category_id)}: ${formatMoney(l.spent)} of ${formatMoney(l.planned)}`)
+      .map(
+        (l) =>
+          `${categoryName(l.category_id)}: ${formatMoney(l.spent)} of ${formatMoney(l.planned)}`,
+      )
       .join('\n');
     const savingsRow = savingsLine
       ? `\n${t('budget.savings')}: ${formatMoney(savingsLine.spent)} of ${formatMoney(savingsLine.planned)}`
@@ -212,7 +248,11 @@ export default function DashboardTab({
 
   const send = () => {
     if (addresses.length === 0 || rejected.length > 0) return;
-    window.location.href = mailtoUrl({ recipients, subject: t('dashboard.mailSubject'), body: bodyText() });
+    window.location.href = mailtoUrl({
+      recipients,
+      subject: t('dashboard.mailSubject'),
+      body: bodyText(),
+    });
   };
 
   const hasIncome = (summary?.income ?? 0) > 0;
@@ -222,7 +262,12 @@ export default function DashboardTab({
     <div className="panel report dashboard">
       <div className="dash-header">
         <h2>{t('dashboard.title')}</h2>
-        <MonthYearPicker value={viewMonth} onChange={setViewMonth} todayMonth={today} locale={locale} />
+        <MonthYearPicker
+          value={viewMonth}
+          onChange={setViewMonth}
+          todayMonth={today}
+          locale={locale}
+        />
       </div>
 
       {summary && hasIncome && (
@@ -240,7 +285,11 @@ export default function DashboardTab({
 
       <div className="dash-summary-cards">
         <div className="dash-card dash-card-income">
-          <span className="dash-card-label">{isCurrentMonth ? t('budget.income') : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}</span>
+          <span className="dash-card-label">
+            {isCurrentMonth
+              ? t('budget.income')
+              : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}
+          </span>
           <span className="dash-card-value">{formatMoney(summary?.income ?? 0)}</span>
         </div>
         <div className="dash-card dash-card-spent">
@@ -272,63 +321,70 @@ export default function DashboardTab({
         />
       </div>
 
-      <div className="table-scroll">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('budget.categoryName')}</th>
-              <th>{t('budget.planned')}</th>
-              <th>{t('budget.actual')}</th>
-              <th>{t('budget.remaining')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {incomeLines.map(categoryRow)}
-            {incomeLines.length > 0 && (
-              <>
-                <tr className="dash-table-total">
-                  <td>{t('dashboard.totalIncome')}</td>
-                  <td className="num">—</td>
-                  <td className="num">{formatMoney(incomeTotals.spent)}</td>
-                  <td className="num">—</td>
-                </tr>
-                <tr className="dash-table-divider" aria-hidden="true">
-                  <td colSpan={4}>
-                    <div className="dash-table-divider-line" />
-                  </td>
-                </tr>
-              </>
-            )}
-            {expenseLines.map(categoryRow)}
-            {expenseLines.length > 0 && (
-              <>
-                <tr className="dash-table-total">
-                  <td>{t('dashboard.totalExpenses')}</td>
-                  <td className="num">{formatMoney(expenseTotals.planned)}</td>
-                  <td className="num">{formatMoney(expenseTotals.spent)}</td>
-                  <td className={`num ${expenseTotals.remaining >= 0 ? 'positive' : 'negative'}`}>
+      <div className="dash-category-list">
+        {incomeLines.map(categoryCard)}
+        {incomeLines.length > 0 && (
+          <>
+            <div className="dash-total-card">
+              <span className="dash-total-name">{t('dashboard.totalIncome')}</span>
+              <div className="dash-card-stats">
+                <span className="dash-stat">
+                  <span className="cell-label">{t('budget.actual')}</span>
+                  <span className="num">{formatMoney(incomeTotals.spent)}</span>
+                </span>
+              </div>
+            </div>
+            <div className="dash-table-divider-line" aria-hidden="true" />
+          </>
+        )}
+        {expenseLines.map(categoryCard)}
+        {expenseLines.length > 0 && (
+          <>
+            <div className="dash-total-card">
+              <span className="dash-total-name">{t('dashboard.totalExpenses')}</span>
+              <div className="dash-card-stats">
+                <span className="dash-stat">
+                  <span className="cell-label">{t('budget.planned')}</span>
+                  <span className="num">{formatMoney(expenseTotals.planned)}</span>
+                </span>
+                <span className="dash-stat">
+                  <span className="cell-label">{t('budget.actual')}</span>
+                  <span className="num">{formatMoney(expenseTotals.spent)}</span>
+                </span>
+                <span className="dash-stat">
+                  <span className="cell-label">{t('budget.remaining')}</span>
+                  <span className={`num ${expenseTotals.remaining >= 0 ? 'positive' : 'negative'}`}>
                     {formatMoney(expenseTotals.remaining)}
-                  </td>
-                </tr>
-                <tr className="dash-table-divider" aria-hidden="true">
-                  <td colSpan={4}>
-                    <div className="dash-table-divider-line" />
-                  </td>
-                </tr>
-              </>
-            )}
-            {savingsLine && (
-              <tr className="dash-table-total">
-                <td>{t('budget.savings')}</td>
-                <td className="num">{formatMoney(savingsLine.planned)}</td>
-                <td className="num">{formatMoney(savingsLine.spent)}</td>
-                <td className={`num ${savingsLine.spent - savingsLine.planned >= 0 ? 'positive' : 'negative'}`}>
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div className="dash-table-divider-line" aria-hidden="true" />
+          </>
+        )}
+        {savingsLine && (
+          <div className="dash-total-card">
+            <span className="dash-total-name">{t('budget.savings')}</span>
+            <div className="dash-card-stats">
+              <span className="dash-stat">
+                <span className="cell-label">{t('budget.planned')}</span>
+                <span className="num">{formatMoney(savingsLine.planned)}</span>
+              </span>
+              <span className="dash-stat">
+                <span className="cell-label">{t('budget.actual')}</span>
+                <span className="num">{formatMoney(savingsLine.spent)}</span>
+              </span>
+              <span className="dash-stat">
+                <span className="cell-label">{t('budget.remaining')}</span>
+                <span
+                  className={`num ${savingsLine.spent - savingsLine.planned >= 0 ? 'positive' : 'negative'}`}
+                >
                   {formatMoney(savingsLine.spent - savingsLine.planned)}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <SpendOverTimeChart
@@ -345,10 +401,20 @@ export default function DashboardTab({
           <h2>{t('goals.title')}</h2>
           <div className="table-scroll">
             <table className="data">
-              <thead><tr><th>{t('goals.name')}</th><th>{t('goals.current')}</th><th>{t('goals.target')}</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>{t('goals.name')}</th>
+                  <th>{t('goals.current')}</th>
+                  <th>{t('goals.target')}</th>
+                </tr>
+              </thead>
               <tbody>
                 {goals.items.map((g) => (
-                  <tr key={g.id}><td>{g.name}</td><td className="num">{formatMoney(g.current_amount)}</td><td className="num">{formatMoney(g.target_amount)}</td></tr>
+                  <tr key={g.id}>
+                    <td>{g.name}</td>
+                    <td className="num">{formatMoney(g.current_amount)}</td>
+                    <td className="num">{formatMoney(g.target_amount)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -361,10 +427,20 @@ export default function DashboardTab({
           <h2>{t('debt.title')}</h2>
           <div className="table-scroll">
             <table className="data">
-              <thead><tr><th>{t('debt.name')}</th><th>{t('debt.balance')}</th><th>{t('debt.minPayment')}</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>{t('debt.name')}</th>
+                  <th>{t('debt.balance')}</th>
+                  <th>{t('debt.minPayment')}</th>
+                </tr>
+              </thead>
               <tbody>
                 {debts.items.map((d) => (
-                  <tr key={d.id}><td>{d.name}</td><td className="num">{formatMoney(d.balance)}</td><td className="num">{formatMoney(d.min_payment)}</td></tr>
+                  <tr key={d.id}>
+                    <td>{d.name}</td>
+                    <td className="num">{formatMoney(d.balance)}</td>
+                    <td className="num">{formatMoney(d.min_payment)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -373,17 +449,27 @@ export default function DashboardTab({
       )}
 
       <div className="report-actions no-print">
-        <button className="btn" onClick={() => window.print()}>{t('dashboard.print')}</button>
+        <button className="btn" onClick={() => window.print()}>
+          {t('dashboard.print')}
+        </button>
       </div>
 
       <div className="form-grid no-print">
         <label className="field">
           <span className="field-label">{t('dashboard.recipients')}</span>
           <div className="field-input">
-            <input value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder={t('dashboard.recipientsPlaceholder')} />
+            <input
+              value={recipients}
+              onChange={(e) => setRecipients(e.target.value)}
+              placeholder={t('dashboard.recipientsPlaceholder')}
+            />
           </div>
         </label>
-        <button className="btn secondary" onClick={send} disabled={addresses.length === 0 || rejected.length > 0}>
+        <button
+          className="btn secondary"
+          onClick={send}
+          disabled={addresses.length === 0 || rejected.length > 0}
+        >
           {t('dashboard.send')}
         </button>
       </div>

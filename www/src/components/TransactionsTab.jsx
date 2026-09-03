@@ -3,13 +3,20 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
 import CalcError from './CalcError';
+import CategoryBadge from './CategoryBadge';
 import DirectionWarning from './DirectionWarning';
 import MonthYearPicker from './MonthYearPicker';
 import { SpreadsheetIcon } from './icons';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
 
-const DEFAULT_MAPPING = { date_col: 0, description_col: 1, amount_col: 2, credit_col: null, has_header: true };
+const DEFAULT_MAPPING = {
+  date_col: 0,
+  description_col: 1,
+  amount_col: 2,
+  credit_col: null,
+  has_header: true,
+};
 
 const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
@@ -98,13 +105,21 @@ export default function TransactionsTab({
   const addRule = async (e) => {
     e.preventDefault();
     if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return;
-    await rules.save({ id: newId(), keyword: ruleDraft.keyword, category_id: ruleDraft.category_id, priority: Number(ruleDraft.priority) || 0 });
+    await rules.save({
+      id: newId(),
+      keyword: ruleDraft.keyword,
+      category_id: ruleDraft.category_id,
+      priority: Number(ruleDraft.priority) || 0,
+    });
     setRuleDraft({ keyword: '', category_id: '', priority: 0 });
   };
 
   const applyRules = async () => {
     if (!wasmModule?.apply_rules) return;
-    const result = await wasmModule.apply_rules({ transactions: transactions.items, rules: rules.items });
+    const result = await wasmModule.apply_rules({
+      transactions: transactions.items,
+      rules: rules.items,
+    });
     if (!result?.error) {
       for (const tx of result.transactions) {
         const before = transactions.items.find((t) => t.id === tx.id);
@@ -113,7 +128,9 @@ export default function TransactionsTab({
     }
   };
 
-  const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? t('transactions.uncategorized');
+  const categoryFor = (id) => categories.items.find((c) => c.id === id);
+  const categoryName = (id) =>
+    categories.items.find((c) => c.id === id)?.name ?? t('transactions.uncategorized');
 
   const removeTransaction = async (tx) => {
     const ok = await confirm(t('confirm.removeTransaction', { description: tx.description }));
@@ -137,7 +154,13 @@ export default function TransactionsTab({
       cadence: recurringDraft.cadence,
       anchor_date: recurringDraft.anchor_date,
     });
-    setRecurringDraft({ description: '', category_id: '', amount: '', cadence: 'monthly', anchor_date: '' });
+    setRecurringDraft({
+      description: '',
+      category_id: '',
+      amount: '',
+      cadence: 'monthly',
+      anchor_date: '',
+    });
   };
 
   const removeRecurring = async (item) => {
@@ -177,7 +200,9 @@ export default function TransactionsTab({
 
       {csvText && (
         <p className="panel-subtitle">
-          {columnsDetected ? t('transactions.columnsDetected') : t('transactions.columnsNotDetected')}
+          {columnsDetected
+            ? t('transactions.columnsDetected')
+            : t('transactions.columnsNotDetected')}
         </p>
       )}
 
@@ -188,38 +213,69 @@ export default function TransactionsTab({
           skimming the page, which defeats the point just as surely as
           leaving them expanded would have. */}
       {csvText && !columnsDetected && (
-      <details className="csv-columns" open>
-        <summary>{t('transactions.mapColumns')}</summary>
-        <div className="form-grid">
-          <label className="field">
-            <span className="field-label">{t('transactions.dateColumn')}</span>
-            <div className="field-input"><input type="number" min="0" value={mapping.date_col} onChange={(e) => setMapping({ ...mapping, date_col: Number(e.target.value) })} /></div>
-          </label>
-          <label className="field">
-            <span className="field-label">{t('transactions.descriptionColumn')}</span>
-            <div className="field-input"><input type="number" min="0" value={mapping.description_col} onChange={(e) => setMapping({ ...mapping, description_col: Number(e.target.value) })} /></div>
-          </label>
-          <label className="field">
-            <span className="field-label">{t('transactions.amountColumn')}</span>
-            <div className="field-input"><input type="number" min="0" value={mapping.amount_col} onChange={(e) => setMapping({ ...mapping, amount_col: Number(e.target.value) })} /></div>
-          </label>
-          <label className="field field-check">
-            <input type="checkbox" checked={mapping.has_header} onChange={(e) => setMapping({ ...mapping, has_header: e.target.checked })} />
-            <span>{t('transactions.hasHeader')}</span>
-          </label>
-        </div>
-      </details>
+        <details className="csv-columns" open>
+          <summary>{t('transactions.mapColumns')}</summary>
+          <div className="form-grid">
+            <label className="field">
+              <span className="field-label">{t('transactions.dateColumn')}</span>
+              <div className="field-input">
+                <input
+                  type="number"
+                  min="0"
+                  value={mapping.date_col}
+                  onChange={(e) => setMapping({ ...mapping, date_col: Number(e.target.value) })}
+                />
+              </div>
+            </label>
+            <label className="field">
+              <span className="field-label">{t('transactions.descriptionColumn')}</span>
+              <div className="field-input">
+                <input
+                  type="number"
+                  min="0"
+                  value={mapping.description_col}
+                  onChange={(e) =>
+                    setMapping({ ...mapping, description_col: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </label>
+            <label className="field">
+              <span className="field-label">{t('transactions.amountColumn')}</span>
+              <div className="field-input">
+                <input
+                  type="number"
+                  min="0"
+                  value={mapping.amount_col}
+                  onChange={(e) => setMapping({ ...mapping, amount_col: Number(e.target.value) })}
+                />
+              </div>
+            </label>
+            <label className="field field-check">
+              <input
+                type="checkbox"
+                checked={mapping.has_header}
+                onChange={(e) => setMapping({ ...mapping, has_header: e.target.checked })}
+              />
+              <span>{t('transactions.hasHeader')}</span>
+            </label>
+          </div>
+        </details>
       )}
 
       <div className="form-grid">
-        <button className="btn" type="button" onClick={runImport} disabled={!csvText}>{t('transactions.import')}</button>
+        <button className="btn" type="button" onClick={runImport} disabled={!csvText}>
+          {t('transactions.import')}
+        </button>
       </div>
 
       {importResult?.error && <CalcError result={importResult} />}
       {importResult && !importResult.error && (
         <p className="headline">
           {t('transactions.importedCount', { count: importResult.imported?.length ?? 0 })}
-          {importResult.skipped?.length ? ` · ${t('transactions.skippedCount', { count: importResult.skipped.length })}` : ''}
+          {importResult.skipped?.length
+            ? ` · ${t('transactions.skippedCount', { count: importResult.skipped.length })}`
+            : ''}
         </p>
       )}
 
@@ -227,11 +283,22 @@ export default function TransactionsTab({
       <form className="form-grid" onSubmit={addTransaction}>
         <label className="field">
           <span className="field-label">{t('transactions.date')}</span>
-          <div className="field-input"><input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              type="date"
+              value={draft.date}
+              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+            />
+          </div>
         </label>
         <label className="field">
           <span className="field-label">{t('transactions.description')}</span>
-          <div className="field-input"><input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            />
+          </div>
         </label>
         <NumberField
           label={t('transactions.amount')}
@@ -242,12 +309,22 @@ export default function TransactionsTab({
         />
         <label className="field">
           <span className="field-label">{t('transactions.category')}</span>
-          <select className="field-select" value={draft.category_id} onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}>
+          <select
+            className="field-select"
+            value={draft.category_id}
+            onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}
+          >
             <option value="">{t('transactions.uncategorized')}</option>
-            {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.items.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </label>
-        <button className="btn" type="submit">{t('transactions.add')}</button>
+        <button className="btn" type="submit">
+          {t('transactions.add')}
+        </button>
       </form>
       <p className="field-label">{t('transactions.amountHint')}</p>
       <DirectionWarning
@@ -276,9 +353,18 @@ export default function TransactionsTab({
               {rules.items.map((r) => (
                 <tr key={r.id}>
                   <td>{r.keyword}</td>
-                  <td>{categoryName(r.category_id)}</td>
+                  <td>
+                    <span className="category-cell">
+                      <CategoryBadge category={categoryFor(r.category_id)} />
+                      {categoryName(r.category_id)}
+                    </span>
+                  </td>
                   <td className="num">{r.priority}</td>
-                  <td><button className="btn ghost" onClick={() => removeRule(r)}>{t('budget.remove')}</button></td>
+                  <td>
+                    <button className="btn ghost" onClick={() => removeRule(r)}>
+                      {t('budget.remove')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -288,21 +374,44 @@ export default function TransactionsTab({
       <form className="form-grid" onSubmit={addRule}>
         <label className="field">
           <span className="field-label">{t('transactions.ruleKeyword')}</span>
-          <div className="field-input"><input value={ruleDraft.keyword} onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              value={ruleDraft.keyword}
+              onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
+            />
+          </div>
         </label>
         <label className="field">
           <span className="field-label">{t('transactions.category')}</span>
-          <select className="field-select" value={ruleDraft.category_id} onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}>
+          <select
+            className="field-select"
+            value={ruleDraft.category_id}
+            onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
+          >
             <option value="">—</option>
-            {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.items.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="field">
           <span className="field-label">{t('transactions.rulePriority')}</span>
-          <div className="field-input"><input type="number" value={ruleDraft.priority} onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              type="number"
+              value={ruleDraft.priority}
+              onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
+            />
+          </div>
         </label>
-        <button className="btn" type="submit">{t('transactions.addRule')}</button>
-        <button className="btn secondary" type="button" onClick={applyRules}>{t('transactions.applyRules')}</button>
+        <button className="btn" type="submit">
+          {t('transactions.addRule')}
+        </button>
+        <button className="btn secondary" type="button" onClick={applyRules}>
+          {t('transactions.applyRules')}
+        </button>
       </form>
 
       <h2 className="section-start">{t('recurring.title')}</h2>
@@ -326,11 +435,20 @@ export default function TransactionsTab({
               {recurring.items.map((r) => (
                 <tr key={r.id}>
                   <td>{r.description}</td>
-                  <td>{categoryName(r.category_id)}</td>
+                  <td>
+                    <span className="category-cell">
+                      <CategoryBadge category={categoryFor(r.category_id)} />
+                      {categoryName(r.category_id)}
+                    </span>
+                  </td>
                   <td className="num">{formatMoney(r.amount)}</td>
                   <td>{t(`freq.${r.cadence}`)}</td>
                   <td>{r.anchor_date}</td>
-                  <td><button className="btn ghost" onClick={() => removeRecurring(r)}>{t('budget.remove')}</button></td>
+                  <td>
+                    <button className="btn ghost" onClick={() => removeRecurring(r)}>
+                      {t('budget.remove')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -343,7 +461,9 @@ export default function TransactionsTab({
           <div className="field-input">
             <input
               value={recurringDraft.description}
-              onChange={(e) => setRecurringDraft({ ...recurringDraft, description: e.target.value })}
+              onChange={(e) =>
+                setRecurringDraft({ ...recurringDraft, description: e.target.value })
+              }
             />
           </div>
         </label>
@@ -355,7 +475,11 @@ export default function TransactionsTab({
             onChange={(e) => setRecurringDraft({ ...recurringDraft, category_id: e.target.value })}
           >
             <option value="">—</option>
-            {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.items.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </label>
         <NumberField
@@ -371,7 +495,11 @@ export default function TransactionsTab({
             value={recurringDraft.cadence}
             onChange={(e) => setRecurringDraft({ ...recurringDraft, cadence: e.target.value })}
           >
-            {CADENCES.map((c) => <option key={c} value={c}>{t(`freq.${c}`)}</option>)}
+            {CADENCES.map((c) => (
+              <option key={c} value={c}>
+                {t(`freq.${c}`)}
+              </option>
+            ))}
           </select>
         </label>
         <label className="field">
@@ -380,11 +508,15 @@ export default function TransactionsTab({
             <input
               type="date"
               value={recurringDraft.anchor_date}
-              onChange={(e) => setRecurringDraft({ ...recurringDraft, anchor_date: e.target.value })}
+              onChange={(e) =>
+                setRecurringDraft({ ...recurringDraft, anchor_date: e.target.value })
+              }
             />
           </div>
         </label>
-        <button className="btn" type="submit">{t('recurring.add')}</button>
+        <button className="btn" type="submit">
+          {t('recurring.add')}
+        </button>
       </form>
       <p className="field-label">{t('recurring.anchorHint')}</p>
 
@@ -399,10 +531,19 @@ export default function TransactionsTab({
                 checked -- picking a month here still narrows the list back
                 down the moment "all months" is unchecked. */}
             <div className={showAllMonths ? 'transactions-picker-dimmed' : ''}>
-              <MonthYearPicker value={viewMonth} onChange={setViewMonth} todayMonth={today} locale={locale} />
+              <MonthYearPicker
+                value={viewMonth}
+                onChange={setViewMonth}
+                todayMonth={today}
+                locale={locale}
+              />
             </div>
             <label className="field field-check">
-              <input type="checkbox" checked={showAllMonths} onChange={(e) => setShowAllMonths(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={showAllMonths}
+                onChange={(e) => setShowAllMonths(e.target.checked)}
+              />
               <span>{t('transactions.showAllMonths')}</span>
             </label>
           </div>
@@ -413,34 +554,32 @@ export default function TransactionsTab({
                 : t('transactions.noneInMonth', { month: monthLabel(viewMonth, locale) })}
             </p>
           ) : (
-            <div className="table-scroll">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('transactions.date')}</th>
-                    <th>{t('transactions.description')}</th>
-                    <th>{t('transactions.category')}</th>
-                    <th>{t('transactions.amount')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...visibleTransactions]
-                    .sort((a, b) => (a.date < b.date ? 1 : -1))
-                    .map((tx) => (
-                      <tr key={tx.id}>
-                        <td>{tx.date}</td>
-                        <td>{tx.description}</td>
-                        <td>{categoryName(tx.category_id)}</td>
-                        <td className={`num ${tx.amount < 0 ? 'negative' : 'positive'}`}>{formatMoney(tx.amount)}</td>
-                        <td>
-                          <button className="btn ghost" onClick={() => removeTransaction(tx)}>{t('budget.remove')}</button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="txn-list">
+              {[...visibleTransactions]
+                .sort((a, b) => (a.date < b.date ? 1 : -1))
+                .map((tx) => (
+                  <li className="txn-card money-card" key={tx.id}>
+                    <CategoryBadge category={categoryFor(tx.category_id)} />
+                    <div className="txn-info">
+                      <div className="txn-description">{tx.description}</div>
+                      <div className="txn-meta">
+                        {tx.date} · {categoryName(tx.category_id)}
+                      </div>
+                    </div>
+                    <div className="txn-trailing">
+                      <span className={`num txn-amount ${tx.amount < 0 ? 'negative' : 'positive'}`}>
+                        {formatMoney(tx.amount)}
+                      </span>
+                      <button
+                        className="btn ghost txn-remove"
+                        onClick={() => removeTransaction(tx)}
+                      >
+                        {t('budget.remove')}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+            </ul>
           )}
         </>
       )}

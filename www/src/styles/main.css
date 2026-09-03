@@ -64,7 +64,9 @@
   }
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -92,8 +94,17 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
-.app-brand { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.45rem; }
-.app-title { font-size: 1.3rem; font-weight: 700; margin: 0; }
+.app-brand {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.app-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
 .app-byline {
   display: flex;
   align-items: center;
@@ -102,13 +113,31 @@ body {
   color: var(--byline);
   text-decoration: none;
 }
-.app-byline:hover, .app-byline:focus-visible { color: var(--ink); }
-.meifio-mark { width: auto; display: block; color: var(--ink); vertical-align: middle; }
+.app-byline:hover,
+.app-byline:focus-visible {
+  color: var(--ink);
+}
+.meifio-mark {
+  width: auto;
+  display: block;
+  color: var(--ink);
+  vertical-align: middle;
+}
 
-.app-switches { display: flex; gap: 10px; flex-wrap: wrap; }
+.app-switches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 /* gap was 2px -- adjacent pills sat close enough that a finger could easily
    land on the wrong one; 6px gives real separation between tap targets. */
-.app-regions { display: flex; gap: 6px; background: var(--panel-alt); padding: 3px; border-radius: 8px; }
+.app-regions {
+  display: flex;
+  gap: 6px;
+  background: var(--panel-alt);
+  padding: 3px;
+  border-radius: 8px;
+}
 .app-region {
   border: none;
   background: transparent;
@@ -124,7 +153,10 @@ body {
   font-size: 0.8rem;
   font-weight: 600;
 }
-.app-region.active { background: var(--accent); color: var(--accent-ink); }
+.app-region.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
 
 /* Replaces the old US/SG region toggle -- a free-form symbol someone types
    once covers more currencies than a two-option picker ever did, and this
@@ -139,7 +171,13 @@ body {
   min-height: 44px;
   cursor: text;
 }
-.app-currency-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.app-currency-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .app-currency-input {
   width: 40px;
   border: none;
@@ -182,7 +220,10 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
 }
-.app-tab.active { background: var(--positive); color: var(--positive-ink); }
+.app-tab.active {
+  background: var(--positive);
+  color: var(--positive-ink);
+}
 
 /* Five tabs wrapped left-aligned at phone width -- a lopsided 2/3 split
    hugging the left edge, reading as crowded and unbalanced. Every tab
@@ -190,16 +231,39 @@ body {
    centers each wrap line independently) turns the same wrap into two
    tidy, balanced rows instead. */
 @media (max-width: 640px) {
-  .app-tabs { justify-content: center; row-gap: 8px; }
+  .app-tabs {
+    justify-content: center;
+    row-gap: 8px;
+  }
 }
 
-.app-main { padding: 24px 0 64px; display: flex; flex-direction: column; gap: 24px; }
+.app-main {
+  padding: 24px 0 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 
-.intro { display: flex; flex-direction: column; gap: 6px; }
-.intro-lede { font-size: 1.05rem; margin: 0; }
-.intro-privacy { margin: 0; font-size: 0.9rem; color: var(--muted); }
-.intro-privacy b { color: var(--positive); }
-.intro-privacy a { color: var(--positive); }
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.intro-lede {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.intro-privacy {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.intro-privacy b {
+  color: var(--positive);
+}
+.intro-privacy a {
+  color: var(--positive);
+}
 
 .panel {
   background: var(--panel);
@@ -211,20 +275,45 @@ body {
   gap: 16px;
 }
 
-.panel h2 { margin: 0; font-size: 1.1rem; }
-.panel-subtitle { margin: -8px 0 0; color: var(--muted); font-size: 0.85rem; }
+.panel h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.panel-subtitle {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 
 /* Marks where one distinct feature ends and the next begins inside a
    panel that stacks several of them (Transactions: manual add, receipt
    capture, CSV import, rules, recurring) -- a rule, not just the panel's
    own flex gap, so the eye has something to catch on between forms that
    would otherwise all read as one long list of fields. */
-.panel h2.section-start { padding-top: 20px; border-top: 1px solid var(--line-soft); }
+.panel h2.section-start {
+  padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
+}
 
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 0.8rem; color: var(--muted); }
-.field-label.with-icon { display: inline-flex; align-items: center; gap: 6px; }
-.field-icon { width: 15px; height: 15px; flex: none; }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.field-label.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.field-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
 
 /* Manual column mapping for CSV import -- closed by default since
    detect_columns (budget-calc) gets the common case right without it;
@@ -236,17 +325,28 @@ body {
   font-weight: 600;
   list-style: none;
 }
-.csv-columns summary::-webkit-details-marker { display: none; }
-.csv-columns summary::before { content: '▸ '; }
-.csv-columns[open] summary::before { content: '▾ '; }
+.csv-columns summary::-webkit-details-marker {
+  display: none;
+}
+.csv-columns summary::before {
+  content: '▸ ';
+}
+.csv-columns[open] summary::before {
+  content: '▾ ';
+}
 /* <details> only hides its content via the user-agent stylesheet, which
    an author rule always overrides regardless of specificity -- .form-grid's
    own `display: grid` (needed everywhere else it's used) was silently
    winning over the browser's native collapse, so the "closed" state was
    closed in name only and every column field stayed visible underneath.
    Toggling display explicitly here is what actually hides it. */
-.csv-columns .form-grid { display: none; margin-top: 12px; }
-.csv-columns[open] .form-grid { display: grid; }
+.csv-columns .form-grid {
+  display: none;
+  margin-top: 12px;
+}
+.csv-columns[open] .form-grid {
+  display: grid;
+}
 
 .visually-hidden {
   position: absolute;
@@ -263,8 +363,21 @@ body {
 /* A live camera viewfinder takes the whole screen, the same way a
    native camera app does -- an inline embed on a long scrolling form
    would be a cramped, unfamiliar way to frame a photo. */
-.camera-live { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; }
-.camera-video { flex: 1; width: 100%; min-height: 0; object-fit: cover; background: #000; }
+.camera-live {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.camera-video {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  object-fit: cover;
+  background: #000;
+}
 .camera-controls {
   display: flex;
   align-items: center;
@@ -272,7 +385,10 @@ body {
   padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
   background: rgba(0, 0, 0, 0.7);
 }
-.camera-controls .btn.secondary { background: rgba(255, 255, 255, 0.15); color: #fff; }
+.camera-controls .btn.secondary {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
 .camera-shutter {
   width: 64px;
   height: 64px;
@@ -281,9 +397,21 @@ body {
   border: 4px solid var(--accent);
   padding: 0;
 }
-.camera-shutter:active { background: var(--accent); }
-.field-check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
-.field-check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+.camera-shutter:active {
+  background: var(--accent);
+}
+.field-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.field-check input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
 
 .field-input {
   display: flex;
@@ -294,7 +422,8 @@ body {
   border-radius: 8px;
   padding: 0 10px;
 }
-.field-input input, .field-input select {
+.field-input input,
+.field-input select {
   background: transparent;
   border: none;
   color: var(--ink);
@@ -304,9 +433,19 @@ body {
   outline: none;
 }
 .field-input input[type='number']::-webkit-outer-spin-button,
-.field-input input[type='number']::-webkit-inner-spin-button { appearance: none; margin: 0; }
-.field-input input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
-.field-suffix { color: var(--muted-2); font-size: 0.8rem; white-space: nowrap; }
+.field-input input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.field-input input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.field-suffix {
+  color: var(--muted-2);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
 
 /* A keyboard-independent way to set a transaction's sign -- some mobile
    keyboards (iOS Safari's `inputMode="decimal"` pad, reported live) have
@@ -327,8 +466,16 @@ body {
   line-height: 1;
   cursor: pointer;
 }
-.sign-toggle.negative { color: var(--negative); border-color: var(--negative-border); background: var(--negative-bg); }
-.sign-toggle.positive { color: var(--positive); border-color: var(--positive-border); background: var(--positive-bg); }
+.sign-toggle.negative {
+  color: var(--negative);
+  border-color: var(--negative-border);
+  background: var(--negative-bg);
+}
+.sign-toggle.positive {
+  color: var(--positive);
+  border-color: var(--positive-border);
+  background: var(--positive-bg);
+}
 
 .field-select {
   background: var(--surface);
@@ -340,7 +487,12 @@ body {
   font-size: 0.95rem;
 }
 
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
 
 .btn {
   display: inline-flex;
@@ -363,38 +515,166 @@ body {
    type="file"> with its own "Choose File" text, which duplicates
    whatever the label next to it already says, so the input stays
    present for its native picker/keyboard behaviour but visually hidden. */
-label.btn { cursor: pointer; }
-.btn.secondary { background: var(--panel-alt); color: var(--ink); }
+label.btn {
+  cursor: pointer;
+}
+.btn.secondary {
+  background: var(--panel-alt);
+  color: var(--ink);
+}
 /* Ghost/danger are the small inline "Remove"/dismiss links used throughout
    tables and rows, not primary actions -- they keep their own compact
    sizing rather than inheriting .btn's 44px floor, which would blow out
    the row height of every table in the app. Their own contexts (the
    mobile .category-row rule below, in particular) size them up where a
    phone is actually the reasonable case to plan for. */
-.btn.ghost { background: transparent; color: var(--muted); padding: 6px 10px; min-height: auto; }
-.btn.danger { background: transparent; color: var(--negative); padding: 6px 10px; min-height: auto; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.ghost {
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 10px;
+  min-height: auto;
+}
+.btn.danger {
+  background: transparent;
+  color: var(--negative);
+  padding: 6px 10px;
+  min-height: auto;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-.stat { background: var(--panel-alt); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-.stat-primary { background: var(--positive-bg); border: 1px solid var(--positive-border); }
-.stat-negative { background: var(--negative-bg); border: 1px solid var(--negative-border); }
-.stat-label { font-size: 0.78rem; color: var(--muted); }
-.stat-value { font-size: 1.35rem; font-weight: 700; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+.stat {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stat-primary {
+  background: var(--positive-bg);
+  border: 1px solid var(--positive-border);
+}
+.stat-negative {
+  background: var(--negative-bg);
+  border: 1px solid var(--negative-border);
+}
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
 
-.headline { font-size: 0.95rem; color: var(--ink); margin: 0; padding: 10px 14px; background: var(--panel-alt); border-radius: 10px; }
+.headline {
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--panel-alt);
+  border-radius: 10px;
+}
 
-table.data { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-table.data th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--line); }
-table.data td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); }
-table.data tr:last-child td { border-bottom: none; }
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+table.data th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+table.data td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+table.data tr:last-child td {
+  border-bottom: none;
+}
 
 /* A table wider than its panel used to just spill out and get clipped by
    the viewport -- the Amount column on Transactions, on a phone, was
    genuinely unreadable, not merely tight. This is the floor: nothing is
    ever inaccessible, even on the widest table (Recurring expenses, six
    columns). */
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* The Transactions list itself -- unlike Rules/Recurring below, this is
+   the screen someone scans most often, so it's cards, not a table.data
+   row: no `.table-scroll`/nowrap needed since a card wraps instead of
+   requiring horizontal scroll to reach the amount on a narrow screen. */
+.txn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.txn-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.txn-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.txn-description {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.txn-meta {
+  font-size: 0.78rem;
+  color: var(--muted-2);
+}
+.txn-trailing {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.txn-amount {
+  font-weight: 600;
+}
+/* A small ghost button still needs a real tap target -- `.btn.ghost`
+   deliberately opts out of `.btn`'s 44px floor for dense desktop rows
+   (see its own comment), but a card row like this one is shown at every
+   width, not just desktop, so this sets the floor back explicitly rather
+   than relying on a mobile-only media query the way `.category-row .btn`
+   does. Selector is `.btn.ghost.txn-remove` (three classes), not just
+   `.txn-remove` -- a single-class selector here loses the cascade to
+   `.btn.ghost`'s own `min-height: auto` (two classes beats one
+   regardless of source order), silently shrinking the tap target back
+   down. */
+.btn.ghost.txn-remove {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--muted-2);
+}
 
 @media (max-width: 640px) {
   /* Every cell stays on one line -- a date wrapping to three lines
@@ -403,29 +683,111 @@ table.data tr:last-child td { border-bottom: none; }
      description too long to fit is a horizontal swipe away instead of
      wrapping, rather than the clipped-and-unreachable state this table
      was in before that wrapper existed. */
-  table.data { font-size: 0.82rem; }
-  table.data th, table.data td { padding: 7px 8px; white-space: nowrap; }
+  table.data {
+    font-size: 0.82rem;
+  }
+  table.data th,
+  table.data td {
+    padding: 7px 8px;
+    white-space: nowrap;
+  }
 }
-.num { font-variant-numeric: tabular-nums; text-align: right; }
-.negative { color: var(--negative); }
-.positive { color: var(--positive); }
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.negative {
+  color: var(--negative);
+}
+.positive {
+  color: var(--positive);
+}
 
-.empty-state { color: var(--muted-2); font-size: 0.88rem; padding: 12px 0; }
+.empty-state {
+  color: var(--muted-2);
+  font-size: 0.88rem;
+  padding: 12px 0;
+}
 
-.error { background: var(--negative-bg); border: 1px solid var(--negative-border); border-radius: 8px; padding: 10px 14px; color: var(--negative); font-size: 0.88rem; }
+.error {
+  background: var(--negative-bg);
+  border: 1px solid var(--negative-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--negative);
+  font-size: 0.88rem;
+}
 
 /* Goal cards -- the blossom is the progress bar. */
-.goal-card { background: var(--panel-alt); border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.goal-add-form { width: 120px; flex: none; }
-.goal-blossom { flex: none; width: 64px; height: 64px; }
-.goal-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.goal-name { font-weight: 700; font-size: 1rem; }
-.goal-progress-text { font-size: 0.82rem; color: var(--muted); }
-.goal-contribution { font-size: 0.82rem; color: var(--positive); }
-.goal-milestone { font-size: 0.85rem; color: var(--gold); margin-top: 4px; }
+.goal-card {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.goal-add-form {
+  width: 120px;
+  flex: none;
+}
+.goal-blossom {
+  flex: none;
+  width: 64px;
+  height: 64px;
+}
+.goal-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goal-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.goal-progress-text {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.goal-contribution {
+  font-size: 0.82rem;
+  color: var(--positive);
+}
+.goal-milestone {
+  font-size: 0.85rem;
+  color: var(--gold);
+  margin-top: 4px;
+}
 
-.category-row { display: grid; grid-template-columns: 1.4fr 0.9fr 0.9fr 1.1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
-.category-row:last-child { border-bottom: none; }
+.category-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 0.9fr 1.1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.category-row:last-child {
+  border-bottom: none;
+}
+/* The "cute" pass's lightest-touch change: a rounded card look layered
+   purely in CSS on top of the existing grid above -- none of that grid's
+   columns, gap, or the `@media (max-width: 720px)` mobile reflow below
+   change. `:not(.category-head)` excludes both column-header rows (this
+   file and the commitments table share the `.category-row` class), which
+   must stay a plain label row, not a card. */
+.category-row:not(.category-head) {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  border-bottom: none;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.category-row:not(.category-head):last-child {
+  margin-bottom: 0;
+}
 /* Not a `.category-row` on purpose -- it's a full-width label, not a
    grid row, and must survive the narrow-screen breakpoint that hides
    `.category-head` (a real column header has nothing to say once rows
@@ -441,60 +803,186 @@ table.data tr:last-child td { border-bottom: none; }
 }
 /* Separates Savings from every real category above it -- Savings is
    always the last row in the table, never sorted in among the others. */
-.category-row-divider { height: 1px; margin: 4px 0 6px; background: var(--line); border: none; }
-.category-row-savings { font-weight: 600; }
+.category-row-divider {
+  height: 1px;
+  margin: 4px 0 6px;
+  background: var(--line);
+  border: none;
+}
+.category-row-savings {
+  font-weight: 600;
+}
 
-/* Dashboard category table: a subtotal row closes out each of the
-   income/expense blocks, followed by a clearly visible rule -- heavier
-   than the hairline `table.data td` border every ordinary row already
-   gets, so the two blocks read as genuinely separate groups rather than
-   one long undifferentiated list. Bold type alone read as barely
-   different from an ordinary row at a glance; a tinted background and an
-   accent-colored left edge make it a distinct callout the eye catches
-   scanning down the table, the same way `.headline`/`.stat` already
-   stand out from plain text elsewhere in this app. */
-.dash-table-total td {
+/* Dashboard category list: each category is its own card (see
+   `.money-card`, `.category-row:not(.category-head)`'s identical
+   reasoning above), closed out per income/expense block by a subtotal
+   card and a divider rule. Bold type alone read as barely different from
+   an ordinary card at a glance; a tinted background and an accent-colored
+   left edge make the subtotal a distinct callout the eye catches scanning
+   down the list, the same way `.headline`/`.stat` already stand out from
+   plain text elsewhere in this app. */
+.dash-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dash-category-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dash-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+  font-size: 0.88rem;
+}
+.dash-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.dash-total-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   font-weight: 700;
   font-size: 0.95rem;
+  border-radius: 12px;
+  border-left: 3px solid var(--accent);
+  padding: 10px 14px;
   /* Plain --panel-alt sits only a few RGB units off --panel in dark mode
      -- too close to read as a highlight next to it. Blending in a slice
      of --accent keeps the tint theme-consistent (it already differs
      between light/dark) while giving real contrast either way. */
   background: color-mix(in srgb, var(--accent) 14%, var(--panel-alt));
-  padding-top: 10px;
-  padding-bottom: 10px;
-  border-bottom: none;
 }
-.dash-table-total td:first-child { border-radius: 8px 0 0 8px; border-left: 3px solid var(--accent); padding-left: 8px; }
-.dash-table-total td:last-child { border-radius: 0 8px 8px 0; }
-.dash-table-divider td { padding: 6px 10px; border-bottom: none; }
-.dash-table-divider-line { height: 2px; background: var(--line); border-radius: 1px; }
-.category-name { font-weight: 600; }
-.category-group { color: var(--muted-2); font-size: 0.75rem; }
-.category-description { color: var(--muted-2); font-size: 0.75rem; margin-top: 2px; line-height: 1.3; }
+.dash-total-name {
+  display: block;
+}
+.dash-table-divider-line {
+  height: 2px;
+  background: var(--line);
+  border-radius: 1px;
+  margin: 2px 0;
+}
+.category-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.category-group {
+  color: var(--muted-2);
+  font-size: 0.75rem;
+}
+.category-description {
+  color: var(--muted-2);
+  font-size: 0.75rem;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* A category's colored icon badge -- see CategoryBadge.jsx/
+   categoryVisuals.js. 24px: fits inline before a name without disturbing
+   any of the 44px touch-target rows already audited in this file: it's
+   inline content next to text, never itself the tap target. Icon color
+   is white regardless of theme -- the palette colors behind it
+   (categoryVisuals.js's CATEGORY_PALETTE, shared with PieChart.jsx) are
+   already hand-tuned for ~4.2:1 contrast against both this app's dark
+   background and print/light-mode white, so white-on-palette-color stays
+   legible without a second tuned icon color for light mode. */
+.category-badge {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.category-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Plain-table category cell (Rules/Recurring in TransactionsTab) --
+   badge + name inline, same gap as `.category-name` above, without
+   giving the whole `<td>` `.category-name`'s bold weight. */
+.category-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Shared rounded-card base for the three "cute" list layouts (the
+   Transactions list, the Dashboard category summary, and this file's own
+   `.category-row` below) -- one rule instead of three near-duplicate
+   blocks. Same background/radius `.goal-card` already uses elsewhere in
+   this file. */
+.money-card {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
 
 /* Unassigned leads the tab: reaching zero IS zero-based budgeting, so it
    gets the weight, and the derived figures below it are subordinate. */
 .assign-banner {
-  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px;
-  padding: 18px 20px; margin-bottom: 12px;
-  background: var(--positive-bg); border: 1px solid var(--positive-border); border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  background: var(--positive-bg);
+  border: 1px solid var(--positive-border);
+  border-radius: 12px;
 }
-.assign-label { font-size: 1.02rem; font-weight: 600; color: var(--ink); }
-.assign-value { font-size: 1.7rem; font-weight: 700; color: var(--positive); font-variant-numeric: tabular-nums; }
+.assign-label {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.assign-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--positive);
+  font-variant-numeric: tabular-nums;
+}
 /* Before a budget exists this is an instruction, not a result. */
-.assign-banner-start { background: var(--panel-alt); border-color: var(--line); }
-.assign-banner-start .assign-value { color: var(--muted); }
-.assign-banner-over { background: var(--negative-bg); border-color: var(--negative-border); }
-.assign-banner-over .assign-value { color: var(--negative); }
+.assign-banner-start {
+  background: var(--panel-alt);
+  border-color: var(--line);
+}
+.assign-banner-start .assign-value {
+  color: var(--muted);
+}
+.assign-banner-over {
+  background: var(--negative-bg);
+  border-color: var(--negative-border);
+}
+.assign-banner-over .assign-value {
+  color: var(--negative);
+}
 
-.stat-grid-secondary .stat-value { font-size: 1.05rem; }
+.stat-grid-secondary .stat-value {
+  font-size: 1.05rem;
+}
 
 /* Spending in a category that was never budgeted is a note, not a
    failure -- nothing was overspent against a plan that doesn't exist. */
-.muted-note { color: var(--muted-2); }
+.muted-note {
+  color: var(--muted-2);
+}
 
-.import-error { color: var(--negative); font-size: 0.85rem; }
+.import-error {
+  color: var(--negative);
+  font-size: 0.85rem;
+}
 
 /* Advisory, not blocking -- a suggestion to fix a likely typo, so it reads
    as caution (gold, the same token milestones already use for attention)
@@ -512,65 +1000,203 @@ table.data tr:last-child td { border-bottom: none; }
   color: var(--ink);
   font-size: 0.85rem;
 }
-.direction-warning .btn.ghost { padding: 2px 8px; border: 1px solid var(--gold); color: var(--gold); }
+.direction-warning .btn.ghost {
+  padding: 2px 8px;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
 
-.commitments-toggle { margin: 4px 0 16px; }
+.commitments-toggle {
+  margin: 4px 0 16px;
+}
 
 /* Per-category progress: how far through the plan this month is, at a
    glance, instead of reading three numbers and doing the division. */
-.progress { height: 4px; border-radius: 2px; background: var(--line-soft); margin-top: 4px; overflow: hidden; }
-.progress-fill { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s ease; }
-.progress-fill.over { background: var(--negative); }
+.progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-soft);
+  margin-top: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+.progress-fill.over {
+  background: var(--negative);
+}
 
-.commitments-table { margin-bottom: 8px; }
+.commitments-table {
+  margin-bottom: 8px;
+}
 
 /* Upcoming this month: what's scheduled to come due, so it's visible
    before it posts rather than only after -- see recurring.rs's doc
    comment for the specific complaint this answers. */
-.upcoming-panel { background: var(--panel-alt); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
-.upcoming-title { margin: 0 0 2px; font-size: 0.98rem; }
-.upcoming-totals { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.upcoming-total-row { display: flex; align-items: center; gap: 12px; }
-.upcoming-total-name { flex: 1; font-weight: 600; }
-.upcoming-total-amount { font-variant-numeric: tabular-nums; color: var(--muted); }
-.upcoming-add { padding: 6px 12px; font-size: 0.82rem; }
-.upcoming-list { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 6px; }
-.upcoming-list li { display: flex; gap: 12px; font-size: 0.85rem; color: var(--muted); }
-.upcoming-list li.past { opacity: 0.55; }
-.upcoming-date { font-variant-numeric: tabular-nums; flex: none; width: 88px; }
-.upcoming-desc { flex: 1; }
-.upcoming-amount { font-variant-numeric: tabular-nums; }
+.upcoming-panel {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.upcoming-title {
+  margin: 0 0 2px;
+  font-size: 0.98rem;
+}
+.upcoming-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.upcoming-total-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.upcoming-total-name {
+  flex: 1;
+  font-weight: 600;
+}
+.upcoming-total-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.upcoming-add {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+.upcoming-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.upcoming-list li {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.upcoming-list li.past {
+  opacity: 0.55;
+}
+.upcoming-date {
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  width: 88px;
+}
+.upcoming-desc {
+  flex: 1;
+}
+.upcoming-amount {
+  font-variant-numeric: tabular-nums;
+}
 
 @media (max-width: 640px) {
-  .upcoming-total-row { flex-wrap: wrap; }
-  .upcoming-list li { flex-wrap: wrap; }
+  .upcoming-total-row {
+    flex-wrap: wrap;
+  }
+  .upcoming-list li {
+    flex-wrap: wrap;
+  }
 }
 
 /* Spending chart: horizontal bars, longest first, with a marker at each
    category's planned amount so a bar reads as over/under at a glance
    rather than needing the figure beside it. */
-.spend-chart { margin-top: 16px; }
-.chart-key i { border-radius: 3px; }
-.key-spent { background: var(--accent); }
-.key-planned { background: var(--muted-2); }
-.spend-rows { display: flex; flex-direction: column; gap: 10px; }
-.spend-row { display: grid; grid-template-columns: minmax(90px, 0.9fr) 2fr auto; align-items: center; gap: 10px; }
-.spend-name { font-size: 0.82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.spend-track { position: relative; height: 14px; background: var(--surface); border-radius: 7px; overflow: visible; }
-.spend-bar { display: block; height: 100%; background: var(--accent); border-radius: 7px; min-width: 2px; }
-.spend-bar.over { background: var(--negative); }
-.spend-marker { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: 0.55; }
-.spend-figure { font-size: 0.82rem; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.spend-figure.over { color: var(--negative); font-weight: 600; }
+.spend-chart {
+  margin-top: 16px;
+}
+.chart-key i {
+  border-radius: 3px;
+}
+.key-spent {
+  background: var(--accent);
+}
+.key-planned {
+  background: var(--muted-2);
+}
+.spend-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.spend-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.9fr) 2fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.spend-name {
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spend-track {
+  position: relative;
+  height: 14px;
+  background: var(--surface);
+  border-radius: 7px;
+  overflow: visible;
+}
+.spend-bar {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 7px;
+  min-width: 2px;
+}
+.spend-bar.over {
+  background: var(--negative);
+}
+.spend-marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+.spend-figure {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.spend-figure.over {
+  color: var(--negative);
+  font-weight: 600;
+}
 
 @media (max-width: 640px) {
-  .spend-row { grid-template-columns: 1fr; gap: 2px; }
-  .spend-figure { text-align: left; }
+  .spend-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .spend-figure {
+    text-align: left;
+  }
 }
 
 /* Column headers: Planned/Spent/Remaining were three unlabelled figures
    before these existed. */
-.category-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-2); padding-bottom: 6px; }
+.category-head {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  padding-bottom: 6px;
+}
 
 /* The planned field sits inside a row rather than a form-grid, so it
    needs to be shorter than a standalone .field-input -- the new 44px
@@ -578,31 +1204,60 @@ table.data tr:last-child td { border-bottom: none; }
    rule, ...), not this dense per-category row repeated a dozen-plus times
    down the Budget tab, where the actual constraint is scanning many rows
    at once rather than tapping any single one precisely. */
-.planned-input { min-height: auto; }
-.planned-input input { padding: 6px 4px; text-align: right; font-variant-numeric: tabular-nums; }
+.planned-input {
+  min-height: auto;
+}
+.planned-input input {
+  padding: 6px 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Redundant while the header row is visible; the only labelling once the
    row stacks on a narrow screen. */
-.cell-label { display: none; }
+.cell-label {
+  display: none;
+}
 
 /* "Spent" is derived from transactions, so it needs a way in from here --
    otherwise the column looks broken to anyone who hasn't found the
    Transactions tab. */
-.spent-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.spent-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .spend-add {
   flex: none;
-  width: 24px; height: 24px; line-height: 1;
-  border: 1px solid var(--input-border); border-radius: 6px;
-  background: var(--surface); color: var(--muted);
-  font-size: 1rem; cursor: pointer;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
 }
-.spend-add:hover { color: var(--ink); border-color: var(--accent); }
-.spend-add[aria-expanded='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.spend-add:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.spend-add[aria-expanded='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
 .spend-form {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px; align-items: end;
-  padding: 12px; margin-bottom: 8px;
-  background: var(--panel-alt); border-radius: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: var(--panel-alt);
+  border-radius: 10px;
 }
 
 @media (max-width: 720px) {
@@ -620,7 +1275,9 @@ table.data tr:last-child td { border-bottom: none; }
   /* Compound selector so this reliably outranks `.category-row`'s own
      `display: grid` below -- both are single-class selectors of equal
      specificity, and source order alone made this lose once already. */
-  .category-row.category-head { display: none; }
+  .category-row.category-head {
+    display: none;
+  }
   .category-row {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -628,7 +1285,10 @@ table.data tr:last-child td { border-bottom: none; }
     padding: 10px 0;
     align-items: start;
   }
-  .category-row > :first-child { grid-column: 1; grid-row: 1; }
+  .category-row > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
   /* Remove moves up beside the name instead of holding its own row, and
      its label stays small -- a per-row action taken once in a while
      shouldn't out-weigh the figures people actually look at. The tap
@@ -648,18 +1308,38 @@ table.data tr:last-child td { border-bottom: none; }
     color: var(--muted-2);
     background: transparent;
   }
-  .planned-input { grid-column: 1 / -1; grid-row: 2; padding: 6px 10px; }
-  .planned-input input { text-align: left; }
+  .planned-input {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 6px 10px;
+  }
+  .planned-input input {
+    text-align: left;
+  }
   /* Inline rather than its own line above the value -- "Spent S$120" on
      one line, not a "SPENT" heading followed by "S$120" underneath it. */
-  .cell-label { display: inline; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-2); }
-  .category-row .spent-cell { grid-column: 1; grid-row: 3; justify-content: flex-start; }
+  .cell-label {
+    display: inline;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted-2);
+  }
+  .category-row .spent-cell {
+    grid-column: 1;
+    grid-row: 3;
+    justify-content: flex-start;
+  }
   /* Was a flat 24x24 everywhere -- fine for a mouse, too small for the
      finger that's doing the tapping on a phone-width layout like this
      one. Desktop's dense 5-column row keeps the smaller size above; this
      row has already reflowed to a single wide column by this point, so
      there's room to grow without crowding anything else in it. */
-  .category-row .spend-add { width: 44px; height: 44px; font-size: 1.1rem; }
+  .category-row .spend-add {
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+  }
   .category-row > .num:not(.spent-cell) {
     grid-column: 2;
     grid-row: 3;
@@ -676,24 +1356,82 @@ table.data tr:last-child td { border-bottom: none; }
   }
 }
 
-.report-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.report-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
 /* Charts -- hand-rolled SVG, same reasoning as mortgage_calculator's
    Charts.jsx: a charting library would cost more gzipped than the wasm
    module the app is built around. */
-.chart { margin: 0; display: flex; flex-direction: column; gap: 10px; background: var(--panel-alt); border-radius: 12px; padding: 18px 20px; }
-.chart-title { font-size: 0.95rem; font-weight: 700; }
-.chart-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.chart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.chart-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 /* Reuses .app-region/.app-region.active from the header's language
    toggle -- same two-state segmented-pill pattern, same 44px min tap
    targets, just scoped to this chart instead of the page header. */
-.chart-granularity { display: flex; gap: 6px; background: var(--panel); padding: 3px; border-radius: 8px; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.78rem; color: var(--muted); }
-.chart-key { display: inline-flex; align-items: center; gap: 6px; }
-.chart-key i { width: 10px; height: 10px; border-radius: 5px; flex: none; }
-.chart-svg { width: 100%; height: 180px; display: block; background: var(--surface); border-radius: 8px; }
-.chart-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted-2); font-variant-numeric: tabular-nums; }
-.chart-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.chart-granularity {
+  display: flex;
+  gap: 6px;
+  background: var(--panel);
+  padding: 3px;
+  border-radius: 8px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.chart-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-key i {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  flex: none;
+}
+.chart-svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+  background: var(--surface);
+  border-radius: 8px;
+}
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.chart-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
 
 /* justify-content: center means the svg+legend pair sits centered as a
    compact group in the card, not pinned to the left with the legend
@@ -701,44 +1439,121 @@ table.data tr:last-child td { border-bottom: none; }
    .pie-empty-hint both cap their own growth below so centering the group
    actually has room to show, rather than one of them expanding to fill
    the card and re-creating a left-pinned layout by another route. */
-.pie-chart-body { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
-.pie-svg { width: 140px; height: 140px; flex: none; }
-.pie-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 0 1 220px; min-width: 180px; }
-.pie-legend li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
-.pie-legend i { width: 10px; height: 10px; border-radius: 5px; flex: none; }
-.pie-legend-label { flex: 1; color: var(--ink); }
-.pie-legend-value { color: var(--muted); font-variant-numeric: tabular-nums; }
-.pie-legend-pct { color: var(--muted-2); font-variant-numeric: tabular-nums; width: 3ch; text-align: right; }
-.report-pies { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.pie-chart-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.pie-svg {
+  width: 140px;
+  height: 140px;
+  flex: none;
+}
+.pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 1 220px;
+  min-width: 180px;
+}
+.pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+.pie-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  flex: none;
+}
+.pie-legend-label {
+  flex: 1;
+  color: var(--ink);
+}
+.pie-legend-value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pie-legend-pct {
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+  width: 3ch;
+  text-align: right;
+}
+.report-pies {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
 
 /* The donut hole's center text -- SVG text has no line-height, so the two
    lines are placed by hand via the x/y passed from PieChart rather than
    stacked with CSS. */
-.pie-donut-label { font-size: 9px; fill: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.pie-donut-value { font-size: 15px; font-weight: 700; fill: var(--ink); }
+.pie-donut-label {
+  font-size: 9px;
+  fill: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pie-donut-value {
+  font-size: 15px;
+  font-weight: 700;
+  fill: var(--ink);
+}
 
 /* The empty-state ring shown before there's anything to chart -- muted
    enough to read as "nothing here yet" rather than a real, single-color
    category. */
-.pie-empty-ring { fill: var(--muted-2); opacity: 0.35; }
-.pie-empty-hint { flex: 0 1 220px; min-width: 180px; margin: 0; }
+.pie-empty-ring {
+  fill: var(--muted-2);
+  opacity: 0.35;
+}
+.pie-empty-hint {
+  flex: 0 1 220px;
+  min-width: 180px;
+  margin: 0;
+}
 
 /* Dashboard landing tab -- month header, over/under-budget banner, and
    the income/spent summary cards above the existing report content. */
-.dash-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 /* A `min-width: 0` here let the title shrink down to whatever sliver of
    the row the picker left it, wrapping word-by-word (even letter-by-
    letter) on a narrow phone instead of the whole title dropping to its
    own line above the picker -- a real 375px bug, not just a desktop
    assumption. A real minimum forces the flex-wrap itself to kick in. */
-.dash-header h2 { flex: 1 1 auto; min-width: 200px; }
+.dash-header h2 {
+  flex: 1 1 auto;
+  min-width: 200px;
+}
 /* Transactions' month header reuses .dash-header's layout for its own
    picker + "show all months" checkbox row. */
-.transactions-month-header { margin-bottom: 4px; }
+.transactions-month-header {
+  margin-bottom: 4px;
+}
 /* Not disabled -- still tappable while "all months" is checked, just
    visually secondary since it isn't driving the list right now. */
-.transactions-picker-dimmed { opacity: 0.55; }
-.dash-month-nav { display: flex; align-items: center; gap: 4px; }
+.transactions-picker-dimmed {
+  opacity: 0.55;
+}
+.dash-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .dash-month-label {
   min-width: 9ch;
   text-align: center;
@@ -760,25 +1575,56 @@ table.data tr:last-child td { border-bottom: none; }
   line-height: 1;
   cursor: pointer;
 }
-.dash-month-btn:hover { border-color: var(--accent); }
+.dash-month-btn:hover {
+  border-color: var(--accent);
+}
 
 /* The month label doubles as a button that opens the year+grid popup --
    it needs to read like the existing label, not like a generic button. */
-.monthpicker-trigger { border: none; background: transparent; cursor: pointer; padding: 0; font: inherit; }
+.monthpicker-trigger {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
 
 .monthpicker-backdrop {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px; z-index: 200;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
 }
 .monthpicker-dialog {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-  padding: 20px; max-width: 320px; width: 100%;
-  display: flex; flex-direction: column; gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  max-width: 320px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.monthpicker-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.monthpicker-title { font-weight: 700; }
-.monthpicker-year-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.monthpicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.monthpicker-title {
+  font-weight: 700;
+}
+.monthpicker-year-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
 .monthpicker-year-label {
   min-width: 5ch;
   text-align: center;
@@ -789,7 +1635,11 @@ table.data tr:last-child td { border-bottom: none; }
 /* 3x4 grid, each cell a real 44x44+ tap target with room between them --
    the same "row of small swatches" trap this workspace's phone-first
    rules call out by name. */
-.monthpicker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.monthpicker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
 .monthpicker-cell {
   min-height: 44px;
   border-radius: 8px;
@@ -801,8 +1651,14 @@ table.data tr:last-child td { border-bottom: none; }
   cursor: pointer;
   position: relative;
 }
-.monthpicker-cell:hover { border-color: var(--accent); }
-.monthpicker-cell.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.monthpicker-cell:hover {
+  border-color: var(--accent);
+}
+.monthpicker-cell.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
 /* A small dot marking "this is the real current month", visible whether
    or not the cell is also the selected one. */
 .monthpicker-cell.today::after {
@@ -816,7 +1672,10 @@ table.data tr:last-child td { border-bottom: none; }
   border-radius: 50%;
   background: currentColor;
 }
-.monthpicker-today-btn { width: 100%; min-height: 44px; }
+.monthpicker-today-btn {
+  width: 100%;
+  min-height: 44px;
+}
 
 .dash-status {
   display: flex;
@@ -827,124 +1686,302 @@ table.data tr:last-child td { border-bottom: none; }
   background: var(--positive-bg);
   border: 1px solid var(--positive-border);
 }
-.dash-status-over { background: var(--negative-bg); border-color: var(--negative-border); }
-.dash-status-headline { font-weight: 700; color: var(--positive); }
-.dash-status-over .dash-status-headline { color: var(--negative); }
-.dash-status-detail { font-size: 0.85rem; color: var(--muted); }
+.dash-status-over {
+  background: var(--negative-bg);
+  border-color: var(--negative-border);
+}
+.dash-status-headline {
+  font-weight: 700;
+  color: var(--positive);
+}
+.dash-status-over .dash-status-headline {
+  color: var(--negative);
+}
+.dash-status-detail {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 
-.dash-summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-.dash-card { background: var(--panel-alt); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
-.dash-card-label { font-size: 0.78rem; color: var(--muted); }
-.dash-card-value { font-size: 1.4rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
-.dash-card-income .dash-card-value { color: var(--positive); }
-.dash-card-spent .dash-card-value { color: var(--negative); }
+.dash-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.dash-card {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dash-card-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.dash-card-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.dash-card-income .dash-card-value {
+  color: var(--positive);
+}
+.dash-card-spent .dash-card-value {
+  color: var(--negative);
+}
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
    failure is noticeable regardless of scroll position and can be dismissed. */
 .toast-region {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 16px; pointer-events: none; z-index: 100;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  pointer-events: none;
+  z-index: 100;
 }
 .toast {
   pointer-events: auto;
-  display: flex; align-items: center; gap: 12px;
-  max-width: 480px; width: 100%;
-  background: var(--negative-bg); border: 1px solid var(--negative-border);
-  color: var(--negative); border-radius: 10px; padding: 12px 14px;
-  font-size: 0.88rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+  width: 100%;
+  background: var(--negative-bg);
+  border: 1px solid var(--negative-border);
+  color: var(--negative);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.88rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
-.toast-message { flex: 1; }
+.toast-message {
+  flex: 1;
+}
 .toast-dismiss {
-  border: none; background: transparent; color: inherit; cursor: pointer;
-  font-size: 1.1rem; line-height: 1; padding: 2px 4px; flex: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 4px;
+  flex: none;
 }
 
 /* A new deploy being available isn't an error -- the base .toast is
    styled red for CalcError's failures, so this overrides to a neutral
    tone and gives the Reload button room next to the dismiss ×. */
-.update-toast { background: var(--panel-alt); border-color: var(--line); color: var(--ink); }
-.update-toast .btn { flex: none; padding: 6px 12px; font-size: 0.82rem; }
+.update-toast {
+  background: var(--panel-alt);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.update-toast .btn {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
 
 /* Confirm dialog */
 .confirm-backdrop {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px; z-index: 200;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
 }
 .confirm-dialog {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-  padding: 22px; max-width: 360px; width: 100%;
-  display: flex; flex-direction: column; gap: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 360px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.confirm-message { margin: 0; font-size: 0.95rem; }
-.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.confirm-message {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 /* .btn.danger is a transparent ghost button everywhere else (a small
    "Remove" link in a table row); inside the dialog it's the primary action
    and needs to read as one. */
-.confirm-actions .btn.danger { background: var(--negative); color: #fff; padding: 10px 16px; }
+.confirm-actions .btn.danger {
+  background: var(--negative);
+  color: #fff;
+  padding: 10px 16px;
+}
 
 /* "Your data" nav dropdown -- same backdrop+dialog pattern as
    .monthpicker-backdrop/.confirm-backdrop, own namespaced classes per
    this codebase's convention of not sharing one generic popup class
    across unrelated components. */
-.data-menu { display: inline-flex; }
+.data-menu {
+  display: inline-flex;
+}
 /* A caret marks this as a dropdown, not a sixth tab -- the other five
    nav buttons switch the main panel, this one opens a popup instead,
    and nothing else in the row hints at that difference otherwise. */
-.data-menu-trigger { display: inline-flex; align-items: center; gap: 6px; }
-.data-menu-caret { flex: none; transition: transform 0.15s ease; }
-.data-menu-trigger[aria-expanded='true'] .data-menu-caret { transform: rotate(180deg); }
+.data-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.data-menu-caret {
+  flex: none;
+  transition: transform 0.15s ease;
+}
+.data-menu-trigger[aria-expanded='true'] .data-menu-caret {
+  transform: rotate(180deg);
+}
 @media (prefers-reduced-motion: reduce) {
-  .data-menu-caret { transition: none; }
+  .data-menu-caret {
+    transition: none;
+  }
 }
 .data-menu-backdrop {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px; z-index: 200;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
 }
 .data-menu-dialog {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-  padding: 22px; max-width: 360px; width: 100%;
-  display: flex; flex-direction: column; gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 360px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.data-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.data-menu-title { font-weight: 700; }
+.data-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.data-menu-title {
+  font-weight: 700;
+}
 /* Stacked, full-width actions -- unlike .confirm-actions' left/right
    pair, these are three independent one-shot actions, not a choice
    between two, so a vertical list reads clearer than a row. */
-.data-menu-actions { display: flex; flex-direction: column; gap: 10px; }
-.data-menu-actions .btn { width: 100%; }
+.data-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.data-menu-actions .btn {
+  width: 100%;
+}
 /* Same reasoning as .confirm-actions .btn.danger above -- "Clear all
    data" is a standalone action here, not a small "Remove" link in a
    table row, and needs a full 44px touch target like its siblings. */
-.data-menu-actions .btn.danger { background: var(--negative); color: #fff; padding: 10px 16px; min-height: 44px; }
+.data-menu-actions .btn.danger {
+  background: var(--negative);
+  color: #fff;
+  padding: 10px 16px;
+  min-height: 44px;
+}
 
 @media print {
-  .app-header, .app-tabs, .app-switches, .report-actions, .no-print, .dash-month-btn, .chart-granularity { display: none !important; }
-  body { background: #fff; color: #111; }
-  .panel { border: none; background: #fff; }
+  .app-header,
+  .app-tabs,
+  .app-switches,
+  .report-actions,
+  .no-print,
+  .dash-month-btn,
+  .chart-granularity {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #111;
+  }
+  .panel {
+    border: none;
+    background: #fff;
+  }
   /* .chart's background/text are dark-theme tokens that .panel's own
      print rule doesn't reach -- SpendChart/DebtChart never needed this
      because neither renders on the Report tab, but the pie charts do. */
-  .chart { background: #fff; border: 1px solid #ddd; }
-  .pie-legend-label { color: #111; }
-  .pie-legend-value, .pie-legend-pct { color: #555; }
+  .chart {
+    background: #fff;
+    border: 1px solid #ddd;
+  }
+  .pie-legend-label {
+    color: #111;
+  }
+  .pie-legend-value,
+  .pie-legend-pct {
+    color: #555;
+  }
   /* Same reasoning as .chart above -- the summary cards and status
      banner use dark-theme panel tokens too. */
-  .dash-card, .dash-status { background: #fff; border: 1px solid #ddd; }
-  .dash-card-value, .dash-status-headline { color: #111; }
-  .dash-card-income .dash-card-value { color: #1f7a3d; }
-  .dash-card-spent .dash-card-value { color: #b3261e; }
-  .dash-status-over .dash-status-headline { color: #b3261e; }
-  .dash-status-detail, .dash-card-label { color: #555; }
-  .pie-donut-value { fill: #111; }
-  .pie-donut-label { fill: #555; }
-  .pie-empty-ring { fill: #ccc; }
-  .pie-empty-hint { color: #555; }
-  /* Same reasoning again -- the table's Total/Savings rows use the same
+  .dash-card,
+  .dash-status {
+    background: #fff;
+    border: 1px solid #ddd;
+  }
+  .dash-card-value,
+  .dash-status-headline {
+    color: #111;
+  }
+  .dash-card-income .dash-card-value {
+    color: #1f7a3d;
+  }
+  .dash-card-spent .dash-card-value {
+    color: #b3261e;
+  }
+  .dash-status-over .dash-status-headline {
+    color: #b3261e;
+  }
+  .dash-status-detail,
+  .dash-card-label {
+    color: #555;
+  }
+  .pie-donut-value {
+    fill: #111;
+  }
+  .pie-donut-label {
+    fill: #555;
+  }
+  .pie-empty-ring {
+    fill: #ccc;
+  }
+  .pie-empty-hint {
+    color: #555;
+  }
+  /* Same reasoning again -- the Total/Savings cards use the same
      accent-tinted dark-theme background. */
-  .dash-table-total td { background: #eef1f5; border-left-color: #2f6fe0; }
+  .dash-total-card {
+    background: #eef1f5;
+    border-left-color: #2f6fe0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -952,17 +1989,38 @@ table.data tr:last-child td { border-bottom: none; }
      into two labelled columns. The single-column rule that used to live
      here put the planned field and both figures on separate lines with
      nothing naming them -- three anonymous numbers under each category. */
-  .app-header { flex-direction: column; align-items: flex-start; }
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
   /* The intro/headline/panel chrome above the fold is identical on every
      tab and was costing a full screen of scrolling before any actual
      content on a phone. Tightened, not cut -- the privacy sentence stays,
      it just stops taking three lines of its own. */
-  .intro { gap: 4px; }
-  .intro-lede { font-size: 0.95rem; }
-  .intro-privacy { font-size: 0.82rem; }
-  .headline { padding: 8px 12px; font-size: 0.88rem; }
-  .panel { padding: 16px; gap: 12px; }
-  .app-main { gap: 16px; padding: 16px 0 48px; }
-  .commitments-toggle { margin: 0 0 10px; font-size: 0.88rem; }
+  .intro {
+    gap: 4px;
+  }
+  .intro-lede {
+    font-size: 0.95rem;
+  }
+  .intro-privacy {
+    font-size: 0.82rem;
+  }
+  .headline {
+    padding: 8px 12px;
+    font-size: 0.88rem;
+  }
+  .panel {
+    padding: 16px;
+    gap: 12px;
+  }
+  .app-main {
+    gap: 16px;
+    padding: 16px 0 48px;
+  }
+  .commitments-toggle {
+    margin: 0 0 10px;
+    font-size: 0.88rem;
+  }
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { categoryColor } from '../categoryVisuals';
 
 // Hand-rolled SVG, same reasoning as SpendChart/DebtChart: a charting
 // library would cost more gzipped than the wasm module this app is
@@ -8,47 +9,6 @@ const SIZE = 160;
 const R = 70;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-
-// A fixed categorical palette rather than generated colors: stable
-// across renders (the same category is always the same color from one
-// month's report to the next) and picked to hold up on both this app's
-// dark screen background and the white page `window.print()` produces --
-// SpendChart/DebtChart only ever render on screen, so this is the first
-// chart that has to work in both.
-//
-// Anchored on meifio's plum (see meifio-brand/README.md's colour table,
-// #B01243 light / #F2547F dark) rather than an arbitrary hue -- index 0,
-// the biggest wedge since `wedges` is sorted by value descending, sits
-// closest to the brand hue (~344deg), each hand-tuned in lightness so
-// every entry lands close to a ~4.2:1 contrast ratio against both this
-// app's dark background (#0f1720) and print/light-mode white -- the same
-// "holds up on both" bar the old arbitrary palette was picked to clear,
-// not a new one. This deliberately does NOT touch `--accent` (see
-// main.css's own comment on why this app kept mortgage_calculator's
-// blue/green instead of meifio's plum) -- that's app-wide chrome, a
-// bigger call than one chart's palette.
-//
-// Ordering: most budgets only ever populate the first handful of these
-// ten, so stepping sequentially around the hue wheel (0, 36, 72deg...)
-// would put the categories people actually see next to each other in
-// value -- and next to each other in hue, the hardest pair to tell
-// apart. Instead this jumps by half the wheel (5 of 10) each step --
-// 0, 180, 36, 216, 72deg... -- so consecutive palette entries always
-// land at least 144deg apart. Whatever prefix of the list a given
-// chart actually uses is close to maximally spread, not just the full
-// set of ten.
-const PALETTE = [
-  '#E52E5F',
-  '#118D6C',
-  '#CC5519',
-  '#1681B6',
-  '#888011',
-  '#656EEC',
-  '#498811',
-  '#A353EA',
-  '#118D22',
-  '#DA1BC0',
-];
 
 function pointOnCircle(angle) {
   return [CX + R * Math.sin(angle), CY - R * Math.cos(angle)];
@@ -135,7 +95,7 @@ export default function PieChart({
     const isFullCircle = sweep >= Math.PI * 2 - 1e-6;
     const path = isFullCircle ? null : wedgePath(angle, angle + sweep);
     angle += sweep;
-    return { ...item, path, color: PALETTE[index % PALETTE.length] };
+    return { ...item, path, color: categoryColor(item) };
   });
 
   // A fresh id per mounted instance, not per render -- two donuts on

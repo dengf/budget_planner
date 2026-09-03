@@ -106,8 +106,18 @@ export function AppShell({ wasmModule }) {
   const [confirm, confirmDialog] = useConfirm();
   const [guardResult, setGuardResult] = useState(null);
 
-  const categories = useCollection(wasmModule, 'list_categories', 'save_category', 'delete_category');
-  const transactions = useCollection(wasmModule, 'list_transactions', 'save_transaction', 'delete_transaction');
+  const categories = useCollection(
+    wasmModule,
+    'list_categories',
+    'save_category',
+    'delete_category',
+  );
+  const transactions = useCollection(
+    wasmModule,
+    'list_transactions',
+    'save_transaction',
+    'delete_transaction',
+  );
   const rules = useCollection(wasmModule, 'list_rules', 'save_rule', 'delete_rule');
   const goals = useCollection(wasmModule, 'list_goals', 'save_goal', 'delete_goal');
   const debts = useCollection(wasmModule, 'list_debts', 'save_debt', 'delete_debt');
@@ -125,7 +135,10 @@ export function AppShell({ wasmModule }) {
     viewMonth,
   );
 
-  const newId = useCallback(() => (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`), [wasmModule]);
+  const newId = useCallback(
+    () => (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`),
+    [wasmModule],
+  );
 
   /**
    * A deleted category used to leave its raw id string on screen wherever
@@ -158,7 +171,11 @@ export function AppShell({ wasmModule }) {
         });
         return;
       }
-      const ok = await confirm(t('confirm.removeCategory', { name: categories.items.find((c) => c.id === id)?.name ?? id }));
+      const ok = await confirm(
+        t('confirm.removeCategory', {
+          name: categories.items.find((c) => c.id === id)?.name ?? id,
+        }),
+      );
       if (!ok) return;
 
       const planRow = budgetPlan.items.find((p) => p.category_id === id);
@@ -185,28 +202,32 @@ export function AppShell({ wasmModule }) {
    * directly is what keeps every preset from being wrongly skipped as
    * "already taken."
    */
-  const addCommonCategories = useCallback(async (existingItems = categories.items) => {
-    if (!wasmModule?.preset_categories) return;
-    const presets = (await wasmModule.preset_categories()) ?? [];
-    const taken = new Set(existingItems.map((c) => c.name.trim().toLowerCase()));
-    for (const preset of presets) {
-      const name = t(preset.key);
-      const fingerprint = name.trim().toLowerCase();
-      if (taken.has(fingerprint)) continue;
-      taken.add(fingerprint);
-      // Sequential rather than Promise.all: each save is one IndexedDB
-      // write through the same store handle, and the list they land in
-      // reads better in the order the presets are declared.
-      // eslint-disable-next-line no-await-in-loop
-      await categories.save({
-        id: newId(),
-        name,
-        group: t(preset.group_key),
-        is_income: preset.is_income,
-        description: t(preset.description_key),
-      });
-    }
-  }, [wasmModule, categories, newId, t]);
+  const addCommonCategories = useCallback(
+    async (existingItems = categories.items) => {
+      if (!wasmModule?.preset_categories) return;
+      const presets = (await wasmModule.preset_categories()) ?? [];
+      const taken = new Set(existingItems.map((c) => c.name.trim().toLowerCase()));
+      for (const preset of presets) {
+        const name = t(preset.key);
+        const fingerprint = name.trim().toLowerCase();
+        if (taken.has(fingerprint)) continue;
+        taken.add(fingerprint);
+        // Sequential rather than Promise.all: each save is one IndexedDB
+        // write through the same store handle, and the list they land in
+        // reads better in the order the presets are declared.
+        // eslint-disable-next-line no-await-in-loop
+        await categories.save({
+          id: newId(),
+          name,
+          group: t(preset.group_key),
+          is_income: preset.is_income,
+          description: t(preset.description_key),
+          preset_key: preset.key,
+        });
+      }
+    },
+    [wasmModule, categories, newId, t],
+  );
 
   /**
    * A budget with zero categories opens with the starter set already in
@@ -252,7 +273,10 @@ export function AppShell({ wasmModule }) {
       const backup = readBackup(payload);
       if (!backup.ok) return { error: t(backup.reason) };
 
-      const ok = await confirm(t('data.importConfirm', { count: backup.count }), t('confirm.replace'));
+      const ok = await confirm(
+        t('data.importConfirm', { count: backup.count }),
+        t('confirm.replace'),
+      );
       if (!ok) return null;
 
       const byName = {
@@ -303,7 +327,15 @@ export function AppShell({ wasmModule }) {
   const clearAllData = useCallback(async () => {
     const ok = await confirm(t('data.clearConfirm'), t('data.clearAll'));
     if (!ok) return;
-    for (const collection of [transactions, budgetPlan, rules, goals, debts, recurring, categories]) {
+    for (const collection of [
+      transactions,
+      budgetPlan,
+      rules,
+      goals,
+      debts,
+      recurring,
+      categories,
+    ]) {
       for (const item of [...collection.items]) {
         // eslint-disable-next-line no-await-in-loop
         await collection.remove(item.id);
@@ -317,7 +349,18 @@ export function AppShell({ wasmModule }) {
     // this closure's own `categories.items` still reads the pre-clear
     // list until a re-render catches up.
     await addCommonCategories([]);
-  }, [transactions, budgetPlan, rules, goals, debts, recurring, categories, confirm, t, addCommonCategories]);
+  }, [
+    transactions,
+    budgetPlan,
+    rules,
+    goals,
+    debts,
+    recurring,
+    categories,
+    confirm,
+    t,
+    addCommonCategories,
+  ]);
 
   const ActivePanel = TABS[activeTab];
 

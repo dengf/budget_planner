@@ -19,6 +19,16 @@ pub struct CategoryRecord {
     /// Same back-compat reasoning as `is_income` above.
     #[serde(default)]
     pub description: String,
+    /// Which starter preset (e.g. `"cat.housing"`) this category was
+    /// created from, if any -- `None` for a hand-typed category. Purely
+    /// decorative (which icon/color the frontend shows), same as `group`
+    /// above: never matched on for behaviour. Stored so the icon survives
+    /// a rename or a later locale switch, since `name` itself is
+    /// translated text frozen at creation time, not a stable identifier.
+    /// `#[serde(default)]` for the same back-compat reasoning as the two
+    /// fields above.
+    #[serde(default)]
+    pub preset_key: Option<String>,
 }
 
 /// One category's planned amount for one month. `month` is `YYYY-MM`.
