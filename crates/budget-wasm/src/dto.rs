@@ -21,6 +21,9 @@ pub struct CategoryDto {
     pub is_income: bool,
     #[serde(default)]
     pub description: String,
+    /// Mirrors `CategoryRecord::preset_key` -- see its own doc comment.
+    #[serde(default)]
+    pub preset_key: Option<String>,
 }
 
 /// A suggested starter category. Carries the i18n key *and* the English

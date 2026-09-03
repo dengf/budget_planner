@@ -73,6 +73,7 @@ pub async fn save_category(dto: JsValue) -> JsValue {
         group: dto.group,
         is_income: dto.is_income,
         description: dto.description,
+        preset_key: dto.preset_key,
     };
     match store.save_category(record).await {
         Ok(()) => to_js(&SaveResult {
@@ -102,6 +103,7 @@ pub async fn list_categories() -> JsValue {
                     group: r.group,
                     is_income: r.is_income,
                     description: r.description,
+                    preset_key: r.preset_key,
                 })
                 .collect::<Vec<_>>(),
         ),

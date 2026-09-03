@@ -3,6 +3,7 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysLeftInMonth, monthLabel, todayIso } from '../month';
 import CalcError from './CalcError';
+import CategoryBadge from './CategoryBadge';
 import SpendChart from './SpendChart';
 import MonthYearPicker from './MonthYearPicker';
 import {
@@ -63,7 +64,12 @@ export default function BudgetTab({
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!wasmModule?.spend_by_category || !wasmModule?.income_by_category || !wasmModule?.build_month) return;
+      if (
+        !wasmModule?.spend_by_category ||
+        !wasmModule?.income_by_category ||
+        !wasmModule?.build_month
+      )
+        return;
       // Two separate totals, one per side of the ledger -- an income
       // category's "actual" is what it received (the positive side of its
       // transactions), an expense category's is what it cost (the negative
@@ -157,7 +163,8 @@ export default function BudgetTab({
         setSavingsResult(null);
         return;
       }
-      const planned = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
+      const planned =
+        budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
       const expense = totalExpenseActual(result.lines ?? [], isIncome, isCommitmentId);
       const built = await wasmModule.build_savings_line({
         planned,
@@ -183,11 +190,15 @@ export default function BudgetTab({
   const savingsRemainingCell = (line) => {
     const gap = line.spent - line.planned;
     if (gap >= 0) {
-      return { className: 'positive', text: t('budget.receivedMore', { amount: formatMoney(gap) }) };
+      return {
+        className: 'positive',
+        text: t('budget.receivedMore', { amount: formatMoney(gap) }),
+      };
     }
     return { className: 'negative', text: formatMoney(gap) };
   };
 
+  const categoryFor = (id) => categories.items.find((c) => c.id === id);
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
   const categoryGroup = (id) => categories.items.find((c) => c.id === id)?.group ?? '';
   const categoryDescription = (id) => categories.items.find((c) => c.id === id)?.description ?? '';
@@ -215,7 +226,10 @@ export default function BudgetTab({
         const aIncome = isIncome(a.category_id);
         const bIncome = isIncome(b.category_id);
         if (aIncome !== bIncome) return aIncome ? -1 : 1;
-        const byGroup = collator.compare(categoryGroup(a.category_id), categoryGroup(b.category_id));
+        const byGroup = collator.compare(
+          categoryGroup(a.category_id),
+          categoryGroup(b.category_id),
+        );
         return byGroup !== 0
           ? byGroup
           : collator.compare(categoryName(a.category_id), categoryName(b.category_id));
@@ -291,7 +305,12 @@ export default function BudgetTab({
   const savePlanned = async (categoryId, amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === categoryId);
     const id = existing?.id ?? (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`);
-    await budgetPlan.save({ id, month: viewMonth, category_id: categoryId, planned: Number(amount) || 0 });
+    await budgetPlan.save({
+      id,
+      month: viewMonth,
+      category_id: categoryId,
+      planned: Number(amount) || 0,
+    });
   };
 
   /**
@@ -343,11 +362,20 @@ export default function BudgetTab({
     }
     if (isIncome(line.category_id)) {
       return line.planned > 0
-        ? { className: 'positive', text: t('budget.receivedMore', { amount: formatMoney(-line.remaining) }) }
-        : { className: 'positive', text: t('budget.unplannedIncome', { amount: formatMoney(-line.remaining) }) };
+        ? {
+            className: 'positive',
+            text: t('budget.receivedMore', { amount: formatMoney(-line.remaining) }),
+          }
+        : {
+            className: 'positive',
+            text: t('budget.unplannedIncome', { amount: formatMoney(-line.remaining) }),
+          };
     }
     return line.planned > 0
-      ? { className: 'negative', text: t('budget.borrowed', { amount: formatMoney(-line.remaining) }) }
+      ? {
+          className: 'negative',
+          text: t('budget.borrowed', { amount: formatMoney(-line.remaining) }),
+        }
       : { className: 'muted-note', text: t('budget.unbudgetedSpend') };
   };
 
@@ -365,8 +393,16 @@ export default function BudgetTab({
   return (
     <div className="panel">
       <div className="dash-header">
-        <h2>{t(isCurrentMonth ? 'budget.title' : 'budget.titleOtherMonth')} · {monthLabel(viewMonth, locale)}</h2>
-        <MonthYearPicker value={viewMonth} onChange={setViewMonth} todayMonth={today} locale={locale} />
+        <h2>
+          {t(isCurrentMonth ? 'budget.title' : 'budget.titleOtherMonth')} ·{' '}
+          {monthLabel(viewMonth, locale)}
+        </h2>
+        <MonthYearPicker
+          value={viewMonth}
+          onChange={setViewMonth}
+          todayMonth={today}
+          locale={locale}
+        />
       </div>
       <p className="headline">
         {isCurrentMonth
@@ -403,7 +439,9 @@ export default function BudgetTab({
               that says so, and the three derived figures you can't act on
               sit underneath it. It used to be the fourth of four
               identical tiles, after three you don't act on at all. */}
-          <div className={`assign-banner${hasBudget ? '' : ' assign-banner-start'}${unassigned < 0 ? ' assign-banner-over' : ''}`}>
+          <div
+            className={`assign-banner${hasBudget ? '' : ' assign-banner-start'}${unassigned < 0 ? ' assign-banner-over' : ''}`}
+          >
             <span className="assign-label">
               {!hasIncome
                 ? t('budget.startWithIncome')
@@ -420,7 +458,11 @@ export default function BudgetTab({
 
           <div className="stat-grid stat-grid-secondary">
             <div className="stat">
-              <span className="stat-label">{isCurrentMonth ? t('budget.income') : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}</span>
+              <span className="stat-label">
+                {isCurrentMonth
+                  ? t('budget.income')
+                  : t('budget.incomeFor', { month: monthLabel(viewMonth, locale) })}
+              </span>
               <span className="stat-value">{formatMoney(summary.income)}</span>
             </div>
             <div className="stat">
@@ -458,7 +500,10 @@ export default function BudgetTab({
           </div>
           <ul className="upcoming-list">
             {upcoming.occurrences.map((o, i) => (
-              <li key={`${o.recurring_id}-${o.date}-${i}`} className={o.date < todayIso() ? 'past' : ''}>
+              <li
+                key={`${o.recurring_id}-${o.date}-${i}`}
+                className={o.date < todayIso() ? 'past' : ''}
+              >
                 <span className="upcoming-date">{o.date}</span>
                 <span className="upcoming-desc">{o.description}</span>
                 <span className="upcoming-amount">{formatMoney(o.amount)}</span>
@@ -488,177 +533,199 @@ export default function BudgetTab({
             // once at the top of the expense block -- `orderedLines` is
             // already sorted income-first, so the boundary is just the
             // one spot the flag flips.
-            const startsNewSection = i === 0 || incomeRow !== isIncome(orderedLines[i - 1].category_id);
+            const startsNewSection =
+              i === 0 || incomeRow !== isIncome(orderedLines[i - 1].category_id);
             return (
-            <React.Fragment key={line.category_id}>
-            {startsNewSection && (
-              <div className="category-section-header">
-                {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
-              </div>
-            )}
-            <div className="category-row">
-              <div>
-                <div className="category-name">{categoryName(line.category_id)}</div>
-                <div className="category-group">{categoryGroup(line.category_id)}</div>
-                {/* Mei's (a CPA) examples of what belongs here -- present
+              <React.Fragment key={line.category_id}>
+                {startsNewSection && (
+                  <div className="category-section-header">
+                    {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
+                  </div>
+                )}
+                <div className="category-row">
+                  <div>
+                    <div className="category-name">
+                      <CategoryBadge category={categoryFor(line.category_id)} />
+                      {categoryName(line.category_id)}
+                    </div>
+                    <div className="category-group">{categoryGroup(line.category_id)}</div>
+                    {/* Mei's (a CPA) examples of what belongs here -- present
                     on a preset category, blank on a hand-typed one, so
                     this only ever adds information, never an empty line
                     that reads as broken. */}
-                {categoryDescription(line.category_id) && (
-                  <div className="category-description">{categoryDescription(line.category_id)}</div>
-                )}
-                {/* How far through the plan this category is, without
+                    {categoryDescription(line.category_id) && (
+                      <div className="category-description">
+                        {categoryDescription(line.category_id)}
+                      </div>
+                    )}
+                    {/* How far through the plan this category is, without
                     reading three numbers and doing the division. Only
                     once a plan exists -- a full bar on planned 0 would
                     read as "done" when it means "unbudgeted". Exceeding
                     plan is only styled as a warning on the expense side --
                     an income category clearing its plan is good news. */}
-                {line.planned > 0 && (
-                  <div
-                    className="progress"
-                    role="img"
-                    aria-label={t('budget.progressAria', {
-                      name: categoryName(line.category_id),
-                      spent: formatMoney(line.spent),
-                      planned: formatMoney(line.planned),
-                    })}
-                  >
-                    <span
-                      className={!incomeRow && line.spent > line.planned ? 'progress-fill over' : 'progress-fill'}
-                      style={{ width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%` }}
+                    {line.planned > 0 && (
+                      <div
+                        className="progress"
+                        role="img"
+                        aria-label={t('budget.progressAria', {
+                          name: categoryName(line.category_id),
+                          spent: formatMoney(line.spent),
+                          planned: formatMoney(line.planned),
+                        })}
+                      >
+                        <span
+                          className={
+                            !incomeRow && line.spent > line.planned
+                              ? 'progress-fill over'
+                              : 'progress-fill'
+                          }
+                          style={{
+                            width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="field-input planned-input">
+                    <span className="cell-label">{t('budget.planned')}</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      aria-label={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
+                      placeholder="0"
+                      // Empty rather than a literal 0, so budgeting a category
+                      // is one keystroke instead of select-then-replace --
+                      // fourteen times over on a seeded budget.
+                      value={plannedDraft[line.category_id] ?? (line.planned || '')}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setPlannedDraft((d) => ({ ...d, [line.category_id]: raw }));
+                        savePlanned(line.category_id, raw);
+                      }}
                     />
                   </div>
-                )}
-              </div>
-              <div className="field-input planned-input">
-                <span className="cell-label">{t('budget.planned')}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="any"
-                  aria-label={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
-                  placeholder="0"
-                  // Empty rather than a literal 0, so budgeting a category
-                  // is one keystroke instead of select-then-replace --
-                  // fourteen times over on a seeded budget.
-                  value={plannedDraft[line.category_id] ?? (line.planned || '')}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setPlannedDraft((d) => ({ ...d, [line.category_id]: raw }));
-                    savePlanned(line.category_id, raw);
-                  }}
-                />
-              </div>
-              {/* The .cell-label spans are hidden once the header row is
+                  {/* The .cell-label spans are hidden once the header row is
                   visible; on a narrow screen the row stacks and they are
                   the only thing naming each figure. */}
-              <div className="num spent-cell">
-                <span className="cell-label">{t(incomeRow ? 'budget.received' : 'budget.spent')}</span>
-                <span className="spent-value">{formatMoney(line.spent)}</span>
-                {/* Logging spending always dates the transaction "today" --
+                  <div className="num spent-cell">
+                    <span className="cell-label">
+                      {t(incomeRow ? 'budget.received' : 'budget.spent')}
+                    </span>
+                    <span className="spent-value">{formatMoney(line.spent)}</span>
+                    {/* Logging spending always dates the transaction "today" --
                     doing that while viewing a different month would create
                     a transaction that silently never shows up in the
                     month on screen. Backfilling a past month, or planning
                     ahead for a future one, goes through the Transactions
                     tab's manual-add form instead, which takes an explicit
                     date. */}
-                {isCurrentMonth && (
-                  <button
-                    type="button"
-                    className="spend-add"
-                    aria-expanded={spendFor === line.category_id}
-                    aria-label={`${t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')} — ${categoryName(line.category_id)}`}
-                    title={t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')}
-                    onClick={() => openSpend(line.category_id)}
-                  >
-                    +
+                    {isCurrentMonth && (
+                      <button
+                        type="button"
+                        className="spend-add"
+                        aria-expanded={spendFor === line.category_id}
+                        aria-label={`${t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')} — ${categoryName(line.category_id)}`}
+                        title={t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')}
+                        onClick={() => openSpend(line.category_id)}
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
+                  <div className={`num ${remaining.className}`}>
+                    <span className="cell-label">{t('budget.remaining')}</span>
+                    {remaining.text}
+                  </div>
+                  <button className="btn ghost" onClick={() => removeCategory(line.category_id)}>
+                    {t('budget.remove')}
                   </button>
+                </div>
+                {spendFor === line.category_id && (
+                  <form className="spend-form" onSubmit={(e) => logSpending(e, line.category_id)}>
+                    <label className="field">
+                      <span className="field-label">
+                        {t(incomeRow ? 'budget.incomeAmount' : 'budget.spendAmount')}
+                      </span>
+                      <div className="field-input">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          min="0"
+                          autoFocus
+                          value={spendDraft.amount}
+                          onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })}
+                        />
+                      </div>
+                    </label>
+                    <label className="field">
+                      <span className="field-label">{t('transactions.description')}</span>
+                      <div className="field-input">
+                        <input
+                          value={spendDraft.description}
+                          placeholder={categoryName(line.category_id)}
+                          onChange={(e) =>
+                            setSpendDraft({ ...spendDraft, description: e.target.value })
+                          }
+                        />
+                      </div>
+                    </label>
+                    <button className="btn" type="submit">
+                      {t('budget.save')}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      onClick={() => setSpendFor(null)}
+                    >
+                      {t('confirm.cancel')}
+                    </button>
+                  </form>
                 )}
-              </div>
-              <div className={`num ${remaining.className}`}>
-                <span className="cell-label">{t('budget.remaining')}</span>
-                {remaining.text}
-              </div>
-              <button className="btn ghost" onClick={() => removeCategory(line.category_id)}>
-                {t('budget.remove')}
-              </button>
-            </div>
-            {spendFor === line.category_id && (
-              <form className="spend-form" onSubmit={(e) => logSpending(e, line.category_id)}>
-                <label className="field">
-                  <span className="field-label">{t(incomeRow ? 'budget.incomeAmount' : 'budget.spendAmount')}</span>
-                  <div className="field-input">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      min="0"
-                      autoFocus
-                      value={spendDraft.amount}
-                      onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })}
-                    />
-                  </div>
-                </label>
-                <label className="field">
-                  <span className="field-label">{t('transactions.description')}</span>
-                  <div className="field-input">
-                    <input
-                      value={spendDraft.description}
-                      placeholder={categoryName(line.category_id)}
-                      onChange={(e) => setSpendDraft({ ...spendDraft, description: e.target.value })}
-                    />
-                  </div>
-                </label>
-                <button className="btn" type="submit">{t('budget.save')}</button>
-                <button className="btn secondary" type="button" onClick={() => setSpendFor(null)}>
-                  {t('confirm.cancel')}
-                </button>
-              </form>
-            )}
-            </React.Fragment>
+              </React.Fragment>
             );
           })}
           {savingsLine && (
             <React.Fragment>
-            <div className="category-row-divider" role="separator" />
-            <div className="category-row category-row-savings">
-              <div>
-                <div className="category-name">{t('budget.savings')}</div>
-                <div className="category-group">{t('budget.savingsHint')}</div>
+              <div className="category-row-divider" role="separator" />
+              <div className="category-row category-row-savings">
+                <div>
+                  <div className="category-name">{t('budget.savings')}</div>
+                  <div className="category-group">{t('budget.savingsHint')}</div>
+                </div>
+                <div className="field-input planned-input">
+                  <span className="cell-label">{t('budget.planned')}</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    aria-label={`${t('budget.planned')} — ${t('budget.savings')}`}
+                    placeholder="0"
+                    value={plannedDraft[SAVINGS_CATEGORY_ID] ?? (savingsLine.planned || '')}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setPlannedDraft((d) => ({ ...d, [SAVINGS_CATEGORY_ID]: raw }));
+                      savePlanned(SAVINGS_CATEGORY_ID, raw);
+                    }}
+                  />
+                </div>
+                <div className="num spent-cell">
+                  <span className="cell-label">{t('budget.savingsActual')}</span>
+                  <span className="spent-value">{formatMoney(savingsLine.spent)}</span>
+                </div>
+                <div className={`num ${savingsRemainingCell(savingsLine).className}`}>
+                  <span className="cell-label">{t('budget.remaining')}</span>
+                  {savingsRemainingCell(savingsLine).text}
+                </div>
+                <div />
               </div>
-              <div className="field-input planned-input">
-                <span className="cell-label">{t('budget.planned')}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="any"
-                  aria-label={`${t('budget.planned')} — ${t('budget.savings')}`}
-                  placeholder="0"
-                  value={plannedDraft[SAVINGS_CATEGORY_ID] ?? (savingsLine.planned || '')}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setPlannedDraft((d) => ({ ...d, [SAVINGS_CATEGORY_ID]: raw }));
-                    savePlanned(SAVINGS_CATEGORY_ID, raw);
-                  }}
-                />
-              </div>
-              <div className="num spent-cell">
-                <span className="cell-label">{t('budget.savingsActual')}</span>
-                <span className="spent-value">{formatMoney(savingsLine.spent)}</span>
-              </div>
-              <div className={`num ${savingsRemainingCell(savingsLine).className}`}>
-                <span className="cell-label">{t('budget.remaining')}</span>
-                {savingsRemainingCell(savingsLine).text}
-              </div>
-              <div />
-            </div>
             </React.Fragment>
           )}
         </div>
       )}
-      {categories.items.length > 0 && (
-        <p className="field-label">{t('budget.spentHint')}</p>
-      )}
+      {categories.items.length > 0 && <p className="field-label">{t('budget.spentHint')}</p>}
 
       {includeCommitments && commitmentLines.length > 0 && (
         <div className="category-table commitments-table">
@@ -671,9 +738,7 @@ export default function BudgetTab({
             <div className="category-row" key={line.category_id}>
               <div>
                 <div className="category-name">{name}</div>
-                <div className="category-group">
-                  {isGoal ? t('goals.title') : t('debt.title')}
-                </div>
+                <div className="category-group">{isGoal ? t('goals.title') : t('debt.title')}</div>
               </div>
               <div className="num">
                 <span className="cell-label">{t('budget.planned')}</span>
@@ -698,13 +763,19 @@ export default function BudgetTab({
         <label className="field">
           <span className="field-label">{t('budget.categoryName')}</span>
           <div className="field-input">
-            <input value={newCategory.name} onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })} />
+            <input
+              value={newCategory.name}
+              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+            />
           </div>
         </label>
         <label className="field">
           <span className="field-label">{t('budget.categoryGroup')}</span>
           <div className="field-input">
-            <input value={newCategory.group} onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })} />
+            <input
+              value={newCategory.group}
+              onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
+            />
           </div>
         </label>
         <label className="field field-check">
@@ -715,7 +786,9 @@ export default function BudgetTab({
           />
           <span>{t('budget.categoryIsIncome')}</span>
         </label>
-        <button className="btn" type="submit">{t('budget.addCategory')}</button>
+        <button className="btn" type="submit">
+          {t('budget.addCategory')}
+        </button>
         <button className="btn secondary" type="button" onClick={addCommonCategories}>
           {t('budget.addCommon')}
         </button>
