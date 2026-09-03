@@ -8,7 +8,8 @@ export default {
   'app.language': '语言',
   'app.currency': '货币',
   'meta.title': '预算规划 — 零基预算、储蓄目标与还债计划 | meifio',
-  'meta.description': '零基预算、储蓄目标与还债计划，支持本地导入银行账单。完全在浏览器中运行——您的数据不会离开您的设备。',
+  'meta.description':
+    '零基预算、储蓄目标与还债计划，支持本地导入银行账单。完全在浏览器中运行——您的数据不会离开您的设备。',
   'meta.ogTitle': '预算规划 — meifio 出品',
 
   'nav.dashboard': '仪表盘',
@@ -92,7 +93,8 @@ export default {
   'data.imported': '已恢复 {count} 条记录。',
   'budget.spendAmount': '支出金额',
   'budget.incomeAmount': '收入金额',
-  'budget.spentHint': '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
+  'budget.spentHint':
+    '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
   'budget.savings': '储蓄',
   'budget.savingsHint': '收入减去所有支出——实际存下的钱',
@@ -119,7 +121,8 @@ export default {
   'cat.foodGroceries': '饮食与日用品',
   'cat.foodGroceries.desc': '食品杂货、家庭日用品、外出就餐、咖啡/饮品。',
   'cat.transportation': '交通',
-  'cat.transportation.desc': '车贷/租车、车辆保险、汽油/电动车充电、停车费、过路费、公交卡、汽车保养。',
+  'cat.transportation.desc':
+    '车贷/租车、车辆保险、汽油/电动车充电、停车费、过路费、公交卡、汽车保养。',
   'cat.healthcareInsurance': '医疗与保险',
   'cat.healthcareInsurance.desc': '医疗/牙科/视力保险费、药房自付费用、自付医疗费用、人寿保险。',
   'cat.debtServicing': '债务偿还',
@@ -131,7 +134,6 @@ export default {
   'cat.otherExpenses': '其他支出',
   'cat.otherExpenses.desc': '不属于以上分类的其他支出。',
 
-
   'transactions.title': '账目',
   'transactions.listTitle': '所有账目',
   'transactions.addManual': '添加一笔账目',
@@ -139,8 +141,10 @@ export default {
   'transactions.description': '说明',
   'transactions.amount': '金额',
   'transactions.amountHint': '支出为负数，收入为正数',
-  'transactions.directionMismatchExpense': '{category}是支出分类，但金额是正数，会被计为收入，不会显示为支出。是不是想输入 {flipped}？',
-  'transactions.directionMismatchIncome': '{category}是收入分类，但金额是负数，会被计为支出，不会显示为收入。是不是想输入 {flipped}？',
+  'transactions.directionMismatchExpense':
+    '{category}是支出分类，但金额是正数，会被计为收入，不会显示为支出。是不是想输入 {flipped}？',
+  'transactions.directionMismatchIncome':
+    '{category}是收入分类，但金额是负数，会被计为支出，不会显示为收入。是不是想输入 {flipped}？',
   'transactions.useFlippedAmount': '改用 {flipped}',
   'transactions.switchToIncome': '切换为收入（目前是支出）',
   'transactions.switchToSpending': '切换为支出（目前是收入）',
@@ -149,7 +153,8 @@ export default {
   'transactions.add': '添加',
   'transactions.noTransactions': '还没有账目记录。',
   'transactions.importTitle': '导入银行账单',
-  'transactions.importHint': '拖入银行或信用卡导出的 CSV 文件。文件在本页解析——不会上传到任何地方。',
+  'transactions.importHint':
+    '拖入银行或信用卡导出的 CSV 文件。文件在本页解析——不会上传到任何地方。',
   'transactions.chooseFile': '上传 CSV',
   'transactions.columnsDetected': '已根据表头自动匹配各列。',
   'transactions.columnsNotDetected': '无法自动匹配各列——请在下方检查。',
@@ -186,7 +191,8 @@ export default {
   'recurring.amount': '每次金额',
   'recurring.cadence': '周期',
   'recurring.anchorDate': '一个真实的到期日',
-  'recurring.anchorHint': '选择任意一次真实发生的日期——本月的房租日、本月的账单日。每周或每两周一次的支出会按真实日历计算，五个星期五的月份会算作 5 次，而不是四舍五入为 4 次。',
+  'recurring.anchorHint':
+    '选择任意一次真实发生的日期——本月的房租日、本月的账单日。每周或每两周一次的支出会按真实日历计算，五个星期五的月份会算作 5 次，而不是四舍五入为 4 次。',
   'recurring.add': '添加定期支出',
   'recurring.upcomingTitle': '本月即将到期',
   'recurring.upcomingHint': '即将到期的支出——提前规划，而不是事后才发现。',
@@ -270,10 +276,13 @@ export default {
   'err.unreadablePdf': '无法读取该 PDF（{value}）。请改为拍摄小票照片。',
   'err.emptyImage': '该照片没有图像数据。',
   'err.ocrModelLoadFailed': '小票识别引擎加载失败（{value}）。请重试。',
-  'err.ocrFailed': '无法从该照片中识别出任何文字（{value}）。请换一张更清晰的照片，或手动添加这笔交易。',
+  'err.ocrFailed':
+    '无法从该照片中识别出任何文字（{value}）。请换一张更清晰的照片，或手动添加这笔交易。',
   'err.badImportFile': '该文件不是预算规划导出的备份——未做任何更改。',
+  'err.importFailed': '无法读取该文件，请重试。',
   'err.invalidRecurringAmount': '该金额无效（收到 {value}）。',
-  'err.categoryInUse': '“{name}”被 {count} 笔账目或定期支出使用——请先给它们重新分类，再删除该分类。',
+  'err.categoryInUse':
+    '“{name}”被 {count} 笔账目或定期支出使用——请先给它们重新分类，再删除该分类。',
 
   'errors.dismiss': '关闭',
 
@@ -292,6 +301,11 @@ export default {
   'data.export': '导出所有数据',
   'data.clearAll': '清空所有数据',
   'data.clearConfirm': '删除全部内容——每一个分类、账目、规则、目标和债务？此操作无法撤销。',
+  'data.lastExported': '上次导出于 {date}。',
+  'data.neverExported': '您还没有导出过备份。',
+  'data.syncTip':
+    '提示：选择一个您的其他设备已经同步的文件夹（例如 iCloud 云盘或 Dropbox），即可在设备之间携带您的预算数据。',
+  'data.exportFailed': '无法保存文件，请重试。',
 
   'chart.debtTitle': '还债进度',
   'chart.remainingBalance': '剩余余额',

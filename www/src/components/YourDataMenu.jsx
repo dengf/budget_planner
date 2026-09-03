@@ -1,6 +1,36 @@
 import React, { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { EXPORT_FORMAT } from '../backup';
+import { loadLastExported, saveLastExported } from '../lastExported';
+
+// Chrome/Edge/Android can save/open straight through a native picker,
+// which is what lets someone point an export at a folder their OS already
+// syncs (iCloud Drive, Dropbox) instead of always landing in Downloads.
+// Safari and Firefox -- all of iOS -- have neither method, so they keep
+// today's <a download>/<input type=file> flow untouched, forever, unless
+// those browsers ship the API. A function, not a module-level constant,
+// so it reflects `window` at the moment it's checked rather than whatever
+// it was the first time this module happened to load.
+function hasFilePicker() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.showSaveFilePicker === 'function' &&
+    typeof window.showOpenFilePicker === 'function'
+  );
+}
+
+// Matches month.js's weekLabel style (short month, numeric day) plus a year,
+// since this is the only place in the app showing a full past date rather
+// than a month or a week range.
+function formatExportDate(iso, locale) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 /**
  * "Your data" as a nav-level dropdown rather than a tab -- it isn't a
@@ -29,20 +59,33 @@ export default function YourDataMenu({
   clearAllData,
   importData,
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [lastExported, setLastExported] = useState(loadLastExported);
   const fileInputRef = useRef(null);
 
-  // Always the app's real current month (`today`), not whatever month is
-  // being browsed -- budget-plan rows are fetched per month, and this
-  // app has no "every month" listing to export. `budgetPlan.items`
-  // tracks `viewMonth` (App.jsx), so when someone exports while browsing
-  // a different month, this fetches `today`'s plan on demand instead of
-  // trusting `budgetPlan.items`.
+  const markExported = () => {
+    const iso = new Date().toISOString();
+    saveLastExported(iso);
+    setLastExported(iso);
+  };
+
+  // Returns whether the export actually went somewhere -- a cancelled
+  // picker or a write failure both leave `false`, which is what tells the
+  // Export button's own handler not to close the dialog on top of nothing
+  // having happened.
   const exportData = async () => {
+    // Always the app's real current month (`today`), not whatever month is
+    // being browsed -- budget-plan rows are fetched per month, and this
+    // app has no "every month" listing to export. `budgetPlan.items`
+    // tracks `viewMonth` (App.jsx), so when someone exports while browsing
+    // a different month, this fetches `today`'s plan on demand instead of
+    // trusting `budgetPlan.items`.
     const todaysPlan =
-      viewMonth === today ? budgetPlan.items : ((await wasmModule?.list_budget_plan?.(today)) ?? []);
+      viewMonth === today
+        ? budgetPlan.items
+        : ((await wasmModule?.list_budget_plan?.(today)) ?? []);
     const payload = {
       format: EXPORT_FORMAT,
       exported_at: new Date().toISOString(),
@@ -59,13 +102,63 @@ export default function YourDataMenu({
       // income, with nothing else to name explicitly.
       budget_plan: { month: today, entries: todaysPlan },
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+
+    if (hasFilePicker()) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `budget-planner-${today}.json`,
+          types: [
+            {
+              description: 'Budget Planner backup',
+              accept: { 'application/json': ['.json'] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } catch (err) {
+        if (err?.name !== 'AbortError') setImportResult({ error: t('data.exportFailed') });
+        return false; // cancelled or failed either way -- nothing to mark
+      }
+      markExported();
+      return true;
+    }
+
+    // No picker support (all of iOS Safari, Firefox): the plain
+    // `<a download>` click below has no completion signal to wait for,
+    // same as it never has -- marked exported on click, not on some later
+    // confirmation that doesn't exist.
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `budget-planner-${today}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    markExported();
+    return true;
+  };
+
+  const importFromFile = async (file) => {
+    let payload;
+    try {
+      payload = JSON.parse(await file.text());
+    } catch {
+      setImportResult({ error: t('err.badImportFile') });
+      return;
+    }
+    const outcome = await importData(payload);
+    // A successful replace closes the dialog, same as Export/Clear -- an
+    // error stays open so the message is readable, and a cancel
+    // (outcome === null) leaves the dialog exactly as the person left it.
+    if (outcome?.imported != null) {
+      setOpen(false);
+      return;
+    }
+    setImportResult(outcome);
   };
 
   const onImportFile = (e) => {
@@ -73,26 +166,27 @@ export default function YourDataMenu({
     // Reset immediately so picking the same file twice still fires a change.
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let payload;
-      try {
-        payload = JSON.parse(String(reader.result ?? ''));
-      } catch {
-        setImportResult({ error: t('err.badImportFile') });
-        return;
-      }
-      const outcome = await importData(payload);
-      // A successful replace closes the dialog, same as Export/Clear --
-      // an error stays open so the message is readable, and a cancel
-      // (outcome === null) leaves the dialog exactly as the person left it.
-      if (outcome?.imported != null) {
-        setOpen(false);
-        return;
-      }
-      setImportResult(outcome);
-    };
-    reader.readAsText(file);
+    importFromFile(file);
+  };
+
+  const pickImportFile = async () => {
+    if (!hasFilePicker()) {
+      fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [
+          {
+            description: 'Budget Planner backup',
+            accept: { 'application/json': ['.json'] },
+          },
+        ],
+      });
+      await importFromFile(await handle.getFile());
+    } catch (err) {
+      if (err?.name !== 'AbortError') setImportResult({ error: t('err.importFailed') });
+    }
   };
 
   const openMenu = () => {
@@ -117,7 +211,14 @@ export default function YourDataMenu({
           viewBox="0 0 10 10"
           aria-hidden="true"
         >
-          <path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M1.5 3.5L5 7L8.5 3.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
 
@@ -148,28 +249,37 @@ export default function YourDataMenu({
           >
             <div className="data-menu-header">
               <span className="data-menu-title">{t('data.title')}</span>
-              <button type="button" className="dash-month-btn" aria-label={t('monthpicker.close')} onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className="dash-month-btn"
+                aria-label={t('monthpicker.close')}
+                onClick={() => setOpen(false)}
+              >
                 ×
               </button>
             </div>
             <p className="panel-subtitle">{t('data.exportHint')}</p>
+            <p className="panel-subtitle">
+              {lastExported
+                ? t('data.lastExported', {
+                    date: formatExportDate(lastExported, locale),
+                  })
+                : t('data.neverExported')}
+            </p>
+            {hasFilePicker() && <p className="panel-subtitle">{t('data.syncTip')}</p>}
 
             <div className="data-menu-actions">
               <button
                 type="button"
                 className="btn secondary"
                 onClick={async () => {
-                  await exportData();
-                  setOpen(false);
+                  const ok = await exportData();
+                  if (ok) setOpen(false);
                 }}
               >
                 {t('data.export')}
               </button>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => fileInputRef.current?.click()}
-              >
+              <button type="button" className="btn secondary" onClick={pickImportFile}>
                 {t('data.import')}
               </button>
               <button
@@ -184,7 +294,11 @@ export default function YourDataMenu({
               </button>
             </div>
 
-            {importResult?.error && <p className="import-error" role="alert">{importResult.error}</p>}
+            {importResult?.error && (
+              <p className="import-error" role="alert">
+                {importResult.error}
+              </p>
+            )}
             {importResult?.imported != null && (
               <p className="headline">{t('data.imported', { count: importResult.imported })}</p>
             )}

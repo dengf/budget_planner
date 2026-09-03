@@ -8,7 +8,8 @@ export default {
   'app.language': '語言',
   'app.currency': '貨幣',
   'meta.title': '預算規劃 — 零基預算、儲蓄目標與還債計劃 | meifio',
-  'meta.description': '零基預算、儲蓄目標與還債計劃，支援本機匯入銀行帳單。完全在瀏覽器中執行——您的資料不會離開您的裝置。',
+  'meta.description':
+    '零基預算、儲蓄目標與還債計劃，支援本機匯入銀行帳單。完全在瀏覽器中執行——您的資料不會離開您的裝置。',
   'meta.ogTitle': '預算規劃 — meifio 出品',
 
   'nav.dashboard': '儀表板',
@@ -92,7 +93,8 @@ export default {
   'data.imported': '已復原 {count} 筆記錄。',
   'budget.spendAmount': '支出金額',
   'budget.incomeAmount': '收入金額',
-  'budget.spentHint': '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
+  'budget.spentHint':
+    '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
   'budget.savings': '儲蓄',
   'budget.savingsHint': '收入減去所有支出——實際存下的錢',
@@ -119,7 +121,8 @@ export default {
   'cat.foodGroceries': '飲食與日用品',
   'cat.foodGroceries.desc': '食品雜貨、家庭日用品、外出用餐、咖啡/飲品。',
   'cat.transportation': '交通',
-  'cat.transportation.desc': '車貸/租車、車輛保險、汽油/電動車充電、停車費、過路費、大眾運輸卡、汽車保養。',
+  'cat.transportation.desc':
+    '車貸/租車、車輛保險、汽油/電動車充電、停車費、過路費、大眾運輸卡、汽車保養。',
   'cat.healthcareInsurance': '醫療與保險',
   'cat.healthcareInsurance.desc': '醫療/牙科/視力保險費、藥局自付額、自付醫療費用、人壽保險。',
   'cat.debtServicing': '債務償還',
@@ -131,7 +134,6 @@ export default {
   'cat.otherExpenses': '其他支出',
   'cat.otherExpenses.desc': '不屬於以上分類的其他支出。',
 
-
   'transactions.title': '帳目',
   'transactions.listTitle': '所有帳目',
   'transactions.addManual': '新增一筆帳目',
@@ -139,8 +141,10 @@ export default {
   'transactions.description': '說明',
   'transactions.amount': '金額',
   'transactions.amountHint': '支出為負數，收入為正數',
-  'transactions.directionMismatchExpense': '{category}是支出分類，但金額是正數，會被計為收入，不會顯示為支出。是不是想輸入 {flipped}？',
-  'transactions.directionMismatchIncome': '{category}是收入分類，但金額是負數，會被計為支出，不會顯示為收入。是不是想輸入 {flipped}？',
+  'transactions.directionMismatchExpense':
+    '{category}是支出分類，但金額是正數，會被計為收入，不會顯示為支出。是不是想輸入 {flipped}？',
+  'transactions.directionMismatchIncome':
+    '{category}是收入分類，但金額是負數，會被計為支出，不會顯示為收入。是不是想輸入 {flipped}？',
   'transactions.useFlippedAmount': '改用 {flipped}',
   'transactions.switchToIncome': '切換為收入（目前是支出）',
   'transactions.switchToSpending': '切換為支出（目前是收入）',
@@ -149,7 +153,8 @@ export default {
   'transactions.add': '新增',
   'transactions.noTransactions': '還沒有帳目記錄。',
   'transactions.importTitle': '匯入銀行帳單',
-  'transactions.importHint': '拖入銀行或信用卡匯出的 CSV 檔案。檔案在本頁解析——不會上傳到任何地方。',
+  'transactions.importHint':
+    '拖入銀行或信用卡匯出的 CSV 檔案。檔案在本頁解析——不會上傳到任何地方。',
   'transactions.chooseFile': '上傳 CSV',
   'transactions.columnsDetected': '已根據表頭自動比對各欄。',
   'transactions.columnsNotDetected': '無法自動比對各欄——請在下方檢查。',
@@ -186,7 +191,8 @@ export default {
   'recurring.amount': '每次金額',
   'recurring.cadence': '週期',
   'recurring.anchorDate': '一個真實的到期日',
-  'recurring.anchorHint': '選擇任意一次真實發生的日期——本月的房租日、本月的帳單日。每週或每兩週一次的支出會按真實日曆計算，五個星期五的月份會算作 5 次，而不是四捨五入為 4 次。',
+  'recurring.anchorHint':
+    '選擇任意一次真實發生的日期——本月的房租日、本月的帳單日。每週或每兩週一次的支出會按真實日曆計算，五個星期五的月份會算作 5 次，而不是四捨五入為 4 次。',
   'recurring.add': '新增定期支出',
   'recurring.upcomingTitle': '本月即將到期',
   'recurring.upcomingHint': '即將到期的支出——提前規劃，而不是事後才發現。',
@@ -270,10 +276,13 @@ export default {
   'err.unreadablePdf': '無法讀取該 PDF（{value}）。請改為拍攝收據照片。',
   'err.emptyImage': '該照片沒有圖像資料。',
   'err.ocrModelLoadFailed': '收據辨識引擎載入失敗（{value}）。請重試。',
-  'err.ocrFailed': '無法從該照片中辨識出任何文字（{value}）。請換一張更清晰的照片，或手動新增這筆交易。',
+  'err.ocrFailed':
+    '無法從該照片中辨識出任何文字（{value}）。請換一張更清晰的照片，或手動新增這筆交易。',
   'err.badImportFile': '該檔案不是預算規劃匯出的備份——未做任何變更。',
+  'err.importFailed': '無法讀取該檔案，請再試一次。',
   'err.invalidRecurringAmount': '該金額無效（收到 {value}）。',
-  'err.categoryInUse': '「{name}」被 {count} 筆帳目或定期支出使用——請先為它們重新分類，再刪除該分類。',
+  'err.categoryInUse':
+    '「{name}」被 {count} 筆帳目或定期支出使用——請先為它們重新分類，再刪除該分類。',
 
   'errors.dismiss': '關閉',
 
@@ -292,6 +301,11 @@ export default {
   'data.export': '匯出所有資料',
   'data.clearAll': '清空所有資料',
   'data.clearConfirm': '刪除全部內容——每一個分類、帳目、規則、目標和債務？此操作無法復原。',
+  'data.lastExported': '上次匯出於 {date}。',
+  'data.neverExported': '您尚未匯出過備份。',
+  'data.syncTip':
+    '提示：選擇一個您的其他裝置已經同步的資料夾（例如 iCloud 雲端硬碟或 Dropbox），即可在裝置之間攜帶您的預算資料。',
+  'data.exportFailed': '無法儲存檔案，請再試一次。',
 
   'chart.debtTitle': '還債進度',
   'chart.remainingBalance': '剩餘餘額',
