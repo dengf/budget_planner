@@ -133,14 +133,22 @@ body {
   gap: 10px;
   flex-wrap: wrap;
 }
-/* gap was 2px -- adjacent pills sat close enough that a finger could easily
-   land on the wrong one; 6px gives real separation between tap targets. */
-.app-regions {
-  display: flex;
-  gap: 6px;
+/* The header's language picker -- a native <select> instead of the old
+   three-way button group (Header.jsx), so adding a fourth language later
+   is a catalog entry, not a wider row that eventually wraps or crowds the
+   currency/data-menu pills next to it. `.app-region`/`.app-region.active`
+   below are unrelated now (SpendOverTimeChart's Daily/Weekly toggle is
+   their only remaining caller) but keep the same pill sizing language. */
+.app-language-select {
   background: var(--panel-alt);
-  padding: 3px;
+  color: var(--ink);
+  border: none;
+  padding: 6px 10px;
+  min-height: 44px;
   border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 .app-region {
   border: none;
@@ -182,7 +190,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-/* "Your data"'s trigger button, relocated here from the tab bar -- same
+/* "My data"'s trigger button, relocated here from the tab bar -- same
    pill treatment as .app-region/.app-currency next to it, not .app-tab's
    look (which now also carries the mobile bottom-bar's stacked-icon
    layout, wrong for a header-row button). */
@@ -286,9 +294,13 @@ body {
     justify-content: space-around;
     row-gap: 0;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
-    /* iOS home-indicator safe area -- a bare 4px padding leaves the last
-       row of tabs sitting under the gesture bar on notched devices. */
-    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    /* iOS home-indicator safe area -- a bare padding leaves the last row
+       of tabs sitting under the gesture bar on notched devices. This only
+       has any effect at all with index.html's `viewport-fit=cover` --
+       without it env(safe-area-inset-bottom) is spec'd to resolve to 0,
+       which is exactly what shipped, unnoticed, until real-device testing
+       caught this bar sitting under Safari's own bottom toolbar. */
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
   .app-tab {
     flex-direction: column;
@@ -1582,9 +1594,9 @@ table.data tr:last-child td {
    laid out as a wrapping flex row rather than true circle-packing physics
    -- consistent with this app's hand-rolled-SVG-over-a-library stance
    elsewhere, just without even the SVG here since a bubble is a plain
-   round button. flex-end alignment means bubbles of different sizes sit
-   on a shared baseline instead of vertically centering, which reads as a
-   loose, ungrounded cluster once diameters vary this much. */
+   round button. flex-end alignment means bubble+label pairs of different
+   sizes sit on a shared baseline instead of vertically centering, which
+   reads as a loose, ungrounded cluster once diameters vary this much. */
 .bubble-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1592,6 +1604,26 @@ table.data tr:last-child td {
   align-items: flex-end;
   gap: 10px;
   padding: 8px 0;
+}
+.bubble-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+/* A hand-typed category (no preset_key) falls back to a generic
+   income/expense icon (categoryVisuals.js's categoryIconId), so several
+   custom categories can render identically apart from color -- the name
+   is what always disambiguates. Capped width + ellipsis rather than
+   letting a long name wrap and blow out the row's shared baseline. */
+.bubble-label {
+  max-width: 84px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bubble {
   flex: none;
@@ -1979,7 +2011,7 @@ table.data tr:last-child td {
   padding: 10px 16px;
 }
 
-/* "Your data" nav dropdown -- same backdrop+dialog pattern as
+/* "My data" nav dropdown -- same backdrop+dialog pattern as
    .monthpicker-backdrop/.confirm-backdrop, own namespaced classes per
    this codebase's convention of not sharing one generic popup class
    across unrelated components. */
@@ -2150,5 +2182,26 @@ table.data tr:last-child td {
   .commitments-toggle {
     margin: 0 0 10px;
     font-size: 0.88rem;
+  }
+
+  /* Income/Expenses/Savings compacted to one row that always fits three
+     real columns (the default auto-fit minmax(160px, ...) wraps to two
+     on a 375px phone, pushing the third card -- usually Savings -- below
+     the fold along with everything else, the opposite of "an overview
+     without scrolling"). Smaller label/value type is what makes three
+     columns legible at this width instead of truncating. */
+  .dash-summary-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .dash-card {
+    padding: 10px 8px;
+    gap: 2px;
+  }
+  .dash-card-label {
+    font-size: 0.68rem;
+  }
+  .dash-card-value {
+    font-size: 1rem;
   }
 }

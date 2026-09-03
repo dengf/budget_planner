@@ -31,7 +31,7 @@ const show = (overrides = {}) =>
   );
 
 async function openMenu() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Your data' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'My data' }));
 }
 
 afterEach(() => {

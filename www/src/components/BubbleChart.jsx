@@ -45,6 +45,13 @@ const PCT_LABEL_MIN_D = 72;
  * counted in the real total). Shown next to the title instead of in a
  * separate summary card, since this chart's heading already *is* that
  * total's label.
+ *
+ * Each bubble carries its category name underneath, not just the icon --
+ * a hand-typed category (no `preset_key`) falls back to a generic
+ * income/expense glyph in `categoryIconId`, so several custom categories
+ * can render the same icon in the same color family and be
+ * indistinguishable without it. The name is the one label that always
+ * disambiguates, preset icon or not.
  */
 export default function BubbleChart({
   title,
@@ -89,22 +96,24 @@ export default function BubbleChart({
             const Icon = CATEGORY_ICONS[categoryIconId(item.category)];
             const isSelected = selectedId === item.id;
             return (
-              <button
-                type="button"
-                key={item.id}
-                className={isSelected ? 'bubble bubble-selected' : 'bubble'}
-                style={{
-                  width: diameter,
-                  height: diameter,
-                  background: categoryColor(item.category),
-                }}
-                aria-pressed={isSelected}
-                aria-label={`${item.label}, ${formatMoney(item.value)}, ${pct}%`}
-                onClick={() => onSelect(isSelected ? null : item.id)}
-              >
-                <Icon />
-                {diameter >= PCT_LABEL_MIN_D && <span className="bubble-pct">{pct}%</span>}
-              </button>
+              <div className="bubble-item" key={item.id}>
+                <button
+                  type="button"
+                  className={isSelected ? 'bubble bubble-selected' : 'bubble'}
+                  style={{
+                    width: diameter,
+                    height: diameter,
+                    background: categoryColor(item.category),
+                  }}
+                  aria-pressed={isSelected}
+                  aria-label={`${item.label}, ${formatMoney(item.value)}, ${pct}%`}
+                  onClick={() => onSelect(isSelected ? null : item.id)}
+                >
+                  <Icon />
+                  {diameter >= PCT_LABEL_MIN_D && <span className="bubble-pct">{pct}%</span>}
+                </button>
+                <span className="bubble-label">{item.label}</span>
+              </div>
             );
           })}
         </div>

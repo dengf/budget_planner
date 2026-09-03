@@ -334,16 +334,24 @@ export default function DashboardTab({
         </div>
       )}
 
-      {savingsLine && (
-        <div className="dash-summary-cards">
+      <div className="dash-summary-cards">
+        <div className="dash-card">
+          <span className="dash-card-label">{t('budget.income')}</span>
+          <span className="dash-card-value positive">{formatMoney(summary?.income ?? 0)}</span>
+        </div>
+        <div className="dash-card">
+          <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
+          <span className="dash-card-value negative">{formatMoney(expenseTotals.spent)}</span>
+        </div>
+        {savingsLine && (
           <div className="dash-card">
             <span className="dash-card-label">{t('budget.savings')}</span>
             <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
               {formatMoney(savingsLine.spent)}
             </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="dash-breakdowns">
         <div>

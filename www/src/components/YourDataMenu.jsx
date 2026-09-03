@@ -33,7 +33,7 @@ function formatExportDate(iso, locale) {
 }
 
 /**
- * "Your data" as a nav-level dropdown rather than a tab -- it isn't a
+ * "My data" as a nav-level dropdown rather than a tab -- it isn't a
  * page of its own (nothing here is browsed or edited in place), just
  * three one-shot actions (export/import/clear) that apply to the whole
  * app's data regardless of which tab happens to be open. Living in the

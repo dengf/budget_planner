@@ -1,4 +1,4 @@
-// When the last backup was written, so "Your data" can show how stale it
+// When the last backup was written, so "My data" can show how stale it
 // is. Same host-layer reasoning as currencySymbol.js: this is a UI nicety
 // about the export, not a budget-calc concept, and losing it just means
 // the reminder starts over -- nothing downstream depends on it surviving.

@@ -321,7 +321,7 @@ export default {
   'confirm.removeRecurring': 'Stop tracking "{description}"? It will no longer show as upcoming.',
   'confirm.removeDebt': 'Remove "{name}" from the payoff plan?',
 
-  'data.title': 'Your data',
+  'data.title': 'My data',
   'data.exportHint': 'Download everything you have entered as a single JSON file.',
   'data.export': 'Export all data',
   'data.clearAll': 'Clear all data',

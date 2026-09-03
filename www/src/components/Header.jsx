@@ -39,21 +39,18 @@ export default function Header({
         </div>
 
         <div className="app-switches">
-          <div className="app-regions" role="group" aria-label={t('app.language')}>
+          <select
+            className="app-language-select"
+            aria-label={t('app.language')}
+            value={locale}
+            onChange={(e) => setLocale(e.target.value)}
+          >
             {LOCALES.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                className={l.id === locale ? 'app-region active' : 'app-region'}
-                aria-pressed={l.id === locale}
-                title={l.name}
-                lang={l.id}
-                onClick={() => setLocale(l.id)}
-              >
-                {l.label}
-              </button>
+              <option key={l.id} value={l.id} lang={l.id}>
+                {l.name}
+              </option>
             ))}
-          </div>
+          </select>
 
           {onCurrencySymbolChange && (
             <label className="app-currency">
@@ -68,7 +65,7 @@ export default function Header({
             </label>
           )}
 
-          {/* "Your data" lives in the header row, not the tab bar below --
+          {/* "My data" lives in the header row, not the tab bar below --
               it's a menu of rare, whole-app actions (export/import/clear),
               not a screen someone navigates to, and doesn't deserve one of
               the five thumb-reach slots the mobile bottom bar has room
