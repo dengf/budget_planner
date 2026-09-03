@@ -11,6 +11,21 @@ import MonthYearPicker from './MonthYearPicker';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 
 /**
+ * Lets a long money string wrap at a digit-group boundary instead of
+ * wherever the browser's own line-breaking happens to land -- needed
+ * because `.dash-card-value`'s `overflow-wrap: anywhere` (main.css) has
+ * no comma to prefer over any other character otherwise. Only the
+ * summary row's 3-across mobile layout is narrow enough for this to ever
+ * matter; a 6-figure "$43,000.00" already fits that row on one line, but
+ * a 7-figure income/expense figure shouldn't wrap mid-digit-group into
+ * something like "$1,234,5" / "67.00".
+ */
+function breakableMoney(str) {
+  const parts = str.split(',');
+  return parts.flatMap((part, i) => (i === 0 ? [part] : [',', <wbr key={i} />, part]));
+}
+
+/**
  * The landing tab: this month's headline numbers first, the full
  * category table and export/import tools below. `viewMonth` is shared
  * app-wide (App.jsx) -- paging Dashboard back to a prior month is the
@@ -334,16 +349,28 @@ export default function DashboardTab({
         </div>
       )}
 
-      {savingsLine && (
-        <div className="dash-summary-cards">
+      <div className="dash-summary-cards">
+        <div className="dash-card">
+          <span className="dash-card-label">{t('budget.income')}</span>
+          <span className="dash-card-value positive">
+            {breakableMoney(formatMoney(summary?.income ?? 0))}
+          </span>
+        </div>
+        <div className="dash-card">
+          <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
+          <span className="dash-card-value negative">
+            {breakableMoney(formatMoney(expenseTotals.spent))}
+          </span>
+        </div>
+        {savingsLine && (
           <div className="dash-card">
             <span className="dash-card-label">{t('budget.savings')}</span>
             <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
-              {formatMoney(savingsLine.spent)}
+              {breakableMoney(formatMoney(savingsLine.spent))}
             </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="dash-breakdowns">
         <div>

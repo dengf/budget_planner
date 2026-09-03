@@ -18,6 +18,14 @@ describe('BubbleChart', () => {
     expect(container.querySelectorAll('.bubble').length).toBe(2);
   });
 
+  it('shows the category name under each bubble', () => {
+    const { getByText } = render(
+      <BubbleChart title="Spending" items={items} formatMoney={formatMoney} onSelect={() => {}} />,
+    );
+    expect(getByText('Housing')).toBeInTheDocument();
+    expect(getByText('Utilities')).toBeInTheDocument();
+  });
+
   it('sizes the largest item at the max diameter', () => {
     const { container } = render(
       <BubbleChart title="Spending" items={items} formatMoney={formatMoney} onSelect={() => {}} />,

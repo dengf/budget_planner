@@ -133,14 +133,22 @@ body {
   gap: 10px;
   flex-wrap: wrap;
 }
-/* gap was 2px -- adjacent pills sat close enough that a finger could easily
-   land on the wrong one; 6px gives real separation between tap targets. */
-.app-regions {
-  display: flex;
-  gap: 6px;
+/* The header's language picker -- a native <select> instead of the old
+   three-way button group (Header.jsx), so adding a fourth language later
+   is a catalog entry, not a wider row that eventually wraps or crowds the
+   currency/data-menu pills next to it. `.app-region`/`.app-region.active`
+   below are unrelated now (SpendOverTimeChart's Daily/Weekly toggle is
+   their only remaining caller) but keep the same pill sizing language. */
+.app-language-select {
   background: var(--panel-alt);
-  padding: 3px;
+  color: var(--ink);
+  border: none;
+  padding: 6px 10px;
+  min-height: 44px;
   border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 .app-region {
   border: none;
@@ -182,7 +190,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-/* "Your data"'s trigger button, relocated here from the tab bar -- same
+/* "My data"'s trigger button, relocated here from the tab bar -- same
    pill treatment as .app-region/.app-currency next to it, not .app-tab's
    look (which now also carries the mobile bottom-bar's stacked-icon
    layout, wrong for a header-row button). */
@@ -265,6 +273,19 @@ body {
     justify-content: center;
     row-gap: 8px;
   }
+
+  /* Language + currency + "My data" overflowed a 375px row by a few
+     pixels, dropping "My data" onto its own line beneath -- an
+     unbalanced 2-then-1 wrap that pushes the whole page down for no
+     content reason. Tightening the row gap and the currency pill's own
+     padding (its widest neighbor) is enough to fit all three on one
+     row again. */
+  .app-switches {
+    gap: 8px;
+  }
+  .app-currency {
+    padding: 3px 8px;
+  }
 }
 
 /* Bottom tab bar on phone -- putting primary navigation in thumb reach
@@ -286,9 +307,13 @@ body {
     justify-content: space-around;
     row-gap: 0;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
-    /* iOS home-indicator safe area -- a bare 4px padding leaves the last
-       row of tabs sitting under the gesture bar on notched devices. */
-    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    /* iOS home-indicator safe area -- a bare padding leaves the last row
+       of tabs sitting under the gesture bar on notched devices. This only
+       has any effect at all with index.html's `viewport-fit=cover` --
+       without it env(safe-area-inset-bottom) is spec'd to resolve to 0,
+       which is exactly what shipped, unnoticed, until real-device testing
+       caught this bar sitting under Safari's own bottom toolbar. */
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
   .app-tab {
     flex-direction: column;
@@ -506,17 +531,28 @@ body {
 .camera-shutter:active {
   background: var(--accent);
 }
+/* `display: flex` here (not just inherited from `.field`) matters:
+   BudgetTab.jsx's commitments-toggle uses `field-check` on its own, with
+   no `.field` alongside it, so without this the row/align-items/gap
+   below never took effect there at all -- it fell back to plain inline
+   flow. `min-height: 44px` is this app's own touch-target floor; the
+   15px checkbox alone (or the ~34px label wrapped tight around it) sat
+   well under it on every one of this class's four call sites, phone or
+   not. */
 .field-check {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  min-height: 44px;
   cursor: pointer;
 }
 .field-check input {
   accent-color: var(--accent);
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   margin: 0;
+  flex: none;
 }
 
 .field-input {
@@ -739,10 +775,23 @@ table.data tr:last-child td {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* `.txn-trailing` (flex: none, so it never yields) used to leave
+     `.txn-info` whatever width was left over -- fine for a short amount,
+     but a large one (a one-time payment, a paycheck) could squeeze it
+     down to just a few characters wide, breaking the description into a
+     vertical stack of one or two letters per line. `.txn-info`'s
+     min-width floor (below) makes this row wrap instead once the two
+     can't both fit at a legible width -- the trailing amount+Remove
+     group gets its own right-aligned line under the description, a
+     phone-width receipt-line layout that reads more consistently than
+     the old one ever did, not just a fallback for the extreme case. */
+  flex-wrap: wrap;
 }
 .txn-info {
   flex: 1;
-  min-width: 0;
+  /* Below this, wrap (above) instead of continuing to shrink the
+     description toward unreadable. */
+  min-width: 140px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -760,6 +809,9 @@ table.data tr:last-child td {
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Right-aligned on its own wrapped line (see `.txn-card` above), not
+     pinned to the left edge under the icon. */
+  margin-left: auto;
 }
 .txn-amount {
   font-weight: 600;
@@ -1582,9 +1634,9 @@ table.data tr:last-child td {
    laid out as a wrapping flex row rather than true circle-packing physics
    -- consistent with this app's hand-rolled-SVG-over-a-library stance
    elsewhere, just without even the SVG here since a bubble is a plain
-   round button. flex-end alignment means bubbles of different sizes sit
-   on a shared baseline instead of vertically centering, which reads as a
-   loose, ungrounded cluster once diameters vary this much. */
+   round button. flex-end alignment means bubble+label pairs of different
+   sizes sit on a shared baseline instead of vertically centering, which
+   reads as a loose, ungrounded cluster once diameters vary this much. */
 .bubble-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1592,6 +1644,33 @@ table.data tr:last-child td {
   align-items: flex-end;
   gap: 10px;
   padding: 8px 0;
+}
+.bubble-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+/* A hand-typed category (no preset_key) falls back to a generic
+   income/expense icon (categoryVisuals.js's categoryIconId), so several
+   custom categories can render identically apart from color -- the name
+   is what always disambiguates. Wraps up to 2 lines instead of a
+   single-line ellipsis (which cut real names off mid-word, e.g. "Food &
+   Groc...") -- a fixed 2-line min-height reserves the same footprint
+   whether a given label actually wraps or not, so `.bubble-grid`'s
+   flex-end baseline still lines every item up by bubble size alone, not
+   by how much of each name got truncated. */
+.bubble-label {
+  max-width: 84px;
+  min-height: 2.3em;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  color: var(--muted);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .bubble {
   flex: none;
@@ -1869,6 +1948,14 @@ table.data tr:last-child td {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* A grid item's default min-width is `auto`, i.e. its content's own
+     min-content size -- for an unbroken string like "$1,234,567.00" with
+     no spaces, that's the whole string's width. Once that exceeds this
+     card's equal `1fr` share (mainly the 3-across mobile row below),
+     the column pushed itself wider and squeezed its two neighbors
+     lopsided instead of wrapping. This lets the column stay at its
+     fair share and hand the overflow to `.dash-card-value` instead. */
+  min-width: 0;
 }
 .dash-card-label {
   font-size: 0.78rem;
@@ -1879,6 +1966,22 @@ table.data tr:last-child td {
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+  /* Lets a value too wide for its card (a large balance in the 3-across
+     mobile row, mainly) wrap onto a second line instead of forcing its
+     column wider than its `1fr` share -- see `.dash-card`'s own
+     min-width note just above. */
+  overflow-wrap: anywhere;
+}
+/* `.positive`/`.negative` (defined earlier, above `.dash-card-value`)
+   otherwise lose this cascade -- same specificity, later rule wins, so
+   the base ink color was silently overriding them on every summary card
+   regardless of which class DashboardTab.jsx added. The compound
+   selector's higher specificity restores the intended color-coding. */
+.dash-card-value.positive {
+  color: var(--positive);
+}
+.dash-card-value.negative {
+  color: var(--negative);
 }
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
@@ -1979,7 +2082,7 @@ table.data tr:last-child td {
   padding: 10px 16px;
 }
 
-/* "Your data" nav dropdown -- same backdrop+dialog pattern as
+/* "My data" nav dropdown -- same backdrop+dialog pattern as
    .monthpicker-backdrop/.confirm-backdrop, own namespaced classes per
    this codebase's convention of not sharing one generic popup class
    across unrelated components. */
@@ -2150,5 +2253,32 @@ table.data tr:last-child td {
   .commitments-toggle {
     margin: 0 0 10px;
     font-size: 0.88rem;
+  }
+
+  /* Income/Expenses/Savings compacted to one row that always fits three
+     real columns (the default auto-fit minmax(160px, ...) wraps to two
+     on a 375px phone, pushing the third card -- usually Savings -- below
+     the fold along with everything else, the opposite of "an overview
+     without scrolling"). Smaller label/value type is what makes three
+     columns legible at this width instead of truncating. */
+  .dash-summary-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .dash-card {
+    padding: 10px 8px;
+    gap: 4px;
+  }
+  /* Reserves 2 lines regardless of whether this card's own label actually
+     wraps ("Savings" fits on one, "Income this month"/"Total expenses"
+     usually don't) -- without it, the shorter label's value sits visibly
+     higher than its neighbors', an uneven row of three. */
+  .dash-card-label {
+    font-size: 0.72rem;
+    line-height: 1.15;
+    min-height: 2.3em;
+  }
+  .dash-card-value {
+    font-size: 1.05rem;
   }
 }
