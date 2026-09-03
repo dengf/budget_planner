@@ -4,7 +4,8 @@ import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import CategoryBadge from './CategoryBadge';
-import PieChart from './PieChart';
+import BubbleChart from './BubbleChart';
+import BlossomProgress from './BlossomProgress';
 import SpendOverTimeChart from './SpendOverTimeChart';
 import MonthYearPicker from './MonthYearPicker';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
@@ -42,6 +43,8 @@ export default function DashboardTab({
   const [dailyTotals, setDailyTotals] = useState([]);
   const [weeklyTotals, setWeeklyTotals] = useState([]);
   const [recipients, setRecipients] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [goalProgress, setGoalProgress] = useState({});
   const isCurrentMonth = viewMonth === today;
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
@@ -135,6 +138,36 @@ export default function DashboardTab({
     };
   }, [wasmModule, lines, budgetPlan.items, summary]);
 
+  // Petal count for each goal's preview card below -- the same
+  // `goal_progress` call GoalsTab makes per goal, just batched here since
+  // this tab shows every goal at once rather than one at a time. Kept in
+  // Rust (petals_filled's fifths division) rather than deriving it here
+  // from current_amount/target_amount, same reasoning as everywhere else
+  // in this app that a ratio-to-bucket rule belongs in budget-calc.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!wasmModule?.goal_progress || goals.items.length === 0) {
+        if (!cancelled) setGoalProgress({});
+        return;
+      }
+      const entries = await Promise.all(
+        goals.items.map(async (g) => {
+          const p = await wasmModule.goal_progress({
+            current_amount: g.current_amount,
+            target_amount: g.target_amount,
+          });
+          return [g.id, p?.petals_filled ?? 0];
+        }),
+      );
+      if (!cancelled) setGoalProgress(Object.fromEntries(entries));
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [wasmModule, goals.items]);
+
   const categoryFor = (id) => categories.items.find((c) => c.id === id);
   const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
 
@@ -142,17 +175,17 @@ export default function DashboardTab({
   // directions of money -- `l.spent` already holds whichever of
   // spend/income applies per category (see the fetch effect above), so
   // this just needs to route each category to the side it belongs on.
-  // `preset_key` rides along so PieChart can color each wedge the same
-  // way CategoryBadge colors that category everywhere else (see
-  // categoryVisuals.js's categoryColor) -- chart and lists agreeing on
-  // color is the whole point of this pass.
+  // The real `category` record rides along (not just its preset_key) so
+  // BubbleChart can hand it straight to CategoryBadge's own
+  // `categoryColor`/`categoryIconId` -- chart and badges agreeing on
+  // color/icon is the whole point of this pass.
   const expenseSlices = lines
     .filter((l) => !isIncome(l.category_id) && l.spent > 0)
     .map((l) => ({
       id: l.category_id,
       label: categoryName(l.category_id),
       value: l.spent,
-      preset_key: categoryFor(l.category_id)?.preset_key,
+      category: categoryFor(l.category_id),
     }));
   const incomeSlices = lines
     .filter((l) => isIncome(l.category_id) && l.spent > 0)
@@ -160,22 +193,14 @@ export default function DashboardTab({
       id: l.category_id,
       label: categoryName(l.category_id),
       value: l.spent,
-      preset_key: categoryFor(l.category_id)?.preset_key,
+      category: categoryFor(l.category_id),
     }));
-  // The donut's own total, not `summary.total_spent` -- that figure sums
-  // every line's `spent` regardless of income/expense, so it includes
-  // income categories' received amounts too (see BudgetTab's identical
-  // total). The expense wedges alone add up to less than that, and
-  // labeling the ring's center with the bigger number would show a total
-  // the ring itself doesn't visually account for.
-  const expenseTotal = expenseSlices.reduce((sum, s) => sum + s.value, 0);
-  const incomeTotal = incomeSlices.reduce((sum, s) => sum + s.value, 0);
 
-  // The category table below groups the same way: every income line,
-  // then every expense line, each block closed out with its own Total
-  // row -- unlike expenseSlices/incomeSlices above, this isn't filtered
-  // to l.spent > 0, since a category with nothing spent yet still belongs
-  // in its group's total (at $0).
+  // Whole-month totals for the summary cards. Not `summary.total_spent`
+  // for the expense figure -- that sums every line's `spent` regardless
+  // of income/expense, so it includes income categories' received
+  // amounts too (same figure BudgetTab avoids for its own total for the
+  // same reason). `expenseTotals.spent` is the pure expense-only sum.
   const incomeLines = lines.filter((l) => isIncome(l.category_id));
   const expenseLines = lines.filter((l) => !isIncome(l.category_id));
   const sumLines = (rows) => ({
@@ -183,49 +208,76 @@ export default function DashboardTab({
     spent: rows.reduce((sum, r) => sum + r.spent, 0),
     remaining: rows.reduce((sum, r) => sum + r.remaining, 0),
   });
-  const incomeTotals = sumLines(incomeLines);
   const expenseTotals = sumLines(expenseLines);
 
-  // This card is the plain-numbers summary (BudgetTab is where planned
-  // income and its "received more than planned"/"unplanned income"
-  // framing actually get edited and explained). Here, an income card's
-  // Planned and Remaining would just be a $0.00 and a green negative
-  // number with no explanation of why negative is good -- confusing
-  // rather than informative, so income cards show Actual only.
-  const categoryCard = (l) => {
-    const income = isIncome(l.category_id);
-    const isGoodNews = l.remaining >= 0;
+  /**
+   * The bubble tapped open below one of the two charts -- income and
+   * expense bubbles share one `selectedCategoryId` (tapping a bubble in
+   * either chart closes whichever was open, including one in the other
+   * chart), and each chart only renders the panel if the selected id is
+   * one of its own. Shows the same planned/actual/remaining split
+   * `categoryCard` used to (income categories show Actual only -- see
+   * that removed function's original comment: a $0.00 Planned and a
+   * green "negative" Remaining on an income row explained nothing),
+   * followed by up to 5 of this category's transactions for the viewed
+   * month, most recent first.
+   */
+  const drilldown = (ids) => {
+    if (!selectedCategoryId || !ids.includes(selectedCategoryId)) return null;
+    const line = lines.find((l) => l.category_id === selectedCategoryId);
+    if (!line) return null;
+    const income = isIncome(selectedCategoryId);
+    const isGoodNews = line.remaining >= 0;
+    const monthTx = transactions.items
+      .filter((tx) => tx.category_id === selectedCategoryId && tx.date?.startsWith(viewMonth))
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    const shown = monthTx.slice(0, 5);
+    const moreCount = monthTx.length - shown.length;
     return (
-      <div className="dash-category-card money-card" key={l.category_id}>
+      <div className="bubble-detail money-card">
         <div className="category-name">
-          <CategoryBadge category={categoryFor(l.category_id)} />
-          {categoryName(l.category_id)}
+          <CategoryBadge category={categoryFor(selectedCategoryId)} />
+          {categoryName(selectedCategoryId)}
         </div>
         <div className="dash-card-stats">
           {income ? (
             <span className="dash-stat">
               <span className="cell-label">{t('budget.actual')}</span>
-              <span className="num">{formatMoney(l.spent)}</span>
+              <span className="num">{formatMoney(line.spent)}</span>
             </span>
           ) : (
             <>
               <span className="dash-stat">
                 <span className="cell-label">{t('budget.planned')}</span>
-                <span className="num">{formatMoney(l.planned)}</span>
+                <span className="num">{formatMoney(line.planned)}</span>
               </span>
               <span className="dash-stat">
                 <span className="cell-label">{t('budget.actual')}</span>
-                <span className="num">{formatMoney(l.spent)}</span>
+                <span className="num">{formatMoney(line.spent)}</span>
               </span>
               <span className="dash-stat">
                 <span className="cell-label">{t('budget.remaining')}</span>
                 <span className={`num ${isGoodNews ? 'positive' : 'negative'}`}>
-                  {formatMoney(l.remaining)}
+                  {formatMoney(line.remaining)}
                 </span>
               </span>
             </>
           )}
         </div>
+        {shown.length > 0 && (
+          <ul className="bubble-detail-tx-list">
+            {shown.map((tx) => (
+              <li key={tx.id} className="bubble-detail-tx-row">
+                <span className="bubble-detail-tx-date">{tx.date}</span>
+                <span className="bubble-detail-tx-desc">{tx.description}</span>
+                <span className="num">{formatMoney(tx.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {moreCount > 0 && (
+          <p className="chart-note">{t('dashboard.moreTransactions', { count: moreCount })}</p>
+        )}
       </div>
     );
   };
@@ -293,98 +345,46 @@ export default function DashboardTab({
           <span className="dash-card-value">{formatMoney(summary?.income ?? 0)}</span>
         </div>
         <div className="dash-card dash-card-spent">
-          <span className="dash-card-label">{t('budget.totalSpent')}</span>
-          <span className="dash-card-value">{formatMoney(summary?.total_spent ?? 0)}</span>
+          <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
+          <span className="dash-card-value">{formatMoney(expenseTotals.spent)}</span>
         </div>
-      </div>
-
-      <div className="report-pies">
-        <PieChart
-          title={t('chart.expenseBreakdown')}
-          items={expenseSlices}
-          formatMoney={formatMoney}
-          ariaLabel={t('chart.expenseBreakdownAria', { month: monthLabel(viewMonth, locale) })}
-          hollow
-          centerLabel={t('budget.spent')}
-          centerValue={formatMoney(expenseTotal)}
-          emptyHint={t('chart.noExpenseYet')}
-        />
-        <PieChart
-          title={t('chart.incomeBreakdown')}
-          items={incomeSlices}
-          formatMoney={formatMoney}
-          ariaLabel={t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) })}
-          hollow
-          centerLabel={t('budget.received')}
-          centerValue={formatMoney(incomeTotal)}
-          emptyHint={t('chart.noIncomeYet')}
-        />
-      </div>
-
-      <div className="dash-category-list">
-        {incomeLines.map(categoryCard)}
-        {incomeLines.length > 0 && (
-          <>
-            <div className="dash-total-card">
-              <span className="dash-total-name">{t('dashboard.totalIncome')}</span>
-              <div className="dash-card-stats">
-                <span className="dash-stat">
-                  <span className="cell-label">{t('budget.actual')}</span>
-                  <span className="num">{formatMoney(incomeTotals.spent)}</span>
-                </span>
-              </div>
-            </div>
-            <div className="dash-table-divider-line" aria-hidden="true" />
-          </>
-        )}
-        {expenseLines.map(categoryCard)}
-        {expenseLines.length > 0 && (
-          <>
-            <div className="dash-total-card">
-              <span className="dash-total-name">{t('dashboard.totalExpenses')}</span>
-              <div className="dash-card-stats">
-                <span className="dash-stat">
-                  <span className="cell-label">{t('budget.planned')}</span>
-                  <span className="num">{formatMoney(expenseTotals.planned)}</span>
-                </span>
-                <span className="dash-stat">
-                  <span className="cell-label">{t('budget.actual')}</span>
-                  <span className="num">{formatMoney(expenseTotals.spent)}</span>
-                </span>
-                <span className="dash-stat">
-                  <span className="cell-label">{t('budget.remaining')}</span>
-                  <span className={`num ${expenseTotals.remaining >= 0 ? 'positive' : 'negative'}`}>
-                    {formatMoney(expenseTotals.remaining)}
-                  </span>
-                </span>
-              </div>
-            </div>
-            <div className="dash-table-divider-line" aria-hidden="true" />
-          </>
-        )}
         {savingsLine && (
-          <div className="dash-total-card">
-            <span className="dash-total-name">{t('budget.savings')}</span>
-            <div className="dash-card-stats">
-              <span className="dash-stat">
-                <span className="cell-label">{t('budget.planned')}</span>
-                <span className="num">{formatMoney(savingsLine.planned)}</span>
-              </span>
-              <span className="dash-stat">
-                <span className="cell-label">{t('budget.actual')}</span>
-                <span className="num">{formatMoney(savingsLine.spent)}</span>
-              </span>
-              <span className="dash-stat">
-                <span className="cell-label">{t('budget.remaining')}</span>
-                <span
-                  className={`num ${savingsLine.spent - savingsLine.planned >= 0 ? 'positive' : 'negative'}`}
-                >
-                  {formatMoney(savingsLine.spent - savingsLine.planned)}
-                </span>
-              </span>
-            </div>
+          <div className="dash-card">
+            <span className="dash-card-label">{t('budget.savings')}</span>
+            <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
+              {formatMoney(savingsLine.spent)}
+            </span>
           </div>
         )}
+      </div>
+
+      <div className="dash-breakdowns">
+        <div>
+          <BubbleChart
+            title={t('chart.expenseBreakdown')}
+            items={expenseSlices}
+            formatMoney={formatMoney}
+            ariaLabel={t('chart.expenseBreakdownAria', { month: monthLabel(viewMonth, locale) })}
+            hint={t('dashboard.bubbleHint')}
+            emptyHint={t('chart.noExpenseYet')}
+            selectedId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
+          />
+          {drilldown(expenseSlices.map((s) => s.id))}
+        </div>
+        <div>
+          <BubbleChart
+            title={t('chart.incomeBreakdown')}
+            items={incomeSlices}
+            formatMoney={formatMoney}
+            ariaLabel={t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) })}
+            hint={t('dashboard.bubbleHint')}
+            emptyHint={t('chart.noIncomeYet')}
+            selectedId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
+          />
+          {drilldown(incomeSlices.map((s) => s.id))}
+        </div>
       </div>
 
       <SpendOverTimeChart
@@ -399,25 +399,18 @@ export default function DashboardTab({
       {goals.items.length > 0 && (
         <>
           <h2>{t('goals.title')}</h2>
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('goals.name')}</th>
-                  <th>{t('goals.current')}</th>
-                  <th>{t('goals.target')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {goals.items.map((g) => (
-                  <tr key={g.id}>
-                    <td>{g.name}</td>
-                    <td className="num">{formatMoney(g.current_amount)}</td>
-                    <td className="num">{formatMoney(g.target_amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="dash-preview-row">
+            {goals.items.map((g) => (
+              <div className="dash-preview-card money-card" key={g.id}>
+                <BlossomProgress filled={goalProgress[g.id] ?? 0} size={36} />
+                <div className="dash-preview-card-info">
+                  <span className="dash-preview-card-name">{g.name}</span>
+                  <span className="dash-preview-card-detail">
+                    {formatMoney(g.current_amount)} / {formatMoney(g.target_amount)}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -425,25 +418,18 @@ export default function DashboardTab({
       {debts.items.length > 0 && (
         <>
           <h2>{t('debt.title')}</h2>
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('debt.name')}</th>
-                  <th>{t('debt.balance')}</th>
-                  <th>{t('debt.minPayment')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {debts.items.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.name}</td>
-                    <td className="num">{formatMoney(d.balance)}</td>
-                    <td className="num">{formatMoney(d.min_payment)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="dash-preview-row">
+            {debts.items.map((d) => (
+              <div className="dash-preview-card money-card" key={d.id}>
+                <div className="dash-preview-card-info">
+                  <span className="dash-preview-card-name">{d.name}</span>
+                  <span className="dash-preview-card-detail">
+                    {t('debt.balance')}: {formatMoney(d.balance)} · {t('debt.minPayment')}:{' '}
+                    {formatMoney(d.min_payment)}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}

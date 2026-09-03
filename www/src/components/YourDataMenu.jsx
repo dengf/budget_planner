@@ -198,7 +198,7 @@ export default function YourDataMenu({
     <div className="data-menu">
       <button
         type="button"
-        className="app-tab data-menu-trigger"
+        className="app-data-trigger data-menu-trigger"
         aria-haspopup="true"
         aria-expanded={open}
         onClick={openMenu}

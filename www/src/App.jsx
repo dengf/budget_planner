@@ -7,23 +7,14 @@ import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth } from './month';
+import { TABS, TAB_ORDER } from './tabs';
 
-// Code-split: a visitor logging one transaction shouldn't download the
-// debt-payoff engine's UI too. Each tab's component (and everything it
-// imports) only loads the first time its tab is opened.
-const DashboardTab = React.lazy(() => import('./components/DashboardTab'));
-const BudgetTab = React.lazy(() => import('./components/BudgetTab'));
-const TransactionsTab = React.lazy(() => import('./components/TransactionsTab'));
-const GoalsTab = React.lazy(() => import('./components/GoalsTab'));
-const DebtTab = React.lazy(() => import('./components/DebtTab'));
-
-const TABS = {
-  dashboard: DashboardTab,
-  budget: BudgetTab,
-  transactions: TransactionsTab,
-  goals: GoalsTab,
-  debt: DebtTab,
-};
+// How far (px) a horizontal drag must travel past the down point before
+// it commits to being a tab-swipe rather than a tap or a vertical scroll.
+const SWIPE_COMMIT_PX = 10;
+// How far past that a released swipe must have travelled to actually
+// change tabs, rather than snapping back to the same one.
+const SWIPE_TRIGGER_PX = 60;
 
 /**
  * Every collection this app persists, loaded once wasm storage is ready
@@ -362,7 +353,62 @@ export function AppShell({ wasmModule }) {
     addCommonCategories,
   ]);
 
-  const ActivePanel = TABS[activeTab];
+  const ActivePanel = TABS.find((tab) => tab.id === activeTab)?.Component;
+
+  /**
+   * Swipe left/right to change tabs on a touch device, matching the
+   * left/right paging gesture every native mobile app uses instead of
+   * requiring a trip back up to the tab bar. Same Pointer Events +
+   * `setPointerCapture` pattern this house already uses for drag surfaces
+   * (see postcard_maker's PostcardCanvas.jsx) -- `swipeRef` is a plain
+   * mutable ref, not state, since none of this needs to trigger a
+   * re-render until the gesture actually completes.
+   *
+   * Gated to `pointerType === 'touch'` so a desktop mouse/trackpad drag
+   * (e.g. selecting text) is never mistaken for a swipe. A gesture only
+   * "commits" to horizontal once it has moved more than SWIPE_COMMIT_PX
+   * and is more horizontal than vertical -- a plain tap or a vertical
+   * scroll never commits, so buttons/inputs/scrolling are unaffected.
+   * Also bailed out entirely if the touch started inside `.table-scroll`
+   * (Debt's tables, Rules/Recurring's tables) -- those already do their
+   * own native horizontal scrolling, and a swipe-to-change-tab there
+   * would fight a legitimate horizontal drag instead of just ignoring it.
+   */
+  const swipeRef = useRef(null);
+
+  const onMainPointerDown = (e) => {
+    if (e.pointerType !== 'touch') return;
+    if (e.target.closest('.table-scroll')) return;
+    swipeRef.current = { startX: e.clientX, startY: e.clientY, dx: 0, committed: null };
+  };
+
+  const onMainPointerMove = (e) => {
+    const s = swipeRef.current;
+    if (!s) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (
+      s.committed === null &&
+      (Math.abs(dx) > SWIPE_COMMIT_PX || Math.abs(dy) > SWIPE_COMMIT_PX)
+    ) {
+      s.committed = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (s.committed === 'x') s.dx = dx;
+  };
+
+  const changeTabBy = (delta) => {
+    const idx = TAB_ORDER.indexOf(activeTab);
+    const nextId = TAB_ORDER[idx + delta];
+    if (nextId) setActiveTab(nextId);
+  };
+
+  const onMainPointerUp = () => {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (!s || s.committed !== 'x') return;
+    if (s.dx <= -SWIPE_TRIGGER_PX) changeTabBy(1);
+    else if (s.dx >= SWIPE_TRIGGER_PX) changeTabBy(-1);
+  };
 
   return (
     <div className="app">
@@ -387,26 +433,34 @@ export function AppShell({ wasmModule }) {
         clearAllData={clearAllData}
         importData={importData}
       />
-      <main className="app-main">
+      <main
+        className="app-main"
+        onPointerDown={onMainPointerDown}
+        onPointerMove={onMainPointerMove}
+        onPointerUp={onMainPointerUp}
+        onPointerCancel={onMainPointerUp}
+      >
         <Suspense fallback={<TabFallback />}>
-          <ActivePanel
-            wasmModule={wasmModule}
-            currencySymbol={currencySymbol}
-            today={today}
-            viewMonth={viewMonth}
-            setViewMonth={setViewMonth}
-            newId={newId}
-            confirm={confirm}
-            categories={categories}
-            removeCategory={removeCategory}
-            addCommonCategories={addCommonCategories}
-            transactions={transactions}
-            rules={rules}
-            goals={goals}
-            debts={debts}
-            recurring={recurring}
-            budgetPlan={budgetPlan}
-          />
+          <div className="tab-panel" key={activeTab}>
+            <ActivePanel
+              wasmModule={wasmModule}
+              currencySymbol={currencySymbol}
+              today={today}
+              viewMonth={viewMonth}
+              setViewMonth={setViewMonth}
+              newId={newId}
+              confirm={confirm}
+              categories={categories}
+              removeCategory={removeCategory}
+              addCommonCategories={addCommonCategories}
+              transactions={transactions}
+              rules={rules}
+              goals={goals}
+              debts={debts}
+              recurring={recurring}
+              budgetPlan={budgetPlan}
+            />
+          </div>
         </Suspense>
         <Intro />
       </main>

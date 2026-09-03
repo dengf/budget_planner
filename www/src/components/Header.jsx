@@ -2,16 +2,9 @@ import React from 'react';
 import { LOCALES, useI18n } from '../i18n';
 import MeifioMark from './MeifioMark';
 import YourDataMenu from './YourDataMenu';
+import { TABS } from '../tabs';
 
 const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
-
-const TABS = [
-  { id: 'dashboard', key: 'nav.dashboard' },
-  { id: 'budget', key: 'nav.budget' },
-  { id: 'transactions', key: 'nav.transactions' },
-  { id: 'goals', key: 'nav.goals' },
-  { id: 'debt', key: 'nav.debt' },
-];
 
 export default function Header({
   activeTab,
@@ -39,9 +32,9 @@ export default function Header({
         <div className="app-brand">
           <h1 className="app-title">{t('app.title')}</h1>
           <a className="app-byline" href={MEIFIO_HOME}>
-            {t('app.byline').split('{logo}').flatMap((part, i) =>
-              i === 0 ? [part] : [<MeifioMark key="mark" />, part],
-            )}
+            {t('app.byline')
+              .split('{logo}')
+              .flatMap((part, i) => (i === 0 ? [part] : [<MeifioMark key="mark" />, part]))}
           </a>
         </div>
 
@@ -74,6 +67,26 @@ export default function Header({
               />
             </label>
           )}
+
+          {/* "Your data" lives in the header row, not the tab bar below --
+              it's a menu of rare, whole-app actions (export/import/clear),
+              not a screen someone navigates to, and doesn't deserve one of
+              the five thumb-reach slots the mobile bottom bar has room
+              for. */}
+          <YourDataMenu
+            wasmModule={wasmModule}
+            today={today}
+            viewMonth={viewMonth}
+            categories={categories}
+            transactions={transactions}
+            rules={rules}
+            budgetPlan={budgetPlan}
+            goals={goals}
+            debts={debts}
+            recurring={recurring}
+            clearAllData={clearAllData}
+            importData={importData}
+          />
         </div>
       </header>
 
@@ -84,29 +97,16 @@ export default function Header({
           grows with the whole page) is what lets the nav stay stuck for
           the entire scroll, not just the first screenful. */}
       <nav className="app-tabs">
-        {TABS.map((tab) => (
+        {TABS.map(({ id, key, Icon }) => (
           <button
-            key={tab.id}
-            className={tab.id === activeTab ? 'app-tab active' : 'app-tab'}
-            onClick={() => onTabChange(tab.id)}
+            key={id}
+            className={id === activeTab ? 'app-tab active' : 'app-tab'}
+            onClick={() => onTabChange(id)}
           >
-            {t(tab.key)}
+            <Icon />
+            <span className="app-tab-label">{t(key)}</span>
           </button>
         ))}
-        <YourDataMenu
-          wasmModule={wasmModule}
-          today={today}
-          viewMonth={viewMonth}
-          categories={categories}
-          transactions={transactions}
-          rules={rules}
-          budgetPlan={budgetPlan}
-          goals={goals}
-          debts={debts}
-          recurring={recurring}
-          clearAllData={clearAllData}
-          importData={importData}
-        />
       </nav>
     </>
   );
