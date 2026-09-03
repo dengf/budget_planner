@@ -9,11 +9,24 @@ const ROTATIONS = [0, 72, 144, 216, 288];
  * decided in Rust -- this component only draws whatever count it is
  * handed, the same division of labour as every other rendered figure in
  * the app.
+ *
+ * A filled petal's color used to be hardcoded (`#B01243`, meifio plum) --
+ * now `var(--accent)` via `.goal-blossom-petal-filled` (see main.css),
+ * since the app's own `--accent` token is that same plum. An empty
+ * petal's outline is `var(--line)` for the same theme-awareness, in place
+ * of its own old hardcoded `#3a4a5e`.
  */
 export default function BlossomProgress({ filled = 0, size = 64 }) {
   const uid = React.useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
-    <svg className="goal-blossom" viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={`${filled} of 5`}>
+    <svg
+      className="goal-blossom"
+      viewBox="0 0 100 100"
+      width={size}
+      height={size}
+      role="img"
+      aria-label={`${filled} of 5`}
+    >
       <defs>
         <path id={`${uid}p`} d={PETAL} />
       </defs>
@@ -22,8 +35,7 @@ export default function BlossomProgress({ filled = 0, size = 64 }) {
           key={angle}
           href={`#${uid}p`}
           transform={`rotate(${angle} 50 50)`}
-          fill={i < filled ? '#B01243' : 'none'}
-          stroke={i < filled ? 'none' : '#3a4a5e'}
+          className={i < filled ? 'goal-blossom-petal-filled' : 'goal-blossom-petal-empty'}
           strokeWidth={i < filled ? 0 : 2}
         />
       ))}

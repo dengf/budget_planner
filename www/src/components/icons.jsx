@@ -48,3 +48,59 @@ export function SpreadsheetIcon() {
     </svg>
   );
 }
+
+/**
+ * Bottom/top nav icons -- same thin-stroke convention as the three
+ * above, not CategoryIcons.jsx's soft-filled register (that one is
+ * reserved for category badges only, see that file's own comment). A
+ * bigger fixed size than `.field-icon` (15px) -- these sit alone in a tap
+ * target rather than beside a text label they need to stay small next to.
+ */
+const NAV_ICON_PROPS = { ...ICON_PROPS, className: 'nav-icon' };
+
+export function DashboardIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <rect x="4" y="4" width="7" height="9" rx="1.2" />
+      <rect x="13" y="4" width="7" height="5" rx="1.2" />
+      <rect x="13" y="11" width="7" height="9" rx="1.2" />
+      <rect x="4" y="15" width="7" height="5" rx="1.2" />
+    </svg>
+  );
+}
+
+export function BudgetIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M12 3v9l7.8 4.5" />
+      <path d="M20.4 13.5A8.4 8.4 0 1 1 12 3.6" />
+    </svg>
+  );
+}
+
+export function TransactionsIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M6 4h12a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2-3-2V5a1 1 0 0 1 1-1Z" />
+      <path d="M8.5 9h7M8.5 13h7" />
+    </svg>
+  );
+}
+
+export function GoalsIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M12 4c1.4 2.6 2.4 4.4 4 5.5-1.6 1.6-2.6 3.8-4 6.5-1.4-2.7-2.4-4.9-4-6.5 1.6-1.1 2.6-2.9 4-5.5Z" />
+      <path d="M12 16v4" />
+    </svg>
+  );
+}
+
+export function DebtIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M4 7 9.5 12.5 13 9 20 16" />
+      <path d="M20 10.5V16h-5.5" />
+    </svg>
+  );
+}

@@ -21,10 +21,10 @@
 // #B01243 light / #F2547F dark) rather than an arbitrary hue -- each
 // hand-tuned in lightness so every entry lands close to a ~4.2:1 contrast
 // ratio against both this app's dark background (#0f1720) and
-// print/light-mode white. This deliberately does NOT touch `--accent`
-// (see main.css's own comment on why this app kept mortgage_calculator's
-// blue/green instead of meifio's plum) -- that's app-wide chrome, a
-// bigger call than one palette.
+// print/light-mode white. `--accent` (main.css) is this same plum family
+// too now, so the app's chrome and its category colors finally agree --
+// they used to deliberately differ, back when this app still kept
+// mortgage_calculator's inherited blue/green for its chrome.
 //
 // Ordering: adjacent entries jump by half the wheel (0, 180, 36, 216,
 // 72deg...) rather than stepping straight around it, so two consecutive

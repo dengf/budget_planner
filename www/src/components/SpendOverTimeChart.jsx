@@ -2,9 +2,8 @@ import React, { useId, useState } from 'react';
 import { useI18n } from '../i18n';
 import { weekLabel, weeksInMonth } from '../month';
 
-// Hand-rolled SVG, same reasoning as DebtChart/PieChart: a charting
-// library would cost more gzipped than the wasm module this app is built
-// around.
+// Hand-rolled SVG, same reasoning as DebtChart: a charting library would
+// cost more gzipped than the wasm module this app is built around.
 
 const BLUE = '#4f8cff';
 const GRID = '#243044';

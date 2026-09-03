@@ -1,11 +1,15 @@
-/* Token system. Dark values are exactly the literals this file used to
-   hardcode -- converting to variables here changes nothing about how dark
-   mode looks; it only makes a light mode possible without duplicating every
-   rule. Light values are a first pass: readable, same blue/green accent
-   family as the rest of the app (deliberately not meifio's plum -- this app
-   inherited mortgage_calculator's blue/green palette, and swapping the
-   accent hue is a bigger brand decision than "add a light theme" asked for),
-   not run through a formal contrast checker yet. */
+/* Token system. Dark values were originally the literals this file used to
+   hardcode; light values are a first pass, not run through a formal
+   contrast checker yet.
+   `--accent`/`--accent-ink` are meifio's plum (see meifio-brand/README.md's
+   colour table), matching what postcard_maker already adopted --
+   #d1436a/#fff7f9 dark, #b01243/#ffffff light. This app used to keep
+   mortgage_calculator's inherited blue/green here instead, reasoning that
+   swapping the accent hue was a bigger brand decision than "add a light
+   theme" asked for -- that's exactly the decision this round's redesign
+   did ask for, and categoryVisuals.js's CATEGORY_PALETTE was already
+   anchored on this same plum, so the app's own category colors and its
+   chrome now agree. */
 :root {
   --bg: #0f1720;
   --panel: #131c26;
@@ -22,8 +26,8 @@
   --line-soft: #1a2433;
   --input-border: #2a3546;
 
-  --accent: #4f8cff;
-  --accent-ink: #0b1119;
+  --accent: #d1436a;
+  --accent-ink: #fff7f9;
   --positive: #7ee787;
   --positive-ink: #0f1720;
   --positive-bg: #16311f;
@@ -51,7 +55,7 @@
     --line-soft: #e7ebf0;
     --input-border: #c7d0da;
 
-    --accent: #2f6fe0;
+    --accent: #b01243;
     --accent-ink: #ffffff;
     --positive: #1f7a3d;
     --positive-ink: #ffffff;
@@ -178,6 +182,24 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+/* "Your data"'s trigger button, relocated here from the tab bar -- same
+   pill treatment as .app-region/.app-currency next to it, not .app-tab's
+   look (which now also carries the mobile bottom-bar's stacked-icon
+   layout, wrong for a header-row button). */
+.app-data-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: var(--panel-alt);
+  color: var(--muted);
+  padding: 6px 10px;
+  min-height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 .app-currency-input {
   width: 40px;
   border: none;
@@ -210,6 +232,9 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 .app-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   background: transparent;
   color: var(--muted);
@@ -220,20 +245,63 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
 }
+/* The active tab used to reuse `--positive` (green) -- the same color
+   this app uses everywhere else to mean "under budget"/"good news". A
+   selected nav tab isn't financial news, so it gets the app's own accent
+   color instead, leaving green free to mean only one thing. */
 .app-tab.active {
-  background: var(--positive);
-  color: var(--positive-ink);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* Five tabs wrapped left-aligned at phone width -- a lopsided 2/3 split
    hugging the left edge, reading as crowded and unbalanced. Every tab
    stays reachable with no scrolling; centering each wrapped row (flex
    centers each wrap line independently) turns the same wrap into two
-   tidy, balanced rows instead. */
+   tidy, balanced rows instead. Superseded below 720px by the fixed
+   bottom bar, which has its own layout. */
 @media (max-width: 640px) {
   .app-tabs {
     justify-content: center;
     row-gap: 8px;
+  }
+}
+
+/* Bottom tab bar on phone -- putting primary navigation in thumb reach
+   instead of a sticky bar at the top, which still requires a reach/scroll
+   on a tall one-handed phone grip (this repo's own phone-first mandate:
+   "primary actions reachable one-handed"). `.app-main`'s matching
+   `padding-bottom` (below) keeps the last bit of every tab's content from
+   sitting underneath this fixed bar. */
+@media (max-width: 720px) {
+  .app-tabs {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    margin: 0;
+    border-radius: 0;
+    justify-content: space-around;
+    row-gap: 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
+    /* iOS home-indicator safe area -- a bare 4px padding leaves the last
+       row of tabs sitting under the gesture bar on notched devices. */
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+  .app-tab {
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 0;
+    padding: 6px 4px;
+    font-size: 0.68rem;
+  }
+  .app-tab-label {
+    white-space: nowrap;
+  }
+  .app-main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }
 
@@ -242,6 +310,36 @@ body {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* Reserves the horizontal gesture for the swipe-to-change-tab handler
+     (App.jsx) while leaving vertical scroll native -- `.table-scroll`
+     descendants (Debt's tables, Rules/Recurring's) still get their own
+     native horizontal scroll; App.jsx's pointer handlers separately bail
+     out of swipe-tracking when a gesture starts inside one, so the two
+     don't fight over the same drag. */
+  touch-action: pan-y;
+}
+
+/* A swipe-triggered tab change remounts this wrapper (`key={activeTab}`
+   in App.jsx), which restarts this animation on every tab switch -- a
+   plain CSS keyframe rather than a JS animation library, this app's usual
+   "hand-rolled over a dependency" choice for anything this small. */
+.tab-panel {
+  animation: tab-panel-enter 180ms ease-out;
+}
+@keyframes tab-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel {
+    animation: none;
+  }
 }
 
 .intro {
@@ -312,6 +410,14 @@ body {
 .field-icon {
   width: 15px;
   height: 15px;
+  flex: none;
+}
+/* Nav tab icons -- bigger than .field-icon since these sit alone in a tap
+   target (top bar inline with a label, bottom bar stacked above one)
+   rather than squeezed beside form text. */
+.nav-icon {
+  width: 20px;
+  height: 20px;
   flex: none;
 }
 
@@ -691,6 +797,16 @@ table.data tr:last-child td {
     padding: 7px 8px;
     white-space: nowrap;
   }
+  /* Same underlying issue as `.category-row .btn`'s identical mobile-only
+     fix above: `.btn.ghost` deliberately opts out of `.btn`'s 44px floor
+     for dense desktop rows, but a plain `<table class="data">` (Debt's
+     debt list, Rules/Recurring in TransactionsTab) is still shown on
+     mobile, where every tappable control needs a real touch target
+     regardless of which screen it's in. */
+  table.data .btn.ghost {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 .num {
   font-variant-numeric: tabular-nums;
@@ -732,10 +848,20 @@ table.data tr:last-child td {
   width: 120px;
   flex: none;
 }
+/* No fixed width/height here -- BlossomProgress.jsx sets those as SVG
+   attributes per instance (64px in GoalsTab, 36px in Dashboard's goal
+   preview cards below), and a CSS size here would win over that
+   per-instance sizing rather than just supplying a flex-layout default. */
 .goal-blossom {
   flex: none;
-  width: 64px;
-  height: 64px;
+}
+.goal-blossom-petal-filled {
+  fill: var(--accent);
+  stroke: none;
+}
+.goal-blossom-petal-empty {
+  fill: none;
+  stroke: var(--line);
 }
 .goal-info {
   flex: 1;
@@ -813,24 +939,10 @@ table.data tr:last-child td {
   font-weight: 600;
 }
 
-/* Dashboard category list: each category is its own card (see
-   `.money-card`, `.category-row:not(.category-head)`'s identical
-   reasoning above), closed out per income/expense block by a subtotal
-   card and a divider rule. Bold type alone read as barely different from
-   an ordinary card at a glance; a tinted background and an accent-colored
-   left edge make the subtotal a distinct callout the eye catches scanning
-   down the list, the same way `.headline`/`.stat` already stand out from
-   plain text elsewhere in this app. */
-.dash-category-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.dash-category-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+/* Shared stat-row layout -- Dashboard's bubble-detail drill-down panel
+   (planned/actual/remaining for the tapped category) is the only current
+   user, but it's generic enough to stay under this name rather than a
+   bubble-specific one. */
 .dash-card-stats {
   display: flex;
   flex-wrap: wrap;
@@ -842,30 +954,6 @@ table.data tr:last-child td {
   display: flex;
   align-items: baseline;
   gap: 4px;
-}
-.dash-total-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-weight: 700;
-  font-size: 0.95rem;
-  border-radius: 12px;
-  border-left: 3px solid var(--accent);
-  padding: 10px 14px;
-  /* Plain --panel-alt sits only a few RGB units off --panel in dark mode
-     -- too close to read as a highlight next to it. Blending in a slice
-     of --accent keeps the tint theme-consistent (it already differs
-     between light/dark) while giving real contrast either way. */
-  background: color-mix(in srgb, var(--accent) 14%, var(--panel-alt));
-}
-.dash-total-name {
-  display: block;
-}
-.dash-table-divider-line {
-  height: 2px;
-  background: var(--line);
-  border-radius: 1px;
-  margin: 2px 0;
 }
 .category-name {
   display: flex;
@@ -917,15 +1005,48 @@ table.data tr:last-child td {
   gap: 8px;
 }
 
-/* Shared rounded-card base for the three "cute" list layouts (the
-   Transactions list, the Dashboard category summary, and this file's own
-   `.category-row` below) -- one rule instead of three near-duplicate
-   blocks. Same background/radius `.goal-card` already uses elsewhere in
-   this file. */
+/* Shared rounded-card base for this app's "cute" card layouts -- the
+   Transactions list, Dashboard's bubble-detail drill-down and goal/debt
+   preview cards below, and this file's own `.category-row` further down
+   -- one rule instead of a near-duplicate block per caller. Same
+   background/radius `.goal-card` already uses elsewhere in this file. */
 .money-card {
   background: var(--panel-alt);
   border-radius: 12px;
   padding: 12px 14px;
+}
+
+/* Dashboard's Goals/Debt preview rows -- small, non-tabular cards
+   replacing what used to be a plain `table.data` (the exact "hard to
+   read on a phone" shape this redesign moved away from). A horizontal
+   `flex-wrap` row rather than a vertical stack: these are previews, not
+   the primary content of this screen, so they read as a compact strip
+   rather than competing for the same vertical rhythm as the bubble
+   charts above them. */
+.dash-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dash-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 220px;
+}
+.dash-preview-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash-preview-card-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.dash-preview-card-detail {
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
 /* Unassigned leads the tab: reaching zero IS zero-based budgeting, so it
@@ -1433,92 +1554,117 @@ table.data tr:last-child td {
   color: var(--muted);
 }
 
-/* justify-content: center means the svg+legend pair sits centered as a
-   compact group in the card, not pinned to the left with the legend
-   stretching to soak up whatever width is left over -- .pie-legend and
-   .pie-empty-hint both cap their own growth below so centering the group
-   actually has room to show, rather than one of them expanding to fill
-   the card and re-creating a left-pinned layout by another route. */
-.pie-chart-body {
+.dash-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* A visible cue for a brand-new interaction pattern -- the per-bubble
+   aria-label (BubbleChart.jsx) covers screen-reader discovery, but a
+   sighted first-time user needs the same "tap to see details" told to
+   them directly too (this app's own "obvious to use" rule). */
+.bubble-hint {
+  margin: 0 0 4px;
+}
+
+/* Bubbles sized by share of total (BubbleChart.jsx does the sizing math),
+   laid out as a wrapping flex row rather than true circle-packing physics
+   -- consistent with this app's hand-rolled-SVG-over-a-library stance
+   elsewhere, just without even the SVG here since a bubble is a plain
+   round button. flex-end alignment means bubbles of different sizes sit
+   on a shared baseline instead of vertically centering, which reads as a
+   loose, ungrounded cluster once diameters vary this much. */
+.bubble-grid {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 0;
+}
+.bubble {
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  gap: 2px;
+  color: #fff;
+  cursor: pointer;
+  /* Selection is shown as a ring outside the circle, not a color/size
+     change -- either of those would fight the size-encodes-value and
+     color-encodes-category meanings this chart already uses. */
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow 0.15s ease;
 }
-.pie-svg {
-  width: 140px;
-  height: 140px;
+.bubble svg {
+  width: 22px;
+  height: 22px;
   flex: none;
 }
-.pie-legend {
+.bubble-selected {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    transition: none;
+  }
+}
+.bubble-pct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* The empty-state placeholder shown before there's anything to chart --
+   muted enough to read as "nothing here yet" rather than a real,
+   single-category bubble. Same reasoning PieChart's old empty ring used. */
+.bubble-empty {
+  background: var(--muted-2);
+  opacity: 0.35;
+  cursor: default;
+}
+.chart-empty-hint {
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+/* The panel that opens below whichever chart owns the tapped bubble.
+   Reuses `.dash-card-stats`/`.dash-stat` for its planned/actual/remaining
+   row, same as every other stat row in this app. */
+.bubble-detail {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bubble-detail-tx-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  flex: 0 1 220px;
-  min-width: 180px;
+  gap: 4px;
 }
-.pie-legend li {
+.bubble-detail-tx-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   font-size: 0.82rem;
 }
-.pie-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 5px;
-  flex: none;
-}
-.pie-legend-label {
-  flex: 1;
-  color: var(--ink);
-}
-.pie-legend-value {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.pie-legend-pct {
+.bubble-detail-tx-date {
   color: var(--muted-2);
   font-variant-numeric: tabular-nums;
-  width: 3ch;
-  text-align: right;
+  flex: none;
 }
-.report-pies {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-/* The donut hole's center text -- SVG text has no line-height, so the two
-   lines are placed by hand via the x/y passed from PieChart rather than
-   stacked with CSS. */
-.pie-donut-label {
-  font-size: 9px;
-  fill: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.pie-donut-value {
-  font-size: 15px;
-  font-weight: 700;
-  fill: var(--ink);
-}
-
-/* The empty-state ring shown before there's anything to chart -- muted
-   enough to read as "nothing here yet" rather than a real, single-color
-   category. */
-.pie-empty-ring {
-  fill: var(--muted-2);
-  opacity: 0.35;
-}
-.pie-empty-hint {
-  flex: 0 1 220px;
-  min-width: 180px;
-  margin: 0;
+.bubble-detail-tx-desc {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
 }
 
 /* Dashboard landing tab -- month header, over/under-budget banner, and
@@ -1928,20 +2074,18 @@ table.data tr:last-child td {
   }
   /* .chart's background/text are dark-theme tokens that .panel's own
      print rule doesn't reach -- SpendChart/DebtChart never needed this
-     because neither renders on the Report tab, but the pie charts do. */
+     because neither renders on the Report tab, but BubbleChart does. */
   .chart {
     background: #fff;
     border: 1px solid #ddd;
   }
-  .pie-legend-label {
-    color: #111;
-  }
-  .pie-legend-value,
-  .pie-legend-pct {
+  .chart-empty-hint {
     color: #555;
   }
-  /* Same reasoning as .chart above -- the summary cards and status
-     banner use dark-theme panel tokens too. */
+  /* Same reasoning as .chart above -- .money-card (the bubble-detail
+     drill-down panel, goal/debt preview cards), the summary cards and the
+     status banner all use dark-theme panel tokens too. */
+  .money-card,
   .dash-card,
   .dash-status {
     background: #fff;
@@ -1963,24 +2107,6 @@ table.data tr:last-child td {
   .dash-status-detail,
   .dash-card-label {
     color: #555;
-  }
-  .pie-donut-value {
-    fill: #111;
-  }
-  .pie-donut-label {
-    fill: #555;
-  }
-  .pie-empty-ring {
-    fill: #ccc;
-  }
-  .pie-empty-hint {
-    color: #555;
-  }
-  /* Same reasoning again -- the Total/Savings cards use the same
-     accent-tinted dark-theme background. */
-  .dash-total-card {
-    background: #eef1f5;
-    border-left-color: #2f6fe0;
   }
 }
 
@@ -2017,7 +2143,12 @@ table.data tr:last-child td {
   }
   .app-main {
     gap: 16px;
-    padding: 16px 0 48px;
+    /* Bottom padding must stay wide enough to clear the fixed bottom tab
+       bar the 720px breakpoint introduces (see the earlier `.app-main`
+       rule) -- this block is a subset of that one (640px < 720px) and
+       used to override it back down to 48px via the shorthand, hiding
+       content behind the tab bar on every phone-width screen. */
+    padding: 16px 0 calc(64px + env(safe-area-inset-bottom));
   }
   .commitments-toggle {
     margin: 0 0 10px;
