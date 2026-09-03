@@ -40,6 +40,17 @@ afterEach(() => {
   // exist in jsdom by default); clean up so it doesn't leak between tests.
   delete window.showSaveFilePicker;
   delete window.showOpenFilePicker;
+  // A successful export writes a real "last exported" date to localStorage
+  // (some environments back jsdom's localStorage with real persistence
+  // across tests in the same file); clear it so one test's export doesn't
+  // leak into the next test's "never exported yet" expectation. Some local
+  // Node versions throw accessing the bare global here (the same reason
+  // lastExported.js itself wraps every call in try/catch), so this must too.
+  try {
+    localStorage.clear();
+  } catch {
+    // Not available in this environment; nothing to clear.
+  }
 });
 
 describe('export, without a File System Access picker', () => {
