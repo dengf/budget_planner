@@ -1499,6 +1499,15 @@ table.data tr:last-child td {
   font-size: 0.95rem;
   font-weight: 700;
 }
+/* The chart's own whole-month total, shown next to its title instead of
+   in a separate summary card -- the title is already this figure's label
+   ("Spending by category" / "Income by source"), so a standalone card
+   restating that label would be the same information twice. */
+.chart-total {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .chart-header {
   display: flex;
   align-items: center;
@@ -1871,12 +1880,6 @@ table.data tr:last-child td {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.dash-card-income .dash-card-value {
-  color: var(--positive);
-}
-.dash-card-spent .dash-card-value {
-  color: var(--negative);
-}
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
    failure is noticeable regardless of scroll position and can be dismissed. */
@@ -2094,12 +2097,6 @@ table.data tr:last-child td {
   .dash-card-value,
   .dash-status-headline {
     color: #111;
-  }
-  .dash-card-income .dash-card-value {
-    color: #1f7a3d;
-  }
-  .dash-card-spent .dash-card-value {
-    color: #b3261e;
   }
   .dash-status-over .dash-status-headline {
     color: #b3261e;
