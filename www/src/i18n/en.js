@@ -33,8 +33,6 @@ export default {
   'freq.quarterly': 'quarterly',
   'freq.yearly': 'yearly',
 
-  'budget.title': 'This month',
-  'budget.titleOtherMonth': 'Budget',
   'budget.viewingPastMonth': 'This month has ended — you can still adjust its plan.',
   'budget.viewingFutureMonth': 'Planning ahead for {month}.',
   'budget.income': 'Income this month',

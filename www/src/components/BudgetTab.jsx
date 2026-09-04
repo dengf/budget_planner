@@ -393,10 +393,6 @@ export default function BudgetTab({
   return (
     <div className="panel">
       <div className="dash-header">
-        <h2>
-          {t(isCurrentMonth ? 'budget.title' : 'budget.titleOtherMonth')} ·{' '}
-          {monthLabel(viewMonth, locale)}
-        </h2>
         <MonthYearPicker
           value={viewMonth}
           onChange={setViewMonth}
