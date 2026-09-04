@@ -321,9 +321,6 @@ export default function DashboardTab({
     });
   };
 
-  const hasIncome = (summary?.income ?? 0) > 0;
-  const isOverBudget = hasIncome && summary && summary.unspent < 0;
-
   return (
     <div className="panel report dashboard">
       <div className="dash-header">
@@ -336,22 +333,9 @@ export default function DashboardTab({
         />
       </div>
 
-      {summary && hasIncome && (
-        <div className={`dash-status${isOverBudget ? ' dash-status-over' : ' dash-status-good'}`}>
-          <span className="dash-status-headline">
-            {isOverBudget ? t('dashboard.overBudget') : t('dashboard.onTrack')}
-          </span>
-          <span className="dash-status-detail">
-            {isOverBudget
-              ? t('dashboard.overBudgetDetail', { amount: formatMoney(-summary.unspent) })
-              : t('dashboard.onTrackDetail', { amount: formatMoney(summary.unspent) })}
-          </span>
-        </div>
-      )}
-
       <div className="dash-summary-cards">
         <div className="dash-card">
-          <span className="dash-card-label">{t('budget.income')}</span>
+          <span className="dash-card-label">{t('dashboard.income')}</span>
           <span className="dash-card-value positive">
             {breakableMoney(formatMoney(summary?.income ?? 0))}
           </span>
@@ -363,7 +347,12 @@ export default function DashboardTab({
           </span>
         </div>
         {savingsLine && (
-          <div className="dash-card">
+          <div className="dash-card dash-card-savings">
+            <div
+              className={`dash-card-blossom ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}
+            >
+              <BlossomProgress filled={savingsLine.spent >= 0 ? 5 : 0} size={22} />
+            </div>
             <span className="dash-card-label">{t('budget.savings')}</span>
             <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
               {breakableMoney(formatMoney(savingsLine.spent))}
