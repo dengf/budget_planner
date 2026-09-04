@@ -5,7 +5,7 @@ import { daysInMonth, monthLabel } from '../month';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import CategoryBadge from './CategoryBadge';
 import BubbleChart from './BubbleChart';
-import BlossomProgress from './BlossomProgress';
+import BlossomProgress, { BlossomWatermark } from './BlossomProgress';
 import SpendOverTimeChart from './SpendOverTimeChart';
 import MonthYearPicker from './MonthYearPicker';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
@@ -350,31 +350,36 @@ export default function DashboardTab({
       </div>
 
       <div className="dash-summary-cards">
-        <div className="dash-card">
-          <span className="dash-card-label">{t('dashboard.income')}</span>
-          <span className="dash-card-value positive">
-            {breakableMoney(formatMoney(summary?.income ?? 0))}
-          </span>
-        </div>
-        <div className="dash-card">
-          <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
-          <span className="dash-card-value negative">
-            {breakableMoney(formatMoney(expenseTotals.spent))}
-          </span>
-        </div>
         {savingsLine && (
-          <div className="dash-card dash-card-savings">
-            <div
-              className={`dash-card-blossom ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}
-            >
-              <BlossomProgress filled={savingsLine.spent >= 0 ? 5 : 0} size={22} />
+          <div className="dash-card dash-card-hero dash-card-savings">
+            <BlossomWatermark className="dash-blossom-watermark" />
+            <div className="dash-card-hero-top">
+              <span className="dash-card-label">{t('budget.savings')}</span>
+              <div
+                className={`dash-card-blossom ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}
+              >
+                <BlossomProgress filled={savingsLine.spent >= 0 ? 5 : 0} size={26} />
+              </div>
             </div>
-            <span className="dash-card-label">{t('budget.savings')}</span>
             <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
               {breakableMoney(formatMoney(savingsLine.spent))}
             </span>
           </div>
         )}
+        <div className="dash-summary-secondary">
+          <div className="dash-card">
+            <span className="dash-card-label">{t('dashboard.income')}</span>
+            <span className="dash-card-value positive">
+              {breakableMoney(formatMoney(summary?.income ?? 0))}
+            </span>
+          </div>
+          <div className="dash-card">
+            <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
+            <span className="dash-card-value negative">
+              {breakableMoney(formatMoney(expenseTotals.spent))}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="dash-breakdowns">

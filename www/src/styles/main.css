@@ -36,6 +36,14 @@
   --negative-bg: #331a1a;
   --negative-border: #6b3030;
   --gold: #d9b46a;
+
+  /* The one hero surface per screen (Dashboard's Savings card, Budget's
+     unassigned banner) -- a plum-tinted wash distinct from --panel-alt's
+     neutral grey, so a hero card reads as a different *kind* of surface
+     rather than the same card at a bigger font size. Everything else
+     keeps --panel-alt; this token exists to be used sparingly. */
+  --panel-hero: #201220;
+  --hero-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
 @media (prefers-color-scheme: light) {
@@ -65,6 +73,9 @@
     --negative-bg: #fbeae9;
     --negative-border: #e7b7b3;
     --gold: #8a6a2c;
+
+    --panel-hero: #fdf1f4;
+    --hero-shadow: 0 8px 20px rgba(176, 18, 67, 0.12);
   }
 }
 
@@ -130,20 +141,22 @@ body {
 
 .app-switches {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 4px;
   flex-wrap: wrap;
 }
-/* The header's language picker -- a native <select> instead of the old
-   three-way button group (Header.jsx), so adding a fourth language later
-   is a catalog entry, not a wider row that eventually wraps or crowds the
-   currency/data-menu pills next to it. `.app-region`/`.app-region.active`
-   below are unrelated now (SpendOverTimeChart's Daily/Weekly toggle is
-   their only remaining caller) but keep the same pill sizing language. */
+/* The header's language picker -- a native <select>. Deliberately quiet
+   (no fill, no border) now that the header carries only this plus the
+   settings gear: a filled pill made sense when this sat in a row of
+   three similarly-weighted controls, but next to just the brand title
+   it doesn't need its own background to read as tappable. `.app-region`/
+   `.app-region.active` below are unrelated (SpendOverTimeChart's
+   Daily/Weekly toggle is their only remaining caller). */
 .app-language-select {
-  background: var(--panel-alt);
-  color: var(--ink);
+  background: transparent;
+  color: var(--muted);
   border: none;
-  padding: 6px 10px;
+  padding: 6px 8px;
   min-height: 44px;
   border-radius: 8px;
   cursor: pointer;
@@ -172,41 +185,48 @@ body {
 
 /* Replaces the old US/SG region toggle -- a free-form symbol someone types
    once covers more currencies than a two-option picker ever did, and this
-   app carries no other region-flavoured behavior for a toggle to justify. */
+   app carries no other region-flavoured behavior for a toggle to justify.
+   Now lives inside `YourDataMenu`'s dialog rather than the header row, so
+   this is a plain labeled field in a vertical list of dialog rows, not a
+   pill competing for space with the language select and the settings
+   trigger next to it. */
 .app-currency {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--panel-alt);
-  padding: 3px 10px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 10px;
   min-height: 44px;
   cursor: text;
 }
 .app-currency-label {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--muted);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
-/* "My data"'s trigger button, relocated here from the tab bar -- same
-   pill treatment as .app-region/.app-currency next to it, not .app-tab's
-   look (which now also carries the mobile bottom-bar's stacked-icon
-   layout, wrong for a header-row button). */
+/* The header's settings trigger (opens `YourDataMenu`'s dialog, which now
+   also carries the currency field above) -- a plain icon button, quiet
+   until pressed, matching the language select next to it rather than the
+   old filled text pill. A single small, low-frequency control instead of
+   a row of three is the point of this header pass. */
 .app-data-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   border: none;
-  background: var(--panel-alt);
+  background: transparent;
   color: var(--muted);
-  padding: 6px 10px;
-  min-height: 44px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 600;
+}
+.app-data-trigger:hover,
+.app-data-trigger:focus-visible,
+.app-data-trigger[aria-expanded='true'] {
+  background: var(--panel-alt);
+  color: var(--ink);
 }
 .app-currency-input {
   width: 40px;
@@ -272,19 +292,6 @@ body {
   .app-tabs {
     justify-content: center;
     row-gap: 8px;
-  }
-
-  /* Language + currency + "My data" overflowed a 375px row by a few
-     pixels, dropping "My data" onto its own line beneath -- an
-     unbalanced 2-then-1 wrap that pushes the whole page down for no
-     content reason. Tightening the row gap and the currency pill's own
-     padding (its widest neighbor) is enough to fit all three on one
-     row again. */
-  .app-switches {
-    gap: 8px;
-  }
-  .app-currency {
-    padding: 3px 8px;
   }
 }
 
@@ -642,7 +649,10 @@ body {
   justify-content: center;
   gap: 6px;
   border: none;
-  border-radius: 8px;
+  /* A rounder pill than the old 8px -- echoes the blossom mark's own
+     curvature (see MeifioMark.jsx/BlossomProgress.jsx) rather than the
+     generic 8px "SaaS card kit" radius used everywhere else. */
+  border-radius: 14px;
   padding: 10px 16px;
   min-height: 44px;
   font-size: 0.9rem;
@@ -650,6 +660,22 @@ body {
   cursor: pointer;
   background: var(--accent);
   color: var(--accent-ink);
+  transition: transform 0.1s ease;
+}
+/* Real tactile feedback on tap -- a focus ring alone (further down) tells
+   a keyboard user something is focused, but nothing previously told a
+   touch user their tap actually registered before the resulting screen
+   change arrives. */
+.btn:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+  .btn:active {
+    transform: none;
+  }
 }
 /* A <label> standing in for a file-picker button (see ReceiptCapture's
    PDF upload, TransactionsTab's CSV upload) needs the same look as a
@@ -715,6 +741,7 @@ label.btn {
 .stat-value {
   font-size: 1.35rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .headline {
@@ -815,6 +842,7 @@ table.data tr:last-child td {
 }
 .txn-amount {
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 /* A small ghost button still needs a real tap target -- `.btn.ghost`
    deliberately opts out of `.btn`'s 44px floor for dense desktop rows
@@ -1112,7 +1140,8 @@ table.data tr:last-child td {
   margin-bottom: 12px;
   background: var(--positive-bg);
   border: 1px solid var(--positive-border);
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: var(--hero-shadow);
 }
 .assign-label {
   font-size: 1.02rem;
@@ -1976,8 +2005,18 @@ table.data tr:last-child td {
 }
 
 .dash-summary-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* The two supporting figures (Income, Expenses) -- deliberately plainer
+   than the hero card below: no fill, just a top rule, smaller value type.
+   Three equal-weight boxes used to make Income/Expenses/Savings compete
+   for the same attention; this pair now reads as backup detail for the
+   one hero number. */
+.dash-summary-secondary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 .dash-card {
@@ -1990,11 +2029,17 @@ table.data tr:last-child td {
   /* A grid item's default min-width is `auto`, i.e. its content's own
      min-content size -- for an unbroken string like "$1,234,567.00" with
      no spaces, that's the whole string's width. Once that exceeds this
-     card's equal `1fr` share (mainly the 3-across mobile row below),
-     the column pushed itself wider and squeezed its two neighbors
-     lopsided instead of wrapping. This lets the column stay at its
-     fair share and hand the overflow to `.dash-card-value` instead. */
+     card's equal `1fr` share, the column pushed itself wider and squeezed
+     its neighbor lopsided instead of wrapping. This lets the column stay
+     at its fair share and hand the overflow to `.dash-card-value`
+     instead. */
   min-width: 0;
+}
+.dash-summary-secondary .dash-card {
+  background: transparent;
+  border-radius: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 2px 0;
 }
 .dash-card-label {
   font-size: 0.78rem;
@@ -2005,11 +2050,14 @@ table.data tr:last-child td {
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-  /* Lets a value too wide for its card (a large balance in the 3-across
+  /* Lets a value too wide for its card (a large balance in the 2-across
      mobile row, mainly) wrap onto a second line instead of forcing its
      column wider than its `1fr` share -- see `.dash-card`'s own
      min-width note just above. */
   overflow-wrap: anywhere;
+}
+.dash-summary-secondary .dash-card-value {
+  font-size: 1.1rem;
 }
 /* `.positive`/`.negative` (defined earlier, above `.dash-card-value`)
    otherwise lose this cascade -- same specificity, later rule wins, so
@@ -2022,18 +2070,39 @@ table.data tr:last-child td {
 .dash-card-value.negative {
   color: var(--negative);
 }
-/* Savings is the one summary card that doubles as the month's mood
-   indicator, so it gets a small blossom badge in its own corner instead
-   of just a colored number -- `position: relative` on the card anchors
-   the badge without disturbing the label/value stack's own flex layout. */
-.dash-card-savings {
+/* Savings is the number this whole screen exists to produce (the repo's
+   own "most prominent thing on screen" rule) -- its own tinted surface,
+   elevation and a large watermark of the brand blossom behind the figure
+   is this screen's one deliberately bold move; Income/Expenses next to
+   it stay flat and quiet on purpose. `overflow: hidden` clips the
+   watermark to the card's own rounded corners. */
+.dash-card-hero.dash-card-savings {
+  background: var(--panel-hero);
+  box-shadow: var(--hero-shadow);
+  border-radius: 18px;
+  padding: 20px 22px;
+  overflow: hidden;
   position: relative;
-  padding-right: 38px;
+}
+.dash-card-hero .dash-card-label {
+  font-size: 0.85rem;
+}
+.dash-card-hero .dash-card-value {
+  font-size: 2.3rem;
+}
+.dash-blossom-watermark {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  width: 120px;
+  height: 120px;
+  color: var(--accent);
+  opacity: 0.1;
+  pointer-events: none;
 }
 .dash-card-blossom {
-  position: absolute;
-  top: 10px;
-  right: 12px;
+  position: relative;
+  flex: none;
 }
 /* `BlossomProgress`'s empty petals default to `--line`, a neutral "not
    yet filled" outline that's nearly invisible against the dark theme and
@@ -2041,6 +2110,12 @@ table.data tr:last-child td {
    needs to actually look like bad news. */
 .dash-card-blossom.negative .goal-blossom-petal-empty {
   stroke: var(--negative);
+}
+.dash-card-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
@@ -2147,26 +2222,6 @@ table.data tr:last-child td {
    across unrelated components. */
 .data-menu {
   display: inline-flex;
-}
-/* A caret marks this as a dropdown, not a sixth tab -- the other five
-   nav buttons switch the main panel, this one opens a popup instead,
-   and nothing else in the row hints at that difference otherwise. */
-.data-menu-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.data-menu-caret {
-  flex: none;
-  transition: transform 0.15s ease;
-}
-.data-menu-trigger[aria-expanded='true'] .data-menu-caret {
-  transform: rotate(180deg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .data-menu-caret {
-    transition: none;
-  }
 }
 .data-menu-backdrop {
   position: fixed;

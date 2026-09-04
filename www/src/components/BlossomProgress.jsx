@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PETAL = 'M50 50 C41 46 34 38 34 27 A16 16 0 1 1 66 27 C66 38 59 46 50 50 Z';
+export const PETAL = 'M50 50 C41 46 34 38 34 27 A16 16 0 1 1 66 27 C66 38 59 46 50 50 Z';
 const ROTATIONS = [0, 72, 144, 216, 288];
 
 /**
@@ -38,6 +38,27 @@ export default function BlossomProgress({ filled = 0, size = 64 }) {
           className={i < filled ? 'goal-blossom-petal-filled' : 'goal-blossom-petal-empty'}
           strokeWidth={i < filled ? 0 : 2}
         />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * A large, low-opacity rendering of the same five-petal path, purely
+ * decorative -- the one place this app spends visual boldness on its own
+ * brand mark instead of a generic gradient/pattern, behind Dashboard's
+ * hero Savings figure (see `.dash-blossom-watermark` in main.css, which
+ * sets the actual size/position/opacity/color; this component only
+ * draws the shape). Reuses `PETAL` rather than a second copy of the path
+ * string, same reasoning as `BlossomProgress` itself. `aria-hidden`
+ * because it carries no information -- the real progress indicator is
+ * `BlossomProgress` above.
+ */
+export function BlossomWatermark({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" aria-hidden="true">
+      {ROTATIONS.map((angle) => (
+        <path key={angle} d={PETAL} fill="currentColor" transform={`rotate(${angle} 50 50)`} />
       ))}
     </svg>
   );

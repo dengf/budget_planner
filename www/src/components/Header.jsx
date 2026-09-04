@@ -52,24 +52,15 @@ export default function Header({
             ))}
           </select>
 
-          {onCurrencySymbolChange && (
-            <label className="app-currency">
-              <span className="app-currency-label">{t('app.currency')}</span>
-              <input
-                type="text"
-                className="app-currency-input"
-                value={currencySymbol}
-                maxLength={3}
-                onChange={(e) => onCurrencySymbolChange(e.target.value)}
-              />
-            </label>
-          )}
-
           {/* "My data" lives in the header row, not the tab bar below --
-              it's a menu of rare, whole-app actions (export/import/clear),
-              not a screen someone navigates to, and doesn't deserve one of
-              the five thumb-reach slots the mobile bottom bar has room
-              for. */}
+              it's a menu of rare, whole-app actions (export/import/clear,
+              plus the currency symbol below), not a screen someone
+              navigates to, and doesn't deserve one of the five
+              thumb-reach slots the mobile bottom bar has room for.
+              Folded into one gear icon instead of its own pill plus a
+              separate currency field, so the header is a title and two
+              small controls rather than a row of settings widgets on
+              every single screen. */}
           <YourDataMenu
             wasmModule={wasmModule}
             today={today}
@@ -83,6 +74,8 @@ export default function Header({
             recurring={recurring}
             clearAllData={clearAllData}
             importData={importData}
+            currencySymbol={currencySymbol}
+            onCurrencySymbolChange={onCurrencySymbolChange}
           />
         </div>
       </header>
