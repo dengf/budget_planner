@@ -1785,8 +1785,9 @@ table.data tr:last-child td {
    the title and the full month nav (two 44px touch-target buttons plus
    "September 2026") don't both fit on one 375px-wide row at their
    default sizes, and the buttons can't shrink below the 44px touch-
-   target floor. Text is what gives, scoped to this tab's own instances
-   of these shared classes so Budget/Transactions keep their full size. */
+   target floor. Text is what gives, scoped to this tab's own instance
+   of `.dash-header h2` (Budget has no title in its header to compete
+   with the picker, so it doesn't need this). */
 .dashboard .dash-header {
   gap: 8px;
 }
@@ -1794,8 +1795,25 @@ table.data tr:last-child td {
   min-width: 0;
   font-size: 0.95rem;
 }
-.dashboard .dash-month-label {
+/* Same month-label size everywhere `MonthYearPicker` renders (Dashboard,
+   Budget, Transactions), so the one piece of UI that appears on all three
+   reads identically -- a shared component drifting in size between tabs
+   it renders on unchanged is the kind of inconsistency this app's
+   "obvious to use" rule calls out. */
+.dashboard .dash-month-label,
+.budget .dash-month-label,
+.transactions-month-header .dash-month-label {
   font-size: 0.85rem;
+}
+/* No title left in Budget's header (see BudgetTab.jsx) to anchor the
+   month nav to the left, so pin it to the right instead of letting
+   `.dash-header`'s `space-between` leave a single flex child stranded
+   at the start. Transactions doesn't need this: its month header already
+   has a second element (the "show all months" checkbox) filling the
+   opposite side, so `space-between` there is doing real work, not
+   stranding anything. */
+.budget .dash-header {
+  justify-content: flex-end;
 }
 /* Transactions' month header reuses .dash-header's layout for its own
    picker + "show all months" checkbox row. */

@@ -391,7 +391,7 @@ export default function BudgetTab({
   const hasBudget = hasIncome && (summary?.total_planned ?? 0) > 0;
 
   return (
-    <div className="panel">
+    <div className="panel budget">
       <div className="dash-header">
         <MonthYearPicker
           value={viewMonth}
