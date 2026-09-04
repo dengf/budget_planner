@@ -29,6 +29,7 @@ export default {
   'freq.quarterly': '每季度',
   'freq.yearly': '每年',
 
+  'budget.title': '预算',
   'budget.viewingPastMonth': '该月已结束 — 你仍然可以调整它的计划。',
   'budget.viewingFutureMonth': '正在为{month}提前规划。',
   'budget.income': '本月收入',
@@ -133,7 +134,7 @@ export default {
   'cat.otherExpenses.desc': '不属于以上分类的其他支出。',
 
   'transactions.title': '账目',
-  'transactions.listTitle': '所有账目',
+  'transactions.listTitle': '记录',
   'transactions.addManual': '添加一笔账目',
   'transactions.date': '日期',
   'transactions.description': '说明',

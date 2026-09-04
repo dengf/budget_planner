@@ -393,6 +393,7 @@ export default function BudgetTab({
   return (
     <div className="panel budget">
       <div className="dash-header">
+        <h2>{t('budget.title')}</h2>
         <MonthYearPicker
           value={viewMonth}
           onChange={setViewMonth}

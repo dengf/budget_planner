@@ -520,13 +520,15 @@ export default function TransactionsTab({
       </form>
       <p className="field-label">{t('recurring.anchorHint')}</p>
 
-      <h2 className="section-start">{t('transactions.listTitle')}</h2>
-
       {transactions.items.length === 0 ? (
-        <p className="empty-state">{t('transactions.noTransactions')}</p>
+        <>
+          <h2 className="section-start">{t('transactions.listTitle')}</h2>
+          <p className="empty-state">{t('transactions.noTransactions')}</p>
+        </>
       ) : (
         <>
           <div className="dash-header transactions-month-header">
+            <h2 className="section-start">{t('transactions.listTitle')}</h2>
             {/* Kept interactive (not disabled) while "all months" is
                 checked -- picking a month here still narrows the list back
                 down the moment "all months" is unchecked. */}
@@ -538,15 +540,15 @@ export default function TransactionsTab({
                 locale={locale}
               />
             </div>
-            <label className="field field-check">
-              <input
-                type="checkbox"
-                checked={showAllMonths}
-                onChange={(e) => setShowAllMonths(e.target.checked)}
-              />
-              <span>{t('transactions.showAllMonths')}</span>
-            </label>
           </div>
+          <label className="field field-check">
+            <input
+              type="checkbox"
+              checked={showAllMonths}
+              onChange={(e) => setShowAllMonths(e.target.checked)}
+            />
+            <span>{t('transactions.showAllMonths')}</span>
+          </label>
           {visibleTransactions.length === 0 ? (
             <p className="empty-state">
               {showAllMonths
