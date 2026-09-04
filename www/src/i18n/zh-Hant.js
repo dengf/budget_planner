@@ -29,8 +29,6 @@ export default {
   'freq.quarterly': '每季',
   'freq.yearly': '每年',
 
-  'budget.title': '本月',
-  'budget.titleOtherMonth': '預算',
   'budget.viewingPastMonth': '該月已結束 — 你仍然可以調整它的計劃。',
   'budget.viewingFutureMonth': '正在為{month}提前規劃。',
   'budget.income': '本月收入',

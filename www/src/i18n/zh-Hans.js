@@ -29,8 +29,6 @@ export default {
   'freq.quarterly': '每季度',
   'freq.yearly': '每年',
 
-  'budget.title': '本月',
-  'budget.titleOtherMonth': '预算',
   'budget.viewingPastMonth': '该月已结束 — 你仍然可以调整它的计划。',
   'budget.viewingFutureMonth': '正在为{month}提前规划。',
   'budget.income': '本月收入',
