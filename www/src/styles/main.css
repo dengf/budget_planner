@@ -1719,9 +1719,18 @@ table.data tr:last-child td {
   text-align: center;
 }
 
-/* The panel that opens below whichever chart owns the tapped bubble.
-   Reuses `.dash-card-stats`/`.dash-stat` for its planned/actual/remaining
-   row, same as every other stat row in this app. */
+/* Forces a line break in `.bubble-grid`'s `flex-wrap` right where it
+   sits -- a 100%-width flex item always starts its own row, so placing
+   this immediately after the tapped bubble in DOM order (BubbleChart.jsx)
+   lands the detail panel directly under that bubble's own row instead of
+   below every other bubble in the grid. */
+.bubble-detail-slot {
+  flex-basis: 100%;
+  width: 100%;
+}
+/* The panel that opens right under the tapped bubble's row. Reuses
+   `.dash-card-stats`/`.dash-stat` for its planned/actual/remaining row,
+   same as every other stat row in this app. */
 .bubble-detail {
   margin-top: 10px;
   display: flex;

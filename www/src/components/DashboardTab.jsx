@@ -389,8 +389,8 @@ export default function DashboardTab({
             emptyHint={t('chart.noExpenseYet')}
             selectedId={selectedCategoryId}
             onSelect={setSelectedCategoryId}
+            detail={drilldown(expenseSlices.map((s) => s.id))}
           />
-          {drilldown(expenseSlices.map((s) => s.id))}
         </div>
         <div>
           <BubbleChart
@@ -402,8 +402,8 @@ export default function DashboardTab({
             emptyHint={t('chart.noIncomeYet')}
             selectedId={selectedCategoryId}
             onSelect={setSelectedCategoryId}
+            detail={drilldown(incomeSlices.map((s) => s.id))}
           />
-          {drilldown(incomeSlices.map((s) => s.id))}
         </div>
       </div>
 

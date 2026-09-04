@@ -72,4 +72,36 @@ describe('BubbleChart', () => {
     fireEvent.click(container.querySelectorAll('.bubble')[0]);
     expect(onSelect).toHaveBeenCalledWith(null);
   });
+
+  it('renders the detail slot immediately after the selected item, not after every item', () => {
+    const { container } = render(
+      <BubbleChart
+        title="Spending"
+        items={items}
+        formatMoney={formatMoney}
+        selectedId="a"
+        onSelect={() => {}}
+        detail={<p>Housing details</p>}
+      />,
+    );
+    const grid = container.querySelector('.bubble-grid');
+    const children = [...grid.children];
+    const itemIndex = children.findIndex((c) => c.textContent.includes('Housing'));
+    expect(children[itemIndex + 1]).toHaveClass('bubble-detail-slot');
+    expect(children[itemIndex + 1].textContent).toBe('Housing details');
+  });
+
+  it('does not render a detail slot for an unselected item', () => {
+    const { container } = render(
+      <BubbleChart
+        title="Spending"
+        items={items}
+        formatMoney={formatMoney}
+        selectedId="a"
+        onSelect={() => {}}
+        detail={<p>Housing details</p>}
+      />,
+    );
+    expect(container.querySelectorAll('.bubble-detail-slot').length).toBe(1);
+  });
 });

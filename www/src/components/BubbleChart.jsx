@@ -52,6 +52,14 @@ const PCT_LABEL_MIN_D = 72;
  * can render the same icon in the same color family and be
  * indistinguishable without it. The name is the one label that always
  * disambiguates, preset icon or not.
+ *
+ * `detail`, optional, is the already-built drill-down panel for whichever
+ * item in this chart is currently `selectedId` (Dashboard computes it,
+ * since it needs data this component doesn't have -- planned/actual
+ * amounts, transactions). Rendered inline in the bubble grid immediately
+ * after the selected item rather than below the whole chart, so it lands
+ * right under the tapped bubble regardless of which row that bubble
+ * wrapped onto.
  */
 export default function BubbleChart({
   title,
@@ -63,6 +71,7 @@ export default function BubbleChart({
   emptyHint,
   selectedId,
   onSelect,
+  detail,
 }) {
   const total = items.reduce((sum, i) => sum + i.value, 0);
   const isEmpty = total <= 0;
@@ -96,24 +105,33 @@ export default function BubbleChart({
             const Icon = CATEGORY_ICONS[categoryIconId(item.category)];
             const isSelected = selectedId === item.id;
             return (
-              <div className="bubble-item" key={item.id}>
-                <button
-                  type="button"
-                  className={isSelected ? 'bubble bubble-selected' : 'bubble'}
-                  style={{
-                    width: diameter,
-                    height: diameter,
-                    background: categoryColor(item.category),
-                  }}
-                  aria-pressed={isSelected}
-                  aria-label={`${item.label}, ${formatMoney(item.value)}, ${pct}%`}
-                  onClick={() => onSelect(isSelected ? null : item.id)}
-                >
-                  <Icon />
-                  {diameter >= PCT_LABEL_MIN_D && <span className="bubble-pct">{pct}%</span>}
-                </button>
-                <span className="bubble-label">{item.label}</span>
-              </div>
+              <React.Fragment key={item.id}>
+                <div className="bubble-item">
+                  <button
+                    type="button"
+                    className={isSelected ? 'bubble bubble-selected' : 'bubble'}
+                    style={{
+                      width: diameter,
+                      height: diameter,
+                      background: categoryColor(item.category),
+                    }}
+                    aria-pressed={isSelected}
+                    aria-label={`${item.label}, ${formatMoney(item.value)}, ${pct}%`}
+                    onClick={() => onSelect(isSelected ? null : item.id)}
+                  >
+                    <Icon />
+                    {diameter >= PCT_LABEL_MIN_D && <span className="bubble-pct">{pct}%</span>}
+                  </button>
+                  <span className="bubble-label">{item.label}</span>
+                </div>
+                {/* A `width: 100%` flex item forces a line break right where
+                    it sits in a `flex-wrap` container -- placing it here,
+                    immediately after the tapped bubble in DOM order, lands
+                    the detail card on its own row directly under whichever
+                    row that bubble is in, not below every other bubble in
+                    the grid regardless of how it wraps. */}
+                {isSelected && detail && <div className="bubble-detail-slot">{detail}</div>}
+              </React.Fragment>
             );
           })}
         </div>
