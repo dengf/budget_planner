@@ -256,8 +256,9 @@ export default {
   'debt.balanceRemaining': 'Remaining',
 
   'dashboard.title': 'Dashboard',
+  'dashboard.income': 'Income',
   'dashboard.totalIncome': 'Total income',
-  'dashboard.totalExpenses': 'Total expenses',
+  'dashboard.totalExpenses': 'Expenses',
   'dashboard.bubbleHint': 'Tap a category to see details',
   'dashboard.moreTransactions': '+{count} more this month',
   'dashboard.overBudget': "You're over budget this month",

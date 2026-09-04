@@ -234,8 +234,9 @@ export default {
   'debt.balanceRemaining': '剩余',
 
   'dashboard.title': '仪表盘',
+  'dashboard.income': '收入',
   'dashboard.totalIncome': '收入总计',
-  'dashboard.totalExpenses': '支出总计',
+  'dashboard.totalExpenses': '支出',
   'dashboard.bubbleHint': '点击某个分类以查看详情',
   'dashboard.moreTransactions': '本月还有 {count} 笔',
   'dashboard.overBudget': '本月已超出预算',

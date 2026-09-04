@@ -990,7 +990,6 @@ table.data tr:last-child td {
 .category-row-savings {
   font-weight: 600;
 }
-
 /* Shared stat-row layout -- Dashboard's bubble-detail drill-down panel
    (planned/actual/remaining for the tapped category) is the only current
    user, but it's generic enough to stay under this name rather than a
@@ -1773,6 +1772,22 @@ table.data tr:last-child td {
   flex: 1 1 auto;
   min-width: 200px;
 }
+/* Dashboard only (not Transactions' reuse of `.dash-header` below) --
+   the title and the full month nav (two 44px touch-target buttons plus
+   "September 2026") don't both fit on one 375px-wide row at their
+   default sizes, and the buttons can't shrink below the 44px touch-
+   target floor. Text is what gives, scoped to this tab's own instances
+   of these shared classes so Budget/Transactions keep their full size. */
+.dashboard .dash-header {
+  gap: 8px;
+}
+.dashboard .dash-header h2 {
+  min-width: 0;
+  font-size: 0.95rem;
+}
+.dashboard .dash-month-label {
+  font-size: 0.85rem;
+}
 /* Transactions' month header reuses .dash-header's layout for its own
    picker + "show all months" checkbox row. */
 .transactions-month-header {
@@ -1911,31 +1926,6 @@ table.data tr:last-child td {
   min-height: 44px;
 }
 
-.dash-status {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-radius: 12px;
-  padding: 12px 16px;
-  background: var(--positive-bg);
-  border: 1px solid var(--positive-border);
-}
-.dash-status-over {
-  background: var(--negative-bg);
-  border-color: var(--negative-border);
-}
-.dash-status-headline {
-  font-weight: 700;
-  color: var(--positive);
-}
-.dash-status-over .dash-status-headline {
-  color: var(--negative);
-}
-.dash-status-detail {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
 .dash-summary-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1982,6 +1972,26 @@ table.data tr:last-child td {
 }
 .dash-card-value.negative {
   color: var(--negative);
+}
+/* Savings is the one summary card that doubles as the month's mood
+   indicator, so it gets a small blossom badge in its own corner instead
+   of just a colored number -- `position: relative` on the card anchors
+   the badge without disturbing the label/value stack's own flex layout. */
+.dash-card-savings {
+  position: relative;
+  padding-right: 38px;
+}
+.dash-card-blossom {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+/* `BlossomProgress`'s empty petals default to `--line`, a neutral "not
+   yet filled" outline that's nearly invisible against the dark theme and
+   doesn't read as "bad" at all -- used as a mood indicator here, filled=0
+   needs to actually look like bad news. */
+.dash-card-blossom.negative .goal-blossom-petal-empty {
+  stroke: var(--negative);
 }
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
@@ -2189,22 +2199,16 @@ table.data tr:last-child td {
     color: #555;
   }
   /* Same reasoning as .chart above -- .money-card (the bubble-detail
-     drill-down panel, goal/debt preview cards), the summary cards and the
-     status banner all use dark-theme panel tokens too. */
+     drill-down panel, goal/debt preview cards) and the summary cards
+     both use dark-theme panel tokens too. */
   .money-card,
-  .dash-card,
-  .dash-status {
+  .dash-card {
     background: #fff;
     border: 1px solid #ddd;
   }
-  .dash-card-value,
-  .dash-status-headline {
+  .dash-card-value {
     color: #111;
   }
-  .dash-status-over .dash-status-headline {
-    color: #b3261e;
-  }
-  .dash-status-detail,
   .dash-card-label {
     color: #555;
   }
@@ -2255,12 +2259,9 @@ table.data tr:last-child td {
     font-size: 0.88rem;
   }
 
-  /* Income/Expenses/Savings compacted to one row that always fits three
-     real columns (the default auto-fit minmax(160px, ...) wraps to two
-     on a 375px phone, pushing the third card -- usually Savings -- below
-     the fold along with everything else, the opposite of "an overview
-     without scrolling"). Smaller label/value type is what makes three
-     columns legible at this width instead of truncating. */
+  /* Income/Expenses/Savings side by side in one row rather than the
+     default auto-fit minmax(160px, ...) wrap, which would stack them on
+     a 375px phone. */
   .dash-summary-cards {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
@@ -2270,9 +2271,9 @@ table.data tr:last-child td {
     gap: 4px;
   }
   /* Reserves 2 lines regardless of whether this card's own label actually
-     wraps ("Savings" fits on one, "Income this month"/"Total expenses"
-     usually don't) -- without it, the shorter label's value sits visibly
-     higher than its neighbors', an uneven row of three. */
+     wraps ("Income this month"/"Total expenses" usually do) -- without
+     it, a shorter label's value would sit visibly higher than its
+     neighbor's, an uneven row. */
   .dash-card-label {
     font-size: 0.72rem;
     line-height: 1.15;
@@ -2280,5 +2281,15 @@ table.data tr:last-child td {
   }
   .dash-card-value {
     font-size: 1.05rem;
+  }
+  /* `.dash-card`'s own shorthand `padding` just above would otherwise win
+     (same specificity, later in source) and collapse the badge clearance
+     `.dash-card-savings` sets at desktop width. */
+  .dash-card-savings {
+    padding-right: 30px;
+  }
+  .dash-card-blossom {
+    top: 8px;
+    right: 6px;
   }
 }

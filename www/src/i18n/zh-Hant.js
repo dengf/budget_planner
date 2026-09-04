@@ -234,8 +234,9 @@ export default {
   'debt.balanceRemaining': '剩餘',
 
   'dashboard.title': '儀表板',
+  'dashboard.income': '收入',
   'dashboard.totalIncome': '收入總計',
-  'dashboard.totalExpenses': '支出總計',
+  'dashboard.totalExpenses': '支出',
   'dashboard.bubbleHint': '點擊某個分類以查看詳情',
   'dashboard.moreTransactions': '本月還有 {count} 筆',
   'dashboard.overBudget': '本月已超出預算',
