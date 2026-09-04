@@ -8,9 +8,6 @@ import { CATEGORY_ICONS } from './CategoryIcons';
 // `.bubble-grid`).
 const MIN_D = 56;
 const MAX_D = 140;
-// A bubble only gets room for the percentage overlay once it's big enough
-// for the text not to collide with the icon.
-const PCT_LABEL_MIN_D = 72;
 
 /**
  * A breakdown by category as tap-to-drill-down bubbles, sized by share of
@@ -120,7 +117,7 @@ export default function BubbleChart({
                     onClick={() => onSelect(isSelected ? null : item.id)}
                   >
                     <Icon />
-                    {diameter >= PCT_LABEL_MIN_D && <span className="bubble-pct">{pct}%</span>}
+                    <span className="bubble-pct">{pct}%</span>
                   </button>
                   <span className="bubble-label">{item.label}</span>
                 </div>
