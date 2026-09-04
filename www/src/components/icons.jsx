@@ -50,6 +50,26 @@ export function SpreadsheetIcon() {
 }
 
 /**
+ * Header trigger for `YourDataMenu` -- three preference sliders, not a
+ * gear: a radiating-spokes gear at header-icon size reads as a sun/
+ * brightness toggle instead (tried first, looked wrong against a real
+ * screenshot), and this app has no light/dark toggle to confuse it with
+ * anyway (theme follows `prefers-color-scheme` only). Sized via
+ * `nav-icon` rather than the inherited `.field-icon` -- like the bottom
+ * nav's icons, this one stands alone in its own 44px tap target instead
+ * of sitting beside label text. */
+export function SettingsIcon() {
+  return (
+    <svg {...ICON_PROPS} className="nav-icon" aria-hidden="true">
+      <path d="M4 7h20M4 12h20M4 17h20" />
+      <circle cx="15" cy="7" r="2.4" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="12" r="2.4" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="17" r="2.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/**
  * Bottom/top nav icons -- same thin-stroke convention as the three
  * above, not CategoryIcons.jsx's soft-filled register (that one is
  * reserved for category badges only, see that file's own comment). A

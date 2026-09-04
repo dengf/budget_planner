@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { EXPORT_FORMAT } from '../backup';
 import { loadLastExported, saveLastExported } from '../lastExported';
+import { SettingsIcon } from './icons';
 
 // Chrome/Edge/Android can save/open straight through a native picker,
 // which is what lets someone point an export at a folder their OS already
@@ -58,6 +59,8 @@ export default function YourDataMenu({
   recurring,
   clearAllData,
   importData,
+  currencySymbol,
+  onCurrencySymbolChange,
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
@@ -201,25 +204,10 @@ export default function YourDataMenu({
         className="app-data-trigger data-menu-trigger"
         aria-haspopup="true"
         aria-expanded={open}
+        aria-label={t('data.title')}
         onClick={openMenu}
       >
-        {t('data.title')}
-        <svg
-          className="data-menu-caret"
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          aria-hidden="true"
-        >
-          <path
-            d="M1.5 3.5L5 7L8.5 3.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <SettingsIcon />
       </button>
 
       {/* Deliberately NOT inside .data-menu-dialog (position: fixed) --
@@ -258,6 +246,18 @@ export default function YourDataMenu({
                 ×
               </button>
             </div>
+            {onCurrencySymbolChange && (
+              <label className="app-currency">
+                <span className="app-currency-label">{t('app.currency')}</span>
+                <input
+                  type="text"
+                  className="app-currency-input"
+                  value={currencySymbol}
+                  maxLength={3}
+                  onChange={(e) => onCurrencySymbolChange(e.target.value)}
+                />
+              </label>
+            )}
             <p className="panel-subtitle">{t('data.exportHint')}</p>
             <p className="panel-subtitle">
               {lastExported
