@@ -162,6 +162,18 @@ What this means in practice:
   a delete button is a trap.
 - **Check it on a phone before calling it done.** Layout bugs in this
   codebase have shown up on narrow screens first, more than once.
+- **A component shared across tabs must look the same everywhere it
+  renders, unless a specific constraint forces a difference.** `dash-header` /
+  `dash-month-nav` / `MonthYearPicker` render on Dashboard, Budget and
+  Transactions; a font size or alignment tweak made while touching one
+  tab's CSS has drifted from the others more than once (e.g. Budget's
+  month label sitting at a different size than Dashboard's until this was
+  caught). When a shared class changes, check every tab that renders it,
+  not just the one on screen. A real exception is still fine — Dashboard's
+  `.dashboard .dash-header h2` font shrink exists only because the title
+  and full month nav don't both fit a 375px row there — but it must be a
+  documented, deliberate exception, not an accidental side effect of
+  editing one tab in isolation.
 
 When a change is reviewed, "does this work?" and "would a first-time user
 understand this?" carry equal weight. The second question is the one that
