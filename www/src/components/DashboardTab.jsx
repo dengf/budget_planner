@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
@@ -60,8 +60,24 @@ export default function DashboardTab({
   const [recipients, setRecipients] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [goalProgress, setGoalProgress] = useState({});
+  const detailRef = useRef(null);
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
+
+  // The tapped bubble's detail card renders after the whole bubble grid
+  // (see `drilldown` below), which can sit a full row or two of bubbles
+  // below the one actually tapped -- easy to miss without scrolling.
+  // Bringing it into view on tap, rather than making the user go find it,
+  // is the fix; `smooth` degrades to an instant jump under
+  // prefers-reduced-motion, matching this app's convention elsewhere.
+  useEffect(() => {
+    if (!selectedCategoryId || !detailRef.current) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    detailRef.current.scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'nearest',
+    });
+  }, [selectedCategoryId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,7 +264,7 @@ export default function DashboardTab({
     const shown = monthTx.slice(0, 5);
     const moreCount = monthTx.length - shown.length;
     return (
-      <div className="bubble-detail money-card">
+      <div className="bubble-detail money-card" ref={detailRef}>
         <div className="category-name">
           <CategoryBadge category={categoryFor(selectedCategoryId)} />
           {categoryName(selectedCategoryId)}
