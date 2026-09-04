@@ -33,6 +33,7 @@ export default {
   'freq.quarterly': 'quarterly',
   'freq.yearly': 'yearly',
 
+  'budget.title': 'Budget',
   'budget.viewingPastMonth': 'This month has ended — you can still adjust its plan.',
   'budget.viewingFutureMonth': 'Planning ahead for {month}.',
   'budget.income': 'Income this month',
@@ -149,7 +150,7 @@ export default {
   'cat.otherExpenses.desc': "Any other expense that doesn't fit the categories above.",
 
   'transactions.title': 'Transactions',
-  'transactions.listTitle': 'All transactions',
+  'transactions.listTitle': 'History',
   'transactions.addManual': 'Add a transaction',
   'transactions.date': 'Date',
   'transactions.description': 'Description',

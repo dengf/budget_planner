@@ -1764,11 +1764,20 @@ table.data tr:last-child td {
 }
 
 /* Dashboard landing tab -- month header, over/under-budget banner, and
-   the income/spent summary cards above the existing report content. */
+   the income/spent summary cards above the existing report content.
+   Every tab that renders this (Dashboard, Budget, Transactions) puts a
+   title first and `MonthYearPicker` second, title left / picker right.
+   `justify-content: flex-end` plus the title's own `margin-right: auto`
+   below produces the same layout as `space-between` when both fit one
+   row, but -- unlike `space-between` -- still pins the picker to the
+   right if the title alone doesn't fit and wraps to its own line first,
+   instead of stranding the picker at the left on whatever's left of that
+   second line. One shared rule so all three tabs get this for free
+   rather than each needing its own wrap-safety fix. */
 .dash-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -1780,18 +1789,28 @@ table.data tr:last-child td {
 .dash-header h2 {
   flex: 1 1 auto;
   min-width: 200px;
+  margin-right: auto;
 }
-/* Dashboard only (not Transactions' reuse of `.dash-header` below) --
-   the title and the full month nav (two 44px touch-target buttons plus
+/* A title and the full month nav (two 44px touch-target buttons plus
    "September 2026") don't both fit on one 375px-wide row at their
    default sizes, and the buttons can't shrink below the 44px touch-
-   target floor. Text is what gives, scoped to this tab's own instance
-   of `.dash-header h2` (Budget has no title in its header to compete
-   with the picker, so it doesn't need this). */
-.dashboard .dash-header {
+   target floor. Text is what gives -- one shared rule for every tab's
+   `.dash-header h2`/month-label, so Dashboard, Budget and Transactions
+   all shrink the same way instead of drifting per-tab. Transactions'
+   title ("Transactions") and Dashboard's/Budget's are all short enough
+   to fit alongside the picker at this size on real phone widths; if a
+   future title doesn't, `.dash-header`'s own `flex-end` + `h2`'s
+   `margin-right: auto` (above) still keeps the picker right-aligned
+   rather than stranded, so a too-long title degrades to two rows without
+   ever breaking the layout. */
+.dashboard .dash-header,
+.budget .dash-header,
+.transactions-month-header {
   gap: 8px;
 }
-.dashboard .dash-header h2 {
+.dashboard .dash-header h2,
+.budget .dash-header h2,
+.transactions-month-header h2 {
   min-width: 0;
   font-size: 0.95rem;
 }
@@ -1805,20 +1824,23 @@ table.data tr:last-child td {
 .transactions-month-header .dash-month-label {
   font-size: 0.85rem;
 }
-/* No title left in Budget's header (see BudgetTab.jsx) to anchor the
-   month nav to the left, so pin it to the right instead of letting
-   `.dash-header`'s `space-between` leave a single flex child stranded
-   at the start. Transactions doesn't need this: its month header already
-   has a second element (the "show all months" checkbox) filling the
-   opposite side, so `space-between` there is doing real work, not
-   stranding anything. */
-.budget .dash-header {
-  justify-content: flex-end;
-}
 /* Transactions' month header reuses .dash-header's layout for its own
-   picker + "show all months" checkbox row. */
+   title + picker row; the section-start divider moves here from the h2
+   itself so it spans the full row instead of just the h2's own (now
+   flex-shrunk) box. */
 .transactions-month-header {
   margin-bottom: 4px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
+}
+.transactions-month-header h2.section-start {
+  padding-top: 0;
+  border-top: none;
+}
+.transactions-month-header h2.section-start {
+  padding-top: 0;
+  border-top: none;
+  margin-right: auto;
 }
 /* Not disabled -- still tappable while "all months" is checked, just
    visually secondary since it isn't driving the list right now. */

@@ -29,6 +29,7 @@ export default {
   'freq.quarterly': '每季',
   'freq.yearly': '每年',
 
+  'budget.title': '預算',
   'budget.viewingPastMonth': '該月已結束 — 你仍然可以調整它的計劃。',
   'budget.viewingFutureMonth': '正在為{month}提前規劃。',
   'budget.income': '本月收入',
@@ -133,7 +134,7 @@ export default {
   'cat.otherExpenses.desc': '不屬於以上分類的其他支出。',
 
   'transactions.title': '帳目',
-  'transactions.listTitle': '所有帳目',
+  'transactions.listTitle': '記錄',
   'transactions.addManual': '新增一筆帳目',
   'transactions.date': '日期',
   'transactions.description': '說明',
