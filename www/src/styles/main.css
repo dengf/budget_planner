@@ -72,8 +72,20 @@
   box-sizing: border-box;
 }
 
+/* No element in this app is meant to widen the page itself -- every wide
+   table opts into its own scroll via `.table-scroll` instead. Without this,
+   a transient layout overshoot (e.g. a bubble row briefly wider than the
+   viewport while wasm-derived sizes settle) can leave the page scrolled
+   sideways on iOS Safari, which restores that scroll offset from its
+   back-forward cache even after the layout no longer overflows -- seen live
+   on phone as the page's left edge cut off behind a phantom horizontal
+   scrollbar. */
+html {
+  overflow-x: hidden;
+}
 body {
   margin: 0;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
