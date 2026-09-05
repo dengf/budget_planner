@@ -811,6 +811,19 @@ table.data tr:last-child td {
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Same two-layer scroll-shadow trick as `.cat-rows` (see its own
+     comment) turned sideways: a `local` cap at the table's true trailing
+     edge slides out of view the moment a column is cut off, uncovering
+     a `scroll`-pinned shadow at the viewport's own trailing edge. Before
+     this, the widest tables (Recurring's six columns, Debt's five) had
+     their last column hard-clipped mid-word at the phone's screen edge
+     with nothing suggesting a sideways swipe would reveal it. */
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0), var(--panel) 70%) 100% 0 / 32px 100% local
+      no-repeat,
+    linear-gradient(to left, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0)) 100% 0 / 14px 100% scroll
+      no-repeat;
+  background-color: var(--panel);
 }
 
 /* The Transactions list itself -- unlike Rules/Recurring below, this is
@@ -1068,6 +1081,19 @@ table.data tr:last-child td {
   display: flex;
   align-items: baseline;
   gap: 4px;
+}
+/* Unlike BudgetTab's per-row `.cell-label` (hidden above 720px because a
+   column-header row above it already names Planned/Actual/Remaining),
+   this card has no such header at any width -- it's a standalone
+   drill-down, not a row in a labelled table. Its own rule, rather than
+   relying on the shared `.cell-label`, so it doesn't inherit that
+   class's `display: none` and go blank above 720px. */
+.dash-stat .cell-label {
+  display: inline;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-2);
 }
 .category-name {
   display: flex;
@@ -1727,6 +1753,22 @@ table.data tr:last-child td {
   gap: 4px;
   max-height: 220px;
   overflow-y: auto;
+  /* The classic two-layer scroll-shadow trick (Lea Verou/CSS-Tricks),
+     not a plain fixed overlay -- a plain overlay would show even when a
+     short list has no more rows to scroll to, which is its own false
+     affordance. Layer 1 (`local`, scrolls WITH the rows) is an opaque
+     cap at the true bottom of the content; it slides out of the visible
+     area the moment there's more below, uncovering layer 2 (`scroll`,
+     pinned to the viewport's own bottom edge) -- so the shadow only
+     ever appears while there's actually something to scroll to. Without
+     this, a list longer than ~4 rows sliced its next row off mid-line
+     with nothing on screen suggesting there was more below it --
+     indistinguishable from a rendering glitch. */
+  background:
+    linear-gradient(rgba(0, 0, 0, 0), var(--panel-alt) 70%) 0 100% / 100% 32px local no-repeat,
+    linear-gradient(to top, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0)) 0 100% / 100% 14px scroll
+      no-repeat;
+  background-color: var(--panel-alt);
 }
 /* The whole row is the tap target, not just the icon -- kept at this
    repo's cross-tool 44px touch-target floor regardless of how many rows
