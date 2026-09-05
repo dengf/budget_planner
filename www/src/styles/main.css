@@ -975,9 +975,24 @@ table.data tr:last-child td {
 .goal-blossom {
   flex: none;
 }
+/* Fires once, naturally: a petal only ever moves from the -empty class to
+   this one (never re-renders while already filled), so the browser starts
+   this animation exactly the moment a petal fills, with no extra state. */
 .goal-blossom-petal-filled {
   fill: var(--accent);
   stroke: none;
+  transform-origin: center;
+  animation: petal-bloom 380ms ease-out;
+}
+@keyframes petal-bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .goal-blossom-petal-empty {
   fill: none;
@@ -1009,10 +1024,31 @@ table.data tr:last-child td {
   font-size: 0.82rem;
   color: var(--positive);
 }
+/* Mounts fresh in the DOM each time milestoneMsg flips from null to a
+   string (GoalsTab.jsx), so this animation fires on its own the moment
+   it appears -- same one-shot-via-mount trick as petal-bloom above. */
 .goal-milestone {
   font-size: 0.85rem;
   color: var(--gold);
   margin-top: 4px;
+  transform-origin: left center;
+  animation: milestone-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes milestone-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .goal-blossom-petal-filled,
+  .goal-milestone {
+    animation: none;
+  }
 }
 
 .category-row {

@@ -31,13 +31,13 @@ export default function BlossomProgress({ filled = 0, size = 64 }) {
         <path id={`${uid}p`} d={PETAL} />
       </defs>
       {ROTATIONS.map((angle, i) => (
-        <use
-          key={angle}
-          href={`#${uid}p`}
-          transform={`rotate(${angle} 50 50)`}
-          className={i < filled ? 'goal-blossom-petal-filled' : 'goal-blossom-petal-empty'}
-          strokeWidth={i < filled ? 0 : 2}
-        />
+        <g key={angle} transform={`rotate(${angle} 50 50)`}>
+          <use
+            href={`#${uid}p`}
+            className={i < filled ? 'goal-blossom-petal-filled' : 'goal-blossom-petal-empty'}
+            strokeWidth={i < filled ? 0 : 2}
+          />
+        </g>
       ))}
     </svg>
   );
