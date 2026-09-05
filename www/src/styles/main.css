@@ -1223,16 +1223,23 @@ table.data tr:last-child td {
    gets the weight, and the derived figures below it are subordinate. */
 .assign-banner {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
+  align-items: center;
+  gap: 16px;
   padding: 18px 20px;
   margin-bottom: 12px;
   background: var(--positive-bg);
   border: 1px solid var(--positive-border);
   border-radius: 16px;
   box-shadow: var(--hero-shadow);
+}
+.assign-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
 }
 .assign-label {
   font-size: 1.02rem;
@@ -1244,6 +1251,43 @@ table.data tr:last-child td {
   font-weight: 700;
   color: var(--positive);
   font-variant-numeric: tabular-nums;
+}
+
+.assign-progress-ring {
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+.assign-progress-ring circle {
+  fill: none;
+  stroke-width: 6;
+}
+.assign-progress-ring .ring-track {
+  stroke: var(--line);
+}
+.assign-progress-ring .ring-fill {
+  stroke: var(--positive);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+.assign-progress-ring-over .ring-fill {
+  stroke: var(--negative);
+}
+.assign-progress-ring-start .ring-fill {
+  stroke: var(--muted);
+}
+/* A new block rather than one of this file's three pre-existing
+   `prefers-reduced-motion` blocks, deliberately: all three sit earlier in
+   this file than the unconditional `.ring-fill` transition rule above,
+   and CSS breaks ties between equal-specificity rules by source order,
+   not by which one is inside a narrower `@media` condition -- so an
+   override placed in any of them would lose the cascade to the
+   unconditional rule below it even while the media query matches. This
+   one only works because it comes after. */
+@media (prefers-reduced-motion: reduce) {
+  .assign-progress-ring .ring-fill {
+    transition: none;
+  }
 }
 /* Before a budget exists this is an instruction, not a result. */
 .assign-banner-start {
@@ -1320,6 +1364,18 @@ table.data tr:last-child td {
 }
 .progress-fill.over {
   background: var(--negative);
+}
+
+/* Deliberately dims rather than removes the planned-input cell in
+   tracking mode -- see the plan's "Deviation from the spec" note for
+   why: `.category-row`'s grid must stay the same shape in both modes.
+   `:focus-within` restores it, so it's always fully usable, just quieter
+   once a month's assignment decision is already made. */
+.category-table-tracking .planned-input {
+  opacity: 0.55;
+}
+.category-table-tracking .planned-input:focus-within {
+  opacity: 1;
 }
 
 .commitments-table {
@@ -2730,5 +2786,101 @@ table.data tr:last-child td {
   .cat-row-pct {
     font-size: 0.62rem;
     min-width: 22px;
+  }
+}
+
+.category-chip-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.category-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.fab-add {
+  position: fixed;
+  right: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.8rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--hero-shadow);
+  z-index: 20;
+}
+.fab-picker {
+  position: fixed;
+  right: 20px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  width: min(280px, calc(100vw - 40px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: var(--hero-shadow);
+  z-index: 21;
+}
+.fab-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: 0.92rem;
+}
+.fab-picker-item:hover,
+.fab-picker-item:focus-visible {
+  background: var(--panel-alt);
+}
+
+/* Below 720px the bottom tab bar (`.app-tabs`, see its own media query
+   above) switches to `position: fixed; bottom: 0` with `z-index: 60` --
+   well above the FAB's own z-index: 20 -- so without this the FAB's
+   plain 20px-from-viewport-bottom position sits directly underneath that
+   bar: mostly hidden, and its tap target stolen by the tab bar's own
+   icons. This has to come after the base `.fab-add`/`.fab-picker` rules
+   above in source order -- an identical `@media (max-width: 720px)`
+   block placed earlier in the file (nearer `.app-tabs`'s own) loses the
+   cascade to these later, equal-specificity unconditional rules, even
+   while its condition matches. Same 64px clearance `.app-main` reserves
+   for that bar, plus the FAB's own 20px margin from that now-cleared
+   edge; the picker list adds the FAB's own height and margin on top of
+   that. */
+@media (max-width: 720px) {
+  .fab-add {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .fab-picker {
+    bottom: calc(148px + env(safe-area-inset-bottom));
   }
 }
