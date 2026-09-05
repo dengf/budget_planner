@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availablePresets } from './presetCategories';
+import { availablePresets, buildCategoryFromPreset } from './presetCategories';
 
 const HOUSING = { key: 'cat.housing' };
 const UTILITIES = { key: 'cat.utilities' };
@@ -37,5 +37,30 @@ describe('availablePresets', () => {
       { id: 'c2', name: ' Utilities ' },
     ];
     expect(availablePresets([HOUSING, UTILITIES], existing, translate)).toEqual([]);
+  });
+});
+
+describe('buildCategoryFromPreset', () => {
+  it('builds the saved category shape from a preset, translated', () => {
+    const newId = () => 'new-id';
+    const preset = {
+      key: 'cat.housing',
+      group_key: 'group.expenses',
+      description_key: 'desc.housing',
+      is_income: false,
+    };
+    const t = (key) =>
+      ({ 'cat.housing': 'Housing', 'group.expenses': 'Expenses', 'desc.housing': 'Rent, mortgage, etc.' })[
+        key
+      ];
+
+    expect(buildCategoryFromPreset(preset, t, newId)).toEqual({
+      id: 'new-id',
+      name: 'Housing',
+      group: 'Expenses',
+      is_income: false,
+      description: 'Rent, mortgage, etc.',
+      preset_key: 'cat.housing',
+    });
   });
 });

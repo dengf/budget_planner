@@ -7,7 +7,7 @@ import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth } from './month';
-import { availablePresets } from './presetCategories';
+import { availablePresets, buildCategoryFromPreset } from './presetCategories';
 import { TABS, TAB_ORDER } from './tabs';
 
 // How far (px) a horizontal drag must travel past the down point before
@@ -204,14 +204,7 @@ export function AppShell({ wasmModule }) {
         // write through the same store handle, and the list they land in
         // reads better in the order the presets are declared.
         // eslint-disable-next-line no-await-in-loop
-        await categories.save({
-          id: newId(),
-          name: t(preset.key),
-          group: t(preset.group_key),
-          is_income: preset.is_income,
-          description: t(preset.description_key),
-          preset_key: preset.key,
-        });
+        await categories.save(buildCategoryFromPreset(preset, t, newId));
       }
     },
     [wasmModule, categories, newId, t],
@@ -225,14 +218,7 @@ export function AppShell({ wasmModule }) {
    */
   const addPresetCategory = useCallback(
     async (preset) => {
-      await categories.save({
-        id: newId(),
-        name: t(preset.key),
-        group: t(preset.group_key),
-        is_income: preset.is_income,
-        description: t(preset.description_key),
-        preset_key: preset.key,
-      });
+      await categories.save(buildCategoryFromPreset(preset, t, newId));
     },
     [categories, newId, t],
   );
