@@ -2700,6 +2700,15 @@ table.data tr:last-child td {
     font-size: 0.88rem;
   }
 
+  /* .add-txn-fab floats bottom-right on this tab regardless of scroll
+     position, and .form-grid collapses to one column at this width, which
+     stretches a lone submit button (Add rule / Add recurring expense) to
+     the full row -- reserve the FAB's own footprint (56px + its 16px
+     offset + a gap) so a button never renders directly under it. */
+  .txn-panel .form-grid .btn {
+    max-width: calc(100% - 80px);
+  }
+
   /* Income/Expenses/Savings side by side in one row rather than the
      default auto-fit minmax(160px, ...) wrap, which would stack them on
      a 375px phone. */
