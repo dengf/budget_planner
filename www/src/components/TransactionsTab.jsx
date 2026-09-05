@@ -115,12 +115,12 @@ export default function TransactionsTab({
 
       <button
         type="button"
-        className="add-txn-fab"
+        className="fab-add"
         aria-label={t('transactions.addManual')}
         onClick={() => setAddOpen(true)}
       >
         <span aria-hidden="true">+</span>
-        <span className="add-txn-fab-label">{t('transactions.add')}</span>
+        <span>{t('transactions.add')}</span>
       </button>
 
       <AddTransactionSheet

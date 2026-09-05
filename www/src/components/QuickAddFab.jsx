@@ -47,10 +47,10 @@ export default function QuickAddFab({ categories, onPick }) {
         type="button"
         className="fab-add"
         aria-expanded={open}
-        aria-label={t('budget.logTransaction')}
         onClick={() => setOpen((o) => !o)}
       >
-        +
+        <span aria-hidden="true">+</span>
+        <span>{t('budget.logTransaction')}</span>
       </button>
     </>
   );
