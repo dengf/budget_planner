@@ -564,7 +564,20 @@ export default function BudgetTab({
         </details>
       )}
 
-      <h2 className="section-start">{t('budget.categoriesTitle')}</h2>
+      <div className="dash-header sticky-title-header section-start">
+        <h2>{t('budget.categoriesTitle')}</h2>
+        {mode !== TRACKING && (
+          <button
+            type="button"
+            className="icon-add-btn"
+            aria-expanded={categoryPanelOpen}
+            aria-label={t('budget.addCategory')}
+            onClick={() => setCategoryPanelOpen((open) => !open)}
+          >
+            <span aria-hidden="true">+</span>
+          </button>
+        )}
+      </div>
       {categories.items.length === 0 && !savingsLine ? (
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
@@ -836,32 +849,22 @@ export default function BudgetTab({
             </details>
           );
         }
-        // ASSIGN mode: a floating button rather than this block sitting
-        // permanently inline -- it's exactly what was pushing the
-        // category table below the fold on a fresh budget. TRACKING mode
-        // keeps its own collapsed <details> above, unchanged -- a second
-        // FAB there would collide with QuickAddFab's bottom-right slot.
+        // ASSIGN mode: a floating panel triggered by the icon button in the
+        // Categories title row, rather than this block sitting permanently
+        // inline -- it's exactly what was pushing the category table below
+        // the fold on a fresh budget. TRACKING mode keeps its own collapsed
+        // <details> above, unchanged -- a second trigger there would
+        // collide with QuickAddFab's bottom-right slot.
         return (
-          <>
-            {categoryPanelOpen && (
-              <div
-                className="fab-picker category-add-panel"
-                role="dialog"
-                aria-label={t('budget.addCategory')}
-              >
-                {editCategoriesBlock}
-              </div>
-            )}
-            <button
-              type="button"
-              className="fab-add"
-              aria-expanded={categoryPanelOpen}
-              onClick={() => setCategoryPanelOpen((open) => !open)}
+          categoryPanelOpen && (
+            <div
+              className="fab-picker category-add-panel"
+              role="dialog"
+              aria-label={t('budget.addCategory')}
             >
-              <span aria-hidden="true">+</span>
-              <span>{t('budget.addCategory')}</span>
-            </button>
-          </>
+              {editCategoriesBlock}
+            </div>
+          )
         );
       })()}
 

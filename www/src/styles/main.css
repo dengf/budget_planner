@@ -2817,22 +2817,37 @@ table.data tr:last-child td {
    bare "+" circle in different rounds of work before this fix. A labeled
    pill throughout: an icon alone doesn't say what it adds, and this
    repo's own "obvious to use" rule favors that over a smaller circle. */
-/* Sticks to the top of the viewport as the tab scrolls, so the add button
-   stays reachable without a fixed FAB landing on top of the "Add
-   rule"/"Apply rules" buttons further down this form-heavy tab -- the
-   negative margin/repadding lets it span the panel's full width and sit
-   flush against the panel's rounded top edge while still floating over
-   the content beneath it. */
-.txn-title-header {
+/* Shared by every title row that sticks to the top of the viewport on
+   scroll instead of using a fixed FAB -- a floating pill kept landing on
+   top of other buttons further down these form/list-heavy tabs no matter
+   how much clearance padding was added beneath it. Horizontal bleed
+   (negative side margins) lets the background span the panel's full
+   width; each caller adds its own top treatment below depending on
+   whether it sits at the panel's very top edge or mid-page. */
+.sticky-title-header {
   position: sticky;
   top: 0;
   z-index: 30;
-  margin: -20px -20px 0;
-  padding: 16px 20px;
+  margin: 0 -20px;
+  padding: 12px 20px;
   background: var(--panel);
+}
+/* The tab's very first row, flush against the panel's own rounded top
+   corner -- Transactions' title row. */
+.sticky-title-header-flush {
+  margin-top: -20px;
+  padding-top: 16px;
   border-radius: 14px 14px 0 0;
 }
-.txn-add-btn {
+/* Budget's Categories row sits mid-panel, so it keeps the ordinary
+   `.section-start` divider (see that rule's own comment) instead of the
+   flush treatment above -- the divider goes on this row rather than the
+   nested h2 so it spans the full width, including the add button. */
+.sticky-title-header.section-start {
+  padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
+}
+.icon-add-btn {
   width: 44px;
   height: 44px;
   min-width: 44px;
