@@ -75,6 +75,7 @@ export default {
   'chart.expenseBreakdownAria': 'Breakdown of spending by category for {month}',
   'chart.incomeBreakdown': 'Income by source',
   'chart.incomeBreakdownAria': 'Breakdown of income by source for {month}',
+  'chart.breakdownGroup': 'Spending or income breakdown',
   'chart.noExpenseYet': 'Nothing logged yet — spending you add will show up here.',
   'chart.noIncomeYet': 'Nothing logged yet — income you add will show up here.',
   'chart.dailySpendTitle': 'Spending by day',

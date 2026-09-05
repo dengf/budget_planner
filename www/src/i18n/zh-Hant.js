@@ -71,6 +71,7 @@ export default {
   'chart.expenseBreakdownAria': '{month}按類別劃分的支出明細',
   'chart.incomeBreakdown': '按來源劃分的收入',
   'chart.incomeBreakdownAria': '{month}按來源劃分的收入明細',
+  'chart.breakdownGroup': '支出或收入明細',
   'chart.noExpenseYet': '目前還沒有記錄 — 新增支出後會顯示在這裡。',
   'chart.noIncomeYet': '目前還沒有記錄 — 新增收入後會顯示在這裡。',
   'chart.dailySpendTitle': '每日支出',
