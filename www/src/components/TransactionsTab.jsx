@@ -120,7 +120,7 @@ export default function TransactionsTab({
         onClick={() => setAddOpen(true)}
       >
         <span aria-hidden="true">+</span>
-        <span>{t('transactions.add')}</span>
+        <span>{t('budget.logTransaction')}</span>
       </button>
 
       <AddTransactionSheet
