@@ -25,6 +25,14 @@ describe('CategoryBadge', () => {
     expect(categoryIconId({ preset_key: undefined, is_income: true })).toBe('income-generic');
   });
 
+  it('renders the repeat icon for a category created from the subscriptions preset', () => {
+    expect(categoryIconId({ preset_key: 'cat.subscriptionsMemberships' })).toBe('repeat');
+  });
+
+  it('renders the gift icon for a category created from the gifts preset', () => {
+    expect(categoryIconId({ preset_key: 'cat.giftsDonations' })).toBe('gift');
+  });
+
   it('renders a badge with a background color even for an undefined category', () => {
     const { container } = render(<CategoryBadge category={undefined} />);
     const badge = container.querySelector('.category-badge');

@@ -8,7 +8,7 @@
 //!
 //! This list replaced an earlier US/SG-specific pair after real-user
 //! feedback: the income/expense taxonomy below (five income sources,
-//! nine expense categories, an "Other" catch-all on each side) isn't
+//! eleven expense categories, an "Other" catch-all on each side) isn't
 //! region-flavoured the way the old set was (S&CC, a parents' allowance).
 //! The app's region/market concept was removed outright afterwards --
 //! nothing else in this codebase needed it either, so there was no reason
@@ -22,7 +22,7 @@
 //! Dependents" has an answer on-screen instead of relying on memory.
 //!
 //! **Why this lives in Rust rather than a JS constant.** Even a universal
-//! taxonomy is a specific choice -- which nine expense buckets, in what
+//! taxonomy is a specific choice -- which eleven expense buckets, in what
 //! words -- that a second implementation could make differently. See
 //! CLAUDE.md's "choosing between rulesets" rule.
 //!
@@ -101,7 +101,7 @@ const INCOME_CATEGORIES: &[PresetCategory] = &[
     ),
     preset(
         "cat.investmentCapitalIncome",
-        "Investment & Capital Income",
+        "Investments",
         INCOME,
         true,
         "cat.investmentCapitalIncome.desc",
@@ -109,7 +109,7 @@ const INCOME_CATEGORIES: &[PresetCategory] = &[
     ),
     preset(
         "cat.governmentSupplemental",
-        "Government & Supplemental",
+        "Government Benefits",
         INCOME,
         true,
         "cat.governmentSupplemental.desc",
@@ -168,7 +168,7 @@ const EXPENSE_CATEGORIES: &[PresetCategory] = &[
     ),
     preset(
         "cat.debtServicing",
-        "Debt Servicing",
+        "Debt Payments",
         EXPENSE,
         false,
         "cat.debtServicing.desc",
@@ -180,7 +180,15 @@ const EXPENSE_CATEGORIES: &[PresetCategory] = &[
         EXPENSE,
         false,
         "cat.personalLifestyle.desc",
-        "Clothing/shoes, personal care, gym memberships, streaming services, hobbies.",
+        "Clothing/shoes, personal care, hobbies.",
+    ),
+    preset(
+        "cat.subscriptionsMemberships",
+        "Subscriptions & Memberships",
+        EXPENSE,
+        false,
+        "cat.subscriptionsMemberships.desc",
+        "Streaming services, gym and other memberships, software subscriptions, recurring app fees.",
     ),
     preset(
         "cat.familyDependents",
@@ -189,6 +197,14 @@ const EXPENSE_CATEGORIES: &[PresetCategory] = &[
         false,
         "cat.familyDependents.desc",
         "Childcare, tuition, school supplies, extracurricular activities, pet care/vet bills.",
+    ),
+    preset(
+        "cat.giftsDonations",
+        "Gifts & Donations",
+        EXPENSE,
+        false,
+        "cat.giftsDonations.desc",
+        "Birthday and holiday gifts, charitable donations, tithing.",
     ),
     preset(
         "cat.otherExpenses",
@@ -272,12 +288,42 @@ mod tests {
     }
 
     #[test]
-    fn five_income_categories_and_nine_expense_categories() {
+    fn five_income_categories_and_eleven_expense_categories() {
         let presets = starter_categories();
         let income = presets.iter().filter(|p| p.group == "Income").count();
         let expense = presets.iter().filter(|p| p.group == "Expense").count();
         assert_eq!(income, 5);
-        assert_eq!(expense, 9);
+        assert_eq!(expense, 11);
+    }
+
+    #[test]
+    fn subscriptions_and_gifts_are_offered() {
+        let presets = starter_categories();
+        let subscriptions = presets
+            .iter()
+            .find(|p| p.key == "cat.subscriptionsMemberships")
+            .expect("subscriptions preset is offered");
+        assert!(!subscriptions.is_income);
+        assert_eq!(subscriptions.group, "Expense");
+
+        let gifts = presets
+            .iter()
+            .find(|p| p.key == "cat.giftsDonations")
+            .expect("gifts preset is offered");
+        assert!(!gifts.is_income);
+        assert_eq!(gifts.group, "Expense");
+    }
+
+    #[test]
+    fn three_labels_read_in_plain_language_now() {
+        let presets = starter_categories();
+        let by_key = |key: &str| presets.iter().find(|p| p.key == key).unwrap();
+        assert_eq!(by_key("cat.investmentCapitalIncome").name, "Investments");
+        assert_eq!(by_key("cat.debtServicing").name, "Debt Payments");
+        assert_eq!(
+            by_key("cat.governmentSupplemental").name,
+            "Government Benefits"
+        );
     }
 
     #[test]

@@ -7,6 +7,7 @@ import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth } from './month';
+import { availablePresets, buildCategoryFromPreset } from './presetCategories';
 import { TABS, TAB_ORDER } from './tabs';
 
 // How far (px) a horizontal drag must travel past the down point before
@@ -181,9 +182,10 @@ export function AppShell({ wasmModule }) {
    *
    * `budget-calc::presets` hands back i18n keys; this composes the name
    * actually stored, in the reader's language, so a Chinese budget
-   * doesn't open with English category names. Skipping a preset whose
-   * name is already present is a referential check against in-memory
-   * state -- host-layer, not a rule the core should own.
+   * doesn't open with English category names. Which presets are still
+   * worth offering -- skipping one already taken by identity or by
+   * translated display name -- is `availablePresets` in
+   * `presetCategories.js`; see its doc comment for why both checks exist.
    *
    * `existingItems` defaults to the live `categories.items`, but takes an
    * explicit override for callers that just mutated categories themselves
@@ -197,27 +199,28 @@ export function AppShell({ wasmModule }) {
     async (existingItems = categories.items) => {
       if (!wasmModule?.preset_categories) return;
       const presets = (await wasmModule.preset_categories()) ?? [];
-      const taken = new Set(existingItems.map((c) => c.name.trim().toLowerCase()));
-      for (const preset of presets) {
-        const name = t(preset.key);
-        const fingerprint = name.trim().toLowerCase();
-        if (taken.has(fingerprint)) continue;
-        taken.add(fingerprint);
+      for (const preset of availablePresets(presets, existingItems, t)) {
         // Sequential rather than Promise.all: each save is one IndexedDB
         // write through the same store handle, and the list they land in
         // reads better in the order the presets are declared.
         // eslint-disable-next-line no-await-in-loop
-        await categories.save({
-          id: newId(),
-          name,
-          group: t(preset.group_key),
-          is_income: preset.is_income,
-          description: t(preset.description_key),
-          preset_key: preset.key,
-        });
+        await categories.save(buildCategoryFromPreset(preset, t, newId));
       }
     },
     [wasmModule, categories, newId, t],
+  );
+
+  /**
+   * Adds exactly one starter preset -- the Budget tab's chip picker calls
+   * this once per tap, unlike `addCommonCategories` above which seeds
+   * every not-yet-taken preset in one shot. Same save shape, just one
+   * category instead of a loop over all of them.
+   */
+  const addPresetCategory = useCallback(
+    async (preset) => {
+      await categories.save(buildCategoryFromPreset(preset, t, newId));
+    },
+    [categories, newId, t],
   );
 
   /**
@@ -453,6 +456,7 @@ export function AppShell({ wasmModule }) {
               categories={categories}
               removeCategory={removeCategory}
               addCommonCategories={addCommonCategories}
+              addPresetCategory={addPresetCategory}
               transactions={transactions}
               rules={rules}
               goals={goals}
