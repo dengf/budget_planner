@@ -106,7 +106,8 @@ export default {
     'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
   'budget.savings': 'Savings',
-  'budget.savingsHint': 'Income minus every expense — what actually got saved',
+  'budget.savingsHint':
+    "What's left after expenses. Set a specific savings target in Goals.",
   'budget.savingsActual': 'Saved',
 
   'cat.group.income': 'Income',
@@ -117,9 +118,9 @@ export default {
   'cat.selfEmploymentBusiness': 'Self-Employment & Business',
   'cat.selfEmploymentBusiness.desc':
     'Freelance revenue, gig work, consulting fees, and business profits.',
-  'cat.investmentCapitalIncome': 'Investment & Capital Income',
+  'cat.investmentCapitalIncome': 'Investments',
   'cat.investmentCapitalIncome.desc': 'Rental income, dividends, interest, and capital gains.',
-  'cat.governmentSupplemental': 'Government & Supplemental',
+  'cat.governmentSupplemental': 'Government Benefits',
   'cat.governmentSupplemental.desc':
     'Pension, Social Security, child support, alimony, and tax refunds.',
   'cat.otherIncome': 'Other Income',
@@ -139,15 +140,19 @@ export default {
   'cat.healthcareInsurance': 'Healthcare & Insurance',
   'cat.healthcareInsurance.desc':
     'Health/dental/vision premiums, pharmacy copays, out-of-pocket medical bills, life insurance.',
-  'cat.debtServicing': 'Debt Servicing',
+  'cat.debtServicing': 'Debt Payments',
   'cat.debtServicing.desc':
     'Credit card balances, student loans, personal loans, medical debt payments.',
   'cat.personalLifestyle': 'Personal & Lifestyle',
-  'cat.personalLifestyle.desc':
-    'Clothing/shoes, personal care, gym memberships, streaming services, hobbies.',
+  'cat.personalLifestyle.desc': 'Clothing/shoes, personal care, hobbies.',
+  'cat.subscriptionsMemberships': 'Subscriptions & Memberships',
+  'cat.subscriptionsMemberships.desc':
+    'Streaming services, gym and other memberships, software subscriptions, recurring app fees.',
   'cat.familyDependents': 'Family & Dependents',
   'cat.familyDependents.desc':
     'Childcare, tuition, school supplies, extracurricular activities, pet care/vet bills.',
+  'cat.giftsDonations': 'Gifts & Donations',
+  'cat.giftsDonations.desc': 'Birthday and holiday gifts, charitable donations, tithing.',
   'cat.otherExpenses': 'Other Expenses',
   'cat.otherExpenses.desc': "Any other expense that doesn't fit the categories above.",
 
