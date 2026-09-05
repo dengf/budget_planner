@@ -147,6 +147,7 @@ export default {
   'transactions.methodManual': '手動',
   'transactions.methodReceipt': '收據',
   'transactions.methodImport': '匯入 CSV',
+  'transactions.methodRecurring': '定期',
   'transactions.date': '日期',
   'transactions.description': '說明',
   'transactions.amount': '金額',

@@ -108,8 +108,7 @@ export default {
   'budget.commonHint': 'A starting point — rename or remove any of them.',
   'budget.editCategoriesTitle': 'Add or edit categories',
   'budget.savings': 'Savings',
-  'budget.savingsHint':
-    "What's left after expenses. Set a specific savings target in Goals.",
+  'budget.savingsHint': "What's left after expenses. Set a specific savings target in Goals.",
   'budget.savingsActual': 'Saved',
 
   'cat.group.income': 'Income',
@@ -164,6 +163,7 @@ export default {
   'transactions.methodManual': 'Manual',
   'transactions.methodReceipt': 'Receipt',
   'transactions.methodImport': 'Import CSV',
+  'transactions.methodRecurring': 'Recurring',
   'transactions.date': 'Date',
   'transactions.description': 'Description',
   'transactions.amount': 'Amount',
