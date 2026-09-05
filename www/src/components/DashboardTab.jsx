@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
-import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import CategoryBadge from './CategoryBadge';
 import CategoryBreakdown from './CategoryBreakdown';
 import BlossomProgress, { BlossomWatermark } from './BlossomProgress';
@@ -27,14 +26,11 @@ function breakableMoney(str) {
 
 /**
  * The landing tab: this month's headline numbers first, the full
- * category table and export/import tools below. `viewMonth` is shared
- * app-wide (App.jsx) -- paging Dashboard back to a prior month is the
- * same month Budget/Transactions land on too. `budgetPlan.items` already
- * tracks `viewMonth` (App.jsx fetches it keyed by `viewMonth`), so this
- * tab reads it directly rather than keeping its own copy. Print, email
- * and export still describe `today`, the real current month (see their
- * own comments below) -- unlike everything else on this tab, those
- * describe *this* month regardless of what's being browsed.
+ * category table below. `viewMonth` is shared app-wide (App.jsx) --
+ * paging Dashboard back to a prior month is the same month
+ * Budget/Transactions land on too. `budgetPlan.items` already tracks
+ * `viewMonth` (App.jsx fetches it keyed by `viewMonth`), so this tab
+ * reads it directly rather than keeping its own copy.
  */
 export default function DashboardTab({
   wasmModule,
@@ -57,7 +53,6 @@ export default function DashboardTab({
   const [savingsLine, setSavingsLine] = useState(null);
   const [dailyTotals, setDailyTotals] = useState([]);
   const [weeklyTotals, setWeeklyTotals] = useState([]);
-  const [recipients, setRecipients] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [goalProgress, setGoalProgress] = useState({});
   const detailRef = useRef(null);
@@ -319,31 +314,6 @@ export default function DashboardTab({
     );
   };
 
-  const addresses = parseRecipients(recipients);
-  const rejected = addresses.filter((a) => !looksLikeAddress(a));
-
-  const bodyText = () => {
-    const rows = lines
-      .map(
-        (l) =>
-          `${categoryName(l.category_id)}: ${formatMoney(l.spent)} of ${formatMoney(l.planned)}`,
-      )
-      .join('\n');
-    const savingsRow = savingsLine
-      ? `\n${t('budget.savings')}: ${formatMoney(savingsLine.spent)} of ${formatMoney(savingsLine.planned)}`
-      : '';
-    return `${t('dashboard.title')} — ${monthLabel(viewMonth, locale)}\n\n${rows}${savingsRow}\n\n${t('dashboard.generatedBy')}`;
-  };
-
-  const send = () => {
-    if (addresses.length === 0 || rejected.length > 0) return;
-    window.location.href = mailtoUrl({
-      recipients,
-      subject: t('dashboard.mailSubject'),
-      body: bodyText(),
-    });
-  };
-
   return (
     <div className="panel report dashboard">
       <div className="dash-header">
@@ -463,32 +433,6 @@ export default function DashboardTab({
           </div>
         </>
       )}
-
-      <div className="report-actions no-print">
-        <button className="btn" onClick={() => window.print()}>
-          {t('dashboard.print')}
-        </button>
-      </div>
-
-      <div className="form-grid no-print">
-        <label className="field">
-          <span className="field-label">{t('dashboard.recipients')}</span>
-          <div className="field-input">
-            <input
-              value={recipients}
-              onChange={(e) => setRecipients(e.target.value)}
-              placeholder={t('dashboard.recipientsPlaceholder')}
-            />
-          </div>
-        </label>
-        <button
-          className="btn secondary"
-          onClick={send}
-          disabled={addresses.length === 0 || rejected.length > 0}
-        >
-          {t('dashboard.send')}
-        </button>
-      </div>
     </div>
   );
 }
