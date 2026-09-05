@@ -1141,12 +1141,6 @@ table.data tr:last-child td {
   color: var(--muted-2);
   font-size: 0.75rem;
 }
-.category-description {
-  color: var(--muted-2);
-  font-size: 0.75rem;
-  margin-top: 2px;
-  line-height: 1.3;
-}
 
 /* A category's colored icon badge -- see CategoryBadge.jsx/
    categoryVisuals.js. 24px: fits inline before a name without disturbing
@@ -1335,15 +1329,45 @@ table.data tr:last-child td {
 /* Upcoming this month: what's scheduled to come due, so it's visible
    before it posts rather than only after -- see recurring.rs's doc
    comment for the specific complaint this answers. */
-.upcoming-panel {
+/* Shared box for the Budget tab's collapsed-by-default sections
+   ("Upcoming this month", the goals/debt commitments table) -- same
+   container, same disclosure-triangle summary treatment as
+   `.csv-columns` below, just applied to a couple more `<details>`. */
+.collapsible-panel {
   background: var(--panel-alt);
   border-radius: 12px;
   padding: 16px 20px;
   margin-bottom: 16px;
 }
-.upcoming-title {
-  margin: 0 0 2px;
-  font-size: 0.98rem;
+.collapsible-panel summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  list-style: none;
+}
+.collapsible-panel summary::-webkit-details-marker {
+  display: none;
+}
+.collapsible-panel summary::before {
+  content: '▸ ';
+}
+.collapsible-panel[open] summary::before {
+  content: '▾ ';
+}
+/* Same `<details>`-hiding trap as `.csv-columns .form-grid` below: an
+   author rule (these two's own `display: flex`) always overrides the
+   user-agent stylesheet's collapse regardless of specificity, so the
+   open/closed toggle has to be explicit here too. */
+.collapsible-panel > .upcoming-totals,
+.collapsible-panel > .upcoming-list {
+  display: none;
+}
+.collapsible-panel[open] > .upcoming-totals {
+  display: flex;
+}
+.collapsible-panel[open] > .upcoming-list {
+  display: flex;
 }
 .upcoming-totals {
   display: flex;
@@ -1652,12 +1676,6 @@ table.data tr:last-child td {
        text is ragged-left and harder to read than left-aligned. */
     text-align: left;
   }
-}
-
-.report-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 /* Charts -- hand-rolled SVG, same reasoning as mortgage_calculator's
@@ -2428,14 +2446,114 @@ table.data tr:last-child td {
   min-height: 44px;
 }
 
+/* The single entry point for every way a transaction gets added --
+   manual, receipt, CSV -- previously three permanently-expanded sections
+   stacked above the transaction list. A pill FAB keeps the primary
+   action reachable one-handed (this repo's phone-first mandate) instead
+   of requiring a scroll to find any of them. Fixed regardless of scroll
+   position, same as the dialogs it opens. */
+.add-txn-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 22px 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.add-txn-fab span:first-child {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+/* Clears the fixed bottom tab bar (`.app-tabs` at this same breakpoint,
+   `.app-main`'s own padding-bottom is the same 64px reservation) with a
+   16px gap above it, rather than sitting flush against or under it. */
+@media (max-width: 720px) {
+  .add-txn-fab {
+    right: 16px;
+    bottom: calc(64px + 16px + env(safe-area-inset-bottom));
+  }
+}
+
+.add-txn-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
+}
+.add-txn-dialog {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  max-width: 480px;
+  width: 100%;
+  max-height: min(640px, 90vh);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.add-txn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.add-txn-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.add-txn-methods {
+  display: flex;
+  gap: 6px;
+  background: var(--panel-alt);
+  padding: 4px;
+  border-radius: 10px;
+}
+.add-txn-method-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 6px;
+  min-height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.add-txn-method-btn.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.add-txn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 @media print {
   .app-header,
   .app-tabs,
   .app-switches,
-  .report-actions,
-  .no-print,
   .dash-month-btn,
-  .chart-granularity {
+  .chart-granularity,
+  .add-txn-fab {
     display: none !important;
   }
   body {

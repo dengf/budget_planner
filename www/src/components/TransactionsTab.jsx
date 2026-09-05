@@ -2,21 +2,10 @@ import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
-import CalcError from './CalcError';
+import AddTransactionSheet from './AddTransactionSheet';
 import CategoryBadge from './CategoryBadge';
-import DirectionWarning from './DirectionWarning';
 import MonthYearPicker from './MonthYearPicker';
-import { SpreadsheetIcon } from './icons';
 import NumberField from './NumberField';
-import ReceiptCapture from './ReceiptCapture';
-
-const DEFAULT_MAPPING = {
-  date_col: 0,
-  description_col: 1,
-  amount_col: 2,
-  credit_col: null,
-  has_header: true,
-};
 
 const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
@@ -36,12 +25,8 @@ export default function TransactionsTab({
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [showAllMonths, setShowAllMonths] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
-  const [draft, setDraft] = useState({ date: '', description: '', amount: '', category_id: '' });
-  const [csvText, setCsvText] = useState('');
-  const [mapping, setMapping] = useState(DEFAULT_MAPPING);
-  const [columnsDetected, setColumnsDetected] = useState(false);
-  const [importResult, setImportResult] = useState(null);
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
   const [recurringDraft, setRecurringDraft] = useState({
     description: '',
@@ -50,57 +35,6 @@ export default function TransactionsTab({
     cadence: 'monthly',
     anchor_date: '',
   });
-
-  const addTransaction = async (e) => {
-    e.preventDefault();
-    if (!draft.date || !draft.description || draft.amount === '') return;
-    await transactions.save({
-      id: newId(),
-      date: draft.date,
-      description: draft.description,
-      amount: Number(draft.amount),
-      category_id: draft.category_id || null,
-    });
-    setDraft({ date: '', description: '', amount: '', category_id: '' });
-  };
-
-  const onFile = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // lets the same file be re-picked after a re-detect
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const text = String(reader.result ?? '');
-      setCsvText(text);
-      setImportResult(null);
-      // Most bank/card exports use a handful of common header names --
-      // detecting from those means the common case needs no manual setup
-      // at all. `mapping: null` means it couldn't confidently guess (an
-      // unrecognized header, or no header at all), so this falls back to
-      // the same manual defaults as before -- nothing is lost, the
-      // "Adjust columns" panel below just opens on its own to prompt it.
-      const detected = await wasmModule?.detect_csv_columns?.(text);
-      if (detected?.mapping) {
-        setMapping(detected.mapping);
-        setColumnsDetected(true);
-      } else {
-        setMapping(DEFAULT_MAPPING);
-        setColumnsDetected(false);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const runImport = async () => {
-    if (!wasmModule?.import_csv || !csvText) return;
-    const outcome = await wasmModule.import_csv({ csv_text: csvText, mapping });
-    setImportResult(outcome);
-    if (!outcome?.error) {
-      for (const row of outcome.imported ?? []) {
-        await transactions.save(row.transaction);
-      }
-    }
-  };
 
   const addRule = async (e) => {
     e.preventDefault();
@@ -179,159 +113,25 @@ export default function TransactionsTab({
     <div className="panel">
       <h2>{t('transactions.title')}</h2>
 
-      <ReceiptCapture
+      <button
+        type="button"
+        className="add-txn-fab"
+        aria-label={t('transactions.addManual')}
+        onClick={() => setAddOpen(true)}
+      >
+        <span aria-hidden="true">+</span>
+        <span className="add-txn-fab-label">{t('transactions.add')}</span>
+      </button>
+
+      <AddTransactionSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
         wasmModule={wasmModule}
         newId={newId}
         categories={categories}
         rules={rules}
         transactions={transactions}
         formatMoney={formatMoney}
-      />
-
-      <h2 className="section-start">{t('transactions.importTitle')}</h2>
-      <p className="panel-subtitle">{t('transactions.importHint')}</p>
-      <div className="form-grid">
-        <label className="btn secondary">
-          <SpreadsheetIcon />
-          {t('transactions.chooseFile')}
-          <input type="file" accept=".csv,text/csv" onChange={onFile} className="visually-hidden" />
-        </label>
-      </div>
-
-      {csvText && (
-        <p className="panel-subtitle">
-          {columnsDetected
-            ? t('transactions.columnsDetected')
-            : t('transactions.columnsNotDetected')}
-        </p>
-      )}
-
-      {/* Only exists in the DOM at all once there's an actual reason for
-          it -- a file picked and detection couldn't confidently place
-          every column. A permanently-present toggle (even collapsed)
-          read as "the manual fields weren't really removed" to someone
-          skimming the page, which defeats the point just as surely as
-          leaving them expanded would have. */}
-      {csvText && !columnsDetected && (
-        <details className="csv-columns" open>
-          <summary>{t('transactions.mapColumns')}</summary>
-          <div className="form-grid">
-            <label className="field">
-              <span className="field-label">{t('transactions.dateColumn')}</span>
-              <div className="field-input">
-                <input
-                  type="number"
-                  min="0"
-                  value={mapping.date_col}
-                  onChange={(e) => setMapping({ ...mapping, date_col: Number(e.target.value) })}
-                />
-              </div>
-            </label>
-            <label className="field">
-              <span className="field-label">{t('transactions.descriptionColumn')}</span>
-              <div className="field-input">
-                <input
-                  type="number"
-                  min="0"
-                  value={mapping.description_col}
-                  onChange={(e) =>
-                    setMapping({ ...mapping, description_col: Number(e.target.value) })
-                  }
-                />
-              </div>
-            </label>
-            <label className="field">
-              <span className="field-label">{t('transactions.amountColumn')}</span>
-              <div className="field-input">
-                <input
-                  type="number"
-                  min="0"
-                  value={mapping.amount_col}
-                  onChange={(e) => setMapping({ ...mapping, amount_col: Number(e.target.value) })}
-                />
-              </div>
-            </label>
-            <label className="field field-check">
-              <input
-                type="checkbox"
-                checked={mapping.has_header}
-                onChange={(e) => setMapping({ ...mapping, has_header: e.target.checked })}
-              />
-              <span>{t('transactions.hasHeader')}</span>
-            </label>
-          </div>
-        </details>
-      )}
-
-      <div className="form-grid">
-        <button className="btn" type="button" onClick={runImport} disabled={!csvText}>
-          {t('transactions.import')}
-        </button>
-      </div>
-
-      {importResult?.error && <CalcError result={importResult} />}
-      {importResult && !importResult.error && (
-        <p className="headline">
-          {t('transactions.importedCount', { count: importResult.imported?.length ?? 0 })}
-          {importResult.skipped?.length
-            ? ` · ${t('transactions.skippedCount', { count: importResult.skipped.length })}`
-            : ''}
-        </p>
-      )}
-
-      <h2 className="section-start">{t('transactions.addManual')}</h2>
-      <form className="form-grid" onSubmit={addTransaction}>
-        <label className="field">
-          <span className="field-label">{t('transactions.date')}</span>
-          <div className="field-input">
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-            />
-          </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.description')}</span>
-          <div className="field-input">
-            <input
-              value={draft.description}
-              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            />
-          </div>
-        </label>
-        <NumberField
-          label={t('transactions.amount')}
-          value={draft.amount}
-          onChange={(v) => setDraft({ ...draft, amount: v })}
-          grouped
-          signed
-        />
-        <label className="field">
-          <span className="field-label">{t('transactions.category')}</span>
-          <select
-            className="field-select"
-            value={draft.category_id}
-            onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}
-          >
-            <option value="">{t('transactions.uncategorized')}</option>
-            {categories.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="btn" type="submit">
-          {t('transactions.add')}
-        </button>
-      </form>
-      <p className="field-label">{t('transactions.amountHint')}</p>
-      <DirectionWarning
-        amount={draft.amount}
-        category={categories.items.find((c) => c.id === draft.category_id)}
-        formatMoney={formatMoney}
-        onUseFlipped={(flipped) => setDraft({ ...draft, amount: String(flipped) })}
       />
 
       <h2 className="section-start">{t('transactions.rulesTitle')}</h2>

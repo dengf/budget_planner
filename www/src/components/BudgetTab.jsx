@@ -475,10 +475,14 @@ export default function BudgetTab({
       )}
 
       {/* Framed entirely around "upcoming" -- only meaningful looking at
-          the current or a future month, not one that's already over. */}
+          the current or a future month, not one that's already over.
+          Collapsed by default (a <details>, same disclosure pattern as
+          the CSV column mapping below) rather than a permanently-open
+          panel -- one more always-visible section was exactly the "too
+          much stacked at once" complaint this round of changes answers. */}
       {!isPastMonth && upcoming && upcoming.occurrences.length > 0 && (
-        <div className="upcoming-panel">
-          <h3 className="upcoming-title">{t('recurring.upcomingTitle')}</h3>
+        <details className="collapsible-panel">
+          <summary>{t('recurring.upcomingTitle')}</summary>
           <p className="panel-subtitle">{t('recurring.upcomingHint')}</p>
           <div className="upcoming-totals">
             {upcoming.totals_by_category.map((total) => (
@@ -507,9 +511,10 @@ export default function BudgetTab({
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
 
+      <h2 className="section-start">{t('budget.categoriesTitle')}</h2>
       {categories.items.length === 0 && !savingsLine ? (
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
@@ -545,16 +550,16 @@ export default function BudgetTab({
                       <CategoryBadge category={categoryFor(line.category_id)} />
                       {categoryName(line.category_id)}
                     </div>
-                    <div className="category-group">{categoryGroup(line.category_id)}</div>
-                    {/* Mei's (a CPA) examples of what belongs here -- present
-                    on a preset category, blank on a hand-typed one, so
-                    this only ever adds information, never an empty line
-                    that reads as broken. */}
-                    {categoryDescription(line.category_id) && (
-                      <div className="category-description">
-                        {categoryDescription(line.category_id)}
-                      </div>
-                    )}
+                    {/* Group and description share one line instead of
+                    two -- a dozen-plus of these stacked down the tab adds
+                    up fast. Mei's (a CPA) description text is present on a
+                    preset category, blank on a hand-typed one, so the
+                    " · " separator only ever appears once there's a second
+                    thing to say. */}
+                    <div className="category-group">
+                      {categoryGroup(line.category_id)}
+                      {categoryDescription(line.category_id) && ` · ${categoryDescription(line.category_id)}`}
+                    </div>
                     {/* How far through the plan this category is, without
                     reading three numbers and doing the division. Only
                     once a plan exists -- a full bar on planned 0 would
@@ -724,38 +729,9 @@ export default function BudgetTab({
       )}
       {categories.items.length > 0 && <p className="field-label">{t('budget.spentHint')}</p>}
 
-      {includeCommitments && commitmentLines.length > 0 && (
-        <div className="category-table commitments-table">
-          <div className="category-row category-head">
-            <div>{t('budget.commitmentsTitle')}</div>
-            <div className="num">{t('budget.planned')}</div>
-            <div />
-          </div>
-          {commitmentLines.map(({ line, isGoal, name }) => (
-            <div className="category-row" key={line.category_id}>
-              <div>
-                <div className="category-name">{name}</div>
-                <div className="category-group">{isGoal ? t('goals.title') : t('debt.title')}</div>
-              </div>
-              <div className="num">
-                <span className="cell-label">{t('budget.planned')}</span>
-                {formatMoney(line.planned)}
-              </div>
-              <div />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Where the money went, not where it came from -- an income
-          category with a big "actual" would otherwise show up as the
-          largest bar in a chart titled "where the month's money went". */}
-      <SpendChart
-        lines={orderedLines.filter((l) => !isIncome(l.category_id))}
-        categoryName={categoryName}
-        formatMoney={formatMoney}
-      />
-
+      {/* Right under the table it adds to, not after the commitments
+          table and chart below -- previously the very last thing on the
+          tab, easy to miss on a first visit with an empty budget. */}
       <form className="form-grid" onSubmit={addCategory}>
         <label className="field">
           <span className="field-label">{t('budget.categoryName')}</span>
@@ -786,11 +762,46 @@ export default function BudgetTab({
         <button className="btn" type="submit">
           {t('budget.addCategory')}
         </button>
-        <button className="btn secondary" type="button" onClick={addCommonCategories}>
+        <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
           {t('budget.addCommon')}
         </button>
       </form>
       <p className="field-label">{t('budget.commonHint')}</p>
+
+      {includeCommitments && commitmentLines.length > 0 && (
+        <details className="collapsible-panel">
+          <summary>{t('budget.commitmentsTitle')}</summary>
+          <div className="category-table commitments-table">
+            <div className="category-row category-head">
+              <div />
+              <div className="num">{t('budget.planned')}</div>
+              <div />
+            </div>
+            {commitmentLines.map(({ line, isGoal, name }) => (
+              <div className="category-row" key={line.category_id}>
+                <div>
+                  <div className="category-name">{name}</div>
+                  <div className="category-group">{isGoal ? t('goals.title') : t('debt.title')}</div>
+                </div>
+                <div className="num">
+                  <span className="cell-label">{t('budget.planned')}</span>
+                  {formatMoney(line.planned)}
+                </div>
+                <div />
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* Where the money went, not where it came from -- an income
+          category with a big "actual" would otherwise show up as the
+          largest bar in a chart titled "where the month's money went". */}
+      <SpendChart
+        lines={orderedLines.filter((l) => !isIncome(l.category_id))}
+        categoryName={categoryName}
+        formatMoney={formatMoney}
+      />
     </div>
   );
 }
