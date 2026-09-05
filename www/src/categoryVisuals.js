@@ -48,7 +48,7 @@ export const CATEGORY_PALETTE = [
   '#DA1BC0',
 ];
 
-// Fixed declaration order of the 14 starter presets (matches
+// Fixed declaration order of the 16 starter presets (matches
 // `crates/budget-calc/src/presets.rs`'s INCOME_CATEGORIES then
 // EXPENSE_CATEGORIES) -- a preset's position here is its permanent color
 // index, so "Housing" is always the same color, not just stable within
@@ -68,6 +68,8 @@ const PRESET_KEY_ORDER = [
   'cat.personalLifestyle',
   'cat.familyDependents',
   'cat.otherExpenses',
+  'cat.subscriptionsMemberships',
+  'cat.giftsDonations',
 ];
 
 const PRESET_ICONS = {
@@ -85,6 +87,8 @@ const PRESET_ICONS = {
   'cat.personalLifestyle': 'sparkle',
   'cat.familyDependents': 'people',
   'cat.otherExpenses': 'tag',
+  'cat.subscriptionsMemberships': 'repeat',
+  'cat.giftsDonations': 'gift',
 };
 
 /** Which icon id (a key into CategoryIcons.jsx's lookup map) a category's badge shows. */

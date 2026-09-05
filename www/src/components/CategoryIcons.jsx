@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Category badge icons: 14 starter-preset icons plus 2 generic fallbacks
+ * Category badge icons: 16 starter-preset icons plus 2 generic fallbacks
  * for a hand-typed category. Deliberately a different visual register
  * from icons.jsx's thin-stroke toolbar icons -- these are solid, rounded,
  * filled shapes (fill="currentColor", no stroke) sitting inside a colored
@@ -170,6 +170,30 @@ export function TagIcon() {
   );
 }
 
+export function RepeatIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M7 5.5h8a4 4 0 0 1 4 4V11h-2V9.5a2 2 0 0 0-2-2H7.8l1.6 1.6-1.4 1.4L4 6.5 8 2.5l1.4 1.4Z" />
+      <path d="M17 18.5H9a4 4 0 0 1-4-4V13h2v1.5a2 2 0 0 0 2 2h8.2l-1.6-1.6 1.4-1.4L21 17.5 17 21.5l-1.4-1.4Z" />
+    </svg>
+  );
+}
+
+export function GiftIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path
+        fillRule="evenodd"
+        d="M4 10.5h16V13H4Zm1 3.5h14v6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1ZM11 10.5h2V20h-2Z"
+      />
+      <path
+        fillRule="evenodd"
+        d="M9.3 4.2c1.7 0 2.7 2 3 3.6.3-1.6 1.3-3.6 3-3.6a2.1 2.1 0 0 1 0 4.2H6.7a2.1 2.1 0 0 1 0-4.2Zm.2 2a.6.6 0 1 0 0 1.2h1.6c-.2-.7-.8-1.2-1.6-1.2Zm5 0c-.8 0-1.4.5-1.6 1.2h1.6a.6.6 0 1 0 0-1.2Z"
+      />
+    </svg>
+  );
+}
+
 export function IncomeGenericIcon() {
   return (
     <svg {...ICON_PROPS}>
@@ -204,6 +228,8 @@ export const CATEGORY_ICONS = {
   sparkle: SparkleIcon,
   people: PeopleIcon,
   tag: TagIcon,
+  repeat: RepeatIcon,
+  gift: GiftIcon,
   'income-generic': IncomeGenericIcon,
   'expense-generic': ExpenseGenericIcon,
 };
