@@ -2817,6 +2817,35 @@ table.data tr:last-child td {
    bare "+" circle in different rounds of work before this fix. A labeled
    pill throughout: an icon alone doesn't say what it adds, and this
    repo's own "obvious to use" rule favors that over a smaller circle. */
+/* Sticks to the top of the viewport as the tab scrolls, so the add button
+   stays reachable without a fixed FAB landing on top of the "Add
+   rule"/"Apply rules" buttons further down this form-heavy tab -- the
+   negative margin/repadding lets it span the panel's full width and sit
+   flush against the panel's rounded top edge while still floating over
+   the content beneath it. */
+.txn-title-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: -20px -20px 0;
+  padding: 16px 20px;
+  background: var(--panel);
+  border-radius: 14px 14px 0 0;
+}
+.txn-add-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
 .fab-add {
   position: fixed;
   right: 20px;

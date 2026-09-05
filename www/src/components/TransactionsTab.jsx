@@ -111,17 +111,17 @@ export default function TransactionsTab({
 
   return (
     <div className="panel txn-panel">
-      <h2>{t('transactions.title')}</h2>
-
-      <button
-        type="button"
-        className="fab-add"
-        aria-label={t('transactions.addManual')}
-        onClick={() => setAddOpen(true)}
-      >
-        <span aria-hidden="true">+</span>
-        <span>{t('budget.logTransaction')}</span>
-      </button>
+      <div className="dash-header txn-title-header">
+        <h2>{t('transactions.title')}</h2>
+        <button
+          type="button"
+          className="txn-add-btn"
+          aria-label={t('budget.logTransaction')}
+          onClick={() => setAddOpen(true)}
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+      </div>
 
       <AddTransactionSheet
         open={addOpen}
