@@ -49,6 +49,7 @@ export default function BudgetTab({
   const formatMoney = makeFormatMoney(currencySymbol);
   const [result, setResult] = useState(null);
   const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [plannedDraft, setPlannedDraft] = useState({});
   // Which category's "log spending" row is open, and what's typed in it.
   const [spendFor, setSpendFor] = useState(null);
@@ -445,23 +446,29 @@ export default function BudgetTab({
             ? t('budget.viewingPastMonth')
             : t('budget.viewingFutureMonth', { month: monthLabel(viewMonth, locale) })}
       </p>
-      {/* The method, stated once. Zero-based budgeting is the entire
-          premise of this tab and the UI never said what it was. */}
-      <p className="panel-subtitle">{t('budget.method')}</p>
+      {/* Grouped into one tighter block rather than two panel-gapped
+          children -- neither line is the next action on this screen (the
+          assign banner below is), so they don't need a full flex gap of
+          their own before it. */}
+      <div className="budget-method-block">
+        {/* The method, stated once. Zero-based budgeting is the entire
+            premise of this tab and the UI never said what it was. */}
+        <p className="panel-subtitle">{t('budget.method')}</p>
 
-      {/* Off by default: a goal or debt only claims part of this month's
-          income once someone says so, not because the feature exists. */}
-      <label className="field-check commitments-toggle">
-        <input
-          type="checkbox"
-          checked={includeCommitments}
-          onChange={(e) => {
-            setIncludeCommitments(e.target.checked);
-            saveIncludeCommitments(e.target.checked);
-          }}
-        />
-        <span>{t('budget.includeCommitments')}</span>
-      </label>
+        {/* Off by default: a goal or debt only claims part of this month's
+            income once someone says so, not because the feature exists. */}
+        <label className="field-check commitments-toggle">
+          <input
+            type="checkbox"
+            checked={includeCommitments}
+            onChange={(e) => {
+              setIncludeCommitments(e.target.checked);
+              saveIncludeCommitments(e.target.checked);
+            }}
+          />
+          <span>{t('budget.includeCommitments')}</span>
+        </label>
+      </div>
 
       {result?.error && <CalcError result={result} />}
       {savingsResult?.error && <CalcError result={savingsResult} />}
@@ -821,13 +828,40 @@ export default function BudgetTab({
             <p className="field-label">{t('budget.commonHint')}</p>
           </>
         );
-        return mode === TRACKING ? (
-          <details className="collapsible-panel">
-            <summary>{t('budget.editCategoriesTitle')}</summary>
-            {editCategoriesBlock}
-          </details>
-        ) : (
-          editCategoriesBlock
+        if (mode === TRACKING) {
+          return (
+            <details className="collapsible-panel">
+              <summary>{t('budget.editCategoriesTitle')}</summary>
+              {editCategoriesBlock}
+            </details>
+          );
+        }
+        // ASSIGN mode: a floating button rather than this block sitting
+        // permanently inline -- it's exactly what was pushing the
+        // category table below the fold on a fresh budget. TRACKING mode
+        // keeps its own collapsed <details> above, unchanged -- a second
+        // FAB there would collide with QuickAddFab's bottom-right slot.
+        return (
+          <>
+            {categoryPanelOpen && (
+              <div
+                className="fab-picker category-add-panel"
+                role="dialog"
+                aria-label={t('budget.addCategory')}
+              >
+                {editCategoriesBlock}
+              </div>
+            )}
+            <button
+              type="button"
+              className="fab-add"
+              aria-expanded={categoryPanelOpen}
+              aria-label={t('budget.addCategory')}
+              onClick={() => setCategoryPanelOpen((open) => !open)}
+            >
+              +
+            </button>
+          </>
         );
       })()}
 
