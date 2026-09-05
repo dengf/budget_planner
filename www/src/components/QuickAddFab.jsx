@@ -50,7 +50,7 @@ export default function QuickAddFab({ categories, onPick }) {
         onClick={() => setOpen((o) => !o)}
       >
         <span aria-hidden="true">+</span>
-        <span>{t('transactions.addManual')}</span>
+        <span>{t('budget.logTransaction')}</span>
       </button>
     </>
   );
