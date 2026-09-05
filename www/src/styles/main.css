@@ -2700,6 +2700,27 @@ table.data tr:last-child td {
     font-size: 0.88rem;
   }
 
+  /* Income/Total planned/Total spent side by side, not stacked -- the
+     base .stat-grid rule (auto-fit, minmax(170px, 1fr)) only fits one
+     170px column on a 375px phone, so these three cards stacked to full
+     height before the category list even started. Same fix as
+     .dash-summary-cards just below, scoped to -secondary so Dashboard's
+     own .stat-grid usage is untouched. */
+  .stat-grid-secondary {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat-grid-secondary .stat {
+    padding: 10px 8px;
+    gap: 4px;
+  }
+  .stat-grid-secondary .stat-label {
+    font-size: 0.7rem;
+  }
+  .stat-grid-secondary .stat-value {
+    font-size: 0.95rem;
+  }
+
   /* Income/Expenses/Savings side by side in one row rather than the
      default auto-fit minmax(160px, ...) wrap, which would stack them on
      a 375px phone. */
@@ -2865,6 +2886,20 @@ table.data tr:last-child td {
 .fab-picker-item:hover,
 .fab-picker-item:focus-visible {
   background: var(--panel-alt);
+}
+
+/* Widens/repads the shared .fab-picker shell for form content (the
+   category-name/group fields, income checkbox, Add/Add-common buttons)
+   instead of a plain tap-to-pick menu list -- position, z-index and the
+   720px bottom-clearance override all still come from .fab-picker itself
+   since both classes land on the same element. */
+.category-add-panel {
+  width: min(340px, calc(100vw - 32px));
+  max-height: 70vh;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* Below 720px the bottom tab bar (`.app-tabs`, see its own media query
