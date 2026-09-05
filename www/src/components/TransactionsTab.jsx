@@ -111,11 +111,11 @@ export default function TransactionsTab({
 
   return (
     <div className="panel txn-panel">
-      <div className="dash-header txn-title-header">
+      <div className="dash-header sticky-title-header sticky-title-header-flush">
         <h2>{t('transactions.title')}</h2>
         <button
           type="button"
-          className="txn-add-btn"
+          className="icon-add-btn"
           aria-label={t('budget.logTransaction')}
           onClick={() => setAddOpen(true)}
         >
