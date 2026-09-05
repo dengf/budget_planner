@@ -4,7 +4,7 @@ import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel } from '../month';
 import { looksLikeAddress, mailtoUrl, parseRecipients } from '../mailto';
 import CategoryBadge from './CategoryBadge';
-import BubbleChart from './BubbleChart';
+import CategoryBreakdown from './CategoryBreakdown';
 import BlossomProgress, { BlossomWatermark } from './BlossomProgress';
 import SpendOverTimeChart from './SpendOverTimeChart';
 import MonthYearPicker from './MonthYearPicker';
@@ -64,12 +64,12 @@ export default function DashboardTab({
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
 
-  // The tapped bubble's detail card renders after the whole bubble grid
-  // (see `drilldown` below), which can sit a full row or two of bubbles
-  // below the one actually tapped -- easy to miss without scrolling.
-  // Bringing it into view on tap, rather than making the user go find it,
-  // is the fix; `smooth` degrades to an instant jump under
-  // prefers-reduced-motion, matching this app's convention elsewhere.
+  // The tapped row's detail card renders as the next row in the list
+  // (see `drilldown` below), which can sit several rows below the one
+  // actually tapped -- easy to miss without scrolling. Bringing it into
+  // view on tap, rather than making the user go find it, is the fix;
+  // `smooth` degrades to an instant jump under prefers-reduced-motion,
+  // matching this app's convention elsewhere.
   useEffect(() => {
     if (!selectedCategoryId || !detailRef.current) return;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -239,13 +239,20 @@ export default function DashboardTab({
     remaining: rows.reduce((sum, r) => sum + r.remaining, 0),
   });
   const expenseTotals = sumLines(expenseLines);
+  // Actual received, same basis as `incomeSlices` -- not `summary.income`
+  // (that's the planned/budgeted figure the top-of-page Income card shows,
+  // a deliberately different metric). The breakdown card's total sits
+  // directly above its own row list, so it has to reconcile with what
+  // those rows actually sum to, same as the expense tab's total already
+  // does with `expenseTotals.spent`.
+  const incomeTotals = sumLines(incomeLines);
 
   /**
-   * The bubble tapped open below one of the two charts -- income and
-   * expense bubbles share one `selectedCategoryId` (tapping a bubble in
-   * either chart closes whichever was open, including one in the other
-   * chart), and each chart only renders the panel if the selected id is
-   * one of its own. Shows the same planned/actual/remaining split
+   * The row tapped open below one of the two charts -- income and expense
+   * rows share one `selectedCategoryId` (tapping a row in either chart
+   * closes whichever was open, including one in the other chart), and
+   * each chart only renders the panel if the selected id is one of its
+   * own. Shows the same planned/actual/remaining split
    * `categoryCard` used to (income categories show Actual only -- see
    * that removed function's original comment: a $0.00 Planned and a
    * green "negative" Remaining on an income row explained nothing),
@@ -382,35 +389,33 @@ export default function DashboardTab({
         </div>
       </div>
 
-      <div className="dash-breakdowns">
-        <div>
-          <BubbleChart
-            title={t('chart.expenseBreakdown')}
-            items={expenseSlices}
-            formatMoney={formatMoney}
-            ariaLabel={t('chart.expenseBreakdownAria', { month: monthLabel(viewMonth, locale) })}
-            hint={t('dashboard.bubbleHint')}
-            totalLabel={formatMoney(expenseTotals.spent)}
-            emptyHint={t('chart.noExpenseYet')}
-            selectedId={selectedCategoryId}
-            onSelect={setSelectedCategoryId}
-            detail={drilldown(expenseSlices.map((s) => s.id))}
-          />
-        </div>
-        <div>
-          <BubbleChart
-            title={t('chart.incomeBreakdown')}
-            items={incomeSlices}
-            formatMoney={formatMoney}
-            ariaLabel={t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) })}
-            totalLabel={formatMoney(summary?.income ?? 0)}
-            emptyHint={t('chart.noIncomeYet')}
-            selectedId={selectedCategoryId}
-            onSelect={setSelectedCategoryId}
-            detail={drilldown(incomeSlices.map((s) => s.id))}
-          />
-        </div>
-      </div>
+      <CategoryBreakdown
+        tabs={[
+          {
+            key: 'expense',
+            label: t('chart.expenseBreakdown'),
+            items: expenseSlices,
+            ariaLabel: t('chart.expenseBreakdownAria', { month: monthLabel(viewMonth, locale) }),
+            hint: t('dashboard.bubbleHint'),
+            totalLabel: formatMoney(expenseTotals.spent),
+            emptyHint: t('chart.noExpenseYet'),
+          },
+          {
+            key: 'income',
+            label: t('chart.incomeBreakdown'),
+            items: incomeSlices,
+            ariaLabel: t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) }),
+            totalLabel: formatMoney(incomeTotals.spent),
+            emptyHint: t('chart.noIncomeYet'),
+          },
+        ]}
+        formatMoney={formatMoney}
+        selectedId={selectedCategoryId}
+        onSelect={setSelectedCategoryId}
+        detail={
+          drilldown(expenseSlices.map((s) => s.id)) ?? drilldown(incomeSlices.map((s) => s.id))
+        }
+      />
 
       <SpendOverTimeChart
         dailyTotals={dailyTotals}

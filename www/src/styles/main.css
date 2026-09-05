@@ -1622,6 +1622,12 @@ table.data tr:last-child td {
   font-size: 1.1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  /* When the tab switcher above wraps to its own full-width row (see
+     `.cat-breakdown-tabs`), this becomes the lone item on the next flex
+     line -- `justify-content: space-between` has nothing to space a
+     single item against, so without this it would sit at that line's
+     start instead of staying right-aligned like it is on the shared row. */
+  margin-left: auto;
 }
 .chart-header {
   display: flex;
@@ -1639,6 +1645,20 @@ table.data tr:last-child td {
   background: var(--panel);
   padding: 3px;
   border-radius: 8px;
+}
+/* CategoryBreakdown.jsx's two tab labels ("Spending by category" /
+   "Income by source") are full sentences, not the two short words
+   .chart-granularity's other caller (Daily/Weekly) sizes for -- letting
+   them share this container's width evenly, rather than each sizing to
+   its own content, is what keeps two long labels from just running past
+   each other. */
+.cat-breakdown-tabs {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.cat-breakdown-tabs .app-region {
+  flex: 1;
+  text-align: center;
 }
 .chart-legend {
   display: flex;
@@ -1678,119 +1698,140 @@ table.data tr:last-child td {
   color: var(--muted);
 }
 
-.dash-breakdowns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-
-/* A visible cue for a brand-new interaction pattern -- the per-bubble
-   aria-label (BubbleChart.jsx) covers screen-reader discovery, but a
-   sighted first-time user needs the same "tap to see details" told to
+/* A visible cue for a brand-new interaction pattern -- the per-row
+   aria-label (CategoryBreakdown.jsx) covers screen-reader discovery, but
+   a sighted first-time user needs the same "tap to see details" told to
    them directly too (this app's own "obvious to use" rule). */
-.bubble-hint {
-  margin: 0 0 4px;
+.cat-hint {
+  margin: 0 0 2px;
 }
 
-/* Bubbles sized by share of total (BubbleChart.jsx does the sizing math),
-   laid out as a wrapping flex row rather than true circle-packing physics
-   -- consistent with this app's hand-rolled-SVG-over-a-library stance
-   elsewhere, just without even the SVG here since a bubble is a plain
-   round button. flex-end alignment means bubble+label pairs of different
-   sizes sit on a shared baseline instead of vertically centering, which
-   reads as a loose, ungrounded cluster once diameters vary this much. */
-.bubble-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 10px;
-  padding: 8px 0;
-}
-.bubble-item {
+/* Category breakdown as a compact bar list -- CategoryBreakdown.jsx's
+   replacement for the earlier circle/bubble chart (see that component's
+   own removal note). A list, not a wrapping grid, so row count (not
+   circle-packing) is what determines height -- the thing this pass is
+   actually trying to shrink. */
+/* Capped rather than growing with the category count -- this pass exists
+   so a first landing on Dashboard shows the hero figure and *both*
+   breakdown charts at once (see the `.dashboard` block below); an
+   uncapped list would grow past that budget the moment a real budget has
+   more than a handful of categories with spend. ~4 rows' worth stays
+   visible; the rest scrolls inside this card instead of pushing the page
+   down, same trade-off a native app's own short lists make. */
+.cat-rows {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
 }
-/* A hand-typed category (no preset_key) falls back to a generic
-   income/expense icon (categoryVisuals.js's categoryIconId), so several
-   custom categories can render identically apart from color -- the name
-   is what always disambiguates. Wraps up to 2 lines instead of a
-   single-line ellipsis (which cut real names off mid-word, e.g. "Food &
-   Groc...") -- a fixed 2-line min-height reserves the same footprint
-   whether a given label actually wraps or not, so `.bubble-grid`'s
-   flex-end baseline still lines every item up by bubble size alone, not
-   by how much of each name got truncated. */
-.bubble-label {
-  max-width: 84px;
-  min-height: 2.3em;
-  font-size: 0.72rem;
-  line-height: 1.15;
-  color: var(--muted);
-  text-align: center;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.bubble {
-  flex: none;
+/* The whole row is the tap target, not just the icon -- kept at this
+   repo's cross-tool 44px touch-target floor regardless of how many rows
+   are visible at once, per CLAUDE.md's phone-first rule. */
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 4px;
   border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.cat-row-selected {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+.cat-row-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
   color: #fff;
-  cursor: pointer;
-  /* Selection is shown as a ring outside the circle, not a color/size
-     change -- either of those would fight the size-encodes-value and
-     color-encodes-category meanings this chart already uses. */
-  box-shadow: 0 0 0 0 transparent;
-  transition: box-shadow 0.15s ease;
 }
-.bubble svg {
-  width: 22px;
-  height: 22px;
+.cat-row-icon svg {
+  width: 15px;
+  height: 15px;
   flex: none;
 }
-.bubble-selected {
-  box-shadow: 0 0 0 3px var(--accent);
+.cat-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .bubble {
-    transition: none;
-  }
+.cat-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
-.bubble-pct {
-  font-size: 0.7rem;
-  font-weight: 700;
+/* A hand-typed category (no preset_key) falls back to a generic
+   income/expense icon (categoryVisuals.js's categoryIconId) -- unlike the
+   removed bubble chart, this row has no separate label underneath to
+   disambiguate, so the name here is doing that same job. Single line with
+   an ellipsis rather than the bubble chart's 2-line wrap: a list row's
+   whole point is staying short, and the amount beside it needs the same
+   line to sit on. */
+.cat-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.cat-row-amount {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-/* The empty-state placeholder shown before there's anything to chart --
-   muted enough to read as "nothing here yet" rather than a real,
-   single-category bubble. Same reasoning PieChart's old empty ring used. */
-.bubble-empty {
-  background: var(--muted-2);
-  opacity: 0.35;
-  cursor: default;
+.cat-row-track {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface);
+  overflow: hidden;
+}
+/* Width is the item's own share of this chart's total, not a comparison
+   to the largest item (CategoryBreakdown.jsx's own comment) -- a
+   full-width bar reading as "all of it" is the point. */
+.cat-row-bar {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  min-width: 2px;
+}
+.cat-row-pct {
+  flex: none;
+  min-width: 30px;
+  text-align: right;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .chart-empty-hint {
-  margin: 8px 0 0;
-  text-align: center;
+  margin: 4px 0 0;
 }
 
-/* Forces a line break in `.bubble-grid`'s `flex-wrap` right where it
-   sits -- a 100%-width flex item always starts its own row, so placing
-   this immediately after the tapped bubble in DOM order (BubbleChart.jsx)
-   lands the detail panel directly under that bubble's own row instead of
-   below every other bubble in the grid. */
-.bubble-detail-slot {
-  flex-basis: 100%;
-  width: 100%;
+/* The panel that opens right under the tapped row -- a plain list, so it
+   just needs to be the next sibling row, no reflow trick required (the
+   removed bubble-grid's wrapping flex layout needed one). */
+.cat-detail-slot {
+  list-style: none;
 }
 /* The panel that opens right under the tapped bubble's row. Reuses
    `.dash-card-stats`/`.dash-stat` for its planned/actual/remaining row,
@@ -2361,6 +2402,11 @@ table.data tr:last-child td {
   .app-header {
     flex-direction: column;
     align-items: flex-start;
+    /* Page-frame padding, not a touch control -- unlike the 44px controls
+       in the row below, this has real slack, and every pixel here pushes
+       the breakdown charts further down a phone screen. */
+    padding: 14px 0 10px;
+    gap: 4px;
   }
 
   /* The intro/headline/panel chrome above the fold is identical on every
@@ -2430,5 +2476,63 @@ table.data tr:last-child td {
   .dash-card-blossom {
     top: 8px;
     right: 6px;
+  }
+
+  /* Every extra pixel here pushes the breakdown charts further down the
+     page -- the whole point of this pass is landing on Dashboard and
+     seeing the hero figure *and* both breakdowns at once, not scrolling
+     to find them. Tightened, not cut: same information, less padding. */
+  .dash-card-hero.dash-card-savings {
+    padding: 14px 16px;
+  }
+  .dash-card-hero .dash-card-value {
+    font-size: 1.9rem;
+  }
+  .dash-blossom-watermark {
+    width: 90px;
+    height: 90px;
+    top: -14px;
+    right: -14px;
+  }
+  .dash-summary-secondary .dash-card {
+    padding-top: 8px;
+  }
+
+  .chart {
+    padding: 12px 14px;
+    gap: 4px;
+  }
+  .chart-total {
+    font-size: 0.95rem;
+  }
+  /* Taller cap than the base rule's 220px -- only one tab's list is ever
+     on screen at once (the other is a tap away, not stacked below it), so
+     a phone's landing-page budget ("hero + this card visible with no
+     scrolling") affords more rows here than it would for two stacked
+     cards. Each list still opens on its biggest category first (sorted
+     descending), so what's cut off first is the least informative row. */
+  .cat-rows {
+    gap: 2px;
+    max-height: 240px;
+  }
+  .cat-row {
+    min-height: 44px;
+    padding: 4px 2px;
+  }
+  .cat-row-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .cat-row-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .cat-row-name,
+  .cat-row-amount {
+    font-size: 0.78rem;
+  }
+  .cat-row-pct {
+    font-size: 0.62rem;
+    min-width: 22px;
   }
 }
