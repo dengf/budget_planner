@@ -16,15 +16,26 @@ const DEFAULT_MAPPING = {
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
 
+const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
+
+const EMPTY_RECURRING_DRAFT = {
+  description: '',
+  category_id: '',
+  amount: '',
+  cadence: 'monthly',
+  anchor_date: '',
+};
+
 /**
- * The three ways a transaction enters the app -- manual entry, a
- * photographed/PDF receipt, a bank CSV export -- collapsed behind one
- * floating "Add" button (TransactionsTab.jsx) instead of three
- * permanently-expanded sections stacked above the transaction list.
- * Manual is the default tab: it needs no file and no OCR wait, the
- * quickest path for the single most common case of logging one thing
- * just spent. Closes itself after a manual add (a genuine one-shot
- * action); receipt and CSV import stay open afterward since scanning a
+ * The four ways a transaction (or a recurring expense that generates
+ * future ones) enters the app -- manual entry, a photographed/PDF
+ * receipt, a bank CSV export, a recurring rule -- collapsed behind one
+ * floating "Add" button (TransactionsTab.jsx) instead of permanently-
+ * expanded sections stacked above the transaction list. Manual is the
+ * default tab: it needs no file and no OCR wait, the quickest path for
+ * the single most common case of logging one thing just spent. Closes
+ * itself after a manual or recurring add (both genuine one-shot
+ * actions); receipt and CSV import stay open afterward since scanning a
  * second receipt or re-running an import with adjusted columns are both
  * real, common follow-ups.
  */
@@ -36,16 +47,18 @@ export default function AddTransactionSheet({
   categories,
   rules,
   transactions,
+  recurring,
   formatMoney,
 }) {
   const { t } = useI18n();
-  const [method, setMethod] = useState('manual'); // 'manual' | 'receipt' | 'csv'
+  const [method, setMethod] = useState('manual'); // 'manual' | 'receipt' | 'csv' | 'recurring'
 
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [csvText, setCsvText] = useState('');
   const [mapping, setMapping] = useState(DEFAULT_MAPPING);
   const [columnsDetected, setColumnsDetected] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [recurringDraft, setRecurringDraft] = useState(EMPTY_RECURRING_DRAFT);
 
   if (!open) return null;
 
@@ -60,6 +73,22 @@ export default function AddTransactionSheet({
       category_id: draft.category_id || null,
     });
     setDraft(EMPTY_DRAFT);
+    onClose();
+  };
+
+  const addRecurring = async (e) => {
+    e.preventDefault();
+    if (!recurringDraft.description.trim() || !recurringDraft.category_id) return;
+    if (!recurringDraft.amount || !recurringDraft.anchor_date) return;
+    await recurring.save({
+      id: newId(),
+      description: recurringDraft.description,
+      category_id: recurringDraft.category_id,
+      amount: Number(recurringDraft.amount),
+      cadence: recurringDraft.cadence,
+      anchor_date: recurringDraft.anchor_date,
+    });
+    setRecurringDraft(EMPTY_RECURRING_DRAFT);
     onClose();
   };
 
@@ -103,6 +132,7 @@ export default function AddTransactionSheet({
 
   const closeAndReset = () => {
     setDraft(EMPTY_DRAFT);
+    setRecurringDraft(EMPTY_RECURRING_DRAFT);
     onClose();
   };
 
@@ -154,6 +184,15 @@ export default function AddTransactionSheet({
             onClick={() => setMethod('csv')}
           >
             {t('transactions.methodImport')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={method === 'recurring'}
+            className={`add-txn-method-btn${method === 'recurring' ? ' active' : ''}`}
+            onClick={() => setMethod('recurring')}
+          >
+            {t('transactions.methodRecurring')}
           </button>
         </div>
 
@@ -321,6 +360,79 @@ export default function AddTransactionSheet({
                     : ''}
                 </p>
               )}
+            </>
+          )}
+
+          {method === 'recurring' && (
+            <>
+              <form className="form-grid" onSubmit={addRecurring}>
+                <label className="field">
+                  <span className="field-label">{t('recurring.description')}</span>
+                  <div className="field-input">
+                    <input
+                      value={recurringDraft.description}
+                      onChange={(e) =>
+                        setRecurringDraft({ ...recurringDraft, description: e.target.value })
+                      }
+                    />
+                  </div>
+                </label>
+                <label className="field">
+                  <span className="field-label">{t('transactions.category')}</span>
+                  <select
+                    className="field-select"
+                    value={recurringDraft.category_id}
+                    onChange={(e) =>
+                      setRecurringDraft({ ...recurringDraft, category_id: e.target.value })
+                    }
+                  >
+                    <option value="">—</option>
+                    {categories.items.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <NumberField
+                  label={t('recurring.amount')}
+                  value={recurringDraft.amount}
+                  onChange={(v) => setRecurringDraft({ ...recurringDraft, amount: v })}
+                  grouped
+                />
+                <label className="field">
+                  <span className="field-label">{t('recurring.cadence')}</span>
+                  <select
+                    className="field-select"
+                    value={recurringDraft.cadence}
+                    onChange={(e) =>
+                      setRecurringDraft({ ...recurringDraft, cadence: e.target.value })
+                    }
+                  >
+                    {CADENCES.map((c) => (
+                      <option key={c} value={c}>
+                        {t(`freq.${c}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span className="field-label">{t('recurring.anchorDate')}</span>
+                  <div className="field-input">
+                    <input
+                      type="date"
+                      value={recurringDraft.anchor_date}
+                      onChange={(e) =>
+                        setRecurringDraft({ ...recurringDraft, anchor_date: e.target.value })
+                      }
+                    />
+                  </div>
+                </label>
+                <button className="btn" type="submit">
+                  {t('recurring.add')}
+                </button>
+              </form>
+              <p className="field-label">{t('recurring.anchorHint')}</p>
             </>
           )}
         </div>
