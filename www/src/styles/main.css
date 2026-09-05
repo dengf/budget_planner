@@ -2506,45 +2506,10 @@ table.data tr:last-child td {
   min-height: 44px;
 }
 
-/* The single entry point for every way a transaction gets added --
-   manual, receipt, CSV -- previously three permanently-expanded sections
-   stacked above the transaction list. A pill FAB keeps the primary
-   action reachable one-handed (this repo's phone-first mandate) instead
-   of requiring a scroll to find any of them. Fixed regardless of scroll
-   position, same as the dialogs it opens. */
-.add-txn-fab {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 70;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 56px;
-  padding: 0 22px 0 18px;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 1rem;
-  font-weight: 700;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-.add-txn-fab span:first-child {
-  font-size: 1.6rem;
-  line-height: 1;
-}
-/* Clears the fixed bottom tab bar (`.app-tabs` at this same breakpoint,
-   `.app-main`'s own padding-bottom is the same 64px reservation) with a
-   16px gap above it, rather than sitting flush against or under it. */
-@media (max-width: 720px) {
-  .add-txn-fab {
-    right: 16px;
-    bottom: calc(64px + 16px + env(safe-area-inset-bottom));
-  }
-}
-
+/* Backdrop for the sheet the shared .fab-add button opens on this tab --
+   the single entry point for every way a transaction gets added (manual,
+   receipt, CSV), replacing three permanently-expanded sections that used
+   to stack above the transaction list. */
 .add-txn-backdrop {
   position: fixed;
   inset: 0;
@@ -2846,23 +2811,34 @@ table.data tr:last-child td {
   outline-offset: 2px;
 }
 
+/* The one floating "add" button style, shared by every tab that has
+   one (Budget's quick-add-spend and add-category FABs, Transactions'
+   add-transaction FAB) -- these independently grew a labeled pill and a
+   bare "+" circle in different rounds of work before this fix. A labeled
+   pill throughout: an icon alone doesn't say what it adds, and this
+   repo's own "obvious to use" rule favors that over a smaller circle. */
 .fab-add {
   position: fixed;
   right: 20px;
   bottom: max(20px, env(safe-area-inset-bottom));
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 22px 0 18px;
   border: none;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 1.8rem;
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.fab-add span:first-child {
+  font-size: 1.6rem;
   line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--hero-shadow);
-  z-index: 20;
 }
 .fab-picker {
   position: fixed;
@@ -2876,7 +2852,7 @@ table.data tr:last-child td {
   border-radius: 16px;
   padding: 8px;
   box-shadow: var(--hero-shadow);
-  z-index: 21;
+  z-index: 71;
 }
 .fab-picker-item {
   display: flex;
@@ -2912,10 +2888,9 @@ table.data tr:last-child td {
 }
 
 /* Below 720px the bottom tab bar (`.app-tabs`, see its own media query
-   above) switches to `position: fixed; bottom: 0` with `z-index: 60` --
-   well above the FAB's own z-index: 20 -- so without this the FAB's
-   plain 20px-from-viewport-bottom position sits directly underneath that
-   bar: mostly hidden, and its tap target stolen by the tab bar's own
+   above) switches to `position: fixed; bottom: 0` -- so without this the
+   FAB's plain 20px-from-viewport-bottom position sits directly underneath
+   that bar: mostly hidden, and its tap target stolen by the tab bar's own
    icons. This has to come after the base `.fab-add`/`.fab-picker` rules
    above in source order -- an identical `@media (max-width: 720px)`
    block placed earlier in the file (nearer `.app-tabs`'s own) loses the

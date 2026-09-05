@@ -856,10 +856,10 @@ export default function BudgetTab({
               type="button"
               className="fab-add"
               aria-expanded={categoryPanelOpen}
-              aria-label={t('budget.addCategory')}
               onClick={() => setCategoryPanelOpen((open) => !open)}
             >
-              +
+              <span aria-hidden="true">+</span>
+              <span>{t('budget.addCategory')}</span>
             </button>
           </>
         );
