@@ -753,6 +753,33 @@ label.btn {
   border-radius: 10px;
 }
 
+/* The payoff plan's own hero -- "months to debt-free" is the number this
+   whole tab exists to produce, same reasoning as Dashboard's Savings card
+   and Budget's unassigned banner. No blossom watermark here, unlike
+   Dashboard's hero: that's this app's one deliberately bold move, and
+   repeating it on every tab's hero would dilute it into decoration. */
+.debt-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--panel-hero);
+  box-shadow: var(--hero-shadow);
+  border-radius: 18px;
+  padding: 18px 20px;
+  margin: 4px 0 8px;
+}
+.debt-hero-headline {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.debt-hero-sub {
+  font-size: 0.95rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 table.data {
   width: 100%;
   border-collapse: collapse;
@@ -949,13 +976,21 @@ table.data tr:last-child td {
   flex-direction: column;
   gap: 4px;
 }
+/* Was the loudest text in the card (700 weight, 1rem) with the actual
+   dollar progress underneath it at 0.82rem and muted -- backwards for a
+   budgeting app, where the amount saved is the figure worth scanning
+   for, same "label small and quiet, value big and prominent" pattern as
+   `.dash-card-label`/`.dash-card-value` and `.stat-label`/`.stat-value`. */
 .goal-name {
-  font-weight: 700;
-  font-size: 1rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 .goal-progress-text {
-  font-size: 0.82rem;
-  color: var(--muted);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .goal-contribution {
   font-size: 0.82rem;
