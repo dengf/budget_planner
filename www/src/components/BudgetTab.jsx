@@ -15,6 +15,10 @@ import {
 } from '../commitments';
 import { monthsBetween } from '../month';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
+import { ASSIGN, budgetMode } from '../budgetMode';
+import { availablePresets } from '../presetCategories';
+import AssignProgressRing from './AssignProgressRing';
+import CategoryChipPicker from './CategoryChipPicker';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -33,6 +37,7 @@ export default function BudgetTab({
   categories,
   removeCategory,
   addCommonCategories,
+  addPresetCategory,
   transactions,
   budgetPlan,
   goals,
@@ -50,6 +55,7 @@ export default function BudgetTab({
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
   const [upcoming, setUpcoming] = useState(null);
   const [savingsResult, setSavingsResult] = useState(null);
+  const [presetCategories, setPresetCategories] = useState([]);
 
   const monthTransactions = useMemo(
     () => transactions.items.filter((tx) => tx.date?.startsWith(viewMonth)),
@@ -340,6 +346,24 @@ export default function BudgetTab({
     };
   }, [wasmModule, recurring?.items, viewMonth]);
 
+  /** The full starter-preset list, for the chip picker -- loaded once
+   *  `wasmModule` is ready. Unlike `addCommonCategories`'s own call to
+   *  the same binding, this one is kept in state so the picker can
+   *  re-filter it against `categories.items` on every render without
+   *  re-fetching from wasm each time. */
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!wasmModule?.preset_categories) return;
+      const presets = (await wasmModule.preset_categories()) ?? [];
+      if (!cancelled) setPresetCategories(presets);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [wasmModule]);
+
   /** Adds a recurring category's expected total on top of whatever is
    *  already planned for it -- the one-click "help solve it" action, not
    *  just a number to notice and go type in by hand. */
@@ -389,6 +413,7 @@ export default function BudgetTab({
   // something has actually been planned against it.
   const hasIncome = (summary?.income ?? 0) > 0;
   const hasBudget = hasIncome && (summary?.total_planned ?? 0) > 0;
+  const mode = budgetMode({ isPastMonth, hasIncome, unassigned });
 
   return (
     <div className="panel budget">
@@ -439,18 +464,24 @@ export default function BudgetTab({
           <div
             className={`assign-banner${hasBudget ? '' : ' assign-banner-start'}${unassigned < 0 ? ' assign-banner-over' : ''}`}
           >
-            <span className="assign-label">
-              {!hasIncome
-                ? t('budget.startWithIncome')
-                : !hasBudget
-                  ? t('budget.assignPrompt', { amount: formatMoney(summary.income) })
-                  : unassigned === 0
-                    ? t('budget.fullyAssigned')
-                    : unassigned > 0
-                      ? t('budget.unassignedPositive', { amount: formatMoney(unassigned) })
-                      : t('budget.unassignedNegative', { amount: formatMoney(-unassigned) })}
-            </span>
-            {hasIncome && <span className="assign-value">{formatMoney(unassigned)}</span>}
+            <AssignProgressRing
+              fraction={summary.income > 0 ? summary.total_planned / summary.income : 0}
+              state={!hasIncome ? 'start' : unassigned < 0 ? 'over' : 'onTrack'}
+            />
+            <div className="assign-banner-text">
+              <span className="assign-label">
+                {!hasIncome
+                  ? t('budget.startWithIncome')
+                  : !hasBudget
+                    ? t('budget.assignPrompt', { amount: formatMoney(summary.income) })
+                    : unassigned === 0
+                      ? t('budget.fullyAssigned')
+                      : unassigned > 0
+                        ? t('budget.unassignedPositive', { amount: formatMoney(unassigned) })
+                        : t('budget.unassignedNegative', { amount: formatMoney(-unassigned) })}
+              </span>
+              {hasIncome && <span className="assign-value">{formatMoney(unassigned)}</span>}
+            </div>
           </div>
 
           <div className="stat-grid stat-grid-secondary">
@@ -732,6 +763,13 @@ export default function BudgetTab({
       {/* Right under the table it adds to, not after the commitments
           table and chart below -- previously the very last thing on the
           tab, easy to miss on a first visit with an empty budget. */}
+      {mode === ASSIGN && (
+        <CategoryChipPicker
+          presets={availablePresets(presetCategories, categories.items, t)}
+          onAdd={addPresetCategory}
+        />
+      )}
+
       <form className="form-grid" onSubmit={addCategory}>
         <label className="field">
           <span className="field-label">{t('budget.categoryName')}</span>
