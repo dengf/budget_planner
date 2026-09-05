@@ -110,7 +110,7 @@ export default function TransactionsTab({
     : transactions.items.filter((tx) => tx.date?.startsWith(viewMonth));
 
   return (
-    <div className="panel">
+    <div className="panel txn-panel">
       <h2>{t('transactions.title')}</h2>
 
       <button
