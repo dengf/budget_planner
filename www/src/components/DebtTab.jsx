@@ -116,9 +116,14 @@ export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, de
 
           {plan && !plan.error && (
             <>
-              <p className="headline">
-                {t('debt.monthsToDebtFree', { months: plan.months_to_debt_free })} · {t('debt.totalInterest', { amount: formatMoney(plan.total_interest) })}
-              </p>
+              <div className="debt-hero">
+                <span className="debt-hero-headline">
+                  {t('debt.monthsToDebtFree', { months: plan.months_to_debt_free })}
+                </span>
+                <span className="debt-hero-sub">
+                  {t('debt.totalInterest', { amount: formatMoney(plan.total_interest) })}
+                </span>
+              </div>
               <p className="field-label">
                 {t('debt.order')}: {plan.order.map(debtName).join(' → ')}
               </p>
