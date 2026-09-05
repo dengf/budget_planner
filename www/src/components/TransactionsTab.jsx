@@ -27,6 +27,7 @@ export default function TransactionsTab({
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
+  const [recurringFormOpen, setRecurringFormOpen] = useState(false);
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
   const [recurringDraft, setRecurringDraft] = useState({
     description: '',
@@ -214,7 +215,18 @@ export default function TransactionsTab({
         </button>
       </form>
 
-      <h2 className="section-start">{t('recurring.title')}</h2>
+      <div className="dash-header sticky-title-header section-start">
+        <h2>{t('recurring.title')}</h2>
+        <button
+          type="button"
+          className="icon-add-btn"
+          aria-expanded={recurringFormOpen}
+          aria-label={t('recurring.add')}
+          onClick={() => setRecurringFormOpen((open) => !open)}
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+      </div>
       <p className="panel-subtitle">{t('recurring.hint')}</p>
       {recurring.items.length === 0 ? (
         <p className="empty-state">{t('recurring.none')}</p>
@@ -255,70 +267,76 @@ export default function TransactionsTab({
           </table>
         </div>
       )}
-      <form className="form-grid" onSubmit={addRecurring}>
-        <label className="field">
-          <span className="field-label">{t('recurring.description')}</span>
-          <div className="field-input">
-            <input
-              value={recurringDraft.description}
-              onChange={(e) =>
-                setRecurringDraft({ ...recurringDraft, description: e.target.value })
-              }
+      {recurringFormOpen && (
+        <>
+          <form className="form-grid" onSubmit={addRecurring}>
+            <label className="field">
+              <span className="field-label">{t('recurring.description')}</span>
+              <div className="field-input">
+                <input
+                  value={recurringDraft.description}
+                  onChange={(e) =>
+                    setRecurringDraft({ ...recurringDraft, description: e.target.value })
+                  }
+                />
+              </div>
+            </label>
+            <label className="field">
+              <span className="field-label">{t('transactions.category')}</span>
+              <select
+                className="field-select"
+                value={recurringDraft.category_id}
+                onChange={(e) =>
+                  setRecurringDraft({ ...recurringDraft, category_id: e.target.value })
+                }
+              >
+                <option value="">—</option>
+                {categories.items.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <NumberField
+              label={t('recurring.amount')}
+              value={recurringDraft.amount}
+              onChange={(v) => setRecurringDraft({ ...recurringDraft, amount: v })}
+              grouped
             />
-          </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.category')}</span>
-          <select
-            className="field-select"
-            value={recurringDraft.category_id}
-            onChange={(e) => setRecurringDraft({ ...recurringDraft, category_id: e.target.value })}
-          >
-            <option value="">—</option>
-            {categories.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <NumberField
-          label={t('recurring.amount')}
-          value={recurringDraft.amount}
-          onChange={(v) => setRecurringDraft({ ...recurringDraft, amount: v })}
-          grouped
-        />
-        <label className="field">
-          <span className="field-label">{t('recurring.cadence')}</span>
-          <select
-            className="field-select"
-            value={recurringDraft.cadence}
-            onChange={(e) => setRecurringDraft({ ...recurringDraft, cadence: e.target.value })}
-          >
-            {CADENCES.map((c) => (
-              <option key={c} value={c}>
-                {t(`freq.${c}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('recurring.anchorDate')}</span>
-          <div className="field-input">
-            <input
-              type="date"
-              value={recurringDraft.anchor_date}
-              onChange={(e) =>
-                setRecurringDraft({ ...recurringDraft, anchor_date: e.target.value })
-              }
-            />
-          </div>
-        </label>
-        <button className="btn" type="submit">
-          {t('recurring.add')}
-        </button>
-      </form>
-      <p className="field-label">{t('recurring.anchorHint')}</p>
+            <label className="field">
+              <span className="field-label">{t('recurring.cadence')}</span>
+              <select
+                className="field-select"
+                value={recurringDraft.cadence}
+                onChange={(e) => setRecurringDraft({ ...recurringDraft, cadence: e.target.value })}
+              >
+                {CADENCES.map((c) => (
+                  <option key={c} value={c}>
+                    {t(`freq.${c}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">{t('recurring.anchorDate')}</span>
+              <div className="field-input">
+                <input
+                  type="date"
+                  value={recurringDraft.anchor_date}
+                  onChange={(e) =>
+                    setRecurringDraft({ ...recurringDraft, anchor_date: e.target.value })
+                  }
+                />
+              </div>
+            </label>
+            <button className="btn" type="submit">
+              {t('recurring.add')}
+            </button>
+          </form>
+          <p className="field-label">{t('recurring.anchorHint')}</p>
+        </>
+      )}
 
       {transactions.items.length === 0 ? (
         <>
