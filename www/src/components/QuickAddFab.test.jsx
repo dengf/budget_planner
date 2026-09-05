@@ -30,13 +30,13 @@ describe('QuickAddFab', () => {
   it('opens the category picker when tapped', () => {
     renderFab();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /log spending or income/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add a transaction/i }));
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
   it('lists categories alphabetically regardless of the order it was given', () => {
     renderFab();
-    fireEvent.click(screen.getByRole('button', { name: /log spending or income/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add a transaction/i }));
     const items = screen.getAllByRole('menuitem').map((el) => el.textContent);
     expect(items).toEqual(['Groceries', 'Utilities']);
   });
@@ -44,7 +44,7 @@ describe('QuickAddFab', () => {
   it('calls onPick with the tapped category id and closes the picker', () => {
     const onPick = vi.fn();
     renderFab({ onPick });
-    fireEvent.click(screen.getByRole('button', { name: /log spending or income/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add a transaction/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Groceries/i }));
     expect(onPick).toHaveBeenCalledWith('c1');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
