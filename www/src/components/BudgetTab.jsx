@@ -15,10 +15,11 @@ import {
 } from '../commitments';
 import { monthsBetween } from '../month';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
-import { ASSIGN, budgetMode } from '../budgetMode';
+import { ASSIGN, TRACKING, budgetMode } from '../budgetMode';
 import { availablePresets } from '../presetCategories';
 import AssignProgressRing from './AssignProgressRing';
 import CategoryChipPicker from './CategoryChipPicker';
+import QuickAddFab from './QuickAddFab';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -308,6 +309,17 @@ export default function BudgetTab({
     setSpendFor((current) => (current === categoryId ? null : categoryId));
   };
 
+  /** Where the FAB's category picker sends focus after a pick -- the
+   *  row's own quick-add form (opened by `openSpend` below) is what
+   *  actually receives the entry; this only makes sure it's on screen.
+   *  Respects `prefers-reduced-motion`, per this repo's CLAUDE.md. */
+  const scrollToCategoryRow = (categoryId) => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document
+      .getElementById(`category-row-${categoryId}`)
+      ?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+  };
+
   const savePlanned = async (categoryId, amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === categoryId);
     const id = existing?.id ?? (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`);
@@ -549,7 +561,7 @@ export default function BudgetTab({
       {categories.items.length === 0 && !savingsLine ? (
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
-        <div className="category-table">
+        <div className={`category-table${mode === TRACKING ? ' category-table-tracking' : ''}`}>
           {/* Without these, Planned/Spent/Remaining read as three bare
               figures with nothing saying which is which. */}
           <div className="category-row category-head">
@@ -575,7 +587,7 @@ export default function BudgetTab({
                     {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
                   </div>
                 )}
-                <div className="category-row">
+                <div className="category-row" id={`category-row-${line.category_id}`}>
                   <div>
                     <div className="category-name">
                       <CategoryBadge category={categoryFor(line.category_id)} />
@@ -763,48 +775,61 @@ export default function BudgetTab({
       {/* Right under the table it adds to, not after the commitments
           table and chart below -- previously the very last thing on the
           tab, easy to miss on a first visit with an empty budget. */}
-      {mode === ASSIGN && (
-        <CategoryChipPicker
-          presets={availablePresets(presetCategories, categories.items, t)}
-          onAdd={addPresetCategory}
-        />
-      )}
-
-      <form className="form-grid" onSubmit={addCategory}>
-        <label className="field">
-          <span className="field-label">{t('budget.categoryName')}</span>
-          <div className="field-input">
-            <input
-              value={newCategory.name}
-              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-            />
-          </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('budget.categoryGroup')}</span>
-          <div className="field-input">
-            <input
-              value={newCategory.group}
-              onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
-            />
-          </div>
-        </label>
-        <label className="field field-check">
-          <input
-            type="checkbox"
-            checked={newCategory.isIncome}
-            onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
-          />
-          <span>{t('budget.categoryIsIncome')}</span>
-        </label>
-        <button className="btn" type="submit">
-          {t('budget.addCategory')}
-        </button>
-        <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
-          {t('budget.addCommon')}
-        </button>
-      </form>
-      <p className="field-label">{t('budget.commonHint')}</p>
+      {(() => {
+        const editCategoriesBlock = (
+          <>
+            {mode === ASSIGN && (
+              <CategoryChipPicker
+                presets={availablePresets(presetCategories, categories.items, t)}
+                onAdd={addPresetCategory}
+              />
+            )}
+            <form className="form-grid" onSubmit={addCategory}>
+              <label className="field">
+                <span className="field-label">{t('budget.categoryName')}</span>
+                <div className="field-input">
+                  <input
+                    value={newCategory.name}
+                    onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span className="field-label">{t('budget.categoryGroup')}</span>
+                <div className="field-input">
+                  <input
+                    value={newCategory.group}
+                    onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
+                  />
+                </div>
+              </label>
+              <label className="field field-check">
+                <input
+                  type="checkbox"
+                  checked={newCategory.isIncome}
+                  onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
+                />
+                <span>{t('budget.categoryIsIncome')}</span>
+              </label>
+              <button className="btn" type="submit">
+                {t('budget.addCategory')}
+              </button>
+              <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
+                {t('budget.addCommon')}
+              </button>
+            </form>
+            <p className="field-label">{t('budget.commonHint')}</p>
+          </>
+        );
+        return mode === TRACKING ? (
+          <details className="collapsible-panel">
+            <summary>{t('budget.editCategoriesTitle')}</summary>
+            {editCategoriesBlock}
+          </details>
+        ) : (
+          editCategoriesBlock
+        );
+      })()}
 
       {includeCommitments && commitmentLines.length > 0 && (
         <details className="collapsible-panel">
@@ -840,6 +865,15 @@ export default function BudgetTab({
         categoryName={categoryName}
         formatMoney={formatMoney}
       />
+      {mode === TRACKING && isCurrentMonth && (
+        <QuickAddFab
+          categories={categories.items}
+          onPick={(categoryId) => {
+            openSpend(categoryId);
+            scrollToCategoryRow(categoryId);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -98,6 +98,7 @@ export default {
   'budget.spentHint':
     '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
+  'budget.editCategoriesTitle': '新增或編輯分類',
   'budget.savings': '儲蓄',
   'budget.savingsHint': '收入減去所有支出後剩下的錢。想設定具體存款目標，請到「儲蓄目標」頁面。',
   'budget.savingsActual': '已儲蓄',

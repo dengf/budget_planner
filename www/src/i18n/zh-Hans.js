@@ -98,6 +98,7 @@ export default {
   'budget.spentHint':
     '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
+  'budget.editCategoriesTitle': '添加或编辑分类',
   'budget.savings': '储蓄',
   'budget.savingsHint': '收入减去所有支出后剩下的钱。想设定具体存款目标，请到“储蓄目标”页面。',
   'budget.savingsActual': '已储蓄',
