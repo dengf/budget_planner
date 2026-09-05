@@ -62,6 +62,7 @@ export default {
   'budget.addCommon': '新增常用分類',
   'budget.logSpending': '記一筆支出',
   'budget.logIncome': '記一筆收入',
+  'budget.logTransaction': '記一筆支出或收入',
   'budget.includeCommitments': '將目標存入與債務最低還款計入本月預算',
   'budget.commitmentsTitle': '本月目標與債務',
   'budget.progressAria': '{name}：已花費 {spent}，計劃 {planned}',

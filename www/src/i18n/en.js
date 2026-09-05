@@ -66,6 +66,7 @@ export default {
   'budget.addCommon': 'Add common categories',
   'budget.logSpending': 'Log spending',
   'budget.logIncome': 'Log income',
+  'budget.logTransaction': 'Log spending or income',
   'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
   'budget.commitmentsTitle': 'Goals & debt this month',
   'budget.progressAria': '{name}: {spent} of {planned} spent',
