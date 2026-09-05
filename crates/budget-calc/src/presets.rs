@@ -22,7 +22,7 @@
 //! Dependents" has an answer on-screen instead of relying on memory.
 //!
 //! **Why this lives in Rust rather than a JS constant.** Even a universal
-//! taxonomy is a specific choice -- which nine expense buckets, in what
+//! taxonomy is a specific choice -- which eleven expense buckets, in what
 //! words -- that a second implementation could make differently. See
 //! CLAUDE.md's "choosing between rulesets" rule.
 //!
@@ -320,7 +320,10 @@ mod tests {
         let by_key = |key: &str| presets.iter().find(|p| p.key == key).unwrap();
         assert_eq!(by_key("cat.investmentCapitalIncome").name, "Investments");
         assert_eq!(by_key("cat.debtServicing").name, "Debt Payments");
-        assert_eq!(by_key("cat.governmentSupplemental").name, "Government Benefits");
+        assert_eq!(
+            by_key("cat.governmentSupplemental").name,
+            "Government Benefits"
+        );
     }
 
     #[test]

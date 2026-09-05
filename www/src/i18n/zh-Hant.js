@@ -98,7 +98,7 @@ export default {
     '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
   'budget.savings': '儲蓄',
-  'budget.savingsHint': '收入減去所有支出後剩下的錢。想設定具體存款目標，請到「目標」頁面。',
+  'budget.savingsHint': '收入減去所有支出後剩下的錢。想設定具體存款目標，請到「儲蓄目標」頁面。',
   'budget.savingsActual': '已儲蓄',
 
   'cat.group.income': '收入',
@@ -131,7 +131,7 @@ export default {
   'cat.personalLifestyle': '個人與生活',
   'cat.personalLifestyle.desc': '服裝鞋類、個人護理、興趣愛好。',
   'cat.subscriptionsMemberships': '訂閱與會籍',
-  'cat.subscriptionsMemberships.desc': '訂閱服務、健身房及其他會籍、軟體訂閱、常見應用程式扣款。',
+  'cat.subscriptionsMemberships.desc': '訂閱服務、健身房及其他會籍、軟體訂閱、定期應用程式扣款。',
   'cat.familyDependents': '家庭與扶養',
   'cat.familyDependents.desc': '托育費、學費、學用品、課外活動、寵物照護/獸醫費用。',
   'cat.giftsDonations': '禮物與捐贈',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_PALETTE, categoryColor, categoryIconId } from './categoryVisuals';
+import { CATEGORY_PALETTE, PRESET_ICONS, categoryColor, categoryIconId } from './categoryVisuals';
+import { CATEGORY_ICONS } from './components/CategoryIcons';
 
 describe('categoryVisuals', () => {
   it('keeps every original 14 presets at their original color index', () => {
@@ -42,5 +43,15 @@ describe('categoryVisuals', () => {
     // hand-typed category with no preset_key at all).
     expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.subscriptionsMemberships' }));
     expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.giftsDonations' }));
+  });
+
+  it('registers every icon id categoryIconId can return in CATEGORY_ICONS', () => {
+    // categoryIconId returns either a PRESET_ICONS value or one of the two
+    // generic fallback ids. CategoryBadge.jsx looks up the result in
+    // CATEGORY_ICONS with no existence guard, so an id missing from that
+    // map would crash at render time ("Element type is invalid") instead
+    // of failing a test. This locks the two maps together.
+    const iconIds = [...Object.values(PRESET_ICONS), 'income-generic', 'expense-generic'];
+    expect(iconIds.every((id) => typeof CATEGORY_ICONS[id] === 'function')).toBe(true);
   });
 });

@@ -98,7 +98,7 @@ export default {
     '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
   'budget.savings': '储蓄',
-  'budget.savingsHint': '收入减去所有支出后剩下的钱。想设定具体存款目标，请到"目标"页面。',
+  'budget.savingsHint': '收入减去所有支出后剩下的钱。想设定具体存款目标，请到“储蓄目标”页面。',
   'budget.savingsActual': '已储蓄',
 
   'cat.group.income': '收入',
@@ -131,7 +131,7 @@ export default {
   'cat.personalLifestyle': '个人与生活',
   'cat.personalLifestyle.desc': '服装鞋履、个人护理、爱好。',
   'cat.subscriptionsMemberships': '订阅与会员',
-  'cat.subscriptionsMemberships.desc': '流媒体服务、健身房及其他会员、软件订阅、常见应用内扣费。',
+  'cat.subscriptionsMemberships.desc': '流媒体服务、健身房及其他会员、软件订阅、定期应用内扣费。',
   'cat.familyDependents': '家庭与抚养',
   'cat.familyDependents.desc': '托儿费、学费、学习用品、课外活动、宠物护理/兽医费用。',
   'cat.giftsDonations': '礼物与捐赠',

@@ -181,9 +181,13 @@ export function AppShell({ wasmModule }) {
    *
    * `budget-calc::presets` hands back i18n keys; this composes the name
    * actually stored, in the reader's language, so a Chinese budget
-   * doesn't open with English category names. Skipping a preset whose
-   * name is already present is a referential check against in-memory
-   * state -- host-layer, not a rule the core should own.
+   * doesn't open with English category names. Skips a preset already
+   * present either by identity (`preset_key` matches an existing
+   * category, even if that category still carries an older display name
+   * from before a preset was renamed) or by current display name (for a
+   * hand-typed category with no `preset_key` at all) -- both checks are
+   * referential against in-memory state, host-layer, not a rule the core
+   * should own.
    *
    * `existingItems` defaults to the live `categories.items`, but takes an
    * explicit override for callers that just mutated categories themselves
@@ -198,11 +202,14 @@ export function AppShell({ wasmModule }) {
       if (!wasmModule?.preset_categories) return;
       const presets = (await wasmModule.preset_categories()) ?? [];
       const taken = new Set(existingItems.map((c) => c.name.trim().toLowerCase()));
+      const takenPresetKeys = new Set(existingItems.map((c) => c.preset_key).filter(Boolean));
       for (const preset of presets) {
+        if (takenPresetKeys.has(preset.key)) continue;
         const name = t(preset.key);
         const fingerprint = name.trim().toLowerCase();
         if (taken.has(fingerprint)) continue;
         taken.add(fingerprint);
+        takenPresetKeys.add(preset.key);
         // Sequential rather than Promise.all: each save is one IndexedDB
         // write through the same store handle, and the list they land in
         // reads better in the order the presets are declared.

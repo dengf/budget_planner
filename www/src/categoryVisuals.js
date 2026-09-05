@@ -48,11 +48,18 @@ export const CATEGORY_PALETTE = [
   '#DA1BC0',
 ];
 
-// Fixed declaration order of the 16 starter presets (matches
-// `crates/budget-calc/src/presets.rs`'s INCOME_CATEGORIES then
-// EXPENSE_CATEGORIES) -- a preset's position here is its permanent color
-// index, so "Housing" is always the same color, not just stable within
-// one render.
+// Append-only list of starter presets -- a preset's position here is its
+// permanent color index, so "Housing" is always the same color, not just
+// stable within one render. It deliberately does NOT match
+// `crates/budget-calc/src/presets.rs`'s declaration order once a preset
+// is added after the initial 14: `cat.subscriptionsMemberships` and
+// `cat.giftsDonations` are declared interleaved with other expense
+// categories in presets.rs but appended at the end here. A new preset
+// must always be appended at the end, regardless of where it logically
+// belongs in presets.rs, and no existing entry may ever be reordered --
+// either change would silently recolor already-saved categories in real
+// users' data, since this array is looked up by `preset_key`, not by
+// name.
 const PRESET_KEY_ORDER = [
   'cat.primaryEarnedIncome',
   'cat.selfEmploymentBusiness',
@@ -72,7 +79,7 @@ const PRESET_KEY_ORDER = [
   'cat.giftsDonations',
 ];
 
-const PRESET_ICONS = {
+export const PRESET_ICONS = {
   'cat.primaryEarnedIncome': 'paycheck',
   'cat.selfEmploymentBusiness': 'briefcase',
   'cat.investmentCapitalIncome': 'trending-up',
