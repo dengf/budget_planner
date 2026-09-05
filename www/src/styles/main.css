@@ -354,18 +354,22 @@ body {
 /* A swipe-triggered tab change remounts this wrapper (`key={activeTab}`
    in App.jsx), which restarts this animation on every tab switch -- a
    plain CSS keyframe rather than a JS animation library, this app's usual
-   "hand-rolled over a dependency" choice for anything this small. */
+   "hand-rolled over a dependency" choice for anything this small.
+   Opacity-only, deliberately: any non-none `transform` on this wrapper --
+   even a completed translateX(0) -- makes it the containing block for
+   every `position: fixed` descendant (the bottom nav's per-tab FABs
+   included) instead of the viewport, which is exactly the kind of
+   animation-timing-dependent glitch that shows on a real device and not
+   in headless test tooling. Don't reintroduce a transform here. */
 .tab-panel {
   animation: tab-panel-enter 180ms ease-out;
 }
 @keyframes tab-panel-enter {
   from {
     opacity: 0;
-    transform: translateX(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
