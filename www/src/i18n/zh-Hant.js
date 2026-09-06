@@ -60,7 +60,7 @@ export default {
   'budget.reallocate': '重新分配',
   'budget.totalPlanned': '計劃總額',
   'budget.totalSpent': '花費總額',
-  'budget.noCategories': '還沒有分類——在下方新增一個，開始規劃本月預算。',
+  'budget.noCategories': '還沒有分類——點擊上方的 + 新增第一個，建議從收入開始。',
   'budget.save': '儲存',
   'budget.remove': '刪除',
 
@@ -92,6 +92,7 @@ export default {
   'chart.granularityDaily': '按天',
   'chart.granularityWeekly': '按週',
   'budget.method': '零基預算：給每一分錢都安排好去處，直到沒有剩餘未分配。',
+  'budget.startWithIncomeCategory': '先在下方新增一個收入分類以開始。',
   'budget.startWithIncome': '從這裡開始——在下方的收入類別中填寫你預計的金額。',
   'budget.assignPrompt': '現在把這 {amount} 分配到下面的各個分類。',
   'budget.unbudgetedSpend': '尚未編入預算',

@@ -426,6 +426,13 @@ export default function BudgetTab({
   // something has actually been planned against it.
   const hasIncome = (summary?.income ?? 0) > 0;
   const hasBudget = hasIncome && (summary?.total_planned ?? 0) > 0;
+  // Distinct from `hasIncome` (which needs a planned amount, not just the
+  // category) -- `budget.startWithIncome`'s "plan how much you expect
+  // from each income category below" only makes sense once one exists to
+  // plan against. On a genuinely empty budget there's nothing "below"
+  // yet, so that message pointed at categories that didn't exist; this
+  // flag picks the one that instead says where to add the first one.
+  const hasIncomeCategory = categories.items.some((c) => c.is_income);
   const mode = budgetMode({ isPastMonth, hasIncome, unassigned });
 
   return (
@@ -489,15 +496,17 @@ export default function BudgetTab({
             />
             <div className="assign-banner-text">
               <span className="assign-label">
-                {!hasIncome
-                  ? t('budget.startWithIncome')
-                  : !hasBudget
-                    ? t('budget.assignPrompt', { amount: formatMoney(summary.income) })
-                    : unassigned === 0
-                      ? t('budget.fullyAssigned')
-                      : unassigned > 0
-                        ? t('budget.unassignedPositive', { amount: formatMoney(unassigned) })
-                        : t('budget.unassignedNegative', { amount: formatMoney(-unassigned) })}
+                {!hasIncomeCategory
+                  ? t('budget.startWithIncomeCategory')
+                  : !hasIncome
+                    ? t('budget.startWithIncome')
+                    : !hasBudget
+                      ? t('budget.assignPrompt', { amount: formatMoney(summary.income) })
+                      : unassigned === 0
+                        ? t('budget.fullyAssigned')
+                        : unassigned > 0
+                          ? t('budget.unassignedPositive', { amount: formatMoney(unassigned) })
+                          : t('budget.unassignedNegative', { amount: formatMoney(-unassigned) })}
               </span>
               {hasIncome && <span className="assign-value">{formatMoney(unassigned)}</span>}
             </div>
@@ -578,7 +587,17 @@ export default function BudgetTab({
           </button>
         )}
       </div>
-      {categories.items.length === 0 && !savingsLine ? (
+      {categories.items.length === 0 ? (
+        // `savingsLine` is truthy from the moment wasm loads -- a zero-
+        // valued Savings line always computes successfully, even with no
+        // income and no expenses (see build_savings_line's own doc
+        // comment). Checking `!savingsLine` here used to make this
+        // branch effectively unreachable: a fresh budget rendered the
+        // real table with only a "$0 Savings" row instead of this
+        // message, with no visible category and no explanation. Savings
+        // has nothing meaningful to show yet either way when there are
+        // no categories at all, so this only checks the one thing that
+        // actually means "empty."
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
         <div className={`category-table${mode === TRACKING ? ' category-table-tracking' : ''}`}>
