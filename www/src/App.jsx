@@ -1,9 +1,11 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Header from './components/Header';
 import Intro from './components/Intro';
+import SwipeHint from './components/SwipeHint';
 import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
+import { loadTheme, saveTheme, applyTheme } from './theme';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth } from './month';
@@ -87,6 +89,11 @@ function TabFallback() {
 export function AppShell({ wasmModule }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currencySymbol, setCurrencySymbol] = useState(() => loadCurrencySymbol());
+  // `index.html`'s inline script already stamps `data-theme` before this
+  // ever mounts (see its own comment for why that copy has to run that
+  // early), so this `useState` just needs to agree with what's already on
+  // the page rather than cause the first paint.
+  const [theme, setTheme] = useState(() => loadTheme());
   // `today` is the real, unchanging current month -- an anchor for "is the
   // month on screen the real current one" comparisons. `viewMonth` is
   // whatever month is actually being browsed/edited right now, shared
@@ -423,6 +430,12 @@ export function AppShell({ wasmModule }) {
           saveCurrencySymbol(next);
           setCurrencySymbol(next);
         }}
+        theme={theme}
+        onThemeChange={(next) => {
+          saveTheme(next);
+          applyTheme(next);
+          setTheme(next);
+        }}
         wasmModule={wasmModule}
         today={today}
         viewMonth={viewMonth}
@@ -443,6 +456,7 @@ export function AppShell({ wasmModule }) {
         onPointerUp={onMainPointerUp}
         onPointerCancel={onMainPointerUp}
       >
+        <SwipeHint />
         <Suspense fallback={<TabFallback />}>
           <div className="tab-panel" key={activeTab}>
             <ActivePanel

@@ -9,7 +9,20 @@
    theme" asked for -- that's exactly the decision this round's redesign
    did ask for, and categoryVisuals.js's CATEGORY_PALETTE was already
    anchored on this same plum, so the app's own category colors and its
-   chrome now agree. */
+   chrome now agree.
+
+   Three-tier light/dark: this `:root` block is the dark default, the
+   `prefers-color-scheme: light` block below applies whenever the OS says
+   light *and* nothing has overridden it, and `:root[data-theme='light']`/
+   `[data-theme='dark']` (YourDataMenu's theme picker, via theme.js)
+   forces a choice regardless of OS preference in either direction. The
+   media-query rule is guarded with `:not([data-theme='dark'])` rather than
+   `:not([data-theme])` so picking "System" again (which clears the
+   attribute -- see theme.js's `applyTheme`) still falls back to it
+   correctly, and so an explicit dark override on a light-OS device isn't
+   fought by the media query. The light values are necessarily written out
+   twice (media-guarded and explicit) since plain CSS custom properties
+   have no shared-block/mixin mechanism to avoid it. */
 :root {
   --bg: #0f1720;
   --panel: #131c26;
@@ -47,7 +60,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']) {
     --bg: #f7f8fa;
     --panel: #ffffff;
     --panel-alt: #eef1f5;
@@ -77,6 +90,38 @@
     --panel-hero: #fdf1f4;
     --hero-shadow: 0 8px 20px rgba(176, 18, 67, 0.12);
   }
+}
+
+/* Explicit override from YourDataMenu's theme picker (theme.js's
+   `applyTheme`) -- forces light regardless of OS preference. Values kept
+   identical to the media-guarded block above; see this file's opening
+   comment for why they can't be shared instead of duplicated. */
+:root[data-theme='light'] {
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --panel-alt: #eef1f5;
+  --surface: #ffffff;
+  --ink: #16202b;
+  --muted: #5a6b7d;
+  --muted-2: #667484;
+  --byline: #6b7a8a;
+  --line: #dde3ea;
+  --line-soft: #e7ebf0;
+  --input-border: #c7d0da;
+
+  --accent: #b01243;
+  --accent-ink: #ffffff;
+  --positive: #1f7a3d;
+  --positive-ink: #ffffff;
+  --positive-bg: #e4f3e8;
+  --positive-border: #b8ddc2;
+  --negative: #b3261e;
+  --negative-bg: #fbeae9;
+  --negative-border: #e7b7b3;
+  --gold: #8a6a2c;
+
+  --panel-hero: #fdf1f4;
+  --hero-shadow: 0 8px 20px rgba(176, 18, 67, 0.12);
 }
 
 * {
@@ -376,6 +421,28 @@ body {
   .tab-panel {
     animation: none;
   }
+}
+
+/* SwipeHint.jsx's one-time tip. Sits above the tab content it's talking
+   about, not inside `.tab-panel` -- it must survive a tab switch (React
+   remounts `.tab-panel` on every `activeTab` change via its `key`) since
+   it's only mounted once for the app's whole lifetime. */
+.swipe-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 8px 10px 14px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.swipe-hint-close {
+  flex-shrink: 0;
+  font-size: 1rem;
 }
 
 .intro {

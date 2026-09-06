@@ -7,6 +7,11 @@ export default {
   'app.byline': '— {logo} 出品',
   'app.language': '语言',
   'app.currency': '货币',
+  'app.theme': '主题',
+  'app.themeSystem': '跟随系统',
+  'app.themeLight': '浅色',
+  'app.themeDark': '深色',
+  'app.swipeHint': '提示：左右滑动可切换标签页。',
   'meta.title': '预算规划 — 零基预算、储蓄目标与还债计划 | meifio',
   'meta.description':
     '零基预算、储蓄目标与还债计划，支持本地导入银行账单。完全在浏览器中运行——您的数据不会离开您的设备。',

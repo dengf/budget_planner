@@ -61,6 +61,8 @@ export default function YourDataMenu({
   importData,
   currencySymbol,
   onCurrencySymbolChange,
+  theme,
+  onThemeChange,
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
@@ -246,6 +248,21 @@ export default function YourDataMenu({
                 ×
               </button>
             </div>
+            {onThemeChange && (
+              <label className="app-currency">
+                <span className="app-currency-label">{t('app.theme')}</span>
+                <select
+                  className="app-language-select"
+                  aria-label={t('app.theme')}
+                  value={theme}
+                  onChange={(e) => onThemeChange(e.target.value)}
+                >
+                  <option value="system">{t('app.themeSystem')}</option>
+                  <option value="light">{t('app.themeLight')}</option>
+                  <option value="dark">{t('app.themeDark')}</option>
+                </select>
+              </label>
+            )}
             {onCurrencySymbolChange && (
               <label className="app-currency">
                 <span className="app-currency-label">{t('app.currency')}</span>

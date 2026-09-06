@@ -11,6 +11,8 @@ export default function Header({
   onTabChange,
   currencySymbol,
   onCurrencySymbolChange,
+  theme,
+  onThemeChange,
   wasmModule,
   today,
   viewMonth,
@@ -76,6 +78,8 @@ export default function Header({
             importData={importData}
             currencySymbol={currencySymbol}
             onCurrencySymbolChange={onCurrencySymbolChange}
+            theme={theme}
+            onThemeChange={onThemeChange}
           />
         </div>
       </header>
