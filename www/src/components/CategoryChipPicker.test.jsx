@@ -11,6 +11,13 @@ const HOUSING = {
   description_key: 'cat.housing.desc',
 };
 
+const SALARY = {
+  key: 'cat.primaryEarnedIncome',
+  group_key: 'cat.group.income',
+  is_income: true,
+  description_key: 'cat.primaryEarnedIncome.desc',
+};
+
 function renderPicker(props) {
   return render(
     <I18nProvider initialLocale="en">
@@ -40,5 +47,19 @@ describe('CategoryChipPicker', () => {
       </I18nProvider>,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('splits income and expense presets into their own labeled groups', () => {
+    renderPicker({ presets: [HOUSING, SALARY] });
+    const groups = screen.getAllByText(/^(Income|Expense)$/);
+    expect(groups.map((el) => el.textContent)).toEqual(['Income', 'Expense']);
+    expect(screen.getByRole('button', { name: /Housing/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Primary Earned Income/i })).toBeInTheDocument();
+  });
+
+  it('omits a group label entirely when it has no presets to show', () => {
+    renderPicker();
+    expect(screen.queryByText('Income')).not.toBeInTheDocument();
+    expect(screen.getByText('Expense')).toBeInTheDocument();
   });
 });

@@ -64,7 +64,8 @@ export default {
   'budget.reallocate': 'Reallocate',
   'budget.totalPlanned': 'Total planned',
   'budget.totalSpent': 'Total spent',
-  'budget.noCategories': 'No categories yet — add one below to start planning the month.',
+  'budget.noCategories':
+    'No categories yet — tap the + above to add your first one, starting with income.',
   'budget.save': 'Save',
   'budget.remove': 'Remove',
 
@@ -98,6 +99,7 @@ export default {
   'chart.granularityDaily': 'Daily',
   'chart.granularityWeekly': 'Weekly',
   'budget.method': 'Zero-based: give every dollar a job until nothing is left unassigned.',
+  'budget.startWithIncomeCategory': 'Add an income category below to get started.',
   'budget.startWithIncome':
     'Start here — plan how much you expect from each income category below.',
   'budget.assignPrompt': 'Now assign your {amount} across the categories below.',

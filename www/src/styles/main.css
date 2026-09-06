@@ -890,8 +890,7 @@ table.data tr:last-child td {
      their last column hard-clipped mid-word at the phone's screen edge
      with nothing suggesting a sideways swipe would reveal it. */
   background:
-    linear-gradient(to right, rgba(0, 0, 0, 0), var(--panel) 70%) 100% 0 / 32px 100% local
-      no-repeat,
+    linear-gradient(to right, rgba(0, 0, 0, 0), var(--panel) 70%) 100% 0 / 32px 100% local no-repeat,
     linear-gradient(to left, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0)) 100% 0 / 14px 100% scroll
       no-repeat;
   background-color: var(--panel);
@@ -2870,9 +2869,25 @@ table.data tr:last-child td {
 
 .category-chip-picker {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+/* Same label treatment as `.category-section-header` below the table --
+   deliberately not that class itself, since this sits above a plain
+   flex-wrapped chip row rather than a `.category-row` grid. */
+.category-chip-group-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.category-chip-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 4px 0 16px;
 }
 .category-chip {
   display: inline-flex;
