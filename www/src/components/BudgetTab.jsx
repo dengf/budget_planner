@@ -621,7 +621,8 @@ export default function BudgetTab({
                     thing to say. */}
                     <div className="category-group">
                       {categoryGroup(line.category_id)}
-                      {categoryDescription(line.category_id) && ` · ${categoryDescription(line.category_id)}`}
+                      {categoryDescription(line.category_id) &&
+                        ` · ${categoryDescription(line.category_id)}`}
                     </div>
                     {/* How far through the plan this category is, without
                     reading three numbers and doing the division. Only
@@ -862,6 +863,17 @@ export default function BudgetTab({
               role="dialog"
               aria-label={t('budget.addCategory')}
             >
+              <div className="add-txn-header">
+                <span className="add-txn-title">{t('budget.addCategory')}</span>
+                <button
+                  type="button"
+                  className="dash-month-btn"
+                  aria-label={t('monthpicker.close')}
+                  onClick={() => setCategoryPanelOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
               {editCategoriesBlock}
             </div>
           )
@@ -881,7 +893,9 @@ export default function BudgetTab({
               <div className="category-row" key={line.category_id}>
                 <div>
                   <div className="category-name">{name}</div>
-                  <div className="category-group">{isGoal ? t('goals.title') : t('debt.title')}</div>
+                  <div className="category-group">
+                    {isGoal ? t('goals.title') : t('debt.title')}
+                  </div>
                 </div>
                 <div className="num">
                   <span className="cell-label">{t('budget.planned')}</span>
