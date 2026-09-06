@@ -7,6 +7,11 @@ export default {
   'app.byline': '— {logo} 出品',
   'app.language': '語言',
   'app.currency': '貨幣',
+  'app.theme': '主題',
+  'app.themeSystem': '跟隨系統',
+  'app.themeLight': '淺色',
+  'app.themeDark': '深色',
+  'app.swipeHint': '提示：左右滑動可切換分頁。',
   'meta.title': '預算規劃 — 零基預算、儲蓄目標與還債計劃 | meifio',
   'meta.description':
     '零基預算、儲蓄目標與還債計劃，支援本機匯入銀行帳單。完全在瀏覽器中執行——您的資料不會離開您的裝置。',

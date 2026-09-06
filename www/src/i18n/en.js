@@ -8,6 +8,11 @@ export default {
   'app.byline': '— a {logo} app',
   'app.language': 'Language',
   'app.currency': 'Currency',
+  'app.theme': 'Theme',
+  'app.themeSystem': 'System',
+  'app.themeLight': 'Light',
+  'app.themeDark': 'Dark',
+  'app.swipeHint': 'Tip: swipe left or right to switch tabs.',
   'meta.title': 'Budget Planner — zero-based budgeting, goals & debt payoff | meifio',
   'meta.description':
     'Zero-based budgeting, savings goals and debt payoff planning, with client-side CSV import. Runs entirely in your browser — your numbers never leave your device.',
