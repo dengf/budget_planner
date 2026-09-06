@@ -859,22 +859,29 @@ export default function BudgetTab({
         return (
           categoryPanelOpen && (
             <div
-              className="fab-picker category-add-panel"
-              role="dialog"
-              aria-label={t('budget.addCategory')}
+              className="add-txn-backdrop"
+              role="presentation"
+              onClick={() => setCategoryPanelOpen(false)}
             >
-              <div className="add-txn-header">
-                <span className="add-txn-title">{t('budget.addCategory')}</span>
-                <button
-                  type="button"
-                  className="dash-month-btn"
-                  aria-label={t('monthpicker.close')}
-                  onClick={() => setCategoryPanelOpen(false)}
-                >
-                  ×
-                </button>
+              <div
+                className="fab-picker category-add-panel"
+                role="dialog"
+                aria-label={t('budget.addCategory')}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="add-txn-header">
+                  <span className="add-txn-title">{t('budget.addCategory')}</span>
+                  <button
+                    type="button"
+                    className="dash-month-btn"
+                    aria-label={t('monthpicker.close')}
+                    onClick={() => setCategoryPanelOpen(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+                {editCategoriesBlock}
               </div>
-              {editCategoriesBlock}
             </div>
           )
         );

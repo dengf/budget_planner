@@ -2509,7 +2509,16 @@ table.data tr:last-child td {
 /* Backdrop for the sheet the shared .fab-add button opens on this tab --
    the single entry point for every way a transaction gets added (manual,
    receipt, CSV), replacing three permanently-expanded sections that used
-   to stack above the transaction list. */
+   to stack above the transaction list. Also reused by Budget's Add
+   Category panel below -- without a dimmed backdrop it floated directly
+   on the page with only a thin border, which read as blending into the
+   main page rather than a popup, since --panel and --bg (:root, top of
+   this file) are close enough in tone that the border alone doesn't
+   read as a separate surface. Nesting a `position: fixed` panel inside
+   this backdrop still lands the panel at its own fixed offset -- fixed
+   positioning is relative to the viewport, not this flex-centering
+   parent, so `.category-add-panel`'s bottom-right anchor is unaffected
+   by reusing this wrapper. */
 .add-txn-backdrop {
   position: fixed;
   inset: 0;
@@ -2532,6 +2541,10 @@ table.data tr:last-child td {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Was relying on the backdrop dimming alone to read as "elevated" --
+     not enough contrast on dark theme where --panel and --bg are close
+     in tone. Same --hero-shadow token .fab-picker already uses below. */
+  box-shadow: var(--hero-shadow);
 }
 .add-txn-header {
   display: flex;
