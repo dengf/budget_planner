@@ -204,26 +204,64 @@ pub struct StatementRow {
 }
 
 /// Splits a bank/card statement's extracted text into one row per
-/// transaction line, instead of `parse_receipt_text`'s single total --
-/// see that function's doc comment for why a receipt is deliberately
+/// transaction, instead of `parse_receipt_text`'s single total -- see
+/// that function's doc comment for why a receipt is deliberately
 /// collapsed to one figure. A statement has no such single "total" to
-/// anchor on; each line that looks like `date … description … amount`
-/// (in that order, a bank's own printed column order) becomes a
-/// candidate row. A line missing either a date or a money-like amount
-/// is silently not a transaction line -- a header, a running-balance
-/// footer, page furniture -- and is left out rather than guessed at.
+/// anchor on.
 ///
-/// Known v1 gap, same shape as `csv_import`'s: a PDF that lost its
-/// column structure in extraction (so date/description/amount are no
-/// longer reliably ordered per line, or a description happens to itself
-/// contain a date-shaped or money-shaped token) can misparse a row. The
-/// caller never auto-saves this -- every row lands in an editable review
-/// list first, exactly like a single receipt's draft.
+/// Two real shapes came out of testing this against an actual exported
+/// statement PDF (a mobile-wallet export), not just synthetic fixtures:
+///
+/// 1. **One line per transaction** -- `date … description … amount`, a
+///    bank's own printed column order, all on one physical line. This is
+///    what a first pass at this function assumed was the only shape.
+/// 2. **One blank-line-delimited *block* per transaction, spanning
+///    several physical lines** -- `pdf-extract`'s line breaks follow the
+///    PDF's content stream, not always the visual row, so a single
+///    transaction came out as `"06 Aug MERCHANT NAME"` on one line and
+///    `"REF NO: ... 20.00 CR"` on the next, with only a blank line
+///    separating one transaction's block from the next. The date also
+///    had no year (`"06 Aug"`, not `"06 Aug 2026"` -- the year appears
+///    once, in the statement's own header), and direction was a trailing
+///    `CR`/`DB` word rather than a `+`/`-` sign.
+///
+/// `parse_statement_text` groups the text into blank-line-delimited
+/// sections first. Within a section, if one or more individual lines
+/// each independently carry both a date and an amount, every such line
+/// becomes its own row (shape 1, and the common case when a PDF's table
+/// structure survives extraction with no blank lines between rows at
+/// all). Otherwise the whole section is pooled into a single row (shape
+/// 2): the first date found across any of its lines, the last amount
+/// found across any of its lines, description from whichever line held
+/// the date. A section with no date anywhere, or no amount anywhere, is
+/// not a transaction -- a header, a running-balance footer, page
+/// furniture -- and contributes no row.
+///
+/// A day/month-only date resolves against `document_year`: the year of
+/// the first fully-dated line found anywhere in the whole text (a
+/// statement's own header date, in practice). Known v1 gap: nothing here
+/// disambiguates a statement spanning a year boundary (a December
+/// transaction under a January header date) -- same trade as
+/// `csv_import`'s own documented gaps, always fixable in the review list
+/// this never auto-saves into.
 pub fn parse_statement_text(text: &str) -> Vec<StatementRow> {
-    text.lines()
-        .enumerate()
-        .filter_map(|(i, line)| parse_statement_line(i + 1, line))
-        .collect()
+    let document_year = find_document_year(text);
+    let mut rows = Vec::new();
+    for section in sections(text) {
+        let per_line: Vec<StatementRow> = section
+            .lines
+            .iter()
+            .filter_map(|&(line_no, line)| parse_statement_line(line_no, line, document_year))
+            .collect();
+        if !per_line.is_empty() {
+            rows.extend(per_line);
+            continue;
+        }
+        if let Some(row) = parse_statement_section(&section, document_year) {
+            rows.push(row);
+        }
+    }
+    rows
 }
 
 /// Summary/footer lines that legitimately contain both a date and a
@@ -236,32 +274,146 @@ pub fn parse_statement_text(text: &str) -> Vec<StatementRow> {
 /// afterward -- nothing here silently overwrites a number.
 const STATEMENT_SKIP_KEYWORDS: [&str; 4] = ["balance", "subtotal", "total", "小计"];
 
-fn parse_statement_line(line_no: usize, raw: &str) -> Option<StatementRow> {
-    let line = raw.trim();
-    if line.is_empty() {
-        return None;
+/// A run of consecutive non-blank lines, source line numbers kept
+/// alongside each so a pooled row can still say which physical line it
+/// came from -- see `parse_statement_text`'s doc comment for why a
+/// transaction isn't always exactly one line.
+struct Section<'a> {
+    lines: Vec<(usize, &'a str)>,
+}
+
+fn sections(text: &str) -> Vec<Section<'_>> {
+    let mut out = Vec::new();
+    let mut current: Vec<(usize, &str)> = Vec::new();
+    for (i, raw) in text.lines().enumerate() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            if !current.is_empty() {
+                out.push(Section {
+                    lines: std::mem::take(&mut current),
+                });
+            }
+            continue;
+        }
+        current.push((i + 1, trimmed));
     }
+    if !current.is_empty() {
+        out.push(Section { lines: current });
+    }
+    out
+}
+
+/// The year of the first fully-dated line anywhere in the document --
+/// almost always a statement's own header date -- used to resolve a
+/// day/month-only transaction date that has none of its own.
+fn find_document_year(text: &str) -> Option<i32> {
+    text.lines().find_map(|line| {
+        let (_, iso) = find_date_token(line)?;
+        iso.get(0..4)?.parse().ok()
+    })
+}
+
+/// `find_date_token`, extended to also try a day/month-only match (a
+/// statement transaction's own date, with the year resolved from
+/// `document_year`) when no fully-dated token is present on the line.
+fn find_row_date_token(line: &str, document_year: Option<i32>) -> Option<(String, String)> {
+    find_date_token(line)
+        .or_else(|| document_year.and_then(|year| find_day_month_token(line, year)))
+}
+
+const DAY_MONTH_FORMATS: [&str; 2] = ["%d %b %Y", "%b %d %Y"];
+
+fn find_day_month_token(line: &str, year: i32) -> Option<(String, String)> {
+    use chrono::NaiveDate;
+
+    let words: Vec<&str> = line.split_whitespace().collect();
+    for window in words.windows(2) {
+        let joined = window.join(" ");
+        let cleaned = joined.trim_matches(|c: char| c == ',');
+        let with_year = format!("{cleaned} {year}");
+        for fmt in DAY_MONTH_FORMATS {
+            if let Ok(d) = NaiveDate::parse_from_str(&with_year, fmt) {
+                return Some((joined.clone(), d.format("%Y-%m-%d").to_string()));
+            }
+        }
+    }
+    None
+}
+
+/// A trailing `CR`/`DB`/`DR` word right after an amount -- a statement's
+/// own credit/debit marker, standing in for a `+`/`-` sign the extracted
+/// text never has. `CR` (credit) is a positive/income-direction amount;
+/// `DB`/`DR` (debit) is negative/expense-direction. `text_after_amount`
+/// is everything on that line past the matched amount's own span.
+fn trailing_direction_marker(text_after_amount: &str) -> Option<bool> {
+    match text_after_amount
+        .split_whitespace()
+        .next()?
+        .to_uppercase()
+        .as_str()
+    {
+        "CR" => Some(true),
+        "DB" | "DR" => Some(false),
+        _ => None,
+    }
+}
+
+/// Resolution order for a statement amount's direction: a sign or parens
+/// actually written in the text always wins (it's unambiguous); then a
+/// `CR`/`DB` marker (a statement's own explicit convention); then the
+/// same income-keyword guess `parse_receipt_text` already makes; then
+/// default to an expense, same default as a single receipt's total.
+fn resolve_statement_amount(
+    magnitude: Decimal,
+    had_explicit_sign: bool,
+    marker: Option<bool>,
+    is_income_line: bool,
+) -> Decimal {
+    if had_explicit_sign {
+        magnitude
+    } else if let Some(is_credit) = marker {
+        if is_credit {
+            magnitude.abs()
+        } else {
+            -magnitude.abs()
+        }
+    } else if is_income_line {
+        magnitude.abs()
+    } else {
+        -magnitude.abs()
+    }
+}
+
+fn strip_span(chars: &[char], start: usize, end: usize) -> String {
+    let mut without = chars.to_vec();
+    without.drain(start..end);
+    without.into_iter().collect()
+}
+
+/// Shape 1: a single line that independently carries both a date and an
+/// amount. `None` for a line missing either -- not every line in a
+/// section is a transaction line, e.g. a statement's own `REF NO: ...`
+/// line in the two-line shape has an amount but no date of its own.
+fn parse_statement_line(
+    line_no: usize,
+    line: &str,
+    document_year: Option<i32>,
+) -> Option<StatementRow> {
     let lower = line.to_lowercase();
     if STATEMENT_SKIP_KEYWORDS.iter().any(|k| lower.contains(k)) {
         return None;
     }
 
-    let (date_token, date) = find_date_token(line)?;
+    let (date_token, date) = find_row_date_token(line, document_year)?;
     let (amount_start, amount_end, magnitude, had_explicit_sign) = find_statement_amount(line)?;
 
-    let is_income_line = INCOME_KEYWORDS.iter().any(|k| lower.contains(k));
-    let amount = if had_explicit_sign {
-        magnitude
-    } else if is_income_line {
-        magnitude.abs()
-    } else {
-        -magnitude.abs()
-    };
-
     let chars: Vec<char> = line.chars().collect();
-    let mut without_amount = chars;
-    without_amount.drain(amount_start..amount_end);
-    let without_amount: String = without_amount.into_iter().collect();
+    let after_amount: String = chars[amount_end..].iter().collect();
+    let marker = trailing_direction_marker(&after_amount);
+    let is_income_line = INCOME_KEYWORDS.iter().any(|k| lower.contains(k));
+    let amount = resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
+
+    let without_amount = strip_span(&chars, amount_start, amount_end);
     let description = without_amount
         .replacen(&date_token, "", 1)
         .trim_matches(|c: char| !c.is_alphanumeric())
@@ -272,6 +424,75 @@ fn parse_statement_line(line_no: usize, raw: &str) -> Option<StatementRow> {
 
     Some(StatementRow {
         line: line_no,
+        date,
+        description: if description.is_empty() {
+            None
+        } else {
+            Some(description)
+        },
+        amount,
+        is_income: amount.is_sign_positive(),
+    })
+}
+
+/// Shape 2: no single line in the section carries both a date and an
+/// amount, so the section is pooled into one row -- the date from
+/// whichever line has one, the amount from the last line that has one
+/// (mirroring `find_statement_amount`'s own "last wins" choice, just
+/// scoped to every line in the section instead of one line's own
+/// tokens), description from the date's own line with the date stripped
+/// out.
+fn parse_statement_section(
+    section: &Section<'_>,
+    document_year: Option<i32>,
+) -> Option<StatementRow> {
+    let joined_lower = section
+        .lines
+        .iter()
+        .map(|(_, l)| l.to_lowercase())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if STATEMENT_SKIP_KEYWORDS
+        .iter()
+        .any(|k| joined_lower.contains(k))
+    {
+        return None;
+    }
+
+    let (date_line_no, date_token, date) = section
+        .lines
+        .iter()
+        .find_map(|&(no, l)| find_row_date_token(l, document_year).map(|(tok, d)| (no, tok, d)))?;
+
+    let mut best_amount: Option<(&str, usize, usize, Decimal, bool)> = None;
+    for &(_, l) in &section.lines {
+        if let Some((start, end, magnitude, had_sign)) = find_statement_amount(l) {
+            best_amount = Some((l, start, end, magnitude, had_sign));
+        }
+    }
+    let (amount_line, _amount_start, amount_end, magnitude, had_explicit_sign) = best_amount?;
+
+    let amount_chars: Vec<char> = amount_line.chars().collect();
+    let after_amount: String = amount_chars[amount_end..].iter().collect();
+    let marker = trailing_direction_marker(&after_amount);
+    let is_income_line = INCOME_KEYWORDS.iter().any(|k| joined_lower.contains(k));
+    let amount = resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
+
+    let date_source_line = section
+        .lines
+        .iter()
+        .find(|&&(no, _)| no == date_line_no)
+        .map(|&(_, l)| l)?;
+    let description = date_source_line
+        .replacen(&date_token, "", 1)
+        .trim_matches(|c: char| !c.is_alphanumeric())
+        .trim()
+        .chars()
+        .take(80)
+        .collect::<String>();
+
+    Some(StatementRow {
+        line: date_line_no,
         date,
         description: if description.is_empty() {
             None
@@ -546,5 +767,42 @@ mod tests {
     #[test]
     fn empty_statement_text_returns_no_rows_not_a_panic() {
         assert!(parse_statement_text("").is_empty());
+    }
+
+    #[test]
+    fn a_day_month_date_resolves_against_the_document_year_and_a_cr_marker_is_income() {
+        let text = "2026-08-01 OPENING BALANCE 1000.00\n\n06 Aug MERCHANT FOUR 15.00 CR\n";
+        let rows = parse_statement_text(text);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].date, "2026-08-06");
+        assert_eq!(rows[0].amount, dec!(15.00));
+        assert!(rows[0].is_income);
+    }
+
+    #[test]
+    fn a_trailing_db_marker_makes_the_amount_negative_expense() {
+        let text = "2026-08-01 OPENING BALANCE 1000.00\n\n06 Aug MERCHANT FIVE 15.00 DB\n";
+        let rows = parse_statement_text(text);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].amount, dec!(-15.00));
+        assert!(!rows[0].is_income);
+    }
+
+    #[test]
+    fn a_two_line_block_separated_by_a_blank_line_is_pooled_into_one_row() {
+        let text = "Statement period ending 08/31/2026\n\n\
+                     07 Aug MERCHANT THREE\n\
+                     REF NO: TF000000000000000002 30.00 CR\n";
+        let rows = parse_statement_text(text);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].date, "2026-08-07");
+        assert_eq!(rows[0].amount, dec!(30.00));
+        assert!(rows[0].is_income);
+    }
+
+    #[test]
+    fn a_day_month_date_with_no_document_year_anywhere_is_not_a_transaction_row() {
+        let rows = parse_statement_text("06 Aug MERCHANT SIX 15.00 CR\n");
+        assert!(rows.is_empty());
     }
 }
