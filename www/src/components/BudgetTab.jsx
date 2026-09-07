@@ -16,7 +16,12 @@ import {
 import { monthsBetween } from '../month';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 import { ASSIGN, TRACKING, budgetMode } from '../budgetMode';
-import { availablePresets } from '../presetCategories';
+import {
+  availablePresets,
+  categoryDisplayDescription,
+  categoryDisplayGroup,
+  categoryDisplayName,
+} from '../presetCategories';
 import AssignProgressRing from './AssignProgressRing';
 import CategoryChipPicker from './CategoryChipPicker';
 import QuickAddFab from './QuickAddFab';
@@ -207,9 +212,12 @@ export default function BudgetTab({
   };
 
   const categoryFor = (id) => categories.items.find((c) => c.id === id);
-  const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
-  const categoryGroup = (id) => categories.items.find((c) => c.id === id)?.group ?? '';
-  const categoryDescription = (id) => categories.items.find((c) => c.id === id)?.description ?? '';
+  const categoryName = (id) => {
+    const c = categoryFor(id);
+    return c ? categoryDisplayName(c, t) : id;
+  };
+  const categoryGroup = (id) => categoryDisplayGroup(categoryFor(id), t);
+  const categoryDescription = (id) => categoryDisplayDescription(categoryFor(id), t);
 
   /**
    * Grouped for display, alphabetically within each group.

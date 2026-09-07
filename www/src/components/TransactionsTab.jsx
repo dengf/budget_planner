@@ -5,6 +5,7 @@ import { monthLabel } from '../month';
 import AddTransactionSheet from './AddTransactionSheet';
 import CategoryBadge from './CategoryBadge';
 import MonthYearPicker from './MonthYearPicker';
+import { categoryDisplayName } from '../presetCategories';
 export default function TransactionsTab({
   wasmModule,
   currencySymbol,
@@ -52,8 +53,10 @@ export default function TransactionsTab({
   };
 
   const categoryFor = (id) => categories.items.find((c) => c.id === id);
-  const categoryName = (id) =>
-    categories.items.find((c) => c.id === id)?.name ?? t('transactions.uncategorized');
+  const categoryName = (id) => {
+    const c = categoryFor(id);
+    return c ? categoryDisplayName(c, t) : t('transactions.uncategorized');
+  };
 
   const removeTransaction = async (tx) => {
     const ok = await confirm(t('confirm.removeTransaction', { description: tx.description }));
@@ -160,7 +163,7 @@ export default function TransactionsTab({
             <option value="">—</option>
             {categories.items.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {categoryDisplayName(c, t)}
               </option>
             ))}
           </select>

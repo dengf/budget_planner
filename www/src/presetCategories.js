@@ -80,3 +80,33 @@ export function buildCategoryFromPreset(preset, translate, newId) {
     preset_key: preset.key,
   };
 }
+
+/**
+ * The name/description/group to show for a category, live in the
+ * reader's *current* language -- as opposed to `category.name` etc.
+ * themselves, which are translated once and frozen into storage at
+ * creation time (see `buildCategoryFromPreset` above). Left alone, that
+ * freezing means switching the UI language after the fact leaves Chinese
+ * chrome around English starter-category text.
+ *
+ * A preset-derived category's `preset_key` is stable and doubles as the
+ * exact i18n key (`categoryVisuals.js` already relies on this same fact
+ * for icon/color), so it can always be re-translated live instead of
+ * trusting the frozen fields. A hand-typed category has no `preset_key`
+ * to look anything up by -- there, the stored text *is* the only text,
+ * so these fall back to it unchanged.
+ */
+export function categoryDisplayName(category, t) {
+  return category?.preset_key ? t(category.preset_key) : (category?.name ?? '');
+}
+
+export function categoryDisplayDescription(category, t) {
+  return category?.preset_key ? t(`${category.preset_key}.desc`) : (category?.description ?? '');
+}
+
+export function categoryDisplayGroup(category, t) {
+  if (!category) return '';
+  return category.preset_key
+    ? t(category.is_income ? 'cat.group.income' : 'cat.group.expense')
+    : (category.group ?? '');
+}

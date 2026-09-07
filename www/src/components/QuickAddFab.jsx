@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import CategoryBadge from './CategoryBadge';
+import { categoryDisplayName } from '../presetCategories';
 
 /**
  * The bottom-anchored, thumb-reachable way to log a transaction once a
@@ -20,7 +21,9 @@ export default function QuickAddFab({ categories, onPick }) {
 
   if (categories.length === 0) return null;
 
-  const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name, locale));
+  const sorted = [...categories].sort((a, b) =>
+    categoryDisplayName(a, t).localeCompare(categoryDisplayName(b, t), locale),
+  );
 
   return (
     <>
@@ -38,7 +41,7 @@ export default function QuickAddFab({ categories, onPick }) {
               }}
             >
               <CategoryBadge category={category} />
-              {category.name}
+              {categoryDisplayName(category, t)}
             </button>
           ))}
         </div>

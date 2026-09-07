@@ -5,6 +5,7 @@ import DirectionWarning from './DirectionWarning';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
 import { SpreadsheetIcon } from './icons';
+import { categoryDisplayName } from '../presetCategories';
 
 const DEFAULT_MAPPING = {
   date_col: 0,
@@ -236,7 +237,7 @@ export default function AddTransactionSheet({
                     <option value="">{t('transactions.uncategorized')}</option>
                     {categories.items.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {categoryDisplayName(c, t)}
                       </option>
                     ))}
                   </select>
@@ -389,7 +390,7 @@ export default function AddTransactionSheet({
                     <option value="">—</option>
                     {categories.items.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {categoryDisplayName(c, t)}
                       </option>
                     ))}
                   </select>
