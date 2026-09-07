@@ -122,6 +122,15 @@ impl From<&BudgetError> for Message {
                 Message::with_value("err.ocrModelLoadFailed", v.clone(), text)
             }
             BudgetError::OcrFailed(v) => Message::with_value("err.ocrFailed", v.clone(), text),
+            BudgetError::EmbedModelLoadFailed(v) => {
+                Message::with_value("err.embedModelLoadFailed", v.clone(), text)
+            }
+            BudgetError::EmbedTokenizerLoadFailed(v) => {
+                Message::with_value("err.embedTokenizerLoadFailed", v.clone(), text)
+            }
+            BudgetError::EmbedClassifyFailed(v) => {
+                Message::with_value("err.embedClassifyFailed", v.clone(), text)
+            }
         }
     }
 }
@@ -181,6 +190,9 @@ mod tests {
             BudgetError::EmptyImage,
             BudgetError::OcrModelLoadFailed("1".into()),
             BudgetError::OcrFailed("1".into()),
+            BudgetError::EmbedModelLoadFailed("1".into()),
+            BudgetError::EmbedTokenizerLoadFailed("1".into()),
+            BudgetError::EmbedClassifyFailed("1".into()),
         ];
         let codes: std::collections::BTreeSet<_> =
             all.iter().map(|e| Message::from(e).code).collect();

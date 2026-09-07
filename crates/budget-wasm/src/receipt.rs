@@ -40,6 +40,7 @@ pub fn parse_statement_text(text: &str) -> JsValue {
             description: r.description,
             amount: decimal_to_f64(r.amount),
             is_income: r.is_income,
+            direction_is_guessed: r.direction_is_guessed,
         })
         .collect();
     to_js(&ParseStatementTextResult { rows })

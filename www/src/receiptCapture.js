@@ -119,7 +119,13 @@ export async function extractReceiptText(file) {
     const result = await callWorker('pdf', { bytes }, [bytes.buffer]);
     if (result?.error) return { text: '', calcError: result };
     if (!result.text.trim()) {
-      return { text: '', calcError: { error: 'pdfNotSupported', error_message: { code: 'transactions.receiptPdfNotSupported', params: {}, text: '' } } };
+      return {
+        text: '',
+        calcError: {
+          error: 'pdfNotSupported',
+          error_message: { code: 'transactions.receiptPdfNotSupported', params: {}, text: '' },
+        },
+      };
     }
     return { text: result.text, calcError: null };
   }
@@ -128,4 +134,28 @@ export async function extractReceiptText(file) {
   const result = await callWorker('ocr', { imageRgb: rgb, width, height }, [rgb.buffer]);
   if (result?.error) return { text: '', calcError: result };
   return { text: result.text, calcError: null };
+}
+
+/**
+ * Classifies statement-row descriptions as income (`true`) or expense
+ * (`false`) using the embedding-based classifier in `budget-wasm-llm` --
+ * see that crate's own doc comment for why an embedding model instead of
+ * a generative one. `ReceiptCapture.jsx` calls this only for rows
+ * `parse_statement_text` flagged `direction_is_guessed: true`; every
+ * other row already has a confident signal and never reaches this path.
+ *
+ * Returns one entry per input description, in order, `null` for any
+ * description that couldn't be classified (a worker-level failure fails
+ * every entry, same fallback the caller already applies row by row) --
+ * the caller keeps the heuristic's existing default-to-expense guess for
+ * a `null` rather than blocking the review screen on a model load.
+ */
+export async function classifyStatementDescriptions(descriptions) {
+  if (descriptions.length === 0) return [];
+  try {
+    const result = await callWorker('llm', { descriptions });
+    return result?.predictions ?? descriptions.map(() => null);
+  } catch {
+    return descriptions.map(() => null);
+  }
 }

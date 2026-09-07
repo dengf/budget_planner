@@ -21,17 +21,20 @@
 //! `JsValue`, calls into `budget-calc` or `budget-ext-redb`, and
 //! serializes the result back. See CLAUDE.md.
 //!
-//! Receipt OCR (`run_ocr`) and PDF text extraction (`extract_pdf_text`)
-//! live in the sibling `budget-wasm-ocr` and `budget-wasm-pdf` crates
+//! Receipt OCR (`run_ocr`), PDF text extraction (`extract_pdf_text`) and
+//! statement-row income/expense classification
+//! (`classify_statement_descriptions`) live in the sibling
+//! `budget-wasm-ocr`, `budget-wasm-pdf` and `budget-wasm-llm` crates
 //! instead, each compiled to its own separate `.wasm` file that
-//! `www/src/receiptCapture.js` only loads the first time someone actually
-//! takes that path (a photo scan never downloads the PDF crate's weight,
-//! and vice versa). `ocrs-cjk`/`rten` and `pdf-extract` respectively are why
-//! -- see each crate's own doc comment for the measured size. This
-//! crate's own [`receipt`] module, by contrast, is `parse_receipt_text`:
-//! plain text/`Decimal` parsing with no heavy dependency, so it lives
-//! here in the always-loaded core instead of duplicated in both lazy
-//! crates.
+//! `www/src/ocrWorker.js` only loads the first time someone actually
+//! takes that path (a photo scan never downloads the PDF or classifier
+//! crate's weight, and vice versa). `ocrs-cjk`/`rten`, `pdf-extract` and
+//! a BERT-family embedding model respectively are why -- see each
+//! crate's own doc comment for the measured size. This crate's own
+//! [`receipt`] module, by contrast, is `parse_receipt_text`/
+//! `parse_statement_text`: plain text/`Decimal` parsing with no heavy
+//! dependency, so it lives here in the always-loaded core instead of
+//! duplicated across the lazy crates.
 
 use wasm_bindgen::prelude::*;
 
@@ -89,6 +92,10 @@ mod bridge_coverage {
         (
             "pdf_text",
             "bridged in the sibling budget-wasm-pdf crate, not here -- see this crate's lib.rs doc comment",
+        ),
+        (
+            "embed_classify",
+            "bridged in the sibling budget-wasm-llm crate, not here -- see this crate's lib.rs doc comment",
         ),
     ];
 

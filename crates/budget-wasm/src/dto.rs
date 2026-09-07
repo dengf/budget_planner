@@ -120,6 +120,7 @@ pub struct StatementRowDto {
     pub description: Option<String>,
     pub amount: f64,
     pub is_income: bool,
+    pub direction_is_guessed: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]

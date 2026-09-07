@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
-import { extractReceiptText, isPdf } from '../receiptCapture';
+import { classifyStatementDescriptions, extractReceiptText, isPdf } from '../receiptCapture';
 import CalcError from './CalcError';
 import CameraCapture from './CameraCapture';
 import DirectionWarning from './DirectionWarning';
@@ -46,6 +46,31 @@ export default function ReceiptCapture({
   const [calcError, setCalcError] = useState(null);
   const [statementRows, setStatementRows] = useState([]);
 
+  // Only rows `resolve_statement_amount` (Rust) had no sign, marker or
+  // keyword to go on -- most statements never have any, so this usually
+  // resolves to the input unchanged without ever loading the classifier.
+  // A row the model couldn't classify (predicted `null`, e.g. the
+  // ~23MB model failed to load) keeps the heuristic's existing
+  // default-to-expense guess rather than blocking statement review on
+  // it -- see `budget-wasm-llm`'s own doc comment for why that fallback
+  // is low-stakes now.
+  const classifyAmbiguousRows = async (rows) => {
+    const ambiguous = rows.filter((r) => r.direction_is_guessed);
+    if (ambiguous.length === 0) return rows;
+    const predictions = await classifyStatementDescriptions(
+      ambiguous.map((r) => r.description ?? ''),
+    );
+    let i = 0;
+    return rows.map((r) => {
+      if (!r.direction_is_guessed) return r;
+      const predictedIncome = predictions[i++];
+      if (predictedIncome === true) {
+        return { ...r, amount: Math.abs(r.amount), is_income: true };
+      }
+      return r;
+    });
+  };
+
   // One `apply_rules` call across every row instead of one per row --
   // same batching TransactionsTab's own "Apply rules" button already
   // does, just seeded from freshly-parsed drafts instead of saved
@@ -89,7 +114,8 @@ export default function ReceiptCapture({
       if (isPdf(file)) {
         const statement = wasmModule.parse_statement_text(text);
         if ((statement?.rows?.length ?? 0) >= MIN_STATEMENT_ROWS) {
-          await startStatementReview(statement.rows);
+          const rows = await classifyAmbiguousRows(statement.rows);
+          await startStatementReview(rows);
           return;
         }
       }
@@ -252,9 +278,7 @@ export default function ReceiptCapture({
                     <select
                       className="field-select"
                       value={row.category_id}
-                      onChange={(e) =>
-                        updateStatementRow(row.key, { category_id: e.target.value })
-                      }
+                      onChange={(e) => updateStatementRow(row.key, { category_id: e.target.value })}
                     >
                       <option value="">{t('transactions.uncategorized')}</option>
                       {categories.items.map((c) => (
