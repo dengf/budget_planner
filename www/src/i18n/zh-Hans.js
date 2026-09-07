@@ -251,6 +251,8 @@ export default {
   'debt.balanceRemaining': '剩余',
 
   'dashboard.title': '仪表盘',
+  'dashboard.welcome': '刚开始使用？在"预算"页面设置收入和预算金额，然后记录支出——本页会随之更新。',
+  'dashboard.welcomeCta': '前往预算',
   'dashboard.income': '收入',
   'dashboard.totalIncome': '收入总计',
   'dashboard.totalExpenses': '支出',

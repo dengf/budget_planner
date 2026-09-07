@@ -45,6 +45,7 @@ export default function DashboardTab({
   goals,
   debts,
   recurring,
+  onNavigateTab,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
@@ -242,6 +243,16 @@ export default function DashboardTab({
   // does with `expenseTotals.spent`.
   const incomeTotals = sumLines(incomeLines);
 
+  // The 16 starter categories are auto-seeded (App.jsx), so a fresh
+  // install never lands on an empty category list -- but it does land
+  // here, on a wall of $0.00 cards, with nothing on screen saying where
+  // to go next. `transactions.items` isn't scoped to `viewMonth` (see
+  // App.jsx's useCollection call), so "never logged anything, anywhere"
+  // is a stable signal that survives paging the month picker; a planned
+  // amount is scoped to `viewMonth`, matching `budgetPlan`'s own scope.
+  const isFreshStart =
+    transactions.items.length === 0 && !budgetPlan.items.some((p) => p.planned > 0);
+
   /**
    * The row tapped open below one of the two charts -- income and expense
    * rows share one `selectedCategoryId` (tapping a row in either chart
@@ -325,6 +336,15 @@ export default function DashboardTab({
           locale={locale}
         />
       </div>
+
+      {isFreshStart && (
+        <div className="dash-welcome">
+          <p className="dash-welcome-text">{t('dashboard.welcome')}</p>
+          <button type="button" className="btn" onClick={() => onNavigateTab?.('budget')}>
+            {t('dashboard.welcomeCta')}
+          </button>
+        </div>
+      )}
 
       <div className="dash-summary-cards">
         {savingsLine && (
