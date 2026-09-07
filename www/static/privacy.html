@@ -93,14 +93,27 @@
     <h2>Third-party models</h2>
     <p>
       The receipt-scanning feature runs two OCR models (text detection and
-      text recognition) from the
-      <a href="https://github.com/robertknight/ocrs-models">ocrs-models</a>
-      project, by Robert Knight, licensed
-      <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA
-      4.0</a>. They run entirely on your device, the same as everything
-      else in this app — see
-      <a href="https://huggingface.co/robertknight/ocrs">the model
-      card</a> for details.
+      text recognition) from
+      <a href="https://github.com/PaddlePaddle/PaddleOCR">PaddleOCR's</a>
+      PP-OCRv6_tiny, converted to run with the pure-Rust <code>rten</code>
+      engine and licensed
+      <a href="https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE">Apache
+      License 2.0</a>. They run entirely on your device, the same as
+      everything else in this app.
+    </p>
+    <p>
+      Smart Parse, an opt-in second scanning engine, uses
+      <a href="https://huggingface.co/onnx-community/GLM-OCR-ONNX">GLM-OCR</a>
+      (licensed MIT). Its model weights (a few gigabytes) are fetched
+      directly from Hugging Face only if you turn the toggle on and take a
+      scan — never on an ordinary visit — and then run entirely on your
+      device like every other model here.
+    </p>
+    <p>
+      Full license text for every open-source component this app is built
+      from, including these models and every Rust crate compiled into it,
+      is on the <a href="third-party-licenses.html">open source licenses</a>
+      page.
     </p>
 
     <h2>Children</h2>
@@ -127,6 +140,8 @@
 
     <footer>
       <a href="./">&larr; Back to the calculator</a>
+      &nbsp;·&nbsp;
+      <a href="third-party-licenses.html">Open source licenses</a>
     </footer>
   </main>
 </body>
