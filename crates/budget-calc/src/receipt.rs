@@ -153,7 +153,9 @@ fn largest_amount(lines: &[&str]) -> Option<Decimal> {
 }
 
 fn find_date(lines: &[&str]) -> Option<String> {
-    lines.iter().find_map(|line| find_date_token(line).map(|(_, date)| date))
+    lines
+        .iter()
+        .find_map(|line| find_date_token(line).map(|(_, date)| date))
 }
 
 /// The first date-shaped token in a single line, as both its raw source
@@ -528,9 +530,8 @@ mod tests {
 
     #[test]
     fn a_balance_footer_line_is_skipped_despite_having_a_date_and_an_amount() {
-        let rows = parse_statement_text(
-            "05/01/2026 STARBUCKS -4.50\n05/01/2026 Ending balance 1234.56\n",
-        );
+        let rows =
+            parse_statement_text("05/01/2026 STARBUCKS -4.50\n05/01/2026 Ending balance 1234.56\n");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].description, Some("STARBUCKS".to_string()));
     }
