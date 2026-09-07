@@ -297,6 +297,9 @@ export default {
   'err.ocrModelLoadFailed': '收據辨識引擎載入失敗（{value}）。請重試。',
   'err.ocrFailed':
     '無法從該照片中辨識出任何文字（{value}）。請換一張更清晰的照片，或手動新增這筆交易。',
+  'err.embedModelLoadFailed': '分類模型載入失敗（{value}）。',
+  'err.embedTokenizerLoadFailed': '分類分詞器載入失敗（{value}）。',
+  'err.embedClassifyFailed': '無法對某一列進行分類（{value}）。',
   'err.badImportFile': '該檔案不是預算規劃匯出的備份——未做任何變更。',
   'err.importFailed': '無法讀取該檔案，請再試一次。',
   'err.invalidRecurringAmount': '該金額無效（收到 {value}）。',

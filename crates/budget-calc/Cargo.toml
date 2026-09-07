@@ -16,6 +16,18 @@ ocrs-cjk = { version = "0.1.0", optional = true, default-features = false, featu
 pdf-extract = { version = "0.12.0", optional = true }
 rten = { version = "0.24.0", optional = true }
 serde_json = { workspace = true, optional = true }
+# Pinned separately from `rten` above (0.24.0, `ocr`'s own pin) under an
+# aliased key rather than bumping that pin: `rten-text` (the WordPiece
+# tokenizer the embedding classifier below needs) only exists from 0.26.0
+# onward, and `ocr`/`embed-classify` are unified into one dependency graph
+# by `cargo build --workspace` (see CLAUDE.md's "Verification traps"), so
+# both versions of `rten` must coexist rather than picking one. Cargo
+# treats 0.24 and 0.26 as unrelated crates here since they're semver-
+# incompatible, so this is safe -- just needs its own import path
+# (`rten_embed::...`, not `rten::...`) inside `embed_classify.rs`.
+rten-embed = { package = "rten", version = "0.26.0", optional = true }
+rten-tensor = { version = "0.26.0", optional = true }
+rten-text = { version = "0.26.0", optional = true }
 
 [features]
 # Two independent features, not one `receipt-capture` bundle: a photo
@@ -28,6 +40,11 @@ serde_json = { workspace = true, optional = true }
 # budgeting math) never compiles either in.
 ocr = ["dep:ocrs-cjk", "dep:rten", "dep:serde_json"]
 pdf-text = ["dep:pdf-extract"]
+# A BERT-family sentence-embedding model (not `ocr`'s generative/OCR use
+# of `rten`), used only to classify a `StatementRow` whose direction
+# `resolve_statement_amount` had to guess -- see `embed_classify.rs`'s
+# own doc comment for why an embedding classifier and not a chat LLM.
+embed-classify = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

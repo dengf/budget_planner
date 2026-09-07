@@ -30,6 +30,54 @@ const INCOME_KEYWORDS: [&str; 6] = [
     "cash back",
 ];
 
+/// Reference phrases for `classify_by_similarity` -- example descriptions
+/// an embedding model (loaded and run by `budget-wasm-llm`, never here;
+/// this crate stays free of that dependency) embeds once and compares a
+/// `StatementRow` with `direction_is_guessed: true` against by cosine
+/// similarity, nearest-neighbor style. This is the one place both sides
+/// of that classifier's vocabulary live, so the comparison logic
+/// (`classify_by_similarity`) and the phrases it was tuned against never
+/// drift apart the way they would if a caller had to keep its own copy
+/// in sync.
+pub const INCOME_EXAMPLE_PHRASES: &[&str] = &[
+    "SALARY PAYMENT",
+    "PAYROLL DEPOSIT",
+    "MONTHLY SALARY CREDIT",
+    "INTEREST EARNED",
+    "DIVIDEND PAYMENT",
+    "TRANSFER RECEIVED FROM",
+    "REFUND RECEIVED",
+    "CASHBACK REWARD",
+    "BONUS PAYMENT",
+    "PENSION PAYMENT",
+];
+pub const EXPENSE_EXAMPLE_PHRASES: &[&str] = &[
+    "GROCERY STORE PURCHASE",
+    "RESTAURANT BILL",
+    "ONLINE SHOPPING PURCHASE",
+    "SUBSCRIPTION FEE",
+    "UTILITY BILL PAYMENT",
+    "TRANSPORT FARE",
+    "COFFEE SHOP PURCHASE",
+    "FUEL PAYMENT",
+    "INSURANCE PREMIUM",
+    "LOAN REPAYMENT",
+    "FOOD DELIVERY APP PAYMENT",
+    "RIDE HAILING FARE",
+    "CAR PARK PAYMENT",
+];
+
+/// `true` (income) when a description's best cosine-similarity match
+/// among `INCOME_EXAMPLE_PHRASES` beats its best match among
+/// `EXPENSE_EXAMPLE_PHRASES`, `false` otherwise -- nearest-neighbor over
+/// two fixed example sets rather than any model-specific logic, so this
+/// stays plain, dependency-free comparison and the actual embedding
+/// happens entirely in `budget-wasm-llm`. Ties favor expense, matching
+/// `resolve_statement_amount`'s own default-to-expense fallback.
+pub fn classify_by_similarity(best_income_similarity: f32, best_expense_similarity: f32) -> bool {
+    best_income_similarity > best_expense_similarity
+}
+
 const NUMERIC_DATE_FORMATS: [&str; 8] = [
     "%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y", "%m/%d/%y", "%d/%m/%y",
 ];
@@ -201,6 +249,14 @@ pub struct StatementRow {
     /// before saving -- same contract as `ParsedReceipt::amount`.
     pub amount: Decimal,
     pub is_income: bool,
+    /// `true` only when `amount`'s direction came from the last-resort
+    /// default (no explicit sign, no `CR`/`DB` marker, no
+    /// `INCOME_KEYWORDS` hit) -- see `resolve_statement_amount`. Lets a
+    /// caller single out exactly the rows worth spending an optional,
+    /// heavier classification pass on (see `classify_by_similarity`)
+    /// instead of every row, since a sign, marker or keyword match is
+    /// already a confident enough signal on its own.
+    pub direction_is_guessed: bool,
 }
 
 /// Splits a bank/card statement's extracted text into one row per
@@ -363,24 +419,31 @@ fn trailing_direction_marker(text_after_amount: &str) -> Option<bool> {
 /// `CR`/`DB` marker (a statement's own explicit convention); then the
 /// same income-keyword guess `parse_receipt_text` already makes; then
 /// default to an expense, same default as a single receipt's total.
+///
+/// The second return value is `true` only in the final, no-signal
+/// fallback branch -- no explicit sign, no marker, no keyword hit -- so
+/// a caller can tell a confident guess apart from a pure default.
 fn resolve_statement_amount(
     magnitude: Decimal,
     had_explicit_sign: bool,
     marker: Option<bool>,
     is_income_line: bool,
-) -> Decimal {
+) -> (Decimal, bool) {
     if had_explicit_sign {
-        magnitude
+        (magnitude, false)
     } else if let Some(is_credit) = marker {
-        if is_credit {
-            magnitude.abs()
-        } else {
-            -magnitude.abs()
-        }
+        (
+            if is_credit {
+                magnitude.abs()
+            } else {
+                -magnitude.abs()
+            },
+            false,
+        )
     } else if is_income_line {
-        magnitude.abs()
+        (magnitude.abs(), false)
     } else {
-        -magnitude.abs()
+        (-magnitude.abs(), true)
     }
 }
 
@@ -411,7 +474,8 @@ fn parse_statement_line(
     let after_amount: String = chars[amount_end..].iter().collect();
     let marker = trailing_direction_marker(&after_amount);
     let is_income_line = INCOME_KEYWORDS.iter().any(|k| lower.contains(k));
-    let amount = resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
+    let (amount, direction_is_guessed) =
+        resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
 
     let without_amount = strip_span(&chars, amount_start, amount_end);
     let description = without_amount
@@ -432,6 +496,7 @@ fn parse_statement_line(
         },
         amount,
         is_income: amount.is_sign_positive(),
+        direction_is_guessed,
     })
 }
 
@@ -476,7 +541,8 @@ fn parse_statement_section(
     let after_amount: String = amount_chars[amount_end..].iter().collect();
     let marker = trailing_direction_marker(&after_amount);
     let is_income_line = INCOME_KEYWORDS.iter().any(|k| joined_lower.contains(k));
-    let amount = resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
+    let (amount, direction_is_guessed) =
+        resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
 
     let date_source_line = section
         .lines
@@ -501,6 +567,7 @@ fn parse_statement_section(
         },
         amount,
         is_income: amount.is_sign_positive(),
+        direction_is_guessed,
     })
 }
 
@@ -716,12 +783,14 @@ mod tests {
         let rows = parse_statement_text("05/01/2026 COFFEE SHOP -4.50\n");
         assert_eq!(rows[0].amount, dec!(-4.50));
         assert!(!rows[0].is_income);
+        assert!(!rows[0].direction_is_guessed);
     }
 
     #[test]
     fn an_unsigned_amount_defaults_to_an_expense() {
         let rows = parse_statement_text("05/01/2026 COFFEE SHOP 4.50\n");
         assert_eq!(rows[0].amount, dec!(-4.50));
+        assert!(rows[0].direction_is_guessed);
     }
 
     #[test]
@@ -729,6 +798,7 @@ mod tests {
         let rows = parse_statement_text("05/01/2026 REFUND FROM STORE 4.50\n");
         assert_eq!(rows[0].amount, dec!(4.50));
         assert!(rows[0].is_income);
+        assert!(!rows[0].direction_is_guessed);
     }
 
     #[test]
@@ -786,6 +856,18 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].amount, dec!(-15.00));
         assert!(!rows[0].is_income);
+        assert!(!rows[0].direction_is_guessed);
+    }
+
+    #[test]
+    fn classify_by_similarity_picks_the_higher_scoring_side() {
+        assert!(classify_by_similarity(0.8, 0.3));
+        assert!(!classify_by_similarity(0.3, 0.8));
+    }
+
+    #[test]
+    fn classify_by_similarity_ties_favor_expense() {
+        assert!(!classify_by_similarity(0.5, 0.5));
     }
 
     #[test]

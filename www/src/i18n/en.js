@@ -322,6 +322,9 @@ export default {
   'err.ocrModelLoadFailed': "The receipt-reading engine couldn't load ({value}). Try again.",
   'err.ocrFailed':
     "Couldn't read any text from that photo ({value}). Try a clearer photo, or add the transaction by hand.",
+  'err.embedModelLoadFailed': "The classification model couldn't load ({value}).",
+  'err.embedTokenizerLoadFailed': "The classification tokenizer couldn't load ({value}).",
+  'err.embedClassifyFailed': "Couldn't classify a row ({value}).",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.importFailed': "Couldn't read that file. Try again.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",

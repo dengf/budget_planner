@@ -6,6 +6,7 @@ www/dist/
 www/pkg/
 www/pkg-ocr/
 www/pkg-pdf/
+www/pkg-llm/
 
 # wasm-pack
 crates/budget-wasm/pkg/
@@ -14,6 +15,8 @@ crates/budget-wasm-ocr/pkg/
 crates/budget-wasm-ocr/target/
 crates/budget-wasm-pdf/pkg/
 crates/budget-wasm-pdf/target/
+crates/budget-wasm-llm/pkg/
+crates/budget-wasm-llm/target/
 
 .DS_Store
 __pycache__/

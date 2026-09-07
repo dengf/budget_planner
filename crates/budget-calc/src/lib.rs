@@ -8,6 +8,8 @@ pub mod category;
 pub mod csv_import;
 mod date_util;
 pub mod debt;
+#[cfg(feature = "embed-classify")]
+pub mod embed_classify;
 pub mod goals;
 #[cfg(feature = "ocr")]
 pub mod ocr;
@@ -27,6 +29,8 @@ pub use csv_import::{
     detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,
 };
 pub use debt::{build_plan, Debt, PayoffMonth, PayoffPlan, Strategy};
+#[cfg(feature = "embed-classify")]
+pub use embed_classify::classify_statement_descriptions;
 pub use goals::{
     milestone_crossed, petals_filled, progress_ratio, required_contribution, Goal, Milestone,
 };
@@ -35,7 +39,10 @@ pub use ocr::run_ocr;
 #[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
 pub use presets::{starter_categories, PresetCategory};
-pub use receipt::{parse_receipt_text, parse_statement_text, ParsedReceipt, StatementRow};
+pub use receipt::{
+    classify_by_similarity, parse_receipt_text, parse_statement_text, ParsedReceipt, StatementRow,
+    EXPENSE_EXAMPLE_PHRASES, INCOME_EXAMPLE_PHRASES,
+};
 pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };

@@ -66,4 +66,13 @@ pub enum BudgetError {
 
     #[error("could not read text from this image: {0}")]
     OcrFailed(String),
+
+    #[error("could not load the classification model: {0}")]
+    EmbedModelLoadFailed(String),
+
+    #[error("could not load the classification tokenizer: {0}")]
+    EmbedTokenizerLoadFailed(String),
+
+    #[error("could not classify a statement row: {0}")]
+    EmbedClassifyFailed(String),
 }

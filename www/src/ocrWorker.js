@@ -1,13 +1,17 @@
-// Runs receipt OCR and PDF text extraction off the main thread.
+// Runs receipt OCR, PDF text extraction, and statement-row income/expense
+// classification off the main thread.
 //
-// Two independent wasm modules, `budget-wasm-ocr` and `budget-wasm-pdf`,
-// each `import()`ed lazily and only the first time its own message type
-// actually arrives -- a photo scan never triggers the `pkg-pdf` download,
-// and a PDF upload never triggers `pkg-ocr`'s (which is the larger of the
-// two, since it carries the `ocrs-cjk`/`rten` ML runtime). They used to be
-// one combined module; splitting them stopped either path paying for the
-// other's weight -- see budget-wasm-ocr/src/lib.rs and
-// budget-wasm-pdf/src/lib.rs for the measured sizes.
+// Three independent wasm modules, `budget-wasm-ocr`, `budget-wasm-pdf`
+// and `budget-wasm-llm`, each `import()`ed lazily and only the first
+// time its own message type actually arrives -- a photo scan never
+// triggers the `pkg-pdf` or `pkg-llm` download, a PDF upload never
+// triggers `pkg-ocr`'s (which is the larger of the two, since it
+// carries the `ocrs-cjk`/`rten` ML runtime), and a statement whose rows
+// all carry an explicit sign or CR/DB marker never triggers `pkg-llm`'s
+// at all. OCR and PDF used to be one combined module; splitting them
+// stopped either path paying for the other's weight -- see
+// budget-wasm-ocr/src/lib.rs, budget-wasm-pdf/src/lib.rs and
+// budget-wasm-llm/src/lib.rs for the measured sizes.
 //
 // Both bindings are synchronous Rust calls -- a real scan blocked the
 // entire tab for 20-40+ seconds on ordinary hardware (worse on a phone),
@@ -47,9 +51,21 @@ const OCR_MODEL_PATHS = {
   recognition: new URL('ocr/ppocrv6-tiny-rec.rten', self.location.href),
 };
 
+// Same resolve-against-the-worker's-own-URL reasoning as OCR_MODEL_PATHS
+// above -- a `llm/` static folder alongside `ocr/`, fetched only the
+// first time a statement row actually needs classifying (see
+// `ReceiptCapture.jsx`: most statements have an explicit sign or a
+// CR/DB marker on every row and never reach this path at all).
+const LLM_MODEL_PATHS = {
+  model: new URL('llm/all-MiniLM-L6-v2.onnx', self.location.href),
+  tokenizer: new URL('llm/tokenizer.json', self.location.href),
+};
+
 let ocrWasmPromise = null;
 let pdfWasmPromise = null;
+let llmWasmPromise = null;
 let modelBytesPromise = null;
+let llmModelBytesPromise = null;
 
 async function fetchBytes(path) {
   const res = await fetch(path);
@@ -77,6 +93,16 @@ function loadPdfWasm() {
   return pdfWasmPromise;
 }
 
+function loadLlmWasm() {
+  if (!llmWasmPromise) {
+    llmWasmPromise = import('../pkg-llm').then(async (wasm) => {
+      if (wasm.default) await wasm.default();
+      return wasm;
+    });
+  }
+  return llmWasmPromise;
+}
+
 // Fetched once per worker lifetime -- a second scan in the same session
 // shouldn't re-download the ~6.3MB of model data again.
 function loadModels() {
@@ -87,6 +113,18 @@ function loadModels() {
     ]);
   }
   return modelBytesPromise;
+}
+
+// Same one-fetch-per-worker-lifetime memoization as loadModels above, for
+// the ~23MB embedding model + its tokenizer.
+function loadLlmModel() {
+  if (!llmModelBytesPromise) {
+    llmModelBytesPromise = Promise.all([
+      fetchBytes(LLM_MODEL_PATHS.model),
+      fetchBytes(LLM_MODEL_PATHS.tokenizer),
+    ]);
+  }
+  return llmModelBytesPromise;
 }
 
 self.onmessage = async (event) => {
@@ -101,6 +139,10 @@ self.onmessage = async (event) => {
     } else if (type === 'pdf') {
       const wasm = await loadPdfWasm();
       result = wasm.extract_pdf_text(event.data.bytes);
+    } else if (type === 'llm') {
+      const wasm = await loadLlmWasm();
+      const [modelBytes, tokenizerJson] = await loadLlmModel();
+      result = wasm.classify_statement_rows(modelBytes, tokenizerJson, event.data.descriptions);
     } else {
       throw new Error(`ocrWorker: unknown message type "${type}"`);
     }

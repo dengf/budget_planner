@@ -296,6 +296,9 @@ export default {
   'err.ocrModelLoadFailed': '小票识别引擎加载失败（{value}）。请重试。',
   'err.ocrFailed':
     '无法从该照片中识别出任何文字（{value}）。请换一张更清晰的照片，或手动添加这笔交易。',
+  'err.embedModelLoadFailed': '分类模型加载失败（{value}）。',
+  'err.embedTokenizerLoadFailed': '分类分词器加载失败（{value}）。',
+  'err.embedClassifyFailed': '无法对某一行进行分类（{value}）。',
   'err.badImportFile': '该文件不是预算规划导出的备份——未做任何更改。',
   'err.importFailed': '无法读取该文件，请重试。',
   'err.invalidRecurringAmount': '该金额无效（收到 {value}）。',
