@@ -1448,6 +1448,22 @@ table.data tr:last-child td {
   opacity: 1;
 }
 
+/* Points at the Income rows before anything is planned, without hiding
+   the Expense side (all 16 starter categories are always present -- see
+   BudgetTab.jsx's `dimExpenseUntilIncome` comment). Same de-emphasize-
+   don't-remove treatment as the tracking-mode planned-input dimming
+   above: `:focus-within` restores full opacity, so a row is never
+   actually harder to use, just quieter until it's the one being typed
+   into. Whole rows here rather than one cell, since "not the priority
+   yet" applies to the entire Expense row, not just its planned amount. */
+.category-row-dim,
+.category-section-dim {
+  opacity: 0.55;
+}
+.category-row-dim:focus-within {
+  opacity: 1;
+}
+
 .commitments-table {
   margin-bottom: 8px;
 }
