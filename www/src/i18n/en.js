@@ -222,6 +222,10 @@ export default {
     "Couldn't read that file. Try a clearer photo or a different file.",
   'transactions.receiptPdfNotSupported':
     "This PDF doesn't have readable text — try a photo of the receipt instead.",
+  'transactions.statementReviewHint':
+    '{count} transactions found — check dates, amounts and categories before adding.',
+  'transactions.statementRowInclude': 'Add this one',
+  'transactions.statementAddAll': 'Add {count} transactions',
   'recurring.title': 'Recurring expenses',
   'recurring.hint':
     'Rent, subscriptions, anything on a schedule. Set one up once and see it coming before it posts.',

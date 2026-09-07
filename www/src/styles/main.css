@@ -553,6 +553,25 @@ body {
   display: none;
   margin-top: 12px;
 }
+
+/* One editable card per detected statement-PDF row (ReceiptCapture.jsx's
+   bulk-review screen) -- a bordered block rather than `.txn-card`'s
+   read-only layout, since every field here is still a draft until "Add"
+   is pressed. `.field-check` above already carries the 44px touch-target
+   floor for the include checkbox. */
+.statement-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.statement-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .csv-columns[open] .form-grid {
   display: grid;
 }

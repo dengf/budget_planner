@@ -13,7 +13,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{decimal_to_f64, to_js};
-use crate::dto::ParseReceiptTextResult;
+use crate::dto::{ParseReceiptTextResult, ParseStatementTextResult, StatementRowDto};
 
 #[wasm_bindgen]
 pub fn parse_receipt_text(text: &str) -> JsValue {
@@ -24,4 +24,23 @@ pub fn parse_receipt_text(text: &str) -> JsValue {
         date: parsed.date,
         is_income: parsed.is_income,
     })
+}
+
+/// Multi-row counterpart to `parse_receipt_text`, for a bank/card
+/// statement PDF instead of a single receipt -- see
+/// `budget_calc::parse_statement_text`'s doc comment for why it's a
+/// separate function rather than a mode of the single-row one.
+#[wasm_bindgen]
+pub fn parse_statement_text(text: &str) -> JsValue {
+    let rows = budget_calc::parse_statement_text(text)
+        .into_iter()
+        .map(|r| StatementRowDto {
+            line: r.line,
+            date: r.date,
+            description: r.description,
+            amount: decimal_to_f64(r.amount),
+            is_income: r.is_income,
+        })
+        .collect();
+    to_js(&ParseStatementTextResult { rows })
 }

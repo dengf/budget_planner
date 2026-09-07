@@ -113,6 +113,20 @@ pub struct ParseReceiptTextResult {
     pub is_income: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct StatementRowDto {
+    pub line: usize,
+    pub date: String,
+    pub description: Option<String>,
+    pub amount: f64,
+    pub is_income: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ParseStatementTextResult {
+    pub rows: Vec<StatementRowDto>,
+}
+
 // ---- transactions & rules -----------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

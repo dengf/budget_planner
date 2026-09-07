@@ -66,7 +66,7 @@ function callWorker(type, payload, transfer) {
   });
 }
 
-function isPdf(file) {
+export function isPdf(file) {
   return file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
 }
 

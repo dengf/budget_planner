@@ -35,7 +35,7 @@ pub use ocr::run_ocr;
 #[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
 pub use presets::{starter_categories, PresetCategory};
-pub use receipt::{parse_receipt_text, ParsedReceipt};
+pub use receipt::{parse_receipt_text, parse_statement_text, ParsedReceipt, StatementRow};
 pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };

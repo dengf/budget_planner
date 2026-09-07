@@ -56,7 +56,7 @@ pub use debt::build_payoff_plan;
 pub use goals::{goal_progress, milestone_crossed, required_contribution};
 pub use message::Message;
 pub use presets::preset_categories;
-pub use receipt::parse_receipt_text;
+pub use receipt::{parse_receipt_text, parse_statement_text};
 pub use recurring::recurring_occurrences;
 pub use rules::apply_rules;
 #[cfg(target_arch = "wasm32")]
