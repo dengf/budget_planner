@@ -40,6 +40,13 @@ thiserror = "2.0"
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 
+[patch.crates-io]
+# See vendor/pdf-extract-0.12.0/README.md's patch note: a real bank-statement
+# PDF hit an upstream panic (font with no unicode-map entry and no fallback
+# encoding) that `panic = "abort"` below turns into a hard wasm-module abort
+# rather than a catchable error.
+pdf-extract = { path = "vendor/pdf-extract-0.12.0" }
+
 [profile.release]
 # Size, not speed -- same rationale as mortgage_calculator: nothing here is
 # compute-bound (a CSV import of a year of transactions is a few hundred
