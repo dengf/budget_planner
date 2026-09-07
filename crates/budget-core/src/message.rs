@@ -131,6 +131,15 @@ impl From<&BudgetError> for Message {
             BudgetError::EmbedClassifyFailed(v) => {
                 Message::with_value("err.embedClassifyFailed", v.clone(), text)
             }
+            BudgetError::SmartParseModelLoadFailed(v) => {
+                Message::with_value("err.smartParseModelLoadFailed", v.clone(), text)
+            }
+            BudgetError::SmartParseTokenizerLoadFailed(v) => {
+                Message::with_value("err.smartParseTokenizerLoadFailed", v.clone(), text)
+            }
+            BudgetError::SmartParseFailed(v) => {
+                Message::with_value("err.smartParseFailed", v.clone(), text)
+            }
         }
     }
 }
@@ -193,6 +202,9 @@ mod tests {
             BudgetError::EmbedModelLoadFailed("1".into()),
             BudgetError::EmbedTokenizerLoadFailed("1".into()),
             BudgetError::EmbedClassifyFailed("1".into()),
+            BudgetError::SmartParseModelLoadFailed("1".into()),
+            BudgetError::SmartParseTokenizerLoadFailed("1".into()),
+            BudgetError::SmartParseFailed("1".into()),
         ];
         let codes: std::collections::BTreeSet<_> =
             all.iter().map(|e| Message::from(e).code).collect();

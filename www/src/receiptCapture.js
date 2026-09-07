@@ -41,9 +41,16 @@ function getWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./ocrWorker.js', import.meta.url));
   worker.onmessage = (event) => {
-    const { id, ok, result, error } = event.data;
+    const { id, ok, result, error, progress } = event.data;
     const call = pending.get(id);
     if (!call) return; // already settled, or from a worker instance we've moved past
+    // A progress event (Smart Parse's model download) isn't terminal --
+    // it carries no `ok` field and the call stays pending afterwards,
+    // unlike every other message this worker ever posts.
+    if (progress) {
+      call.onProgress?.(progress);
+      return;
+    }
     pending.delete(id);
     if (ok) call.resolve(result);
     else call.reject(new Error(error));
@@ -58,10 +65,10 @@ function getWorker() {
   return worker;
 }
 
-function callWorker(type, payload, transfer) {
+function callWorker(type, payload, transfer, onProgress) {
   const id = nextId++;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+    pending.set(id, { resolve, reject, onProgress });
     getWorker().postMessage({ id, type, ...payload }, transfer);
   });
 }
@@ -150,6 +157,40 @@ export async function extractReceiptText(file) {
  * the caller keeps the heuristic's existing default-to-expense guess for
  * a `null` rather than blocking the review screen on a model load.
  */
+// The combined size of GLM-OCR's six fp16 ONNX files, as served today --
+// used only to turn `loadedBytes` progress events into a percentage and
+// a human-readable estimate before the app commits to downloading them.
+// Not load-bearing: if Hugging Face's actual file sizes drift, the
+// progress bar is off by a little rather than broken (`loadedBytes` can
+// exceed this and the bar just clamps at 100%).
+export const SMART_PARSE_APPROX_TOTAL_BYTES = 2_221_272_382;
+
+/**
+ * Reads a photographed receipt or statement with Smart Parse (GLM-OCR)
+ * instead of the always-available OCR engine `extractReceiptText` uses --
+ * see `budget-calc::smart_parse`'s own doc comment for why this is a
+ * second engine, not a replacement. Returns plain text through the exact
+ * same shape `extractReceiptText` does, so the caller feeds it into
+ * `parse_receipt_text`/`parse_statement_text` identically either way.
+ *
+ * `onProgress(loadedBytes)` fires repeatedly while the ~2.2GB model
+ * downloads (only on the very first use per browser -- cached afterwards
+ * via Cache Storage, see `ocrWorker.js`), and not at all on a cache hit
+ * before the model bytes are ready, then never again once the model
+ * itself starts running.
+ */
+export async function smartParseReceiptImage(file, onProgress) {
+  const { rgb, width, height } = await imageToRgb(file);
+  const result = await callWorker(
+    'smart-parse',
+    { imageRgb: rgb, width, height },
+    [rgb.buffer],
+    onProgress ? (progress) => onProgress(progress.loadedBytes) : undefined,
+  );
+  if (result?.error) return { text: '', calcError: result };
+  return { text: result.text, calcError: null };
+}
+
 export async function classifyStatementDescriptions(descriptions) {
   if (descriptions.length === 0) return [];
   try {

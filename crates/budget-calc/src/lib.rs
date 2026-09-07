@@ -19,6 +19,8 @@ pub mod presets;
 pub mod receipt;
 pub mod recurring;
 pub mod rules;
+#[cfg(feature = "smart-parse")]
+pub mod smart_parse;
 pub mod transaction;
 
 pub use category::{
@@ -47,6 +49,8 @@ pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };
 pub use rules::{apply_rules, CategorizationRule};
+#[cfg(feature = "smart-parse")]
+pub use smart_parse::run_smart_parse;
 pub use transaction::{
     daily_spend, income_by_category, spend_by_category, weekly_spend, Transaction,
 };
