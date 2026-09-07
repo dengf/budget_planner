@@ -2318,6 +2318,37 @@ table.data tr:last-child td {
   min-height: 44px;
 }
 
+/* Shown only while `isFreshStart` holds (DashboardTab.jsx) -- the
+   instruction a brand-new install needs before the wall of $0.00 cards
+   below means anything. Styled like `.assign-banner-start` (panel-alt +
+   line border, not the positive-tinted default) for the same reason that
+   rule gives: this is an instruction, not a result. Wraps to a stacked
+   layout under its own `min-width: 220px` on the text rather than a
+   dedicated mobile breakpoint -- the button already meets the 44px
+   touch-target floor via `.btn`. */
+.dash-welcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.dash-welcome-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+.dash-welcome .btn {
+  flex: none;
+}
+
 .dash-summary-cards {
   display: flex;
   flex-direction: column;

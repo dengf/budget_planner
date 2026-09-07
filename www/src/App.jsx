@@ -477,6 +477,7 @@ export function AppShell({ wasmModule }) {
               debts={debts}
               recurring={recurring}
               budgetPlan={budgetPlan}
+              onNavigateTab={setActiveTab}
             />
           </div>
         </Suspense>

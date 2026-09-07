@@ -274,6 +274,9 @@ export default {
   'debt.balanceRemaining': 'Remaining',
 
   'dashboard.title': 'Dashboard',
+  'dashboard.welcome':
+    'New here? Set your income and budget amounts on the Budget tab, then log spending — this page fills in as you go.',
+  'dashboard.welcomeCta': 'Go to Budget',
   'dashboard.income': 'Income',
   'dashboard.totalIncome': 'Total income',
   'dashboard.totalExpenses': 'Expenses',
