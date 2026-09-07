@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
-import { classifyStatementDescriptions, extractReceiptText, isPdf } from '../receiptCapture';
+import {
+  classifyStatementDescriptions,
+  extractReceiptText,
+  isPdf,
+  smartParseReceiptImage,
+  SMART_PARSE_APPROX_TOTAL_BYTES,
+} from '../receiptCapture';
 import CalcError from './CalcError';
 import CameraCapture from './CameraCapture';
 import DirectionWarning from './DirectionWarning';
@@ -9,6 +15,15 @@ import NumberField from './NumberField';
 import { categoryDisplayName } from '../presetCategories';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
+
+// One decimal place is plenty for a download-progress readout -- nobody
+// needs "2.10 GB" over "2.1 GB" here, and a byte-exact figure would just
+// be noise given `SMART_PARSE_APPROX_TOTAL_BYTES` is itself an estimate.
+function formatBytes(bytes) {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
+  return `${(bytes / 1e3).toFixed(0)} KB`;
+}
 
 // A statement PDF (several transaction lines) needs at least two rows to
 // be worth a bulk-review screen instead of the single-draft form below --
@@ -45,6 +60,15 @@ export default function ReceiptCapture({
   const [isIncomeHint, setIsIncomeHint] = useState(false);
   const [calcError, setCalcError] = useState(null);
   const [statementRows, setStatementRows] = useState([]);
+  // Opt-in, not a default -- see `transactions.smartParseHint`, shown
+  // right next to this toggle: it names the ~2.2GB one-time download
+  // before anyone turns it on, per CLAUDE.md's "never state something
+  // that isn't true yet" -- there is no silent, surprise download here.
+  const [smartParseEnabled, setSmartParseEnabled] = useState(false);
+  // Bytes downloaded so far this session, only while Smart Parse's model
+  // is still being fetched -- `null` once inference itself starts (no
+  // more progress to report) or when nothing is downloading yet.
+  const [downloadedBytes, setDownloadedBytes] = useState(null);
 
   // Only rows `resolve_statement_amount` (Rust) had no sign, marker or
   // keyword to go on -- most statements never have any, so this usually
@@ -102,9 +126,17 @@ export default function ReceiptCapture({
   const handleFile = async (file) => {
     if (!file || !wasmModule) return;
     setCalcError(null);
+    setDownloadedBytes(null);
     setStatus('reading');
     try {
-      const { text, calcError: extractError } = await extractReceiptText(file);
+      // Smart Parse only reads images -- GLM-OCR is a vision-language
+      // model, not a PDF-text extractor. A PDF upload always takes the
+      // existing `pdf-extract` path regardless of the toggle.
+      const useSmartParse = smartParseEnabled && !isPdf(file);
+      const { text, calcError: extractError } = useSmartParse
+        ? await smartParseReceiptImage(file, setDownloadedBytes)
+        : await extractReceiptText(file);
+      setDownloadedBytes(null); // download (if any) is done; inference has no further progress to report
       if (extractError) {
         setCalcError(extractError);
         setStatus('idle');
@@ -210,22 +242,50 @@ export default function ReceiptCapture({
       <p className="panel-subtitle">{t('transactions.receiptHint')}</p>
 
       {status !== 'review' && status !== 'statementReview' && (
-        <div className="form-grid">
-          <CameraCapture onFile={handleFile} />
-          <label className="btn secondary">
-            <PdfIcon />
-            {t('transactions.uploadPdf')}
+        <>
+          <div className="form-grid">
+            <CameraCapture onFile={handleFile} />
+            <label className="btn secondary">
+              <PdfIcon />
+              {t('transactions.uploadPdf')}
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={onPdfFile}
+                className="visually-hidden"
+              />
+            </label>
+          </div>
+          <label className="field field-check">
             <input
-              type="file"
-              accept="application/pdf"
-              onChange={onPdfFile}
-              className="visually-hidden"
+              type="checkbox"
+              checked={smartParseEnabled}
+              onChange={(e) => setSmartParseEnabled(e.target.checked)}
+              disabled={status === 'reading'}
             />
+            <span>{t('transactions.smartParseToggle')}</span>
           </label>
-        </div>
+          {smartParseEnabled && (
+            <p className="panel-subtitle">
+              {t('transactions.smartParseHint', { size: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES) })}
+            </p>
+          )}
+        </>
       )}
 
-      {status === 'reading' && <p className="empty-state">{t('transactions.receiptReading')}</p>}
+      {status === 'reading' && (
+        <p className="empty-state">
+          {smartParseEnabled && downloadedBytes !== null && downloadedBytes < SMART_PARSE_APPROX_TOTAL_BYTES
+            ? t('transactions.smartParseDownloading', {
+                percent: Math.min(100, Math.round((downloadedBytes / SMART_PARSE_APPROX_TOTAL_BYTES) * 100)),
+                loaded: formatBytes(downloadedBytes),
+                total: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES),
+              })
+            : smartParseEnabled
+              ? t('transactions.smartParseRunning')
+              : t('transactions.receiptReading')}
+        </p>
+      )}
       {calcError && <CalcError result={calcError} />}
 
       {status === 'statementReview' && (

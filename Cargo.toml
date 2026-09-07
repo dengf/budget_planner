@@ -17,6 +17,7 @@ members = [
     "crates/budget-wasm-ocr",
     "crates/budget-wasm-pdf",
     "crates/budget-wasm-llm",
+    "crates/budget-wasm-glmocr",
 ]
 resolver = "2"
 

@@ -75,4 +75,13 @@ pub enum BudgetError {
 
     #[error("could not classify a statement row: {0}")]
     EmbedClassifyFailed(String),
+
+    #[error("could not load the Smart Parse model: {0}")]
+    SmartParseModelLoadFailed(String),
+
+    #[error("could not load the Smart Parse tokenizer: {0}")]
+    SmartParseTokenizerLoadFailed(String),
+
+    #[error("could not read this image with Smart Parse: {0}")]
+    SmartParseFailed(String),
 }

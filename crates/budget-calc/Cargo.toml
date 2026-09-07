@@ -28,6 +28,11 @@ serde_json = { workspace = true, optional = true }
 rten-embed = { package = "rten", version = "0.26.0", optional = true }
 rten-tensor = { version = "0.26.0", optional = true }
 rten-text = { version = "0.26.0", optional = true }
+# `smart_parse.rs`'s own image resize/patchify -- default-features off
+# since only PNG/JPEG decoding is needed (a camera capture always
+# encodes as JPEG; a picked file could be either), not the crate's full
+# format zoo.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
 
 [features]
 # Two independent features, not one `receipt-capture` bundle: a photo
@@ -45,6 +50,13 @@ pdf-text = ["dep:pdf-extract"]
 # `resolve_statement_amount` had to guess -- see `embed_classify.rs`'s
 # own doc comment for why an embedding classifier and not a chat LLM.
 embed-classify = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text"]
+# GLM-OCR (0.9B vision-language model) for "Smart Parse" -- see
+# `smart_parse.rs`'s own doc comment for why this is a second OCR engine
+# rather than a replacement for `ocr`'s PP-OCRv6_tiny. Shares the same
+# `rten` 0.26 pin as `embed-classify` (both aliased as `rten-embed`)
+# rather than introducing a third version to coexist -- see the comment
+# on that dependency above.
+smart-parse = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text", "dep:image"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

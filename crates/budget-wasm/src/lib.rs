@@ -21,16 +21,18 @@
 //! `JsValue`, calls into `budget-calc` or `budget-ext-redb`, and
 //! serializes the result back. See CLAUDE.md.
 //!
-//! Receipt OCR (`run_ocr`), PDF text extraction (`extract_pdf_text`) and
+//! Receipt OCR (`run_ocr`), PDF text extraction (`extract_pdf_text`),
 //! statement-row income/expense classification
-//! (`classify_statement_descriptions`) live in the sibling
-//! `budget-wasm-ocr`, `budget-wasm-pdf` and `budget-wasm-llm` crates
+//! (`classify_statement_descriptions`) and Smart Parse
+//! (`run_smart_parse`, GLM-OCR) live in the sibling `budget-wasm-ocr`,
+//! `budget-wasm-pdf`, `budget-wasm-llm` and `budget-wasm-glmocr` crates
 //! instead, each compiled to its own separate `.wasm` file that
 //! `www/src/ocrWorker.js` only loads the first time someone actually
-//! takes that path (a photo scan never downloads the PDF or classifier
-//! crate's weight, and vice versa). `ocrs-cjk`/`rten`, `pdf-extract` and
-//! a BERT-family embedding model respectively are why -- see each
-//! crate's own doc comment for the measured size. This crate's own
+//! takes that path (a photo scan never downloads the PDF, classifier or
+//! Smart Parse crate's weight, and vice versa). `ocrs-cjk`/`rten`,
+//! `pdf-extract`, a BERT-family embedding model and GLM-OCR's ~2.2GB of
+//! vision-language weights respectively are why -- see each crate's own
+//! doc comment for the measured size. This crate's own
 //! [`receipt`] module, by contrast, is `parse_receipt_text`/
 //! `parse_statement_text`: plain text/`Decimal` parsing with no heavy
 //! dependency, so it lives here in the always-loaded core instead of
@@ -96,6 +98,10 @@ mod bridge_coverage {
         (
             "embed_classify",
             "bridged in the sibling budget-wasm-llm crate, not here -- see this crate's lib.rs doc comment",
+        ),
+        (
+            "smart_parse",
+            "bridged in the sibling budget-wasm-glmocr crate, not here -- see this crate's lib.rs doc comment",
         ),
     ];
 
