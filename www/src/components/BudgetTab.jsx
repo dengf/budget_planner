@@ -434,6 +434,20 @@ export default function BudgetTab({
   // flag picks the one that instead says where to add the first one.
   const hasIncomeCategory = categories.items.some((c) => c.is_income);
   const mode = budgetMode({ isPastMonth, hasIncome, unassigned });
+  // Every fresh or cleared budget lands on all 16 starter categories at
+  // once (App.jsx re-seeds the moment the list is empty, deliberately --
+  // see its own comment), not the empty-table-plus-chip-picker state the
+  // tap-to-add-one-at-a-time picker was designed around. The assign
+  // banner already says "start with income," but with the Income and
+  // Expense sections sitting at equal visual weight, that's a sentence
+  // to apply to five specific rows out of sixteen, not something the eye
+  // finds on its own. Dimming the Expense side (rows and its section
+  // header) until an income category has something planned turns that
+  // instruction into a visual one instead. `:focus-within` (main.css)
+  // restores full opacity, so nothing here is actually harder to reach,
+  // and this never applies to a past month -- reviewing history isn't
+  // "start here" guidance.
+  const dimExpenseUntilIncome = mode === ASSIGN && !hasIncome;
 
   return (
     <div className="panel budget">
@@ -619,14 +633,24 @@ export default function BudgetTab({
             // one spot the flag flips.
             const startsNewSection =
               i === 0 || incomeRow !== isIncome(orderedLines[i - 1].category_id);
+            const dimmed = dimExpenseUntilIncome && !incomeRow;
             return (
               <React.Fragment key={line.category_id}>
                 {startsNewSection && (
-                  <div className="category-section-header">
+                  <div
+                    className={
+                      dimmed
+                        ? 'category-section-header category-section-dim'
+                        : 'category-section-header'
+                    }
+                  >
                     {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
                   </div>
                 )}
-                <div className="category-row" id={`category-row-${line.category_id}`}>
+                <div
+                  className={dimmed ? 'category-row category-row-dim' : 'category-row'}
+                  id={`category-row-${line.category_id}`}
+                >
                   <div>
                     <div className="category-name">
                       <CategoryBadge category={categoryFor(line.category_id)} />
@@ -775,7 +799,13 @@ export default function BudgetTab({
           {savingsLine && (
             <React.Fragment>
               <div className="category-row-divider" role="separator" />
-              <div className="category-row category-row-savings">
+              <div
+                className={
+                  dimExpenseUntilIncome
+                    ? 'category-row category-row-savings category-row-dim'
+                    : 'category-row category-row-savings'
+                }
+              >
                 <div>
                   <div className="category-name">{t('budget.savings')}</div>
                   <div className="category-group">{t('budget.savingsHint')}</div>
