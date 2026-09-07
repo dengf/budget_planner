@@ -78,8 +78,14 @@ pub fn classify_by_similarity(best_income_similarity: f32, best_expense_similari
     best_income_similarity > best_expense_similarity
 }
 
+// Day-first tried before month-first: a genuinely ambiguous numeric date
+// (both halves <= 12, e.g. "03/08/2026") is read as day/month, matching
+// the international/SG convention most of this app's userbase uses, not
+// US month/day. An unambiguous date still resolves correctly either way
+// -- "08/27/2026" fails the day-first attempt (27 is not a valid month)
+// and falls through to month-first, same as before this reordering.
 const NUMERIC_DATE_FORMATS: [&str; 8] = [
-    "%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y", "%m/%d/%y", "%d/%m/%y",
+    "%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%m-%d-%Y", "%d/%m/%y", "%m/%d/%y",
 ];
 const NAMED_DATE_FORMATS: [&str; 4] = ["%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%d %b %Y"];
 
@@ -265,8 +271,9 @@ pub struct StatementRow {
 /// collapsed to one figure. A statement has no such single "total" to
 /// anchor on.
 ///
-/// Two real shapes came out of testing this against an actual exported
-/// statement PDF (a mobile-wallet export), not just synthetic fixtures:
+/// Three real shapes came out of testing this against actual exported
+/// statement PDFs (a mobile-wallet export, then a bank statement), not
+/// just synthetic fixtures:
 ///
 /// 1. **One line per transaction** -- `date … description … amount`, a
 ///    bank's own printed column order, all on one physical line. This is
@@ -280,6 +287,11 @@ pub struct StatementRow {
 ///    had no year (`"06 Aug"`, not `"06 Aug 2026"` -- the year appears
 ///    once, in the statement's own header), and direction was a trailing
 ///    `CR`/`DB` word rather than a `+`/`-` sign.
+/// 3. **A trailing running-balance column with no label of its own** --
+///    either shape above, but the amount line ends `AMOUNT  BALANCE`
+///    instead of just `AMOUNT`, with two spaces and no marker separating
+///    them. See `find_statement_amount`'s own doc comment for how this
+///    is told apart from the actual transaction amount.
 ///
 /// `parse_statement_text` groups the text into blank-line-delimited
 /// sections first. Within a section, if one or more individual lines
@@ -447,9 +459,14 @@ fn resolve_statement_amount(
     }
 }
 
-fn strip_span(chars: &[char], start: usize, end: usize) -> String {
+/// Removes every given span from `chars`, latest-starting first so an
+/// earlier span's indices stay valid as later ones are drained out.
+fn strip_spans(chars: &[char], mut spans: Vec<(usize, usize)>) -> String {
+    spans.sort_by_key(|&(start, _)| std::cmp::Reverse(start));
     let mut without = chars.to_vec();
-    without.drain(start..end);
+    for (start, end) in spans {
+        without.drain(start..end);
+    }
     without.into_iter().collect()
 }
 
@@ -468,7 +485,8 @@ fn parse_statement_line(
     }
 
     let (date_token, date) = find_row_date_token(line, document_year)?;
-    let (amount_start, amount_end, magnitude, had_explicit_sign) = find_statement_amount(line)?;
+    let (amount_start, amount_end, magnitude, had_explicit_sign, balance_span) =
+        find_statement_amount(line)?;
 
     let chars: Vec<char> = line.chars().collect();
     let after_amount: String = chars[amount_end..].iter().collect();
@@ -477,7 +495,11 @@ fn parse_statement_line(
     let (amount, direction_is_guessed) =
         resolve_statement_amount(magnitude, had_explicit_sign, marker, is_income_line);
 
-    let without_amount = strip_span(&chars, amount_start, amount_end);
+    let mut spans = vec![(amount_start, amount_end)];
+    if let Some(span) = balance_span {
+        spans.push(span);
+    }
+    let without_amount = strip_spans(&chars, spans);
     let description = without_amount
         .replacen(&date_token, "", 1)
         .trim_matches(|c: char| !c.is_alphanumeric())
@@ -531,7 +553,11 @@ fn parse_statement_section(
 
     let mut best_amount: Option<(&str, usize, usize, Decimal, bool)> = None;
     for &(_, l) in &section.lines {
-        if let Some((start, end, magnitude, had_sign)) = find_statement_amount(l) {
+        // The balance span (this line's trailing running-balance column,
+        // if any) is irrelevant here: shape 2's description always comes
+        // from the *date's own* line, never the amount line, so there's
+        // nothing to strip it out of the way `parse_statement_line` does.
+        if let Some((start, end, magnitude, had_sign, _balance_span)) = find_statement_amount(l) {
             best_amount = Some((l, start, end, magnitude, had_sign));
         }
     }
@@ -571,20 +597,40 @@ fn parse_statement_section(
     })
 }
 
-/// The last money-like run in a line, as its character span (so the
-/// caller can strip exactly that substring out of the description) and
-/// signed value. A run is widened one character left to catch a leading
-/// `+`/`-` sign or, when the whole run is `(`...`)`-wrapped, both
-/// parens -- mirroring `extract_amounts`'s own paren handling -- so
-/// `had_explicit_sign` can tell a written sign apart from a bare
-/// magnitude with no direction of its own. "Last" rather than "largest"
-/// (`extract_amounts`'s choice for a receipt's total): a statement's
-/// own printed column order puts the amount after the date and
-/// description, and a fee or tax figure earlier in the same line should
-/// not outrank it just for being bigger.
-fn find_statement_amount(line: &str) -> Option<(usize, usize, Decimal, bool)> {
+/// `(start, end, magnitude, had_explicit_sign, balance_span)` -- see
+/// `find_statement_amount`'s own doc comment for what each field means.
+type StatementAmountMatch = (usize, usize, Decimal, bool, Option<(usize, usize)>);
+
+/// The transaction-amount money-like run in a line, as its character
+/// span (so the caller can strip exactly that substring out of the
+/// description) and signed value, plus the span of a trailing running-
+/// balance run when one was found alongside it (so a caller can strip
+/// that out of the description too, rather than leaving the account's
+/// balance figure sitting in the row's description text). A run is
+/// widened one character left to catch a leading `+`/`-` sign or, when
+/// the whole run is `(`...`)`-wrapped, both parens -- mirroring
+/// `extract_amounts`'s own paren handling -- so `had_explicit_sign` can
+/// tell a written sign apart from a bare magnitude with no direction of
+/// its own.
+///
+/// When exactly one money-like run exists on the line, it's the amount
+/// -- the shape every statement tested before this function's second
+/// real-world case used (a bank's own printed column order puts the
+/// amount after the date and description, so it's always last on the
+/// line, and choosing "last" over "largest" keeps an earlier fee/tax
+/// figure from outranking it just for being bigger).
+///
+/// When two or more runs exist, the second-to-last is the amount and the
+/// last is a running-balance column, not a second candidate. A real SG
+/// bank statement PDF printed every transaction as `AMOUNT  BALANCE`
+/// with no label distinguishing the two -- reading "last" as the amount
+/// there silently took the account's running balance instead of the
+/// actual withdrawal/deposit figure. No statement shape seen so far
+/// prints more than one genuine amount on a transaction's own line, so
+/// this is unambiguous rather than a guess among many candidates.
+fn find_statement_amount(line: &str) -> Option<StatementAmountMatch> {
     let chars: Vec<char> = line.chars().collect();
-    let mut found = None;
+    let mut candidates: Vec<(usize, usize, Decimal, bool)> = Vec::new();
     let mut i = 0;
     while i < chars.len() {
         if !chars[i].is_ascii_digit() {
@@ -615,10 +661,25 @@ fn find_statement_amount(line: &str) -> Option<(usize, usize, Decimal, bool)> {
         };
         let token: String = chars[start..end].iter().collect();
         if let Some(amount) = parse_amount(&token) {
-            found = Some((start, end, amount, had_explicit_sign));
+            candidates.push((start, end, amount, had_explicit_sign));
         }
     }
-    found
+    if candidates.len() >= 2 {
+        let (b_start, b_end, ..) = candidates[candidates.len() - 1];
+        let (a_start, a_end, a_magnitude, a_had_sign) = candidates[candidates.len() - 2];
+        Some((
+            a_start,
+            a_end,
+            a_magnitude,
+            a_had_sign,
+            Some((b_start, b_end)),
+        ))
+    } else {
+        candidates
+            .into_iter()
+            .next()
+            .map(|(s, e, m, sign)| (s, e, m, sign, None))
+    }
 }
 
 #[cfg(test)]
@@ -766,12 +827,12 @@ mod tests {
 
     #[test]
     fn a_statement_with_several_lines_yields_one_row_per_transaction() {
-        let text = "05/01/2026 STARBUCKS -4.50\n\
-                     05/02/2026 SALARY DEPOSIT +3000.00\n\
-                     05/03/2026 RENT -1500.00\n";
+        let text = "15/05/2026 STARBUCKS -4.50\n\
+                     16/05/2026 SALARY DEPOSIT +3000.00\n\
+                     17/05/2026 RENT -1500.00\n";
         let rows = parse_statement_text(text);
         assert_eq!(rows.len(), 3);
-        assert_eq!(rows[0].date, "2026-05-01");
+        assert_eq!(rows[0].date, "2026-05-15");
         assert_eq!(rows[0].amount, dec!(-4.50));
         assert_eq!(rows[0].description, Some("STARBUCKS".to_string()));
         assert_eq!(rows[1].amount, dec!(3000.00));
@@ -886,5 +947,47 @@ mod tests {
     fn a_day_month_date_with_no_document_year_anywhere_is_not_a_transaction_row() {
         let rows = parse_statement_text("06 Aug MERCHANT SIX 15.00 CR\n");
         assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn an_ambiguous_numeric_date_defaults_to_day_first_not_us_month_first() {
+        // 03/08 is a valid date either way (day=3/month=8 or month=3/day=8)
+        // -- this app's userbase reads it day-first (international/SG
+        // convention), not US month-first.
+        let parsed = parse_receipt_text("SHOP\n03/08/2026\nTotal 10.00\n");
+        assert_eq!(parsed.date, Some("2026-08-03".to_string()));
+    }
+
+    #[test]
+    fn an_unambiguous_numeric_date_still_resolves_correctly_despite_the_day_first_default() {
+        let parsed = parse_receipt_text("SHOP\n08/27/2026\nTotal 10.00\n");
+        assert_eq!(parsed.date, Some("2026-08-27".to_string()));
+    }
+
+    #[test]
+    fn a_trailing_running_balance_is_not_mistaken_for_the_amount_on_a_single_line() {
+        // Real SG bank statement shape: date, description and the
+        // AMOUNT BALANCE pair all on one physical line, with no label
+        // distinguishing the two trailing numbers.
+        let rows = parse_statement_text("31/08/2026 INTEREST PAID 2.51  77580.68\n");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].amount, dec!(-2.51));
+    }
+
+    #[test]
+    fn a_trailing_running_balance_is_stripped_out_of_the_description_too() {
+        let rows = parse_statement_text("31/08/2026 INTEREST PAID 2.51  77580.68\n");
+        assert_eq!(rows[0].description, Some("INTEREST PAID".to_string()));
+    }
+
+    #[test]
+    fn a_trailing_running_balance_is_not_mistaken_for_the_amount_in_a_pooled_section() {
+        let text = "2026-08-01 OPENING BALANCE 1000.00\n\n\
+                     31/08/2026 SOME MERCHANT NAME\n\
+                     REF: ABCDEF123456\n\
+                     3850.01  77578.17\n";
+        let rows = parse_statement_text(text);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].amount, dec!(-3850.01));
     }
 }
