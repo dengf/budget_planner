@@ -6,6 +6,7 @@ import CameraCapture from './CameraCapture';
 import DirectionWarning from './DirectionWarning';
 import { PdfIcon } from './icons';
 import NumberField from './NumberField';
+import { categoryDisplayName } from '../presetCategories';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
 
@@ -18,7 +19,14 @@ const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
  * pre-filled, fully editable form and nothing saves until "Add" is
  * pressed. See the receipt-capture plan addendum for the full design.
  */
-export default function ReceiptCapture({ wasmModule, newId, categories, rules, transactions, formatMoney }) {
+export default function ReceiptCapture({
+  wasmModule,
+  newId,
+  categories,
+  rules,
+  transactions,
+  formatMoney,
+}) {
   const { t } = useI18n();
   const [status, setStatus] = useState('idle'); // idle | reading | review
   const [draft, setDraft] = useState(EMPTY_DRAFT);
@@ -105,7 +113,12 @@ export default function ReceiptCapture({ wasmModule, newId, categories, rules, t
           <label className="btn secondary">
             <PdfIcon />
             {t('transactions.uploadPdf')}
-            <input type="file" accept="application/pdf" onChange={onPdfFile} className="visually-hidden" />
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={onPdfFile}
+              className="visually-hidden"
+            />
           </label>
         </div>
       )}
@@ -121,13 +134,20 @@ export default function ReceiptCapture({ wasmModule, newId, categories, rules, t
             <label className="field">
               <span className="field-label">{t('transactions.date')}</span>
               <div className="field-input">
-                <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+                <input
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                />
               </div>
             </label>
             <label className="field">
               <span className="field-label">{t('transactions.description')}</span>
               <div className="field-input">
-                <input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+                <input
+                  value={draft.description}
+                  onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                />
               </div>
             </label>
             <NumberField
@@ -139,13 +159,25 @@ export default function ReceiptCapture({ wasmModule, newId, categories, rules, t
             />
             <label className="field">
               <span className="field-label">{t('transactions.category')}</span>
-              <select className="field-select" value={draft.category_id} onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}>
+              <select
+                className="field-select"
+                value={draft.category_id}
+                onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}
+              >
                 <option value="">{t('transactions.uncategorized')}</option>
-                {categories.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {categories.items.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {categoryDisplayName(c, t)}
+                  </option>
+                ))}
               </select>
             </label>
-            <button className="btn" type="submit">{t('transactions.add')}</button>
-            <button className="btn secondary" type="button" onClick={discard}>{t('confirm.cancel')}</button>
+            <button className="btn" type="submit">
+              {t('transactions.add')}
+            </button>
+            <button className="btn secondary" type="button" onClick={discard}>
+              {t('confirm.cancel')}
+            </button>
           </form>
           <DirectionWarning
             amount={draft.amount}

@@ -8,6 +8,7 @@ import BlossomProgress, { BlossomWatermark } from './BlossomProgress';
 import SpendOverTimeChart from './SpendOverTimeChart';
 import MonthYearPicker from './MonthYearPicker';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
+import { categoryDisplayName } from '../presetCategories';
 
 /**
  * Lets a long money string wrap at a digit-group boundary instead of
@@ -195,7 +196,10 @@ export default function DashboardTab({
   }, [wasmModule, goals.items]);
 
   const categoryFor = (id) => categories.items.find((c) => c.id === id);
-  const categoryName = (id) => categories.items.find((c) => c.id === id)?.name ?? id;
+  const categoryName = (id) => {
+    const c = categoryFor(id);
+    return c ? categoryDisplayName(c, t) : id;
+  };
 
   // Two separate breakdowns, not one chart trying to show both
   // directions of money -- `l.spent` already holds whichever of

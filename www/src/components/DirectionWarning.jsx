@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../i18n';
 import { directionMismatch } from '../directionMismatch';
+import { categoryDisplayName } from '../presetCategories';
 
 /**
  * Fires when a typed amount's sign disagrees with the picked category's
@@ -18,11 +19,13 @@ export default function DirectionWarning({ amount, category, formatMoney, onUseF
 
   const flipped = -Number(amount);
   const flippedText = formatMoney(flipped);
-  const key = category.is_income ? 'transactions.directionMismatchIncome' : 'transactions.directionMismatchExpense';
+  const key = category.is_income
+    ? 'transactions.directionMismatchIncome'
+    : 'transactions.directionMismatchExpense';
 
   return (
     <p className="direction-warning" role="alert">
-      {t(key, { category: category.name, flipped: flippedText })}{' '}
+      {t(key, { category: categoryDisplayName(category, t), flipped: flippedText })}{' '}
       <button type="button" className="btn ghost" onClick={() => onUseFlipped(flipped)}>
         {t('transactions.useFlippedAmount', { flipped: flippedText })}
       </button>
