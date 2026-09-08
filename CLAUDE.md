@@ -30,11 +30,18 @@ than one that is visibly broken.
 | `budget-wasm-pdf` | Bridge only, same rule — a *third*, independent wasm module (see below) |
 | `www/` | Layout, input, formatting for display, i18n |
 
-### Three wasm modules, not one
+### Several wasm modules, not one
 
-`budget-wasm-ocr` and `budget-wasm-pdf` exist purely to keep
+`budget-wasm-ocr`, `budget-wasm-pdf`, `budget-wasm-pdfrender`,
+`budget-wasm-llm` and `budget-wasm-glmocr` exist purely to keep
 `budget-wasm`'s download small, and to keep each other's weight off a
-session that only takes one of the two receipt-capture paths.
+session that only takes one of the receipt-capture paths. The
+OCR/PDF split below is the original, most-documented case of the
+pattern; `budget-wasm-pdfrender` (rasterizing a PDF page to pixels via
+`hayro`, a pure-Rust PDF interpreter) is its newest instance, added so a
+scanned PDF (no text layer) and Smart Parse's PDF path both have pixels
+to read without a text-layer PDF or an image-only session ever paying
+for it — see `budget-wasm-pdfrender/src/lib.rs`'s own doc comment.
 
 `ocrs-cjk`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
 of the wasm payload — 3.7MB with them compiled into the main crate,
@@ -75,9 +82,13 @@ needs it. If two such features are genuinely independent (never both
 needed in the same user action), give each its own crate rather than
 bundling them — the OCR/PDF history above is the cautionary example.
 `Message` (the wasm-boundary error convention) lives in `budget-core`, not
-any of the three wasm crates, specifically so multiple wasm-bindgen crates
+any of the wasm crates, specifically so multiple wasm-bindgen crates
 mapping `BudgetError` never duplicate that mapping — see
-`budget-core/src/message.rs`'s own doc comment.
+`budget-core/src/message.rs`'s own doc comment. `render_pdf_page`
+(`budget-wasm-pdfrender`) is a deliberate, documented exception: it
+returns a raw `Vec<u8>` instead, because a rendered page's pixels are too
+large to route through the usual serialized `Message`-shaped result
+without a real performance cost — see that binding's own doc comment.
 
 Business logic is anything where a second implementation could give a
 different answer: arithmetic on money, thresholds, deriving one value from

@@ -1,17 +1,26 @@
 // Runs receipt OCR, PDF text extraction, and statement-row income/expense
 // classification off the main thread.
 //
-// Three independent wasm modules, `budget-wasm-ocr`, `budget-wasm-pdf`
-// and `budget-wasm-llm`, each `import()`ed lazily and only the first
-// time its own message type actually arrives -- a photo scan never
-// triggers the `pkg-pdf` or `pkg-llm` download, a PDF upload never
-// triggers `pkg-ocr`'s (which is the larger of the two, since it
+// Several independent wasm modules -- `budget-wasm-ocr`, `budget-wasm-pdf`,
+// `budget-wasm-pdfrender`, `budget-wasm-llm` and `budget-wasm-glmocr` --
+// each `import()`ed lazily and only the first time its own message type
+// actually arrives -- a photo scan never triggers the `pkg-pdf` or
+// `pkg-llm` download, a PDF upload never triggers `pkg-ocr`'s (which
 // carries the `ocrs-cjk`/`rten` ML runtime), and a statement whose rows
 // all carry an explicit sign or CR/DB marker never triggers `pkg-llm`'s
 // at all. OCR and PDF used to be one combined module; splitting them
 // stopped either path paying for the other's weight -- see
 // budget-wasm-ocr/src/lib.rs, budget-wasm-pdf/src/lib.rs and
 // budget-wasm-llm/src/lib.rs for the measured sizes.
+//
+// `pkg-pdfrender` (`hayro`, a pure-Rust PDF rasterizer) is the one
+// exception to "one message type per module": both the `'pdf-page-count'`
+// and `'pdf-render-page'` messages load it, and it's reached from two
+// different callers in `receiptCapture.js` -- a scanned PDF with no text
+// layer falling back to it from the plain OCR path, and any PDF page at
+// all when Smart Parse is turned on, since GLM-OCR only reads pixels.
+// Neither a text-layer-only PDF session nor an image-only session ever
+// downloads it.
 //
 // Both bindings are synchronous Rust calls -- a real scan blocked the
 // entire tab for 20-40+ seconds on ordinary hardware (worse on a phone),
@@ -87,6 +96,7 @@ const GLM_OCR_CACHE_NAME = 'smart-parse-glm-ocr-v1';
 
 let ocrWasmPromise = null;
 let pdfWasmPromise = null;
+let pdfRenderWasmPromise = null;
 let llmWasmPromise = null;
 let glmOcrWasmPromise = null;
 let modelBytesPromise = null;
@@ -158,6 +168,16 @@ function loadPdfWasm() {
     });
   }
   return pdfWasmPromise;
+}
+
+function loadPdfRenderWasm() {
+  if (!pdfRenderWasmPromise) {
+    pdfRenderWasmPromise = import('../pkg-pdfrender').then(async (wasm) => {
+      if (wasm.default) await wasm.default();
+      return wasm;
+    });
+  }
+  return pdfRenderWasmPromise;
 }
 
 function loadLlmWasm() {
@@ -238,6 +258,7 @@ self.onmessage = async (event) => {
   const { id, type } = event.data;
   try {
     let result;
+    let transfer; // only 'pdf-render-page' below has a buffer worth transferring back
     if (type === 'ocr') {
       const wasm = await loadOcrWasm();
       const [detectionModel, recognitionModel] = await loadModels();
@@ -246,6 +267,32 @@ self.onmessage = async (event) => {
     } else if (type === 'pdf') {
       const wasm = await loadPdfWasm();
       result = wasm.extract_pdf_text(event.data.bytes);
+    } else if (type === 'pdf-page-count') {
+      const wasm = await loadPdfRenderWasm();
+      result = wasm.pdf_page_count(event.data.bytes);
+    } else if (type === 'pdf-render-page') {
+      const wasm = await loadPdfRenderWasm();
+      // `render_pdf_page` returns a plain `Vec<u8>`, not the usual
+      // `to_js`-wrapped result object -- see budget-wasm-pdfrender's own
+      // doc comment for why: a rendered page is several megabytes, and
+      // wasm-bindgen only gets the cheap, native `Uint8Array` conversion
+      // for a raw `Vec<u8>` return type, not one buried in a serialized
+      // struct field. An empty buffer is the failure sentinel (bad page
+      // index, or a page with no visible area); everything else is an
+      // 8-byte little-endian `[width, height]` header followed by the
+      // RGB pixels themselves.
+      const packed = wasm.render_pdf_page(event.data.bytes, event.data.pageIndex);
+      if (packed.length === 0) {
+        result = { width: 0, height: 0, rgb: new Uint8Array(0) };
+      } else {
+        const header = new DataView(packed.buffer, packed.byteOffset, 8);
+        result = {
+          width: header.getUint32(0, true),
+          height: header.getUint32(4, true),
+          rgb: new Uint8Array(packed.buffer, packed.byteOffset + 8, packed.length - 8),
+        };
+        transfer = [packed.buffer];
+      }
     } else if (type === 'llm') {
       const wasm = await loadLlmWasm();
       const [modelBytes, tokenizerJson] = await loadLlmModel();
@@ -272,7 +319,7 @@ self.onmessage = async (event) => {
     } else {
       throw new Error(`ocrWorker: unknown message type "${type}"`);
     }
-    self.postMessage({ id, ok: true, result });
+    self.postMessage({ id, ok: true, result }, transfer ?? []);
   } catch (error) {
     self.postMessage({ id, ok: false, error: error?.message ?? String(error) });
   }

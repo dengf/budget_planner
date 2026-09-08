@@ -216,15 +216,15 @@ export default {
   'transactions.uploadPdf': 'Upload PDF',
   'transactions.cameraStarting': 'Opening camera…',
   'transactions.receiptReading': 'Reading receipt…',
+  'transactions.receiptReadingPage': 'Reading page {page} of {totalPages}…',
+  'transactions.receiptPagesTruncated': 'Only the first {processed} of {total} pages were processed.',
   'transactions.receiptReviewHint': "OCR isn't perfect — check these before adding.",
   'transactions.receiptIncomeHint': 'Looks like a refund or credit — check the sign on the amount.',
   'transactions.receiptExtractFailed':
     "Couldn't read that file. Try a clearer photo or a different file.",
-  'transactions.receiptPdfNotSupported':
-    "This PDF doesn't have readable text — try a photo of the receipt instead.",
   'transactions.smartParseToggle': 'Smart Parse (beta)',
   'transactions.smartParseHint':
-    'Reads photos far more accurately using a bigger AI model, still entirely on your device. Downloads about {size} from Hugging Face the first time — best on Wi-Fi. Cached afterwards, so it only downloads once.',
+    'Reads photos and PDFs far more accurately using a bigger AI model, still entirely on your device. Downloads about {size} from Hugging Face the first time — best on Wi-Fi. Cached afterwards, so it only downloads once.',
   'transactions.smartParseDownloading': 'Downloading Smart Parse model… {percent}% ({loaded} of {total})',
   'transactions.smartParseRunning': 'Reading with Smart Parse…',
   'transactions.statementReviewHint':

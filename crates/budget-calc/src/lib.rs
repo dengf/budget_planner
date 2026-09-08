@@ -13,6 +13,8 @@ pub mod embed_classify;
 pub mod goals;
 #[cfg(feature = "ocr")]
 pub mod ocr;
+#[cfg(feature = "pdf-render")]
+pub mod pdf_render;
 #[cfg(feature = "pdf-text")]
 pub mod pdf_text;
 pub mod presets;
@@ -38,6 +40,8 @@ pub use goals::{
 };
 #[cfg(feature = "ocr")]
 pub use ocr::run_ocr;
+#[cfg(feature = "pdf-render")]
+pub use pdf_render::{pdf_page_count, render_pdf_page, RenderedPage};
 #[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
 pub use presets::{starter_categories, PresetCategory};

@@ -33,6 +33,14 @@ rten-text = { version = "0.26.0", optional = true }
 # encodes as JPEG; a picked file could be either), not the crate's full
 # format zoo.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
+# Rasterizes a PDF page to pixels -- see `pdf_render.rs`'s own doc comment
+# for why this closes a real v1 gap (`pdf_text.rs` has no answer for a
+# scanned/image-only PDF) and for the wasm32 spike that justified adding
+# it. Default features (`embed-fonts`, `embed-cmaps`) kept on deliberately:
+# many real bank-statement PDFs reference the 14 standard PDF fonts or a
+# predefined CJK cmap without embedding it, and without these a page would
+# render with missing glyphs instead of the text an OCR engine needs.
+hayro = { version = "0.7", optional = true }
 
 [features]
 # Two independent features, not one `receipt-capture` bundle: a photo
@@ -57,6 +65,12 @@ embed-classify = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text"]
 # rather than introducing a third version to coexist -- see the comment
 # on that dependency above.
 smart-parse = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text", "dep:image"]
+# Independent of both `ocr` and `pdf-text` for the same reason those two
+# are independent of each other -- see `pdf_render.rs`'s own doc comment.
+# `hayro` pulls a real dependency tree of its own (a font-and-path
+# rasterizer, `vello_cpu`), so a session that never touches a scanned PDF
+# or Smart Parse-for-PDF shouldn't pay for it.
+pdf-render = ["dep:hayro"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

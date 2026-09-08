@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "description": "Zero-based budgeting, CSV import, savings goals and debt payoff, powered by Rust/WASM",
   "scripts": {
-    "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:llm && npm run build:wasm:glmocr",
+    "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:pdfrender && npm run build:wasm:llm && npm run build:wasm:glmocr",
     "build:wasm:core": "cd ../crates/budget-wasm && wasm-pack build --target web --out-dir ../../www/pkg",
     "build:wasm:ocr": "cd ../crates/budget-wasm-ocr && wasm-pack build --target web --out-dir ../../www/pkg-ocr",
     "build:wasm:pdf": "cd ../crates/budget-wasm-pdf && wasm-pack build --target web --out-dir ../../www/pkg-pdf",
+    "build:wasm:pdfrender": "cd ../crates/budget-wasm-pdfrender && wasm-pack build --target web --out-dir ../../www/pkg-pdfrender",
     "build:wasm:llm": "cd ../crates/budget-wasm-llm && wasm-pack build --target web --out-dir ../../www/pkg-llm",
     "build:wasm:glmocr": "cd ../crates/budget-wasm-glmocr && wasm-pack build --target web --out-dir ../../www/pkg-glmocr",
     "start": "npm run build:wasm && webpack serve --mode development",
