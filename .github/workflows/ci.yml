@@ -91,8 +91,17 @@ jobs:
       - name: cargo build -p budget-wasm-llm --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm-llm --target wasm32-unknown-unknown
 
-      - name: cargo build -p budget-wasm-glmocr --target wasm32-unknown-unknown
-        run: cargo build -p budget-wasm-glmocr --target wasm32-unknown-unknown
+      - name: cargo build -p budget-wasm-glmocr-vision --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-glmocr-vision --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-glmocr-embed --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-glmocr-embed --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-glmocr-decoder --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-glmocr-decoder --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-glmocr-orchestrate --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-glmocr-orchestrate --target wasm32-unknown-unknown
 
   coverage:
     name: cargo llvm-cov (coverage gate)

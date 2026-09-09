@@ -1,35 +1,29 @@
-//! Lazily-loaded WebAssembly bindings for "Smart Parse" -- GLM-OCR, a
-//! 0.9B vision-language model, read over a photographed receipt or
-//! statement instead of the always-available `budget-wasm-ocr` engine.
+//! Lazily-loaded WebAssembly bindings for GLM-OCR's token embedder, one
+//! of four independent wasm modules "Smart Parse" now spans (the others
+//! are the sibling `budget-wasm-glmocr-vision`/`-decoder`/`-orchestrate`
+//! crates) -- see `budget-wasm-glmocr-vision`'s own doc comment for the
+//! full 4GiB-ceiling/fp16-doubling rationale behind the split, and
+//! `budget_calc::smart_parse_model`'s for why this model's own memory is
+//! kept in a module of its own.
 //!
-//! A *fourth* independent lazy wasm module, not a mode of
-//! `budget-wasm-ocr` -- see `budget-calc::smart_parse`'s own doc comment
-//! for why this is a second OCR engine, and `www/src/ocrWorker.js` for
-//! why its ~2.2GB of model weights are fetched from Hugging Face at
-//! runtime rather than vendored the way `budget-wasm-ocr`'s ~6.3MB
-//! PP-OCRv6_tiny models are. Every ordinary budgeting session, and even
-//! an ordinary "Take a photo" receipt scan, downloads none of this --
-//! only a user who explicitly opts into Smart Parse ever triggers
-//! `www/src/receiptCapture.js`'s `import('../pkg-glmocr')`.
-//!
-//! No business logic lives in this crate either -- the one binding
-//! parses buffers, calls into `budget-calc`, and serializes the result
-//! back. See CLAUDE.md and `budget-wasm`'s own identical rule.
+//! No business logic lives here either -- the one binding parses
+//! buffers, calls into `budget-calc`, and serializes the result back.
+//! See CLAUDE.md and `budget-wasm`'s own identical rule.
 
 use wasm_bindgen::prelude::*;
 
 pub mod convert;
 pub mod dto;
-pub mod smart_parse;
+pub mod embed;
 
-pub use smart_parse::SmartParseSession;
+pub use embed::TokenEmbedder;
 
 /// Same guard as `budget-wasm::message::no_debug_formatted_errors`, run
 /// over this crate's own single binding file -- bindings split across
 /// crates need the check applied per crate, not once globally.
 #[cfg(test)]
 mod no_debug_formatted_errors {
-    const BINDINGS: &[(&str, &str)] = &[("smart_parse.rs", include_str!("smart_parse.rs"))];
+    const BINDINGS: &[(&str, &str)] = &[("embed.rs", include_str!("embed.rs"))];
 
     #[test]
     fn every_binding_serializes_through_the_json_compatible_helper() {
@@ -73,17 +67,4 @@ mod no_debug_formatted_errors {
 pub fn init() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
-}
-
-/// Temporary diagnostic for the phone-crash investigation: this module's
-/// *actual* linear memory size in bytes, straight from the wasm engine
-/// (`memory.size` * the fixed 64KiB page size), not an estimate from the
-/// buffers this crate happens to be holding. `www/src/ocrWorker.js` logs
-/// this alongside download progress so a real device's console shows how
-/// close a crash gets to wasm32's hard 4GiB linear-memory ceiling --
-/// remove once that question is answered.
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub fn wasm_memory_bytes() -> f64 {
-    core::arch::wasm32::memory_size(0) as f64 * 65536.0
 }

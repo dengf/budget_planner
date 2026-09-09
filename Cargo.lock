@@ -276,7 +276,46 @@ dependencies = [
 ]
 
 [[package]]
-name = "budget-wasm-glmocr"
+name = "budget-wasm-glmocr-decoder"
+version = "0.1.0"
+dependencies = [
+ "budget-calc",
+ "budget-core",
+ "console_error_panic_hook",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "budget-wasm-glmocr-embed"
+version = "0.1.0"
+dependencies = [
+ "budget-calc",
+ "budget-core",
+ "console_error_panic_hook",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "budget-wasm-glmocr-orchestrate"
+version = "0.1.0"
+dependencies = [
+ "budget-calc",
+ "budget-core",
+ "console_error_panic_hook",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "budget-wasm-glmocr-vision"
 version = "0.1.0"
 dependencies = [
  "budget-calc",

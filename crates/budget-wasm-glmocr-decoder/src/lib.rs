@@ -1,41 +1,37 @@
-//! Lazily-loaded WebAssembly bindings for rasterizing a PDF page to pixels.
+//! Lazily-loaded WebAssembly bindings for GLM-OCR's decoder, one of four
+//! independent wasm modules "Smart Parse" now spans (the others are the
+//! sibling `budget-wasm-glmocr-vision`/`-embed`/`-orchestrate` crates) --
+//! see `budget-wasm-glmocr-vision`'s own doc comment for the full
+//! 4GiB-ceiling/fp16-doubling rationale behind the split.
 //!
-//! A fourth independent lazy wasm module, alongside `budget-wasm-ocr`,
-//! `budget-wasm-pdf` and Smart Parse's own `budget-wasm-glmocr-vision`/
-//! `-embed`/`-decoder`/`-orchestrate` crates -- see this repo's own
-//! CLAUDE.md for why each heavy, rarely-used capability gets its own
-//! crate rather than growing one shared one. `hayro` (a pure-Rust PDF
-//! interpreter/rasterizer) is only reachable from `budget-calc`'s
-//! `pdf-render` feature, which only this crate enables, so a session that
-//! never touches a PDF -- and a PDF session whose file already has a text
-//! layer and doesn't need Smart Parse -- never downloads it.
+//! Unlike its vision/embed siblings, this module's session is
+//! **stateful across calls**: `DecoderSession` holds the KV cache
+//! (`past_key_values`) internally, growing every greedy-decode step, and
+//! it deliberately never crosses the wasm boundary -- see
+//! `budget_calc::smart_parse_model::DecoderSession`'s own doc comment.
+//! **Every caller must call `reset()` before the first `step()` of a new
+//! image's generation** -- skipping it silently splices a new scan's
+//! tokens onto a previous scan's cached keys/values (wrong output, not a
+//! crash), so nothing else catches the mistake if it's made.
 //!
-//! `www/src/ocrWorker.js` `import()`s this crate's own `pkg-pdfrender`
-//! output only when a PDF page actually needs rasterizing: a scanned PDF
-//! with no text layer, or any PDF page when Smart Parse is turned on
-//! (Smart Parse's GLM-OCR reads pixels, not `pdf-extract`'s heuristic
-//! text, on the theory that vision-based extraction is more accurate than
-//! text-layer heuristics for the same reason it was worth adding for
-//! photographed receipts in the first place).
-//!
-//! No business logic lives in this crate either -- `pdf_page_count` and
-//! `render_pdf_page` parse bytes, call into `budget-calc`, and serialize
-//! the result back. See CLAUDE.md and `budget-wasm`'s own identical rule.
+//! No business logic lives here either -- the one binding parses
+//! buffers, calls into `budget-calc`, and serializes the result back.
+//! See CLAUDE.md and `budget-wasm`'s own identical rule.
 
 use wasm_bindgen::prelude::*;
 
 pub mod convert;
+pub mod decoder;
 pub mod dto;
-pub mod pdf_render;
 
-pub use pdf_render::{pdf_page_count, render_pdf_page};
+pub use decoder::DecoderSession;
 
 /// Same guard as `budget-wasm::message::no_debug_formatted_errors`, run
-/// over this crate's own binding file -- bindings split across crates
-/// need the check applied per crate, not once globally.
+/// over this crate's own single binding file -- bindings split across
+/// crates need the check applied per crate, not once globally.
 #[cfg(test)]
 mod no_debug_formatted_errors {
-    const BINDINGS: &[(&str, &str)] = &[("pdf_render.rs", include_str!("pdf_render.rs"))];
+    const BINDINGS: &[(&str, &str)] = &[("decoder.rs", include_str!("decoder.rs"))];
 
     #[test]
     fn every_binding_serializes_through_the_json_compatible_helper() {

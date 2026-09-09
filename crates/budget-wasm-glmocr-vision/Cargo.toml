@@ -1,6 +1,6 @@
 [package]
-name = "budget-wasm-glmocr"
-description = "Lazily-loaded WebAssembly bindings for Smart Parse (GLM-OCR)"
+name = "budget-wasm-glmocr-vision"
+description = "Lazily-loaded WebAssembly bindings for GLM-OCR's vision encoder (Smart Parse)"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -17,7 +17,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 budget-core = { workspace = true }
-budget-calc = { workspace = true, features = ["smart-parse"] }
+budget-calc = { workspace = true, features = ["smart-parse-model"] }
 
 wasm-bindgen = "0.2"
 serde = { workspace = true }
