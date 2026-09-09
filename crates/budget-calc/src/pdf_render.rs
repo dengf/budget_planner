@@ -111,7 +111,8 @@ pub fn render_pdf_page(bytes: &[u8], page_index: u32) -> Result<RenderedPage, Bu
 
     let rgba = pixmap.data_as_u8_slice();
     let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
-    for chunk in rgba.chunks_exact(4) {
+    let (chunks, _remainder) = rgba.as_chunks::<4>();
+    for chunk in chunks {
         rgb.extend_from_slice(&chunk[..3]);
     }
     Ok(RenderedPage { rgb, width, height })
