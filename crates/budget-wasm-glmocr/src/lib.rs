@@ -22,7 +22,7 @@ pub mod convert;
 pub mod dto;
 pub mod smart_parse;
 
-pub use smart_parse::run_smart_parse;
+pub use smart_parse::SmartParseSession;
 
 /// Same guard as `budget-wasm::message::no_debug_formatted_errors`, run
 /// over this crate's own single binding file -- bindings split across

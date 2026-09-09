@@ -287,196 +287,245 @@ fn zero_past(batch: usize) -> Vec<(Tensor<f32>, Tensor<f32>)> {
         .collect()
 }
 
-/// Runs GLM-OCR's full text-recognition pipeline over one image: resize
-/// + patchify, vision encoder, chat-template + mrope position ids, token
-///   embedding (with image features spliced into the image-token
-///   positions), then a greedy-decoded, KV-cached generation loop until
-///   end-of-sequence or `MAX_NEW_TOKENS`.
-#[allow(clippy::too_many_arguments)]
-pub fn run_smart_parse(
-    vision_graph: Vec<u8>,
-    vision_data: Vec<u8>,
-    embed_graph: Vec<u8>,
-    embed_data: Vec<u8>,
-    decoder_graph: Vec<u8>,
-    decoder_data: Vec<u8>,
-    tokenizer_json: &[u8],
-    image_rgb: &[u8],
-    width: u32,
-    height: u32,
-) -> Result<String, BudgetError> {
-    if image_rgb.is_empty() || width == 0 || height == 0 {
-        return Err(BudgetError::EmptyImage);
-    }
-    if image_rgb.len() != (width as usize) * (height as usize) * 3 {
-        return Err(BudgetError::SmartParseFailed(
-            "image buffer length does not match width * height * 3".into(),
-        ));
+/// Incrementally-loaded GLM-OCR session. The three models load one at a
+/// time through their own methods rather than all at once through a
+/// single function taking nine buffers, so a caller can hand each
+/// ~200MB-to-1GB-scale file to Rust as soon as it finishes downloading
+/// and drop its own copy immediately after -- see
+/// `www/src/ocrWorker.js`'s own doc comment on `loadGlmOcrModel` for the
+/// real crash this fixes: the previous all-at-once shape needed the
+/// caller to hold its own full ~2.2GB of raw bytes in memory right up
+/// until a single call handed all of it to Rust, which then held a
+/// second ~2.2GB owned copy at the same moment -- on a phone, that
+/// combined peak exceeded the browser's per-tab memory ceiling and the
+/// tab was killed by the OS before the download even finished.
+#[derive(Default)]
+pub struct SmartParseSession {
+    vision: Option<LoadedModel>,
+    embed: Option<LoadedModel>,
+    decoder: Option<LoadedModel>,
+}
+
+impl SmartParseSession {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    let tokenizer_json = std::str::from_utf8(tokenizer_json)
-        .map_err(|e| BudgetError::SmartParseTokenizerLoadFailed(e.to_string()))?;
-    let tokenizer = Tokenizer::from_json(tokenizer_json)
-        .map_err(|e| BudgetError::SmartParseTokenizerLoadFailed(e.to_string()))?;
+    pub fn load_vision(&mut self, graph: Vec<u8>, data: Vec<u8>) -> Result<(), BudgetError> {
+        self.vision = Some(LoadedModel::load(
+            graph,
+            "vision_encoder_fp16.onnx_data",
+            data,
+        )?);
+        Ok(())
+    }
 
-    let vision = LoadedModel::load(vision_graph, "vision_encoder_fp16.onnx_data", vision_data)?;
-    let embed = LoadedModel::load(embed_graph, "embed_tokens_fp16.onnx_data", embed_data)?;
-    let decoder = LoadedModel::load(
-        decoder_graph,
-        "decoder_model_merged_fp16.onnx_data",
-        decoder_data,
-    )?;
+    pub fn load_embed(&mut self, graph: Vec<u8>, data: Vec<u8>) -> Result<(), BudgetError> {
+        self.embed = Some(LoadedModel::load(
+            graph,
+            "embed_tokens_fp16.onnx_data",
+            data,
+        )?);
+        Ok(())
+    }
 
-    // -- vision encoder --
-    let (pixel_values, grid_h, grid_w) = patchify(image_rgb, width, height);
-    let num_patches = (grid_h * grid_w) as usize;
-    let pixel_tensor = Tensor::from_data(&[num_patches, 1176], pixel_values);
-    let grid_tensor = Tensor::from_data(&[1, 3], vec![1i32, grid_h as i32, grid_w as i32]);
+    pub fn load_decoder(&mut self, graph: Vec<u8>, data: Vec<u8>) -> Result<(), BudgetError> {
+        self.decoder = Some(LoadedModel::load(
+            graph,
+            "decoder_model_merged_fp16.onnx_data",
+            data,
+        )?);
+        Ok(())
+    }
 
-    let [image_features_val] = vision
-        .model
-        .run_n(
-            vec![
-                (vision.node("pixel_values")?, pixel_tensor.into()),
-                (vision.node("image_grid_thw")?, grid_tensor.into()),
-            ],
-            [vision.model.output_ids()[0]],
-            None,
-        )
-        .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
-    let image_features: Tensor<f32> = image_features_val.try_into().map_err(|_| {
-        BudgetError::SmartParseFailed("unexpected vision encoder output shape".into())
-    })?;
-    let num_image_tokens = image_features.shape()[0];
-
-    // -- chat template + mrope position ids --
-    let input_ids = build_input_ids(&tokenizer, num_image_tokens)?;
-    let seq_len = input_ids.len();
-    let position_ids_flat = get_rope_index(&input_ids, grid_h, grid_w);
-
-    // -- token embedding, with image features spliced into image-token positions --
-    let embed_in = embed.node("input_ids")?;
-    let embed_out = embed.model.output_ids()[0];
-    let ids_tensor = Tensor::from_data(&[1, seq_len], input_ids.clone());
-    let [embeds_val] = embed
-        .model
-        .run_n(vec![(embed_in, ids_tensor.into())], [embed_out], None)
-        .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
-    let mut embeds: Tensor<f32> = embeds_val
-        .try_into()
-        .map_err(|_| BudgetError::SmartParseFailed("unexpected embedding output shape".into()))?;
-    {
-        let feat_data = image_features.data().ok_or_else(|| {
-            BudgetError::SmartParseFailed("vision encoder output is not contiguous".into())
-        })?;
-        let data = embeds.data_mut().ok_or_else(|| {
-            BudgetError::SmartParseFailed("embedding output is not contiguous".into())
-        })?;
-        let mut img_row = 0usize;
-        for (pos, &id) in input_ids.iter().enumerate() {
-            if id == IMAGE_TOKEN {
-                let dst = &mut data[pos * HIDDEN_SIZE..(pos + 1) * HIDDEN_SIZE];
-                let src = &feat_data[img_row * HIDDEN_SIZE..(img_row + 1) * HIDDEN_SIZE];
-                dst.copy_from_slice(src);
-                img_row += 1;
-            }
+    /// Runs GLM-OCR's full text-recognition pipeline over one image:
+    /// resize + patchify, vision encoder, chat-template + mrope position
+    /// ids, token embedding (with image features spliced into the
+    /// image-token positions), then a greedy-decoded, KV-cached
+    /// generation loop until end-of-sequence or `MAX_NEW_TOKENS`. All
+    /// three models must already be loaded via `load_vision`/
+    /// `load_embed`/`load_decoder`.
+    pub fn run(
+        &self,
+        tokenizer_json: &[u8],
+        image_rgb: &[u8],
+        width: u32,
+        height: u32,
+    ) -> Result<String, BudgetError> {
+        if image_rgb.is_empty() || width == 0 || height == 0 {
+            return Err(BudgetError::EmptyImage);
         }
-    }
-
-    // -- greedy, KV-cached decode loop --
-    let logits_id = decoder.node("logits")?;
-    let mut present_ids = Vec::with_capacity(2 * NUM_LAYERS);
-    for i in 0..NUM_LAYERS {
-        present_ids.push(decoder.node(&format!("present.{i}.key"))?);
-        present_ids.push(decoder.node(&format!("present.{i}.value"))?);
-    }
-    let inputs_embeds_id = decoder.node("inputs_embeds")?;
-    let attention_mask_id = decoder.node("attention_mask")?;
-    let position_ids_id = decoder.node("position_ids")?;
-    let num_logits_to_keep_id = decoder.node("num_logits_to_keep")?;
-    let mut past_key_value_ids = Vec::with_capacity(2 * NUM_LAYERS);
-    for i in 0..NUM_LAYERS {
-        past_key_value_ids.push((
-            decoder.node(&format!("past_key_values.{i}.key"))?,
-            decoder.node(&format!("past_key_values.{i}.value"))?,
-        ));
-    }
-
-    let mut cur_embeds = embeds.into_shape([1, seq_len, HIDDEN_SIZE].as_slice());
-    let mut cur_seq_len = seq_len;
-    let mut pos_data = position_ids_flat;
-    let mut attn_mask_data = vec![1i32; seq_len];
-    let mut past = zero_past(1);
-
-    let mut generated: Vec<u32> = Vec::new();
-    for _ in 0..MAX_NEW_TOKENS {
-        let pos_tensor = Tensor::from_data(&[3, 1, cur_seq_len], pos_data.clone());
-        let attn_tensor = Tensor::from_data(&[1, attn_mask_data.len()], attn_mask_data.clone());
-        let ntk = Tensor::from_data(&[] as &[usize], vec![1i32]);
-
-        let mut inputs: Vec<(NodeId, rten_embed::ValueOrView)> = vec![
-            (inputs_embeds_id, cur_embeds.clone().into()),
-            (attention_mask_id, attn_tensor.into()),
-            (position_ids_id, pos_tensor.into()),
-            (num_logits_to_keep_id, ntk.into()),
-        ];
-        for (i, (k, v)) in past.iter().enumerate() {
-            inputs.push((past_key_value_ids[i].0, k.clone().into()));
-            inputs.push((past_key_value_ids[i].1, v.clone().into()));
+        if image_rgb.len() != (width as usize) * (height as usize) * 3 {
+            return Err(BudgetError::SmartParseFailed(
+                "image buffer length does not match width * height * 3".into(),
+            ));
         }
 
-        let mut output_ids = vec![logits_id];
-        output_ids.extend(present_ids.iter().copied());
-        let outputs = decoder
+        let tokenizer_json = std::str::from_utf8(tokenizer_json)
+            .map_err(|e| BudgetError::SmartParseTokenizerLoadFailed(e.to_string()))?;
+        let tokenizer = Tokenizer::from_json(tokenizer_json)
+            .map_err(|e| BudgetError::SmartParseTokenizerLoadFailed(e.to_string()))?;
+
+        let vision = self.vision.as_ref().ok_or_else(|| {
+            BudgetError::SmartParseModelLoadFailed("vision model not loaded".into())
+        })?;
+        let embed = self.embed.as_ref().ok_or_else(|| {
+            BudgetError::SmartParseModelLoadFailed("embed model not loaded".into())
+        })?;
+        let decoder = self.decoder.as_ref().ok_or_else(|| {
+            BudgetError::SmartParseModelLoadFailed("decoder model not loaded".into())
+        })?;
+
+        // -- vision encoder --
+        let (pixel_values, grid_h, grid_w) = patchify(image_rgb, width, height);
+        let num_patches = (grid_h * grid_w) as usize;
+        let pixel_tensor = Tensor::from_data(&[num_patches, 1176], pixel_values);
+        let grid_tensor = Tensor::from_data(&[1, 3], vec![1i32, grid_h as i32, grid_w as i32]);
+
+        let [image_features_val] = vision
             .model
-            .run(inputs, &output_ids, None)
+            .run_n(
+                vec![
+                    (vision.node("pixel_values")?, pixel_tensor.into()),
+                    (vision.node("image_grid_thw")?, grid_tensor.into()),
+                ],
+                [vision.model.output_ids()[0]],
+                None,
+            )
             .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
-
-        let logits: Tensor<f32> = outputs[0]
-            .clone()
-            .try_into()
-            .map_err(|_| BudgetError::SmartParseFailed("unexpected decoder output shape".into()))?;
-        let logits_data = logits.data().ok_or_else(|| {
-            BudgetError::SmartParseFailed("decoder logits are not contiguous".into())
+        let image_features: Tensor<f32> = image_features_val.try_into().map_err(|_| {
+            BudgetError::SmartParseFailed("unexpected vision encoder output shape".into())
         })?;
-        let next_id = argmax(logits_data) as i32;
+        let num_image_tokens = image_features.shape()[0];
 
-        if EOS.contains(&next_id) {
-            break;
-        }
-        generated.push(next_id as u32);
+        // -- chat template + mrope position ids --
+        let input_ids = build_input_ids(&tokenizer, num_image_tokens)?;
+        let seq_len = input_ids.len();
+        let position_ids_flat = get_rope_index(&input_ids, grid_h, grid_w);
 
-        for i in 0..NUM_LAYERS {
-            let k: Tensor<f32> = outputs[1 + 2 * i].clone().try_into().map_err(|_| {
-                BudgetError::SmartParseFailed("unexpected present.key shape".into())
-            })?;
-            let v: Tensor<f32> = outputs[2 + 2 * i].clone().try_into().map_err(|_| {
-                BudgetError::SmartParseFailed("unexpected present.value shape".into())
-            })?;
-            past[i] = (k, v);
-        }
-
-        let next_ids_tensor = Tensor::from_data(&[1, 1], vec![next_id]);
-        let [next_embed_val] = embed
+        // -- token embedding, with image features spliced into image-token positions --
+        let embed_in = embed.node("input_ids")?;
+        let embed_out = embed.model.output_ids()[0];
+        let ids_tensor = Tensor::from_data(&[1, seq_len], input_ids.clone());
+        let [embeds_val] = embed
             .model
-            .run_n(vec![(embed_in, next_ids_tensor.into())], [embed_out], None)
+            .run_n(vec![(embed_in, ids_tensor.into())], [embed_out], None)
             .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
-        cur_embeds = next_embed_val.try_into().map_err(|_| {
+        let mut embeds: Tensor<f32> = embeds_val.try_into().map_err(|_| {
             BudgetError::SmartParseFailed("unexpected embedding output shape".into())
         })?;
-
-        let mut new_pos = Vec::with_capacity(3);
-        for c in 0..3 {
-            new_pos.push(pos_data[c * cur_seq_len + cur_seq_len - 1] + 1);
+        {
+            let feat_data = image_features.data().ok_or_else(|| {
+                BudgetError::SmartParseFailed("vision encoder output is not contiguous".into())
+            })?;
+            let data = embeds.data_mut().ok_or_else(|| {
+                BudgetError::SmartParseFailed("embedding output is not contiguous".into())
+            })?;
+            let mut img_row = 0usize;
+            for (pos, &id) in input_ids.iter().enumerate() {
+                if id == IMAGE_TOKEN {
+                    let dst = &mut data[pos * HIDDEN_SIZE..(pos + 1) * HIDDEN_SIZE];
+                    let src = &feat_data[img_row * HIDDEN_SIZE..(img_row + 1) * HIDDEN_SIZE];
+                    dst.copy_from_slice(src);
+                    img_row += 1;
+                }
+            }
         }
-        pos_data = new_pos;
-        cur_seq_len = 1;
-        attn_mask_data.push(1);
-    }
 
-    tokenizer
-        .decode(&generated)
-        .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))
+        // -- greedy, KV-cached decode loop --
+        let logits_id = decoder.node("logits")?;
+        let mut present_ids = Vec::with_capacity(2 * NUM_LAYERS);
+        for i in 0..NUM_LAYERS {
+            present_ids.push(decoder.node(&format!("present.{i}.key"))?);
+            present_ids.push(decoder.node(&format!("present.{i}.value"))?);
+        }
+        let inputs_embeds_id = decoder.node("inputs_embeds")?;
+        let attention_mask_id = decoder.node("attention_mask")?;
+        let position_ids_id = decoder.node("position_ids")?;
+        let num_logits_to_keep_id = decoder.node("num_logits_to_keep")?;
+        let mut past_key_value_ids = Vec::with_capacity(2 * NUM_LAYERS);
+        for i in 0..NUM_LAYERS {
+            past_key_value_ids.push((
+                decoder.node(&format!("past_key_values.{i}.key"))?,
+                decoder.node(&format!("past_key_values.{i}.value"))?,
+            ));
+        }
+
+        let mut cur_embeds = embeds.into_shape([1, seq_len, HIDDEN_SIZE].as_slice());
+        let mut cur_seq_len = seq_len;
+        let mut pos_data = position_ids_flat;
+        let mut attn_mask_data = vec![1i32; seq_len];
+        let mut past = zero_past(1);
+
+        let mut generated: Vec<u32> = Vec::new();
+        for _ in 0..MAX_NEW_TOKENS {
+            let pos_tensor = Tensor::from_data(&[3, 1, cur_seq_len], pos_data.clone());
+            let attn_tensor = Tensor::from_data(&[1, attn_mask_data.len()], attn_mask_data.clone());
+            let ntk = Tensor::from_data(&[] as &[usize], vec![1i32]);
+
+            let mut inputs: Vec<(NodeId, rten_embed::ValueOrView)> = vec![
+                (inputs_embeds_id, cur_embeds.clone().into()),
+                (attention_mask_id, attn_tensor.into()),
+                (position_ids_id, pos_tensor.into()),
+                (num_logits_to_keep_id, ntk.into()),
+            ];
+            for (i, (k, v)) in past.iter().enumerate() {
+                inputs.push((past_key_value_ids[i].0, k.clone().into()));
+                inputs.push((past_key_value_ids[i].1, v.clone().into()));
+            }
+
+            let mut output_ids = vec![logits_id];
+            output_ids.extend(present_ids.iter().copied());
+            let outputs = decoder
+                .model
+                .run(inputs, &output_ids, None)
+                .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
+
+            let logits: Tensor<f32> = outputs[0].clone().try_into().map_err(|_| {
+                BudgetError::SmartParseFailed("unexpected decoder output shape".into())
+            })?;
+            let logits_data = logits.data().ok_or_else(|| {
+                BudgetError::SmartParseFailed("decoder logits are not contiguous".into())
+            })?;
+            let next_id = argmax(logits_data) as i32;
+
+            if EOS.contains(&next_id) {
+                break;
+            }
+            generated.push(next_id as u32);
+
+            for i in 0..NUM_LAYERS {
+                let k: Tensor<f32> = outputs[1 + 2 * i].clone().try_into().map_err(|_| {
+                    BudgetError::SmartParseFailed("unexpected present.key shape".into())
+                })?;
+                let v: Tensor<f32> = outputs[2 + 2 * i].clone().try_into().map_err(|_| {
+                    BudgetError::SmartParseFailed("unexpected present.value shape".into())
+                })?;
+                past[i] = (k, v);
+            }
+
+            let next_ids_tensor = Tensor::from_data(&[1, 1], vec![next_id]);
+            let [next_embed_val] = embed
+                .model
+                .run_n(vec![(embed_in, next_ids_tensor.into())], [embed_out], None)
+                .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
+            cur_embeds = next_embed_val.try_into().map_err(|_| {
+                BudgetError::SmartParseFailed("unexpected embedding output shape".into())
+            })?;
+
+            let mut new_pos = Vec::with_capacity(3);
+            for c in 0..3 {
+                new_pos.push(pos_data[c * cur_seq_len + cur_seq_len - 1] + 1);
+            }
+            pos_data = new_pos;
+            cur_seq_len = 1;
+            attn_mask_data.push(1);
+        }
+
+        tokenizer
+            .decode(&generated)
+            .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))
+    }
 }
 
 fn argmax(values: &[f32]) -> usize {
@@ -497,56 +546,24 @@ mod tests {
 
     #[test]
     fn an_empty_image_buffer_is_rejected_before_touching_the_models() {
-        let err = run_smart_parse(
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            b"{}",
-            &[],
-            0,
-            0,
-        )
-        .unwrap_err();
+        let err = SmartParseSession::new().run(b"{}", &[], 0, 0).unwrap_err();
         assert_eq!(err, BudgetError::EmptyImage);
     }
 
     #[test]
     fn a_buffer_that_does_not_match_width_and_height_is_rejected() {
-        let err = run_smart_parse(
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            b"{}",
-            &[0, 0, 0],
-            2,
-            2,
-        )
-        .unwrap_err();
+        let err = SmartParseSession::new()
+            .run(b"{}", &[0, 0, 0], 2, 2)
+            .unwrap_err();
         assert!(matches!(err, BudgetError::SmartParseFailed(_)));
     }
 
     #[test]
     fn garbage_tokenizer_json_fails_to_load_rather_than_panicking() {
         let pixel = vec![0u8; 3];
-        let err = run_smart_parse(
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            b"not json",
-            &pixel,
-            1,
-            1,
-        )
-        .unwrap_err();
+        let err = SmartParseSession::new()
+            .run(b"not json", &pixel, 1, 1)
+            .unwrap_err();
         assert!(matches!(err, BudgetError::SmartParseTokenizerLoadFailed(_)));
     }
 

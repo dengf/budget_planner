@@ -54,7 +54,7 @@ pub use recurring::{
 };
 pub use rules::{apply_rules, CategorizationRule};
 #[cfg(feature = "smart-parse")]
-pub use smart_parse::run_smart_parse;
+pub use smart_parse::SmartParseSession;
 pub use transaction::{
     daily_spend, income_by_category, spend_by_category, weekly_spend, Transaction,
 };
