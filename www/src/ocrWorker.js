@@ -92,7 +92,22 @@ const GLM_OCR_MODEL_PATHS = {
   decoderData: `${GLM_OCR_BASE}/onnx/decoder_model_merged_fp16.onnx_data`,
   tokenizer: `${GLM_OCR_BASE}/tokenizer.json`,
 };
-const GLM_OCR_CACHE_NAME = 'smart-parse-glm-ocr-v1';
+// v2, not v1: v1 cached each of the three large external-data files as
+// one whole-file Cache Storage entry; v2 caches them in
+// `GLM_OCR_CHUNK_BYTES`-sized pieces instead (see `fetchDataChunkCached`
+// below), a different enough key shape that reusing the old name would
+// just leave v1's whole-file entries as permanent dead weight never read
+// again. The browser will evict `v1` under normal storage-pressure
+// eviction like any other stale cache.
+const GLM_OCR_CACHE_NAME = 'smart-parse-glm-ocr-v2';
+
+// Each of GLM-OCR's three external-data (weights) files is fetched in
+// pieces this large via HTTP Range requests, rather than as one
+// streamed response -- see `loadGlmOcrSession`'s own doc comment for
+// why. Hugging Face's model CDN confirmed to honor `Range` with a real
+// `206 Partial Content` + `Content-Range` response before this was
+// built on that assumption.
+const GLM_OCR_CHUNK_BYTES = 32 * 1024 * 1024;
 
 let ocrWasmPromise = null;
 let pdfWasmPromise = null;
@@ -261,6 +276,62 @@ function loadGlmOcrWasm() {
   return glmOcrWasmPromise;
 }
 
+// Discovers a file's total byte length via a HEAD request, without
+// downloading any of the body -- used only for the three large
+// external-data files, to know how many `GLM_OCR_CHUNK_BYTES` range
+// requests to issue and how large a buffer `SmartParseSession.begin_data`
+// should reserve.
+async function fetchContentLength(url) {
+  const res = await fetch(url, { method: 'HEAD' });
+  if (!res.ok) throw new Error(`could not HEAD ${url}: ${res.status}`);
+  const length = Number(res.headers.get('content-length'));
+  if (!Number.isFinite(length) || length <= 0) {
+    throw new Error(`${url} did not report a usable Content-Length`);
+  }
+  return length;
+}
+
+// Fetches one `GLM_OCR_CHUNK_BYTES`-sized (or smaller, for the last
+// piece) range of `url`, checking Cache Storage first under a
+// per-chunk key -- a prior interrupted download that already cached
+// some chunks skips straight past them on retry, same resumability
+// `fetchBytesCached` gets from whole-file caching, just at a finer
+// grain (and, unlike whole-file caching, no partial progress is ever
+// lost to an interruption beyond the one chunk in flight when it hit).
+async function fetchDataChunkCached(url, start, end) {
+  const cache = await caches.open(GLM_OCR_CACHE_NAME);
+  const chunkKey = `${url}#bytes=${start}-${end}`;
+  const cached = await cache.match(chunkKey);
+  if (cached) return new Uint8Array(await cached.arrayBuffer());
+
+  const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+  if (res.status !== 206) {
+    throw new Error(
+      `expected a 206 Partial Content response to a ranged request for ${url}, got ${res.status}`,
+    );
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  cache.put(chunkKey, new Response(bytes)).catch(() => {}); // best-effort; quota errors shouldn't fail the parse itself
+  return bytes;
+}
+
+// Fetches one of GLM-OCR's three external-data (weights) files in
+// `GLM_OCR_CHUNK_BYTES`-sized HTTP range requests, handing each chunk to
+// `session.append_data_chunk` as soon as it arrives -- see
+// `loadGlmOcrSession`'s own doc comment for why this worker never
+// materializes the whole file as one JS buffer at all, not even
+// one-file-at-a-time.
+async function fetchDataFileIntoSession(session, url, track) {
+  const totalLength = await fetchContentLength(url);
+  session.begin_data(totalLength);
+  for (let start = 0; start < totalLength; start += GLM_OCR_CHUNK_BYTES) {
+    const end = Math.min(start + GLM_OCR_CHUNK_BYTES, totalLength) - 1;
+    const chunk = await fetchDataChunkCached(url, start, end);
+    session.append_data_chunk(chunk);
+    track(chunk.byteLength);
+  }
+}
+
 // Same one-fetch-per-worker-lifetime memoization as `loadModels` above,
 // at ~2.2GB instead of a few megabytes -- `onProgress(loadedBytes)` is
 // called with the running total across all seven files as they stream
@@ -276,39 +347,38 @@ function loadGlmOcrWasm() {
 // any of the three models.
 //
 // Sequential, deliberately not concurrent -- downloading all seven files
-// at once meant up to seven of `fetchBytesCached`'s buffers resident
-// simultaneously, and with two of these files around 900MB and 1.1GB,
-// that was enough on its own to crash the tab partway through a real
-// download even after fixing the per-file buffering above.
+// at once meant up to seven buffers resident simultaneously, and with
+// two of these files around 900MB and 1.1GB, that was enough on its own
+// to crash the tab partway through a real download.
 //
-// Each model's graph+data pair is also handed to
-// `wasm.SmartParseSession.load_*` immediately after it finishes
-// downloading, inside its own block scope, rather than collected into an
-// array and passed to one big call at the end -- collecting all three
-// models' bytes first meant this worker held its own ~2.2GB of raw JS
-// buffers, and then `run_smart_parse` handed all of it to Rust in a
-// single call, which held a second ~2.2GB owned copy at the same moment.
-// On a phone, that combined peak exceeded the browser's per-tab memory
-// ceiling and the OS killed the tab outright -- silently, with no JS
-// exception for any `catch` to see, before the download even finished
-// (reported around the vision+embed files' combined ~1GB mark, right as
-// the ~1.1GB decoder file's pre-sized buffer was allocated on top of
-// them). Block-scoping each pair lets it become unreachable, and
-// collectible, the moment its `load_*` call returns, instead of staying
-// referenced for the rest of this function -- so peak JS memory here is
-// roughly one file at a time (~1.1GB) rather than the sum of all three,
-// and Rust never needs to hold its own copy alongside a still-resident
-// JS one. See `budget_calc::SmartParseSession`'s own doc comment for the
-// matching Rust-side half of this.
+// Each large file's bytes also arrive via `fetchDataFileIntoSession`'s
+// tens-of-MB range requests, handed to `session.append_data_chunk` one
+// chunk at a time and finished with `session.finish_*`, rather than
+// this worker ever assembling the whole ~868MB-to-1.1GB file as one JS
+// buffer -- an earlier round already stopped collecting all three
+// models' bytes before the first call into Rust (which fixed a crash
+// from holding all ~2.2GB across all three files at once), but a single
+// ~868MB-to-1.1GB buffer crossing the JS/wasm boundary in one call was
+// still, on its own, enough to crash a real phone's tab -- confirmed on
+// a brand-new, high-RAM iPhone, in both Safari and Chrome, with only one
+// tab open, so neither a low-RAM device nor other tabs sharing memory
+// explain it. `rten`'s own external-data storage doesn't duplicate the
+// buffer either (confirmed against its source: a plain `Arc`-wrapped
+// move). Chunking bounds every single buffer this worker or
+// `budget_calc::SmartParseSession` ever handles in one call to tens of
+// MB, regardless of how large the overall model file is, which rules
+// out whatever below-the-model-loading-layer cost a single huge buffer
+// was incurring, whatever it turns out to be.
 //
 // Reset to null on rejection, same reasoning as loadModels above but far
 // more likely to matter here: a ~2.2GB download takes minutes even on a
 // fast connection, and mobile browsers routinely interrupt a long fetch
 // (screen lock, backgrounding, switching between wifi and cellular).
 // Without the reset, that first interruption would permanently wedge
-// Smart Parse until a full page reload. `fetchBytesCached` checks Cache
-// Storage before fetching, so a retry after this reset skips whichever
-// files already finished and only re-fetches from the point of failure.
+// Smart Parse until a full page reload. `fetchDataChunkCached` and
+// `fetchBytesCached` both check Cache Storage before fetching, so a
+// retry after this reset only re-fetches whatever chunk was in flight
+// when the interruption hit, not the whole download.
 function loadGlmOcrSession(onProgress) {
   if (!glmOcrSessionPromise) {
     let loaded = 0;
@@ -322,18 +392,18 @@ function loadGlmOcrSession(onProgress) {
 
       {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionGraph, track);
-        const data = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionData, track);
-        throwIfLoadError(session.load_vision(graph, data));
+        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.visionData, track);
+        throwIfLoadError(session.finish_vision(graph));
       }
       {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track);
-        const data = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedData, track);
-        throwIfLoadError(session.load_embed(graph, data));
+        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.embedData, track);
+        throwIfLoadError(session.finish_embed(graph));
       }
       {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderGraph, track);
-        const data = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderData, track);
-        throwIfLoadError(session.load_decoder(graph, data));
+        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.decoderData, track);
+        throwIfLoadError(session.finish_decoder(graph));
       }
 
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
