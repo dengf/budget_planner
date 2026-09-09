@@ -84,4 +84,10 @@ pub enum BudgetError {
 
     #[error("could not read this image with Smart Parse: {0}")]
     SmartParseFailed(String),
+
+    #[error("could not read this PDF page: {0}")]
+    PdfPageOutOfRange(String),
+
+    #[error("could not render this PDF page: {0}")]
+    PdfRenderFailed(String),
 }

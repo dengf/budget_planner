@@ -30,11 +30,18 @@ than one that is visibly broken.
 | `budget-wasm-pdf` | Bridge only, same rule — a *third*, independent wasm module (see below) |
 | `www/` | Layout, input, formatting for display, i18n |
 
-### Three wasm modules, not one
+### Several wasm modules, not one
 
-`budget-wasm-ocr` and `budget-wasm-pdf` exist purely to keep
+`budget-wasm-ocr`, `budget-wasm-pdf`, `budget-wasm-pdfrender`,
+`budget-wasm-llm` and `budget-wasm-glmocr` exist purely to keep
 `budget-wasm`'s download small, and to keep each other's weight off a
-session that only takes one of the two receipt-capture paths.
+session that only takes one of the receipt-capture paths. The
+OCR/PDF split below is the original, most-documented case of the
+pattern; `budget-wasm-pdfrender` (rasterizing a PDF page to pixels via
+`hayro`, a pure-Rust PDF interpreter) is its newest instance, added so a
+scanned PDF (no text layer) and Smart Parse's PDF path both have pixels
+to read without a text-layer PDF or an image-only session ever paying
+for it — see `budget-wasm-pdfrender/src/lib.rs`'s own doc comment.
 
 `ocrs-cjk`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
 of the wasm payload — 3.7MB with them compiled into the main crate,
@@ -75,9 +82,13 @@ needs it. If two such features are genuinely independent (never both
 needed in the same user action), give each its own crate rather than
 bundling them — the OCR/PDF history above is the cautionary example.
 `Message` (the wasm-boundary error convention) lives in `budget-core`, not
-any of the three wasm crates, specifically so multiple wasm-bindgen crates
+any of the wasm crates, specifically so multiple wasm-bindgen crates
 mapping `BudgetError` never duplicate that mapping — see
-`budget-core/src/message.rs`'s own doc comment.
+`budget-core/src/message.rs`'s own doc comment. `render_pdf_page`
+(`budget-wasm-pdfrender`) is a deliberate, documented exception: it
+returns a raw `Vec<u8>` instead, because a rendered page's pixels are too
+large to route through the usual serialized `Message`-shaped result
+without a real performance cost — see that binding's own doc comment.
 
 Business logic is anything where a second implementation could give a
 different answer: arithmetic on money, thresholds, deriving one value from
@@ -190,22 +201,28 @@ gets skipped, so ask it explicitly.
   relying on the slower `www-build` job to exercise it indirectly; run it
   locally before trusting a green native build.
 - **`npm run build` does not rebuild the wasm.** Run `npm run build:wasm`
-  first, or you are testing the previous `pkg/`, `pkg-ocr/` and `pkg-pdf/`.
+  first, or you are testing the previous `pkg/`, `pkg-ocr/`, `pkg-pdf/`,
+  `pkg-pdfrender/`, `pkg-llm/` and `pkg-glmocr/`.
 - **`cargo build -p budget-wasm --target wasm32-unknown-unknown` alone
-  does not prove `budget-wasm-ocr` or `budget-wasm-pdf` compiles.** All
-  three are separate crates with separate wasm-pack builds (`npm run
-  build:wasm:core` / `build:wasm:ocr` / `build:wasm:pdf`); CI's `wasm32`
-  job checks all three, and a local check should too before trusting any
-  one build. `cargo build --workspace` unifies `budget-calc`'s `ocr` and
-  `pdf-text` features across every member being built together (since
-  `budget-wasm-ocr` and `budget-wasm-pdf` each request one), which masks
-  whether `budget-wasm` alone still excludes both, and whether
-  `budget-wasm-ocr`/`budget-wasm-pdf` still exclude each other's feature
-  — the only way to confirm the size split still holds is building each
-  of the three in isolation (`cd crates/budget-wasm && wasm-pack build
-  --target web --out-dir ../../www/pkg`, and the equivalent for the other
-  two into `pkg-ocr`/`pkg-pdf`) and checking each `*_bg.wasm`'s size
-  directly.
+  does not prove any of the lazy crates compile.** `budget-wasm-ocr`,
+  `budget-wasm-pdf`, `budget-wasm-pdfrender`, `budget-wasm-llm` and
+  `budget-wasm-glmocr` are all separate crates with separate wasm-pack
+  builds (`npm run build:wasm:ocr` / `:pdf` / `:pdfrender` / `:llm` /
+  `:glmocr`); CI's `wasm32` job checks every one of them individually
+  (a real, retroactively-fixed gap: `budget-wasm-llm`/`budget-wasm-glmocr`
+  were added to the crate list without ever being added to this job, and
+  `budget-wasm-pdfrender` shipped the same way in its own first PR, caught
+  only because that PR's own local check happened to build it — CI itself
+  passed that PR without ever building it on wasm32). A local check should
+  too, before trusting any one build. `cargo build --workspace` unifies
+  every one of `budget-calc`'s heavy-dependency features across every
+  member being built together (since each lazy crate requests its own),
+  which masks whether `budget-wasm` alone still excludes all of them, and
+  whether the lazy crates still exclude each other's features — the only
+  way to confirm the size split still holds is building each crate in
+  isolation (`cd crates/budget-wasm && wasm-pack build --target web
+  --out-dir ../../www/pkg`, and the equivalent for each other crate into
+  its own `pkg-*` directory) and checking each `*_bg.wasm`'s size directly.
 - **jsdom has no `localStorage`** on `window` or as a bare global; every
   storage path (`currencySymbol.js`, `commitments.js`) runs into its catch
   block under test unless the test stands up a fake.

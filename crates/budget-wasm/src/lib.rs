@@ -23,16 +23,18 @@
 //!
 //! Receipt OCR (`run_ocr`), PDF text extraction (`extract_pdf_text`),
 //! statement-row income/expense classification
-//! (`classify_statement_descriptions`) and Smart Parse
+//! (`classify_statement_descriptions`), PDF page rasterization
+//! (`pdf_page_count`, `render_pdf_page`) and Smart Parse
 //! (`run_smart_parse`, GLM-OCR) live in the sibling `budget-wasm-ocr`,
-//! `budget-wasm-pdf`, `budget-wasm-llm` and `budget-wasm-glmocr` crates
-//! instead, each compiled to its own separate `.wasm` file that
-//! `www/src/ocrWorker.js` only loads the first time someone actually
-//! takes that path (a photo scan never downloads the PDF, classifier or
-//! Smart Parse crate's weight, and vice versa). `ocrs-cjk`/`rten`,
-//! `pdf-extract`, a BERT-family embedding model and GLM-OCR's ~2.2GB of
-//! vision-language weights respectively are why -- see each crate's own
-//! doc comment for the measured size. This crate's own
+//! `budget-wasm-pdf`, `budget-wasm-llm`, `budget-wasm-pdfrender` and
+//! `budget-wasm-glmocr` crates instead, each compiled to its own separate
+//! `.wasm` file that `www/src/ocrWorker.js` only loads the first time
+//! someone actually takes that path (a photo scan never downloads the
+//! PDF, classifier, rasterizer or Smart Parse crate's weight, and vice
+//! versa). `ocrs-cjk`/`rten`, `pdf-extract`, a BERT-family embedding
+//! model, `hayro` and GLM-OCR's ~2.2GB of vision-language weights
+//! respectively are why -- see each crate's own doc comment for the
+//! measured size. This crate's own
 //! [`receipt`] module, by contrast, is `parse_receipt_text`/
 //! `parse_statement_text`: plain text/`Decimal` parsing with no heavy
 //! dependency, so it lives here in the always-loaded core instead of
@@ -102,6 +104,10 @@ mod bridge_coverage {
         (
             "smart_parse",
             "bridged in the sibling budget-wasm-glmocr crate, not here -- see this crate's lib.rs doc comment",
+        ),
+        (
+            "pdf_render",
+            "bridged in the sibling budget-wasm-pdfrender crate, not here -- see this crate's lib.rs doc comment",
         ),
     ];
 

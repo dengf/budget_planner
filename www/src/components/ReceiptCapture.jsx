@@ -4,7 +4,7 @@ import {
   classifyStatementDescriptions,
   extractReceiptText,
   isPdf,
-  smartParseReceiptImage,
+  smartParseReceiptFile,
   SMART_PARSE_APPROX_TOTAL_BYTES,
 } from '../receiptCapture';
 import CalcError from './CalcError';
@@ -65,10 +65,15 @@ export default function ReceiptCapture({
   // before anyone turns it on, per CLAUDE.md's "never state something
   // that isn't true yet" -- there is no silent, surprise download here.
   const [smartParseEnabled, setSmartParseEnabled] = useState(false);
-  // Bytes downloaded so far this session, only while Smart Parse's model
-  // is still being fetched -- `null` once inference itself starts (no
-  // more progress to report) or when nothing is downloading yet.
-  const [downloadedBytes, setDownloadedBytes] = useState(null);
+  // `{ phase: 'download', loadedBytes }` while Smart Parse's model is
+  // still being fetched, `{ phase: 'page', page, totalPages }` while a
+  // multi-page PDF is being rasterized and read one page at a time, or
+  // `null` when there's nothing more specific to report than "reading".
+  const [progress, setProgress] = useState(null);
+  // Set when a PDF had more pages than `receiptCapture.js`'s per-import
+  // cap -- shown once processing finishes, alongside whatever the capped
+  // pass did manage to extract, rather than silently dropping pages.
+  const [truncated, setTruncated] = useState(null);
 
   // Only rows `resolve_statement_amount` (Rust) had no sign, marker or
   // keyword to go on -- most statements never have any, so this usually
@@ -126,22 +131,24 @@ export default function ReceiptCapture({
   const handleFile = async (file) => {
     if (!file || !wasmModule) return;
     setCalcError(null);
-    setDownloadedBytes(null);
+    setProgress(null);
+    setTruncated(null);
     setStatus('reading');
     try {
-      // Smart Parse only reads images -- GLM-OCR is a vision-language
-      // model, not a PDF-text extractor. A PDF upload always takes the
-      // existing `pdf-extract` path regardless of the toggle.
-      const useSmartParse = smartParseEnabled && !isPdf(file);
-      const { text, calcError: extractError } = useSmartParse
-        ? await smartParseReceiptImage(file, setDownloadedBytes)
-        : await extractReceiptText(file);
-      setDownloadedBytes(null); // download (if any) is done; inference has no further progress to report
+      // Smart Parse reads pixels for a PDF too now (rasterizing each page
+      // via `budget-wasm-pdfrender`), not just photographed receipts --
+      // see `smartParseReceiptFile`'s own doc comment for why that's true
+      // even for a PDF that already has a text layer.
+      const { text, calcError: extractError, truncated: extractTruncated } = smartParseEnabled
+        ? await smartParseReceiptFile(file, setProgress)
+        : await extractReceiptText(file, setProgress);
+      setProgress(null); // done either way; nothing left to report
       if (extractError) {
         setCalcError(extractError);
         setStatus('idle');
         return;
       }
+      if (extractTruncated) setTruncated(extractTruncated);
 
       if (isPdf(file)) {
         const statement = wasmModule.parse_statement_text(text);
@@ -275,18 +282,23 @@ export default function ReceiptCapture({
 
       {status === 'reading' && (
         <p className="empty-state">
-          {smartParseEnabled && downloadedBytes !== null && downloadedBytes < SMART_PARSE_APPROX_TOTAL_BYTES
+          {progress?.phase === 'download' && progress.loadedBytes < SMART_PARSE_APPROX_TOTAL_BYTES
             ? t('transactions.smartParseDownloading', {
-                percent: Math.min(100, Math.round((downloadedBytes / SMART_PARSE_APPROX_TOTAL_BYTES) * 100)),
-                loaded: formatBytes(downloadedBytes),
+                percent: Math.min(100, Math.round((progress.loadedBytes / SMART_PARSE_APPROX_TOTAL_BYTES) * 100)),
+                loaded: formatBytes(progress.loadedBytes),
                 total: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES),
               })
-            : smartParseEnabled
-              ? t('transactions.smartParseRunning')
-              : t('transactions.receiptReading')}
+            : progress?.phase === 'page'
+              ? t('transactions.receiptReadingPage', progress)
+              : smartParseEnabled
+                ? t('transactions.smartParseRunning')
+                : t('transactions.receiptReading')}
         </p>
       )}
       {calcError && <CalcError result={calcError} />}
+      {truncated && (
+        <p className="panel-subtitle">{t('transactions.receiptPagesTruncated', truncated)}</p>
+      )}
 
       {status === 'statementReview' && (
         <>

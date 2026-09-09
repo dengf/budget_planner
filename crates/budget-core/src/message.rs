@@ -140,6 +140,12 @@ impl From<&BudgetError> for Message {
             BudgetError::SmartParseFailed(v) => {
                 Message::with_value("err.smartParseFailed", v.clone(), text)
             }
+            BudgetError::PdfPageOutOfRange(v) => {
+                Message::with_value("err.pdfPageOutOfRange", v.clone(), text)
+            }
+            BudgetError::PdfRenderFailed(v) => {
+                Message::with_value("err.pdfRenderFailed", v.clone(), text)
+            }
         }
     }
 }
@@ -205,6 +211,8 @@ mod tests {
             BudgetError::SmartParseModelLoadFailed("1".into()),
             BudgetError::SmartParseTokenizerLoadFailed("1".into()),
             BudgetError::SmartParseFailed("1".into()),
+            BudgetError::PdfPageOutOfRange("1".into()),
+            BudgetError::PdfRenderFailed("1".into()),
         ];
         let codes: std::collections::BTreeSet<_> =
             all.iter().map(|e| Message::from(e).code).collect();
