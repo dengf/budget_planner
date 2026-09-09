@@ -340,14 +340,30 @@ async function fetchDataChunkCached(url, start, end) {
 // `loadGlmOcrSession`'s own doc comment for why this worker never
 // materializes the whole file as one JS buffer at all, not even
 // one-file-at-a-time.
-async function fetchDataFileIntoSession(session, url, track) {
+// TEMPORARY: logs the wasm module's actual linear memory size (from
+// `wasm_memory_bytes`, straight from the engine, not an estimate) at each
+// step of loading -- part of the phone-crash investigation into whether
+// this is a real crash inside WebKit's GC triggered by a
+// `memory.grow()` call approaching wasm32's hard 4GiB linear-memory
+// ceiling. A crash mid-download kills the tab before any return value
+// makes it back to the main thread, but this log line itself reaches
+// Console.app immediately, so the last one printed before a crash shows
+// how close the heap actually got. Remove once that question is answered.
+function logGlmOcrHeapSize(wasm, label) {
+  const bytes = wasm.wasm_memory_bytes();
+  console.log(`[SmartParse] wasm heap: ${(bytes / (1024 * 1024)).toFixed(1)}MB -- ${label}`);
+}
+
+async function fetchDataFileIntoSession(session, url, track, wasm) {
   const totalLength = await fetchContentLength(url);
   session.begin_data(totalLength);
+  logGlmOcrHeapSize(wasm, `begin_data(${totalLength}) for ${url}`);
   for (let start = 0; start < totalLength; start += GLM_OCR_CHUNK_BYTES) {
     const end = Math.min(start + GLM_OCR_CHUNK_BYTES, totalLength) - 1;
     const chunk = await fetchDataChunkCached(url, start, end);
     session.append_data_chunk(chunk);
     track(chunk.byteLength);
+    logGlmOcrHeapSize(wasm, `after chunk ${end + 1}/${totalLength} of ${url}`);
   }
 }
 
@@ -411,18 +427,21 @@ function loadGlmOcrSession(onProgress) {
 
       {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionGraph, track);
-        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.visionData, track);
+        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.visionData, track, wasm);
         throwIfLoadError(session.finish_vision(graph));
+        logGlmOcrHeapSize(wasm, 'after finish_vision');
       }
       {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track);
-        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.embedData, track);
+        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.embedData, track, wasm);
         throwIfLoadError(session.finish_embed(graph));
+        logGlmOcrHeapSize(wasm, 'after finish_embed');
       }
       {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderGraph, track);
-        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.decoderData, track);
+        await fetchDataFileIntoSession(session, GLM_OCR_MODEL_PATHS.decoderData, track, wasm);
         throwIfLoadError(session.finish_decoder(graph));
+        logGlmOcrHeapSize(wasm, 'after finish_decoder');
       }
 
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
