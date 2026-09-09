@@ -6,7 +6,12 @@ www/dist/
 www/pkg/
 www/pkg-ocr/
 www/pkg-pdf/
+www/pkg-pdfrender/
 www/pkg-llm/
+www/pkg-glmocr-vision/
+www/pkg-glmocr-embed/
+www/pkg-glmocr-decoder/
+www/pkg-glmocr-orchestrate/
 
 # wasm-pack
 crates/budget-wasm/pkg/
@@ -15,8 +20,18 @@ crates/budget-wasm-ocr/pkg/
 crates/budget-wasm-ocr/target/
 crates/budget-wasm-pdf/pkg/
 crates/budget-wasm-pdf/target/
+crates/budget-wasm-pdfrender/pkg/
+crates/budget-wasm-pdfrender/target/
 crates/budget-wasm-llm/pkg/
 crates/budget-wasm-llm/target/
+crates/budget-wasm-glmocr-vision/pkg/
+crates/budget-wasm-glmocr-vision/target/
+crates/budget-wasm-glmocr-embed/pkg/
+crates/budget-wasm-glmocr-embed/target/
+crates/budget-wasm-glmocr-decoder/pkg/
+crates/budget-wasm-glmocr-decoder/target/
+crates/budget-wasm-glmocr-orchestrate/pkg/
+crates/budget-wasm-glmocr-orchestrate/target/
 
 .DS_Store
 __pycache__/

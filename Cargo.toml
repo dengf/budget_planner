@@ -18,7 +18,10 @@ members = [
     "crates/budget-wasm-pdf",
     "crates/budget-wasm-pdfrender",
     "crates/budget-wasm-llm",
-    "crates/budget-wasm-glmocr",
+    "crates/budget-wasm-glmocr-vision",
+    "crates/budget-wasm-glmocr-embed",
+    "crates/budget-wasm-glmocr-decoder",
+    "crates/budget-wasm-glmocr-orchestrate",
 ]
 resolver = "2"
 

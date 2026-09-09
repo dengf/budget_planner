@@ -33,15 +33,30 @@ than one that is visibly broken.
 ### Several wasm modules, not one
 
 `budget-wasm-ocr`, `budget-wasm-pdf`, `budget-wasm-pdfrender`,
-`budget-wasm-llm` and `budget-wasm-glmocr` exist purely to keep
-`budget-wasm`'s download small, and to keep each other's weight off a
-session that only takes one of the receipt-capture paths. The
-OCR/PDF split below is the original, most-documented case of the
-pattern; `budget-wasm-pdfrender` (rasterizing a PDF page to pixels via
-`hayro`, a pure-Rust PDF interpreter) is its newest instance, added so a
-scanned PDF (no text layer) and Smart Parse's PDF path both have pixels
-to read without a text-layer PDF or an image-only session ever paying
-for it — see `budget-wasm-pdfrender/src/lib.rs`'s own doc comment.
+`budget-wasm-llm` and Smart Parse's own `budget-wasm-glmocr-vision`/
+`-embed`/`-decoder`/`-orchestrate` exist purely to keep `budget-wasm`'s
+download small, and to keep each other's weight off a session that only
+takes one of the receipt-capture paths. The OCR/PDF split below is the
+original, most-documented case of the pattern; `budget-wasm-pdfrender`
+(rasterizing a PDF page to pixels via `hayro`, a pure-Rust PDF
+interpreter) is its newest instance before Smart Parse's own four, added
+so a scanned PDF (no text layer) and Smart Parse's PDF path both have
+pixels to read without a text-layer PDF or an image-only session ever
+paying for it — see `budget-wasm-pdfrender/src/lib.rs`'s own doc comment.
+
+Smart Parse's four crates are a further, separate instance of the same
+principle applied *within* one feature rather than across features: each
+of GLM-OCR's three ONNX models needs its own independent wasm module (not
+just its own download), because `rten` (the ONNX runtime these bindings
+use) doubles a model's resident memory at load time converting its fp16
+weights to f32, and three such models sharing one wasm32 module's 4GiB
+linear-memory ceiling exceeded it by construction — confirmed as the
+cause of a real iPhone crash. See
+`budget-wasm-glmocr-vision/src/lib.rs`'s own doc comment for the full
+writeup, and `www/src/ocrWorker.js`'s `runSmartParseGeneration` for how
+the generation control-flow loop that used to live in one shared Rust
+session now lives in JS instead, since separate wasm module instances
+cannot call each other directly.
 
 `ocrs-cjk`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
 of the wasm payload — 3.7MB with them compiled into the main crate,
@@ -202,19 +217,23 @@ gets skipped, so ask it explicitly.
   locally before trusting a green native build.
 - **`npm run build` does not rebuild the wasm.** Run `npm run build:wasm`
   first, or you are testing the previous `pkg/`, `pkg-ocr/`, `pkg-pdf/`,
-  `pkg-pdfrender/`, `pkg-llm/` and `pkg-glmocr/`.
+  `pkg-pdfrender/`, `pkg-llm/`, `pkg-glmocr-vision/`, `pkg-glmocr-embed/`,
+  `pkg-glmocr-decoder/` and `pkg-glmocr-orchestrate/`.
 - **`cargo build -p budget-wasm --target wasm32-unknown-unknown` alone
   does not prove any of the lazy crates compile.** `budget-wasm-ocr`,
   `budget-wasm-pdf`, `budget-wasm-pdfrender`, `budget-wasm-llm` and
-  `budget-wasm-glmocr` are all separate crates with separate wasm-pack
-  builds (`npm run build:wasm:ocr` / `:pdf` / `:pdfrender` / `:llm` /
-  `:glmocr`); CI's `wasm32` job checks every one of them individually
-  (a real, retroactively-fixed gap: `budget-wasm-llm`/`budget-wasm-glmocr`
-  were added to the crate list without ever being added to this job, and
-  `budget-wasm-pdfrender` shipped the same way in its own first PR, caught
-  only because that PR's own local check happened to build it — CI itself
-  passed that PR without ever building it on wasm32). A local check should
-  too, before trusting any one build. `cargo build --workspace` unifies
+  Smart Parse's own `budget-wasm-glmocr-vision`/`-embed`/`-decoder`/
+  `-orchestrate` are all separate crates with separate wasm-pack builds
+  (`npm run build:wasm:ocr` / `:pdf` / `:pdfrender` / `:llm` /
+  `:glmocr-vision` / `:glmocr-embed` / `:glmocr-decoder` /
+  `:glmocr-orchestrate`); CI's `wasm32` job checks every one of them
+  individually (a real, retroactively-fixed gap: `budget-wasm-llm`/the
+  original single `budget-wasm-glmocr` were added to the crate list
+  without ever being added to this job, and `budget-wasm-pdfrender`
+  shipped the same way in its own first PR, caught only because that
+  PR's own local check happened to build it — CI itself passed that PR
+  without ever building it on wasm32). A local check should too, before
+  trusting any one build. `cargo build --workspace` unifies
   every one of `budget-calc`'s heavy-dependency features across every
   member being built together (since each lazy crate requests its own),
   which masks whether `budget-wasm` alone still excludes all of them, and
