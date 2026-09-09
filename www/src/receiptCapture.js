@@ -59,10 +59,15 @@ function getWorker() {
   };
   // A worker-level crash (e.g. the wasm failed to load at all) has no `id`
   // to route to a specific call -- fail every call still waiting rather
-  // than leaving them hanging forever.
+  // than leaving them hanging forever. Also drop the memoized worker
+  // itself: a crashed instance won't respond to anything sent to it
+  // afterwards, so leaving it in place would silently hang every future
+  // call until a full page reload. Clearing it here means the next
+  // `getWorker()` spins up a fresh instance instead.
   worker.onerror = (event) => {
     for (const call of pending.values()) call.reject(new Error(event.message));
     pending.clear();
+    worker = null;
   };
   return worker;
 }
