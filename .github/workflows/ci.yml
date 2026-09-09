@@ -70,17 +70,29 @@ jobs:
       - name: cargo build -p budget-wasm --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm --target wasm32-unknown-unknown
 
-      # budget-wasm-ocr pulls in ocrs/rten (an ML tensor runtime) behind
-      # budget-calc's `ocr` feature, and budget-wasm-pdf pulls in
-      # pdf-extract behind `pdf-text` -- the one place this repo documented
-      # as a real wasm32 compile risk (native `cargo build` would not catch
-      # a wasm-only break in either dependency graph), so both get the same
-      # explicit wasm32 check as the main crate.
+      # Each lazy wasm-binding crate pulls in a heavy dependency behind its
+      # own budget-calc feature (ocrs/rten, pdf-extract, hayro, a BERT-family
+      # embedding model, GLM-OCR's bindings) -- the one place this repo
+      # documented as a real wasm32 compile risk (native `cargo build` would
+      # not catch a wasm-only break in any of these dependency graphs), so
+      # every one of them gets the same explicit wasm32 check as the main
+      # crate. See CLAUDE.md's "cargo build -p budget-wasm-ocr or
+      # budget-wasm-pdf alone does not prove ... compiles" -- true of every
+      # crate in this list, not just those two.
       - name: cargo build -p budget-wasm-ocr --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm-ocr --target wasm32-unknown-unknown
 
       - name: cargo build -p budget-wasm-pdf --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm-pdf --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-pdfrender --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-pdfrender --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-llm --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-llm --target wasm32-unknown-unknown
+
+      - name: cargo build -p budget-wasm-glmocr --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-glmocr --target wasm32-unknown-unknown
 
   coverage:
     name: cargo llvm-cov (coverage gate)

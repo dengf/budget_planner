@@ -201,22 +201,28 @@ gets skipped, so ask it explicitly.
   relying on the slower `www-build` job to exercise it indirectly; run it
   locally before trusting a green native build.
 - **`npm run build` does not rebuild the wasm.** Run `npm run build:wasm`
-  first, or you are testing the previous `pkg/`, `pkg-ocr/` and `pkg-pdf/`.
+  first, or you are testing the previous `pkg/`, `pkg-ocr/`, `pkg-pdf/`,
+  `pkg-pdfrender/`, `pkg-llm/` and `pkg-glmocr/`.
 - **`cargo build -p budget-wasm --target wasm32-unknown-unknown` alone
-  does not prove `budget-wasm-ocr` or `budget-wasm-pdf` compiles.** All
-  three are separate crates with separate wasm-pack builds (`npm run
-  build:wasm:core` / `build:wasm:ocr` / `build:wasm:pdf`); CI's `wasm32`
-  job checks all three, and a local check should too before trusting any
-  one build. `cargo build --workspace` unifies `budget-calc`'s `ocr` and
-  `pdf-text` features across every member being built together (since
-  `budget-wasm-ocr` and `budget-wasm-pdf` each request one), which masks
-  whether `budget-wasm` alone still excludes both, and whether
-  `budget-wasm-ocr`/`budget-wasm-pdf` still exclude each other's feature
-  — the only way to confirm the size split still holds is building each
-  of the three in isolation (`cd crates/budget-wasm && wasm-pack build
-  --target web --out-dir ../../www/pkg`, and the equivalent for the other
-  two into `pkg-ocr`/`pkg-pdf`) and checking each `*_bg.wasm`'s size
-  directly.
+  does not prove any of the lazy crates compile.** `budget-wasm-ocr`,
+  `budget-wasm-pdf`, `budget-wasm-pdfrender`, `budget-wasm-llm` and
+  `budget-wasm-glmocr` are all separate crates with separate wasm-pack
+  builds (`npm run build:wasm:ocr` / `:pdf` / `:pdfrender` / `:llm` /
+  `:glmocr`); CI's `wasm32` job checks every one of them individually
+  (a real, retroactively-fixed gap: `budget-wasm-llm`/`budget-wasm-glmocr`
+  were added to the crate list without ever being added to this job, and
+  `budget-wasm-pdfrender` shipped the same way in its own first PR, caught
+  only because that PR's own local check happened to build it — CI itself
+  passed that PR without ever building it on wasm32). A local check should
+  too, before trusting any one build. `cargo build --workspace` unifies
+  every one of `budget-calc`'s heavy-dependency features across every
+  member being built together (since each lazy crate requests its own),
+  which masks whether `budget-wasm` alone still excludes all of them, and
+  whether the lazy crates still exclude each other's features — the only
+  way to confirm the size split still holds is building each crate in
+  isolation (`cd crates/budget-wasm && wasm-pack build --target web
+  --out-dir ../../www/pkg`, and the equivalent for each other crate into
+  its own `pkg-*` directory) and checking each `*_bg.wasm`'s size directly.
 - **jsdom has no `localStorage`** on `window` or as a bare global; every
   storage path (`currencySymbol.js`, `commitments.js`) runs into its catch
   block under test unless the test stands up a fake.
