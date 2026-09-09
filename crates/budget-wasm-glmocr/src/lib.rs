@@ -74,3 +74,16 @@ pub fn init() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 }
+
+/// Temporary diagnostic for the phone-crash investigation: this module's
+/// *actual* linear memory size in bytes, straight from the wasm engine
+/// (`memory.size` * the fixed 64KiB page size), not an estimate from the
+/// buffers this crate happens to be holding. `www/src/ocrWorker.js` logs
+/// this alongside download progress so a real device's console shows how
+/// close a crash gets to wasm32's hard 4GiB linear-memory ceiling --
+/// remove once that question is answered.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn wasm_memory_bytes() -> f64 {
+    core::arch::wasm32::memory_size(0) as f64 * 65536.0
+}
