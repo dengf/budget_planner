@@ -69,7 +69,12 @@ impl VisionEncoder {
     /// `to_js`, never Debug-formatted); `www/src/ocrWorker.js`'s
     /// orchestration loop catches it the same way for every other
     /// hot-path call across all four Smart Parse wasm modules.
-    pub fn encode(&self, pixel_values: &[f32], grid_h: u32, grid_w: u32) -> Result<Vec<f32>, JsValue> {
+    pub fn encode(
+        &self,
+        pixel_values: &[f32],
+        grid_h: u32,
+        grid_w: u32,
+    ) -> Result<Vec<f32>, JsValue> {
         self.inner
             .encode(pixel_values, grid_h as i64, grid_w as i64)
             .map_err(|e| to_js(&Message::from(&e)))

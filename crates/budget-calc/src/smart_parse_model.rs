@@ -133,12 +133,19 @@ impl VisionEncoder {
     /// `num_image_tokens` is recoverable by the caller as
     /// `returned.len() / HIDDEN_SIZE`, so it doesn't cross the boundary
     /// as a separate value.
-    pub fn encode(&self, pixel_values: &[f32], grid_h: i64, grid_w: i64) -> Result<Vec<f32>, BudgetError> {
-        let model = self
-            .model
+    pub fn encode(
+        &self,
+        pixel_values: &[f32],
+        grid_h: i64,
+        grid_w: i64,
+    ) -> Result<Vec<f32>, BudgetError> {
+        let model = self.model.as_ref().ok_or_else(|| {
+            BudgetError::SmartParseModelLoadFailed("vision model not loaded".into())
+        })?;
+        let nodes = self
+            .nodes
             .as_ref()
-            .ok_or_else(|| BudgetError::SmartParseModelLoadFailed("vision model not loaded".into()))?;
-        let nodes = self.nodes.as_ref().expect("nodes set alongside model in finish()");
+            .expect("nodes set alongside model in finish()");
 
         let num_patches = pixel_values.len() / 1176;
         let pixel_tensor = Tensor::from_data(&[num_patches, 1176], pixel_values.to_vec());
@@ -158,10 +165,9 @@ impl VisionEncoder {
         let image_features: Tensor<f32> = image_features_val.try_into().map_err(|_| {
             BudgetError::SmartParseFailed("unexpected vision encoder output shape".into())
         })?;
-        image_features
-            .data()
-            .map(|d| d.to_vec())
-            .ok_or_else(|| BudgetError::SmartParseFailed("vision encoder output is not contiguous".into()))
+        image_features.data().map(|d| d.to_vec()).ok_or_else(|| {
+            BudgetError::SmartParseFailed("vision encoder output is not contiguous".into())
+        })
     }
 }
 
@@ -211,25 +217,30 @@ impl TokenEmbedder {
     /// Embeds `input_ids` (the whole prompt, or a single next-token id),
     /// returning a flat `[input_ids.len() * HIDDEN_SIZE]` buffer.
     pub fn embed(&self, input_ids: &[i32]) -> Result<Vec<f32>, BudgetError> {
-        let model = self
-            .model
+        let model = self.model.as_ref().ok_or_else(|| {
+            BudgetError::SmartParseModelLoadFailed("embed model not loaded".into())
+        })?;
+        let nodes = self
+            .nodes
             .as_ref()
-            .ok_or_else(|| BudgetError::SmartParseModelLoadFailed("embed model not loaded".into()))?;
-        let nodes = self.nodes.as_ref().expect("nodes set alongside model in finish()");
+            .expect("nodes set alongside model in finish()");
 
         let seq_len = input_ids.len();
         let ids_tensor = Tensor::from_data(&[1, seq_len], input_ids.to_vec());
         let [embeds_val] = model
             .model
-            .run_n(vec![(nodes.input_ids, ids_tensor.into())], [nodes.output], None)
+            .run_n(
+                vec![(nodes.input_ids, ids_tensor.into())],
+                [nodes.output],
+                None,
+            )
             .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
-        let embeds: Tensor<f32> = embeds_val
-            .try_into()
-            .map_err(|_| BudgetError::SmartParseFailed("unexpected embedding output shape".into()))?;
-        embeds
-            .data()
-            .map(|d| d.to_vec())
-            .ok_or_else(|| BudgetError::SmartParseFailed("embedding output is not contiguous".into()))
+        let embeds: Tensor<f32> = embeds_val.try_into().map_err(|_| {
+            BudgetError::SmartParseFailed("unexpected embedding output shape".into())
+        })?;
+        embeds.data().map(|d| d.to_vec()).ok_or_else(|| {
+            BudgetError::SmartParseFailed("embedding output is not contiguous".into())
+        })
     }
 }
 
@@ -321,11 +332,13 @@ impl DecoderSession {
         attention_mask: &[i32],
         position_ids: &[i32],
     ) -> Result<Vec<f32>, BudgetError> {
-        let model = self
-            .model
+        let model = self.model.as_ref().ok_or_else(|| {
+            BudgetError::SmartParseModelLoadFailed("decoder model not loaded".into())
+        })?;
+        let nodes = self
+            .nodes
             .as_ref()
-            .ok_or_else(|| BudgetError::SmartParseModelLoadFailed("decoder model not loaded".into()))?;
-        let nodes = self.nodes.as_ref().expect("nodes set alongside model in finish()");
+            .expect("nodes set alongside model in finish()");
 
         let embeds_tensor = Tensor::from_data(&[1, seq_len, HIDDEN_SIZE], inputs_embeds.to_vec());
         let pos_tensor = Tensor::from_data(&[3, 1, seq_len], position_ids.to_vec());
@@ -354,10 +367,9 @@ impl DecoderSession {
             .clone()
             .try_into()
             .map_err(|_| BudgetError::SmartParseFailed("unexpected decoder output shape".into()))?;
-        let logits_data = logits
-            .data()
-            .map(|d| d.to_vec())
-            .ok_or_else(|| BudgetError::SmartParseFailed("decoder logits are not contiguous".into()))?;
+        let logits_data = logits.data().map(|d| d.to_vec()).ok_or_else(|| {
+            BudgetError::SmartParseFailed("decoder logits are not contiguous".into())
+        })?;
 
         for i in 0..NUM_LAYERS {
             let k: Tensor<f32> = outputs[1 + 2 * i].clone().try_into().map_err(|_| {

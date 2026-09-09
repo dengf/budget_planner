@@ -460,7 +460,10 @@ mod tests {
         let image_features = vec![1.0f32; HIDDEN_SIZE];
         splice_image_features(&mut embeds, &image_features, &input_ids).unwrap();
         assert_eq!(embeds[0], 9.0);
-        assert_eq!(&embeds[HIDDEN_SIZE..2 * HIDDEN_SIZE], image_features.as_slice());
+        assert_eq!(
+            &embeds[HIDDEN_SIZE..2 * HIDDEN_SIZE],
+            image_features.as_slice()
+        );
         assert_eq!(embeds[2 * HIDDEN_SIZE], 0.0);
     }
 }

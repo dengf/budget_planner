@@ -57,6 +57,8 @@ impl TokenEmbedder {
     /// comment, and needed even more here: this is called once for the
     /// whole prompt and once per generated token thereafter.
     pub fn embed(&self, input_ids: &[i32]) -> Result<Vec<f32>, JsValue> {
-        self.inner.embed(input_ids).map_err(|e| to_js(&Message::from(&e)))
+        self.inner
+            .embed(input_ids)
+            .map_err(|e| to_js(&Message::from(&e)))
     }
 }

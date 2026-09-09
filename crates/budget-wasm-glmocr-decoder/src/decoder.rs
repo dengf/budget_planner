@@ -77,7 +77,12 @@ impl DecoderSession {
         position_ids: &[i32],
     ) -> Result<Vec<f32>, JsValue> {
         self.inner
-            .step(inputs_embeds, seq_len as usize, attention_mask, position_ids)
+            .step(
+                inputs_embeds,
+                seq_len as usize,
+                attention_mask,
+                position_ids,
+            )
             .map_err(|e| to_js(&Message::from(&e)))
     }
 }
