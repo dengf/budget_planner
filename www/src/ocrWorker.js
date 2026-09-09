@@ -101,7 +101,7 @@ let llmWasmPromise = null;
 let glmOcrWasmPromise = null;
 let modelBytesPromise = null;
 let llmModelBytesPromise = null;
-let glmOcrModelBytesPromise = null;
+let glmOcrSessionPromise = null;
 
 async function fetchBytes(path) {
   const res = await fetch(path);
@@ -263,24 +263,43 @@ function loadGlmOcrWasm() {
 
 // Same one-fetch-per-worker-lifetime memoization as `loadModels` above,
 // at ~2.2GB instead of a few megabytes -- `onProgress(loadedBytes)` is
-// called with the running total across all six files as they stream in,
-// so a caller can show real download progress rather than a UI that
+// called with the running total across all seven files as they stream
+// in, so a caller can show real download progress rather than a UI that
 // looks frozen for however long a 2.2GB fetch takes. Only called once
 // per worker lifetime even if `onProgress` differs between callers
 // (a second Smart Parse call while the first is still loading shares the
 // same in-flight promise but won't see progress events -- acceptable,
 // since Smart Parse's own UI disables re-triggering while a parse is in
-// flight).
+// flight). Memoizes the fully-loaded `wasm.SmartParseSession`, not raw
+// bytes -- a second Smart Parse call in the same worker lifetime reuses
+// the already-built session directly, without re-fetching or re-parsing
+// any of the three models.
 //
-// Sequential, deliberately not `Promise.all` -- downloading all seven
-// files at once meant up to seven of `fetchBytesCached`'s buffers
-// resident simultaneously, and with two of these files around 900MB and
-// 1.1GB, that was enough on its own to crash the tab partway through a
-// real download even after fixing the per-file buffering above. One file
-// at a time keeps peak memory to roughly the largest single file instead
-// of the sum of all seven. Slower on a very fast connection than full
-// concurrency would be, but this is a one-time download and a crash is
-// strictly worse than a few extra seconds.
+// Sequential, deliberately not concurrent -- downloading all seven files
+// at once meant up to seven of `fetchBytesCached`'s buffers resident
+// simultaneously, and with two of these files around 900MB and 1.1GB,
+// that was enough on its own to crash the tab partway through a real
+// download even after fixing the per-file buffering above.
+//
+// Each model's graph+data pair is also handed to
+// `wasm.SmartParseSession.load_*` immediately after it finishes
+// downloading, inside its own block scope, rather than collected into an
+// array and passed to one big call at the end -- collecting all three
+// models' bytes first meant this worker held its own ~2.2GB of raw JS
+// buffers, and then `run_smart_parse` handed all of it to Rust in a
+// single call, which held a second ~2.2GB owned copy at the same moment.
+// On a phone, that combined peak exceeded the browser's per-tab memory
+// ceiling and the OS killed the tab outright -- silently, with no JS
+// exception for any `catch` to see, before the download even finished
+// (reported around the vision+embed files' combined ~1GB mark, right as
+// the ~1.1GB decoder file's pre-sized buffer was allocated on top of
+// them). Block-scoping each pair lets it become unreachable, and
+// collectible, the moment its `load_*` call returns, instead of staying
+// referenced for the rest of this function -- so peak JS memory here is
+// roughly one file at a time (~1.1GB) rather than the sum of all three,
+// and Rust never needs to hold its own copy alongside a still-resident
+// JS one. See `budget_calc::SmartParseSession`'s own doc comment for the
+// matching Rust-side half of this.
 //
 // Reset to null on rejection, same reasoning as loadModels above but far
 // more likely to matter here: a ~2.2GB download takes minutes even on a
@@ -290,25 +309,45 @@ function loadGlmOcrWasm() {
 // Smart Parse until a full page reload. `fetchBytesCached` checks Cache
 // Storage before fetching, so a retry after this reset skips whichever
 // files already finished and only re-fetches from the point of failure.
-function loadGlmOcrModel(onProgress) {
-  if (!glmOcrModelBytesPromise) {
+function loadGlmOcrSession(onProgress) {
+  if (!glmOcrSessionPromise) {
     let loaded = 0;
     const track = (delta) => {
       loaded += delta;
       onProgress(loaded);
     };
-    glmOcrModelBytesPromise = (async () => {
-      const bytes = [];
-      for (const url of Object.values(GLM_OCR_MODEL_PATHS)) {
-        bytes.push(await fetchBytesCached(url, track));
+    glmOcrSessionPromise = (async () => {
+      const wasm = await loadGlmOcrWasm();
+      const session = new wasm.SmartParseSession();
+
+      {
+        const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionGraph, track);
+        const data = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionData, track);
+        throwIfLoadError(session.load_vision(graph, data));
       }
-      return bytes;
+      {
+        const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track);
+        const data = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedData, track);
+        throwIfLoadError(session.load_embed(graph, data));
+      }
+      {
+        const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderGraph, track);
+        const data = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderData, track);
+        throwIfLoadError(session.load_decoder(graph, data));
+      }
+
+      const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
+      return { session, tokenizerJson };
     })().catch((err) => {
-      glmOcrModelBytesPromise = null;
+      glmOcrSessionPromise = null;
       throw err;
     });
   }
-  return glmOcrModelBytesPromise;
+  return glmOcrSessionPromise;
+}
+
+function throwIfLoadError(loadResult) {
+  if (loadResult?.error) throw new Error(loadResult.error);
 }
 
 self.onmessage = async (event) => {
@@ -355,24 +394,11 @@ self.onmessage = async (event) => {
       const [modelBytes, tokenizerJson] = await loadLlmModel();
       result = wasm.classify_statement_rows(modelBytes, tokenizerJson, event.data.descriptions);
     } else if (type === 'smart-parse') {
-      const wasm = await loadGlmOcrWasm();
-      const [visionGraph, visionData, embedGraph, embedData, decoderGraph, decoderData, tokenizerJson] =
-        await loadGlmOcrModel((loadedBytes) => {
-          self.postMessage({ id, progress: { loadedBytes } });
-        });
+      const { session, tokenizerJson } = await loadGlmOcrSession((loadedBytes) => {
+        self.postMessage({ id, progress: { loadedBytes } });
+      });
       const { imageRgb, width, height } = event.data;
-      result = wasm.run_smart_parse(
-        visionGraph,
-        visionData,
-        embedGraph,
-        embedData,
-        decoderGraph,
-        decoderData,
-        tokenizerJson,
-        imageRgb,
-        width,
-        height,
-      );
+      result = session.run(tokenizerJson, imageRgb, width, height);
     } else {
       throw new Error(`ocrWorker: unknown message type "${type}"`);
     }

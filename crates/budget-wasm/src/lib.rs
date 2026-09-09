@@ -25,7 +25,7 @@
 //! statement-row income/expense classification
 //! (`classify_statement_descriptions`), PDF page rasterization
 //! (`pdf_page_count`, `render_pdf_page`) and Smart Parse
-//! (`run_smart_parse`, GLM-OCR) live in the sibling `budget-wasm-ocr`,
+//! (`SmartParseSession`, GLM-OCR) live in the sibling `budget-wasm-ocr`,
 //! `budget-wasm-pdf`, `budget-wasm-llm`, `budget-wasm-pdfrender` and
 //! `budget-wasm-glmocr` crates instead, each compiled to its own separate
 //! `.wasm` file that `www/src/ocrWorker.js` only loads the first time
