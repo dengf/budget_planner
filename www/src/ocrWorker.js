@@ -298,6 +298,21 @@ async function fetchContentLength(url) {
 // `fetchBytesCached` gets from whole-file caching, just at a finer
 // grain (and, unlike whole-file caching, no partial progress is ever
 // lost to an interruption beyond the one chunk in flight when it hit).
+//
+// The write to Cache Storage is awaited before this function returns,
+// deliberately giving up the overlap a fire-and-forget `cache.put` would
+// allow between one chunk's disk write and the next chunk's network
+// fetch. A first version left it fire-and-forget, the same way
+// `fetchBytesCached` below writes its one whole-file entry -- fine
+// there, since it happens once per file, but here it runs ~27 times per
+// large file in quick succession, and a disk write slower than the next
+// chunk's fetch (plausible on iOS's encrypted storage) let unfinished
+// writes back up, each still holding its own chunk-sized buffer alive
+// until it completed. That backlog was a new memory consumer this
+// chunked rewrite introduced that the old whole-file streaming path
+// never had, and it made a real device crash *earlier* than before this
+// rewrite rather than later -- awaiting the write caps how many
+// chunk-sized buffers can be alive for caching purposes at once to one.
 async function fetchDataChunkCached(url, start, end) {
   const cache = await caches.open(GLM_OCR_CACHE_NAME);
   const chunkKey = `${url}#bytes=${start}-${end}`;
@@ -311,7 +326,11 @@ async function fetchDataChunkCached(url, start, end) {
     );
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
-  cache.put(chunkKey, new Response(bytes)).catch(() => {}); // best-effort; quota errors shouldn't fail the parse itself
+  try {
+    await cache.put(chunkKey, new Response(bytes));
+  } catch {
+    // best-effort; a quota or storage error shouldn't fail the parse itself
+  }
   return bytes;
 }
 
