@@ -115,6 +115,20 @@ async function fetchBytes(path) {
 // bytes stream in -- the caller uses this to post incremental progress
 // back to the main thread, since a single 2.2GB fetch with no feedback
 // reads as a frozen/broken app on a slow connection.
+//
+// Writes straight into one pre-sized buffer (from the response's own
+// `Content-Length` -- Hugging Face's CDN always sends one for these
+// files) rather than an array of chunks concatenated at the end, and
+// caches from that finished buffer rather than a `clone()`'d stream
+// buffered concurrently by the Cache API. The old version did both at
+// once per file -- a chunks array, a final concatenated copy, and a
+// second full buffer inside `cache.put`'s own stream handling -- close
+// to 3x a file's size resident at once. With the two largest of GLM-OCR's
+// seven files around 900MB and 1.1GB, downloading all seven at once (see
+// below) with that per-file overhead was enough to crash the whole tab
+// partway through a real download, reported live at roughly 50% of the
+// combined ~2.2GB. Falls back to the old chunks-then-concat approach only
+// if a response is ever served without a usable `Content-Length`.
 async function fetchBytesCached(url, onChunk) {
   const cache = await caches.open(GLM_OCR_CACHE_NAME);
   const cached = await cache.match(url);
@@ -126,27 +140,39 @@ async function fetchBytesCached(url, onChunk) {
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`could not fetch ${url}: ${res.status}`);
-  // Cache a clone before consuming the body -- a `Response` can only be
-  // read once, and the cache needs its own untouched copy.
-  const toCache = res.clone();
-  cache.put(url, toCache).catch(() => {}); // best-effort; quota errors shouldn't fail the parse itself
-
   const reader = res.body.getReader();
-  const chunks = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    total += value.byteLength;
-    onChunk(value.byteLength);
+  const declaredLength = Number(res.headers.get('content-length'));
+
+  let bytes;
+  if (Number.isFinite(declaredLength) && declaredLength > 0) {
+    bytes = new Uint8Array(declaredLength);
+    let offset = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes.set(value, offset);
+      offset += value.byteLength;
+      onChunk(value.byteLength);
+    }
+  } else {
+    const chunks = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.byteLength;
+      onChunk(value.byteLength);
+    }
+    bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
   }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+
+  cache.put(url, new Response(bytes)).catch(() => {}); // best-effort; quota errors shouldn't fail the parse itself
   return bytes;
 }
 
@@ -234,6 +260,16 @@ function loadGlmOcrWasm() {
 // same in-flight promise but won't see progress events -- acceptable,
 // since Smart Parse's own UI disables re-triggering while a parse is in
 // flight).
+//
+// Sequential, deliberately not `Promise.all` -- downloading all seven
+// files at once meant up to seven of `fetchBytesCached`'s buffers
+// resident simultaneously, and with two of these files around 900MB and
+// 1.1GB, that was enough on its own to crash the tab partway through a
+// real download even after fixing the per-file buffering above. One file
+// at a time keeps peak memory to roughly the largest single file instead
+// of the sum of all seven. Slower on a very fast connection than full
+// concurrency would be, but this is a one-time download and a crash is
+// strictly worse than a few extra seconds.
 function loadGlmOcrModel(onProgress) {
   if (!glmOcrModelBytesPromise) {
     let loaded = 0;
@@ -241,15 +277,13 @@ function loadGlmOcrModel(onProgress) {
       loaded += delta;
       onProgress(loaded);
     };
-    glmOcrModelBytesPromise = Promise.all([
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.visionGraph, track),
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.visionData, track),
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track),
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.embedData, track),
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderGraph, track),
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderData, track),
-      fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track),
-    ]);
+    glmOcrModelBytesPromise = (async () => {
+      const bytes = [];
+      for (const url of Object.values(GLM_OCR_MODEL_PATHS)) {
+        bytes.push(await fetchBytesCached(url, track));
+      }
+      return bytes;
+    })();
   }
   return glmOcrModelBytesPromise;
 }
