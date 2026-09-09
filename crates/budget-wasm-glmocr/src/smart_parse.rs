@@ -4,14 +4,13 @@
 //! function taking nine buffers -- see `budget_calc::SmartParseSession`'s
 //! own doc comment for why: `www/src/ocrWorker.js` downloads each of
 //! GLM-OCR's three ~200MB-to-1GB-scale models (graph + external-data
-//! pair) one at a time and hands each straight to `load_vision`/
-//! `load_embed`/`load_decoder` as soon as it finishes, instead of
-//! collecting all ~2.2GB of raw bytes in JS before a single call. Buffer
-//! params take `Vec<u8>` by value here, not `&[u8]`, so wasm-bindgen's
-//! own JS-to-wasm copy becomes the owned buffer `budget_calc` stores --
-//! `&[u8]` plus a `.to_vec()` inside would mean a second, redundant
-//! ~1GB-scale copy of whichever file is currently loading, on top of the
-//! one wasm-bindgen already made crossing the boundary.
+//! pair) in tens-of-MB range-request chunks, feeding each chunk to
+//! `append_data_chunk` as it arrives and finishing with `finish_vision`/
+//! `finish_embed`/`finish_decoder`, instead of ever handing this crate
+//! one huge buffer in a single call. `finish_vision`/`finish_embed`/
+//! `finish_decoder` take the (small) graph buffer as `Vec<u8>` by value,
+//! not `&[u8]`, so wasm-bindgen's own JS-to-wasm copy becomes the owned
+//! buffer `budget_calc` stores.
 
 use budget_core::Message;
 use wasm_bindgen::prelude::*;
@@ -39,16 +38,24 @@ impl SmartParseSession {
         }
     }
 
-    pub fn load_vision(&mut self, graph: Vec<u8>, data: Vec<u8>) -> JsValue {
-        to_js(&load_result(self.inner.load_vision(graph, data)))
+    pub fn begin_data(&mut self, total_len: u32) {
+        self.inner.begin_data(total_len as usize);
     }
 
-    pub fn load_embed(&mut self, graph: Vec<u8>, data: Vec<u8>) -> JsValue {
-        to_js(&load_result(self.inner.load_embed(graph, data)))
+    pub fn append_data_chunk(&mut self, chunk: &[u8]) {
+        self.inner.append_data_chunk(chunk);
     }
 
-    pub fn load_decoder(&mut self, graph: Vec<u8>, data: Vec<u8>) -> JsValue {
-        to_js(&load_result(self.inner.load_decoder(graph, data)))
+    pub fn finish_vision(&mut self, graph: Vec<u8>) -> JsValue {
+        to_js(&load_result(self.inner.finish_vision(graph)))
+    }
+
+    pub fn finish_embed(&mut self, graph: Vec<u8>) -> JsValue {
+        to_js(&load_result(self.inner.finish_embed(graph)))
+    }
+
+    pub fn finish_decoder(&mut self, graph: Vec<u8>) -> JsValue {
+        to_js(&load_result(self.inner.finish_decoder(graph)))
     }
 
     pub fn run(&self, tokenizer_json: &[u8], image_rgb: &[u8], width: u32, height: u32) -> JsValue {

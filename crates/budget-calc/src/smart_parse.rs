@@ -287,23 +287,31 @@ fn zero_past(batch: usize) -> Vec<(Tensor<f32>, Tensor<f32>)> {
         .collect()
 }
 
-/// Incrementally-loaded GLM-OCR session. The three models load one at a
-/// time through their own methods rather than all at once through a
-/// single function taking nine buffers, so a caller can hand each
-/// ~200MB-to-1GB-scale file to Rust as soon as it finishes downloading
-/// and drop its own copy immediately after -- see
-/// `www/src/ocrWorker.js`'s own doc comment on `loadGlmOcrModel` for the
-/// real crash this fixes: the previous all-at-once shape needed the
-/// caller to hold its own full ~2.2GB of raw bytes in memory right up
-/// until a single call handed all of it to Rust, which then held a
-/// second ~2.2GB owned copy at the same moment -- on a phone, that
-/// combined peak exceeded the browser's per-tab memory ceiling and the
-/// tab was killed by the OS before the download even finished.
+/// Incrementally-loaded GLM-OCR session. Each of the three models'
+/// external-data (weights) buffers builds up through `begin_data` +
+/// repeated `append_data_chunk` calls, tens-of-MB at a time, rather than
+/// arriving as one `~200MB-to-1GB`-scale buffer in a single call -- see
+/// `www/src/ocrWorker.js`'s own doc comment on `loadGlmOcrSession` for
+/// why: even after an earlier round moved to handing each *file* to Rust
+/// as soon as it finished downloading (rather than collecting all three
+/// first), a single ~868MB-to-1.1GB buffer crossing the JS/wasm boundary
+/// in one call was still enough on its own to crash a real phone's tab,
+/// on a brand-new high-RAM iPhone, in both Safari and Chrome, with no
+/// other tabs open -- something below the level either engine's model
+/// loading or `rten`'s own external-data storage (confirmed via its
+/// source: a plain `Arc`-wrapped move, no extra copy) could explain.
+/// Chunking bounds every single buffer this module ever receives in one
+/// call to tens of MB, regardless of how large the overall model file
+/// is. `self.staging` is reused across all three models (they always
+/// load one at a time, matching `ocrWorker.js`'s sequential download
+/// order) rather than three separate fields, since only one is ever
+/// mid-load at once.
 #[derive(Default)]
 pub struct SmartParseSession {
     vision: Option<LoadedModel>,
     embed: Option<LoadedModel>,
     decoder: Option<LoadedModel>,
+    staging: Vec<u8>,
 }
 
 impl SmartParseSession {
@@ -311,7 +319,22 @@ impl SmartParseSession {
         Self::default()
     }
 
-    pub fn load_vision(&mut self, graph: Vec<u8>, data: Vec<u8>) -> Result<(), BudgetError> {
+    /// Starts a new external-data buffer, reserved to `total_len` up
+    /// front so `append_data_chunk` never triggers a reallocate-and-copy
+    /// of everything appended so far as it grows.
+    pub fn begin_data(&mut self, total_len: usize) {
+        self.staging = Vec::with_capacity(total_len);
+    }
+
+    /// Appends one chunk to the external-data buffer started by
+    /// `begin_data`. Chunk-sized (tens of MB), not file-sized -- see
+    /// this struct's own doc comment for why that bound matters.
+    pub fn append_data_chunk(&mut self, chunk: &[u8]) {
+        self.staging.extend_from_slice(chunk);
+    }
+
+    pub fn finish_vision(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
+        let data = std::mem::take(&mut self.staging);
         self.vision = Some(LoadedModel::load(
             graph,
             "vision_encoder_fp16.onnx_data",
@@ -320,7 +343,8 @@ impl SmartParseSession {
         Ok(())
     }
 
-    pub fn load_embed(&mut self, graph: Vec<u8>, data: Vec<u8>) -> Result<(), BudgetError> {
+    pub fn finish_embed(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
+        let data = std::mem::take(&mut self.staging);
         self.embed = Some(LoadedModel::load(
             graph,
             "embed_tokens_fp16.onnx_data",
@@ -329,7 +353,8 @@ impl SmartParseSession {
         Ok(())
     }
 
-    pub fn load_decoder(&mut self, graph: Vec<u8>, data: Vec<u8>) -> Result<(), BudgetError> {
+    pub fn finish_decoder(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
+        let data = std::mem::take(&mut self.staging);
         self.decoder = Some(LoadedModel::load(
             graph,
             "decoder_model_merged_fp16.onnx_data",
