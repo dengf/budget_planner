@@ -217,25 +217,36 @@ function loadLlmWasm() {
 }
 
 // Fetched once per worker lifetime -- a second scan in the same session
-// shouldn't re-download the ~6.3MB of model data again.
+// shouldn't re-download the ~6.3MB of model data again. Reset to null on
+// rejection so a dropped connection (flaky wifi, phone briefly offline)
+// doesn't permanently poison every later attempt with the same stale
+// rejected promise -- without this, only a full page reload (which
+// re-creates the worker) could recover.
 function loadModels() {
   if (!modelBytesPromise) {
     modelBytesPromise = Promise.all([
       fetchBytes(OCR_MODEL_PATHS.detection),
       fetchBytes(OCR_MODEL_PATHS.recognition),
-    ]);
+    ]).catch((err) => {
+      modelBytesPromise = null;
+      throw err;
+    });
   }
   return modelBytesPromise;
 }
 
-// Same one-fetch-per-worker-lifetime memoization as loadModels above, for
-// the ~23MB embedding model + its tokenizer.
+// Same one-fetch-per-worker-lifetime memoization (and reset-on-rejection,
+// see loadModels above) as loadModels, for the ~23MB embedding model +
+// its tokenizer.
 function loadLlmModel() {
   if (!llmModelBytesPromise) {
     llmModelBytesPromise = Promise.all([
       fetchBytes(LLM_MODEL_PATHS.model),
       fetchBytes(LLM_MODEL_PATHS.tokenizer),
-    ]);
+    ]).catch((err) => {
+      llmModelBytesPromise = null;
+      throw err;
+    });
   }
   return llmModelBytesPromise;
 }
@@ -270,6 +281,15 @@ function loadGlmOcrWasm() {
 // of the sum of all seven. Slower on a very fast connection than full
 // concurrency would be, but this is a one-time download and a crash is
 // strictly worse than a few extra seconds.
+//
+// Reset to null on rejection, same reasoning as loadModels above but far
+// more likely to matter here: a ~2.2GB download takes minutes even on a
+// fast connection, and mobile browsers routinely interrupt a long fetch
+// (screen lock, backgrounding, switching between wifi and cellular).
+// Without the reset, that first interruption would permanently wedge
+// Smart Parse until a full page reload. `fetchBytesCached` checks Cache
+// Storage before fetching, so a retry after this reset skips whichever
+// files already finished and only re-fetches from the point of failure.
 function loadGlmOcrModel(onProgress) {
   if (!glmOcrModelBytesPromise) {
     let loaded = 0;
@@ -283,7 +303,10 @@ function loadGlmOcrModel(onProgress) {
         bytes.push(await fetchBytesCached(url, track));
       }
       return bytes;
-    })();
+    })().catch((err) => {
+      glmOcrModelBytesPromise = null;
+      throw err;
+    });
   }
   return glmOcrModelBytesPromise;
 }
