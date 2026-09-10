@@ -42,11 +42,24 @@ async function deployedBuildId() {
  * which would leave the page exactly as stale as before, so navigate to a
  * URL the cache has never seen instead. `replace` rather than `assign` so
  * the stale page doesn't become a back-button destination.
+ *
+ * `force` skips the reload-loop guard below. It exists for exactly one
+ * caller: `UpdateBanner`'s own Reload button. Without it, a visitor who
+ * arrived while GitHub Pages' ten-minute HTML cache was still serving an
+ * older deploy than the one `version.json` already reports would silently
+ * do nothing on a second click — the automatic reload that ran first (on
+ * load, or while the tab was hidden) already set the guard for that same
+ * id, so every later match against it, automatic or not, used to bail out
+ * with only a `console.warn` no one watching the tab could see. A person
+ * clicking a visible button deliberately is not the runaway-loop case this
+ * guard exists to stop; only the automatic path needs protecting from
+ * that.
  */
-export function reloadOnto(deployedId) {
+export function reloadOnto(deployedId, { force = false } = {}) {
   // If we already reloaded for this id and are somehow still stale,
-  // something is wrong upstream — stop rather than loop.
-  if (sessionStorage.getItem(RELOAD_GUARD_KEY) === deployedId) {
+  // something is wrong upstream — stop rather than loop. Does not apply
+  // to a forced (manual button) reload — see doc comment above.
+  if (!force && sessionStorage.getItem(RELOAD_GUARD_KEY) === deployedId) {
     console.warn(`Still running an old build after reloading for ${deployedId}; not retrying.`);
     return;
   }
@@ -77,8 +90,19 @@ function tidyUrl() {
  * the tab is hidden, since replacing the page under someone mid-calculation
  * would discard whatever they had entered. Saved scenarios live in
  * IndexedDB and survive either way; unsaved field values do not.
+ *
+ * `isBusy` is the one exception to "hidden means safe to reload": a real
+ * report from an in-flight Smart Parse scan (a multi-minute download, no
+ * saved state until it finishes) showed the page reloading mid-download
+ * with no error at all — indistinguishable from a crash, but actually
+ * this same "safe" hidden-tab reload firing while the tab had simply been
+ * backgrounded for a moment. `isBusy()` (backed by `activityGuard.js`) is
+ * checked alongside `document.hidden` so this path defers to `onStale`
+ * instead — the banner it renders is inert while the tab stays hidden,
+ * costing nothing, and the next check (the 5-minute timer, or the next
+ * visibility change) reloads normally once the scan has finished.
  */
-export function startVersionCheck({ onStale } = {}) {
+export function startVersionCheck({ onStale, isBusy } = {}) {
   const current = currentBuildId();
   if (!current) return () => {};
 
@@ -91,7 +115,7 @@ export function startVersionCheck({ onStale } = {}) {
     const deployed = await deployedBuildId();
     if (stopped || !deployed || deployed === current) return;
 
-    if (eager || document.hidden) {
+    if ((eager || document.hidden) && !(isBusy && isBusy())) {
       reloadOnto(deployed);
     } else if (onStale) {
       onStale(deployed);
