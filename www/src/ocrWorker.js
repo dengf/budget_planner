@@ -171,23 +171,34 @@ async function fetchBytesCached(url, onChunk) {
     return new Uint8Array(buf);
   }
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`could not fetch ${url}: ${res.status}`);
-  const reader = res.body.getReader();
-  const declaredLength = Number(res.headers.get('content-length'));
+  // Retried as one unit rather than resuming mid-stream -- these are the
+  // small graph/tokenizer files (single-digit MB), unlike the chunked
+  // `fetchDataChunkCached` path above, so re-fetching from byte 0 on a
+  // transient drop is cheap. A retry here does call `onChunk` again for
+  // whatever a failed partial attempt already reported, inflating the
+  // running progress total -- acceptable since that total is already
+  // documented as approximate (see `SMART_PARSE_APPROX_TOTAL_BYTES` in
+  // receiptCapture.js) and only ever clamped for display, never relied on
+  // for correctness.
+  const bytes = await withTransientFetchRetry(async () => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`could not fetch ${url}: ${res.status}`);
+    const reader = res.body.getReader();
+    const declaredLength = Number(res.headers.get('content-length'));
 
-  let bytes;
-  if (Number.isFinite(declaredLength) && declaredLength > 0) {
-    bytes = new Uint8Array(declaredLength);
-    let offset = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes.set(value, offset);
-      offset += value.byteLength;
-      onChunk(value.byteLength);
+    if (Number.isFinite(declaredLength) && declaredLength > 0) {
+      const buf = new Uint8Array(declaredLength);
+      let offset = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf.set(value, offset);
+        offset += value.byteLength;
+        onChunk(value.byteLength);
+      }
+      return buf;
     }
-  } else {
+
     const chunks = [];
     let total = 0;
     for (;;) {
@@ -197,13 +208,14 @@ async function fetchBytesCached(url, onChunk) {
       total += value.byteLength;
       onChunk(value.byteLength);
     }
-    bytes = new Uint8Array(total);
+    const buf = new Uint8Array(total);
     let offset = 0;
     for (const chunk of chunks) {
-      bytes.set(chunk, offset);
+      buf.set(chunk, offset);
       offset += chunk.byteLength;
     }
-  }
+    return buf;
+  });
 
   cache.put(url, new Response(bytes)).catch(() => {}); // best-effort; quota errors shouldn't fail the parse itself
   return bytes;
@@ -324,19 +336,51 @@ function loadGlmOrchestrateWasm() {
   return glmOrchestrateWasmPromise;
 }
 
+// Smart Parse's ~2.2GB first-time download issues dozens of sequential
+// network requests (a HEAD plus ~27 range requests per large file) over
+// however many minutes that takes on a real connection -- long enough
+// that a screen lock, backgrounding, or a wifi/cellular handoff dropping
+// exactly one of them is an expected occurrence, not a rare edge case.
+// Without this, that one dropped request failed the *entire* attempt --
+// discarding every chunk already downloaded and cached in this same
+// call -- with no automatic recovery, surfacing as the same generic,
+// unhelpful "couldn't read that file" toast a real corrupt file would
+// (see `ReceiptCapture.jsx`'s catch block). A few retries with a short
+// growing delay covers a transient drop; a genuinely dead connection
+// still fails after these, same as before.
+const TRANSIENT_FETCH_RETRIES = 3;
+const TRANSIENT_FETCH_RETRY_DELAY_MS = 1000;
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTransientFetchRetry(attempt) {
+  for (let tryNum = 0; ; tryNum++) {
+    try {
+      return await attempt();
+    } catch (err) {
+      if (tryNum >= TRANSIENT_FETCH_RETRIES) throw err;
+      await wait(TRANSIENT_FETCH_RETRY_DELAY_MS * (tryNum + 1));
+    }
+  }
+}
+
 // Discovers a file's total byte length via a HEAD request, without
 // downloading any of the body -- used only for the three large
 // external-data files, to know how many `GLM_OCR_CHUNK_BYTES` range
 // requests to issue and how large a buffer the session's own
 // `begin_data` should reserve.
 async function fetchContentLength(url) {
-  const res = await fetch(url, { method: 'HEAD' });
-  if (!res.ok) throw new Error(`could not HEAD ${url}: ${res.status}`);
-  const length = Number(res.headers.get('content-length'));
-  if (!Number.isFinite(length) || length <= 0) {
-    throw new Error(`${url} did not report a usable Content-Length`);
-  }
-  return length;
+  return withTransientFetchRetry(async () => {
+    const res = await fetch(url, { method: 'HEAD' });
+    if (!res.ok) throw new Error(`could not HEAD ${url}: ${res.status}`);
+    const length = Number(res.headers.get('content-length'));
+    if (!Number.isFinite(length) || length <= 0) {
+      throw new Error(`${url} did not report a usable Content-Length`);
+    }
+    return length;
+  });
 }
 
 // Fetches one `GLM_OCR_CHUNK_BYTES`-sized (or smaller, for the last
@@ -367,13 +411,15 @@ async function fetchDataChunkCached(url, start, end) {
   const cached = await cache.match(chunkKey);
   if (cached) return new Uint8Array(await cached.arrayBuffer());
 
-  const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
-  if (res.status !== 206) {
-    throw new Error(
-      `expected a 206 Partial Content response to a ranged request for ${url}, got ${res.status}`,
-    );
-  }
-  const bytes = new Uint8Array(await res.arrayBuffer());
+  const bytes = await withTransientFetchRetry(async () => {
+    const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+    if (res.status !== 206) {
+      throw new Error(
+        `expected a 206 Partial Content response to a ranged request for ${url}, got ${res.status}`,
+      );
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  });
   try {
     await cache.put(chunkKey, new Response(bytes));
   } catch {

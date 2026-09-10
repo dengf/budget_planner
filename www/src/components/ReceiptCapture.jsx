@@ -139,7 +139,11 @@ export default function ReceiptCapture({
       // via `budget-wasm-pdfrender`), not just photographed receipts --
       // see `smartParseReceiptFile`'s own doc comment for why that's true
       // even for a PDF that already has a text layer.
-      const { text, calcError: extractError, truncated: extractTruncated } = smartParseEnabled
+      const {
+        text,
+        calcError: extractError,
+        truncated: extractTruncated,
+      } = smartParseEnabled
         ? await smartParseReceiptFile(file, setProgress)
         : await extractReceiptText(file, setProgress);
       setProgress(null); // done either way; nothing left to report
@@ -185,7 +189,14 @@ export default function ReceiptCapture({
       });
       setIsIncomeHint(parsed.is_income);
       setStatus('review');
-    } catch {
+    } catch (error) {
+      // Surfaced only to the console, not the user -- the toast below
+      // stays generic and translated either way. Before this, a failure
+      // here (a worker crash, a Smart Parse model-download error) left no
+      // trace anywhere: this `catch` had no error parameter at all, so a
+      // real iPhone report of this exact toast couldn't be diagnosed after
+      // the fact even with Safari's remote Web Inspector open on a retry.
+      console.error('Receipt extraction failed:', error);
       setCalcError({ error: t('transactions.receiptExtractFailed') });
       setStatus('idle');
     }
@@ -274,7 +285,9 @@ export default function ReceiptCapture({
           </label>
           {smartParseEnabled && (
             <p className="panel-subtitle">
-              {t('transactions.smartParseHint', { size: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES) })}
+              {t('transactions.smartParseHint', {
+                size: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES),
+              })}
             </p>
           )}
         </>
@@ -284,7 +297,10 @@ export default function ReceiptCapture({
         <p className="empty-state">
           {progress?.phase === 'download' && progress.loadedBytes < SMART_PARSE_APPROX_TOTAL_BYTES
             ? t('transactions.smartParseDownloading', {
-                percent: Math.min(100, Math.round((progress.loadedBytes / SMART_PARSE_APPROX_TOTAL_BYTES) * 100)),
+                percent: Math.min(
+                  100,
+                  Math.round((progress.loadedBytes / SMART_PARSE_APPROX_TOTAL_BYTES) * 100),
+                ),
                 loaded: formatBytes(progress.loadedBytes),
                 total: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES),
               })
