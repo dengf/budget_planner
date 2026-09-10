@@ -27,6 +27,18 @@
 // now lives here instead -- separate wasm module instances cannot call
 // each other directly, only JS can sequence calls across them.
 //
+// That fix addressed wasm32's own 4GiB-per-module ceiling, but left a
+// second, lower ceiling standing: all three module instances still share
+// this one worker's OS-level process, and their doubled memory adds up
+// there regardless of how many separate wasm32 address spaces they
+// occupy -- roughly 4.2GB combined, comfortably past a real iPhone's
+// actual per-tab memory budget, confirmed as the cause of a second
+// real-device failure (the tab silently reset with no JS-visible error at
+// all -- an OS-level memory kill, not a catchable exception). Vision is
+// only ever needed once per scan, so it runs in its own dedicated worker,
+// terminated immediately after -- see `runVisionInSubworker` and
+// `glmVisionWorker.js`'s own doc comment.
+//
 // `pkg-pdfrender` (`hayro`, a pure-Rust PDF rasterizer) is the one
 // exception to "one message type per module": both the `'pdf-page-count'`
 // and `'pdf-render-page'` messages load it, and it's reached from two
@@ -84,51 +96,22 @@ const LLM_MODEL_PATHS = {
   tokenizer: new URL('llm/tokenizer.json', self.location.href),
 };
 
-// Smart Parse's model, unlike every other one in this file, is not
-// vendored under `static/` -- GLM-OCR's fp16 ONNX export is ~2.2GB
-// across these six files, far beyond what's reasonable to check into
-// git or download on an ordinary visit (see
-// `budget-calc::smart_parse_model`'s own doc comment). Fetched directly
-// from Hugging Face's model CDN only
-// the first time a user explicitly opts into Smart Parse, and cached
-// afterwards via `caches.open()` below (Cache Storage, not just the
-// browser's ordinary HTTP cache) so a second use, even in a later
-// session, doesn't re-download 2.2GB -- explicit control matters at this
-// size, where an evicted HTTP cache silently turning into a re-download
-// is a materially worse experience than for the other, much smaller
-// models this worker fetches.
-const GLM_OCR_BASE = 'https://huggingface.co/onnx-community/GLM-OCR-ONNX/resolve/main';
-const GLM_OCR_MODEL_PATHS = {
-  visionGraph: `${GLM_OCR_BASE}/onnx/vision_encoder_fp16.onnx`,
-  visionData: `${GLM_OCR_BASE}/onnx/vision_encoder_fp16.onnx_data`,
-  embedGraph: `${GLM_OCR_BASE}/onnx/embed_tokens_fp16.onnx`,
-  embedData: `${GLM_OCR_BASE}/onnx/embed_tokens_fp16.onnx_data`,
-  decoderGraph: `${GLM_OCR_BASE}/onnx/decoder_model_merged_fp16.onnx`,
-  decoderData: `${GLM_OCR_BASE}/onnx/decoder_model_merged_fp16.onnx_data`,
-  tokenizer: `${GLM_OCR_BASE}/tokenizer.json`,
-};
-// v2, not v1: v1 cached each of the three large external-data files as
-// one whole-file Cache Storage entry; v2 caches them in
-// `GLM_OCR_CHUNK_BYTES`-sized pieces instead (see `fetchDataChunkCached`
-// below), a different enough key shape that reusing the old name would
-// just leave v1's whole-file entries as permanent dead weight never read
-// again. The browser will evict `v1` under normal storage-pressure
-// eviction like any other stale cache.
-const GLM_OCR_CACHE_NAME = 'smart-parse-glm-ocr-v2';
-
-// Each of GLM-OCR's three external-data (weights) files is fetched in
-// pieces this large via HTTP Range requests, rather than as one
-// streamed response -- see `loadGlmOcrModels`'s own doc comment for
-// why. Hugging Face's model CDN confirmed to honor `Range` with a real
-// `206 Partial Content` + `Content-Range` response before this was
-// built on that assumption.
-const GLM_OCR_CHUNK_BYTES = 32 * 1024 * 1024;
+// Smart Parse's own fetch/cache/retry helpers and model paths live in
+// `glmOcrFetch.js`, shared with `glmVisionWorker.js` -- see that file's
+// own doc comment for why vision runs in a separate, dedicated worker
+// rather than loading here alongside embed/decoder the way it used to.
+import {
+  GLM_OCR_MODEL_PATHS,
+  fetchBytesCached,
+  fetchDataFileIntoSession,
+  throwIfLoadError,
+  isMessageShaped,
+} from './glmOcrFetch';
 
 let ocrWasmPromise = null;
 let pdfWasmPromise = null;
 let pdfRenderWasmPromise = null;
 let llmWasmPromise = null;
-let glmVisionWasmPromise = null;
 let glmEmbedWasmPromise = null;
 let glmDecoderWasmPromise = null;
 let glmOrchestrateWasmPromise = null;
@@ -140,85 +123,6 @@ async function fetchBytes(path) {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`could not fetch ${path}: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
-}
-
-// Same as `fetchBytes`, plus: checks Cache Storage first (a prior Smart
-// Parse download persists there across page loads, unlike an in-memory
-// promise), and reports download progress via `onChunk(loadedDelta)` as
-// bytes stream in -- the caller uses this to post incremental progress
-// back to the main thread, since a single 2.2GB fetch with no feedback
-// reads as a frozen/broken app on a slow connection.
-//
-// Writes straight into one pre-sized buffer (from the response's own
-// `Content-Length` -- Hugging Face's CDN always sends one for these
-// files) rather than an array of chunks concatenated at the end, and
-// caches from that finished buffer rather than a `clone()`'d stream
-// buffered concurrently by the Cache API. The old version did both at
-// once per file -- a chunks array, a final concatenated copy, and a
-// second full buffer inside `cache.put`'s own stream handling -- close
-// to 3x a file's size resident at once. With the two largest of GLM-OCR's
-// seven files around 900MB and 1.1GB, downloading all seven at once (see
-// below) with that per-file overhead was enough to crash the whole tab
-// partway through a real download, reported live at roughly 50% of the
-// combined ~2.2GB. Falls back to the old chunks-then-concat approach only
-// if a response is ever served without a usable `Content-Length`.
-async function fetchBytesCached(url, onChunk) {
-  const cache = await caches.open(GLM_OCR_CACHE_NAME);
-  const cached = await cache.match(url);
-  if (cached) {
-    const buf = await cached.arrayBuffer();
-    onChunk(buf.byteLength);
-    return new Uint8Array(buf);
-  }
-
-  // Retried as one unit rather than resuming mid-stream -- these are the
-  // small graph/tokenizer files (single-digit MB), unlike the chunked
-  // `fetchDataChunkCached` path above, so re-fetching from byte 0 on a
-  // transient drop is cheap. A retry here does call `onChunk` again for
-  // whatever a failed partial attempt already reported, inflating the
-  // running progress total -- acceptable since that total is already
-  // documented as approximate (see `SMART_PARSE_APPROX_TOTAL_BYTES` in
-  // receiptCapture.js) and only ever clamped for display, never relied on
-  // for correctness.
-  const bytes = await withTransientFetchRetry(async () => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`could not fetch ${url}: ${res.status}`);
-    const reader = res.body.getReader();
-    const declaredLength = Number(res.headers.get('content-length'));
-
-    if (Number.isFinite(declaredLength) && declaredLength > 0) {
-      const buf = new Uint8Array(declaredLength);
-      let offset = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf.set(value, offset);
-        offset += value.byteLength;
-        onChunk(value.byteLength);
-      }
-      return buf;
-    }
-
-    const chunks = [];
-    let total = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      total += value.byteLength;
-      onChunk(value.byteLength);
-    }
-    const buf = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-      buf.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return buf;
-  });
-
-  cache.put(url, new Response(bytes)).catch(() => {}); // best-effort; quota errors shouldn't fail the parse itself
-  return bytes;
 }
 
 function loadOcrWasm() {
@@ -296,16 +200,6 @@ function loadLlmModel() {
   return llmModelBytesPromise;
 }
 
-function loadGlmVisionWasm() {
-  if (!glmVisionWasmPromise) {
-    glmVisionWasmPromise = import('../pkg-glmocr-vision').then(async (wasm) => {
-      if (wasm.default) await wasm.default();
-      return wasm;
-    });
-  }
-  return glmVisionWasmPromise;
-}
-
 function loadGlmEmbedWasm() {
   if (!glmEmbedWasmPromise) {
     glmEmbedWasmPromise = import('../pkg-glmocr-embed').then(async (wasm) => {
@@ -336,184 +230,68 @@ function loadGlmOrchestrateWasm() {
   return glmOrchestrateWasmPromise;
 }
 
-// Smart Parse's ~2.2GB first-time download issues dozens of sequential
-// network requests (a HEAD plus ~27 range requests per large file) over
-// however many minutes that takes on a real connection -- long enough
-// that a screen lock, backgrounding, or a wifi/cellular handoff dropping
-// exactly one of them is an expected occurrence, not a rare edge case.
-// Without this, that one dropped request failed the *entire* attempt --
-// discarding every chunk already downloaded and cached in this same
-// call -- with no automatic recovery, surfacing as the same generic,
-// unhelpful "couldn't read that file" toast a real corrupt file would
-// (see `ReceiptCapture.jsx`'s catch block). A few retries with a short
-// growing delay covers a transient drop; a genuinely dead connection
-// still fails after these, same as before.
-const TRANSIENT_FETCH_RETRIES = 3;
-const TRANSIENT_FETCH_RETRY_DELAY_MS = 1000;
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withTransientFetchRetry(attempt) {
-  for (let tryNum = 0; ; tryNum++) {
-    try {
-      return await attempt();
-    } catch (err) {
-      if (tryNum >= TRANSIENT_FETCH_RETRIES) throw err;
-      await wait(TRANSIENT_FETCH_RETRY_DELAY_MS * (tryNum + 1));
-    }
-  }
-}
-
-// Discovers a file's total byte length via a HEAD request, without
-// downloading any of the body -- used only for the three large
-// external-data files, to know how many `GLM_OCR_CHUNK_BYTES` range
-// requests to issue and how large a buffer the session's own
-// `begin_data` should reserve.
-async function fetchContentLength(url) {
-  return withTransientFetchRetry(async () => {
-    const res = await fetch(url, { method: 'HEAD' });
-    if (!res.ok) throw new Error(`could not HEAD ${url}: ${res.status}`);
-    const length = Number(res.headers.get('content-length'));
-    if (!Number.isFinite(length) || length <= 0) {
-      throw new Error(`${url} did not report a usable Content-Length`);
-    }
-    return length;
-  });
-}
-
-// Fetches one `GLM_OCR_CHUNK_BYTES`-sized (or smaller, for the last
-// piece) range of `url`, checking Cache Storage first under a
-// per-chunk key -- a prior interrupted download that already cached
-// some chunks skips straight past them on retry, same resumability
-// `fetchBytesCached` gets from whole-file caching, just at a finer
-// grain (and, unlike whole-file caching, no partial progress is ever
-// lost to an interruption beyond the one chunk in flight when it hit).
-//
-// The write to Cache Storage is awaited before this function returns,
-// deliberately giving up the overlap a fire-and-forget `cache.put` would
-// allow between one chunk's disk write and the next chunk's network
-// fetch. A first version left it fire-and-forget, the same way
-// `fetchBytesCached` below writes its one whole-file entry -- fine
-// there, since it happens once per file, but here it runs ~27 times per
-// large file in quick succession, and a disk write slower than the next
-// chunk's fetch (plausible on iOS's encrypted storage) let unfinished
-// writes back up, each still holding its own chunk-sized buffer alive
-// until it completed. That backlog was a new memory consumer this
-// chunked rewrite introduced that the old whole-file streaming path
-// never had, and it made a real device crash *earlier* than before this
-// rewrite rather than later -- awaiting the write caps how many
-// chunk-sized buffers can be alive for caching purposes at once to one.
-async function fetchDataChunkCached(url, start, end) {
-  const cache = await caches.open(GLM_OCR_CACHE_NAME);
-  const chunkKey = `${url}#bytes=${start}-${end}`;
-  const cached = await cache.match(chunkKey);
-  if (cached) return new Uint8Array(await cached.arrayBuffer());
-
-  const bytes = await withTransientFetchRetry(async () => {
-    const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
-    if (res.status !== 206) {
-      throw new Error(
-        `expected a 206 Partial Content response to a ranged request for ${url}, got ${res.status}`,
-      );
-    }
-    return new Uint8Array(await res.arrayBuffer());
-  });
-  try {
-    await cache.put(chunkKey, new Response(bytes));
-  } catch {
-    // best-effort; a quota or storage error shouldn't fail the parse itself
-  }
-  return bytes;
-}
-
-// Fetches one of GLM-OCR's three external-data (weights) files in
-// `GLM_OCR_CHUNK_BYTES`-sized HTTP range requests, handing each chunk to
-// `session.append_data_chunk` as soon as it arrives -- see
-// `loadGlmOcrModels`'s own doc comment for why this worker never
-// materializes the whole file as one JS buffer at all, not even
-// one-file-at-a-time.
-async function fetchDataFileIntoSession(session, url, track) {
-  const totalLength = await fetchContentLength(url);
-  session.begin_data(totalLength);
-  for (let start = 0; start < totalLength; start += GLM_OCR_CHUNK_BYTES) {
-    const end = Math.min(start + GLM_OCR_CHUNK_BYTES, totalLength) - 1;
-    const chunk = await fetchDataChunkCached(url, start, end);
-    session.append_data_chunk(chunk);
-    track(chunk.byteLength);
-  }
-}
-
 // Same one-fetch-per-worker-lifetime memoization as `loadModels` above,
-// at ~2.2GB instead of a few megabytes -- `onProgress(loadedBytes)` is
-// called with the running total across all seven files as they stream
-// in, so a caller can show real download progress rather than a UI that
-// looks frozen for however long a 2.2GB fetch takes. Only called once
-// per worker lifetime even if `onProgress` differs between callers
-// (a second Smart Parse call while the first is still loading shares the
-// same in-flight promise but won't see progress events -- acceptable,
-// since Smart Parse's own UI disables re-triggering while a parse is in
-// flight). Memoizes the fully-loaded model objects, not raw bytes -- a
-// second Smart Parse call in the same worker lifetime reuses them
-// directly, without re-fetching or re-parsing any of the three models.
+// for embed, decoder and the tokenizer -- `onProgress(loadedBytes)` is
+// called with the running total as they stream in, so a caller can show
+// real download progress rather than a UI that looks frozen for however
+// long a multi-hundred-MB fetch takes. Only called once per worker
+// lifetime even if `onProgress` differs between callers (a second Smart
+// Parse call while the first is still loading shares the same in-flight
+// promise but won't see progress events -- acceptable, since Smart
+// Parse's own UI disables re-triggering while a parse is in flight).
+// Memoizes the fully-loaded model objects, not raw bytes -- a second
+// Smart Parse call in the same worker lifetime reuses them directly,
+// without re-fetching or re-parsing either model.
 //
-// Sequential, deliberately not concurrent -- downloading all seven files
-// at once meant up to seven buffers resident simultaneously, and with
-// two of these files around 900MB and 1.1GB, that was enough on its own
-// to crash the tab partway through a real download.
+// Vision is deliberately NOT loaded or memoized here -- see
+// `runVisionInSubworker` below and `glmVisionWorker.js`'s own doc comment
+// for why it runs in its own, separately-terminated worker instead:
+// embed (~0.35GB doubled) and decoder (~2.2GB doubled, before its
+// KV-cache even starts growing) both need to stay resident for the whole
+// generation loop, but vision (~1.65GB doubled) is only ever called once,
+// right at the start, and holding all three simultaneously reliably
+// exceeds a real iPhone's actual per-tab memory budget even though no
+// single wasm32 module ever approaches its own 4GiB ceiling.
 //
-// Each large file's bytes also arrive via `fetchDataFileIntoSession`'s
+// Sequential, deliberately not concurrent -- downloading both files at
+// once meant two buffers resident simultaneously, and decoder's own file
+// alone is over 1GB, which combined with embed's was enough overhead on
+// its own to matter on a real device.
+//
+// Each large file's bytes arrive via `fetchDataFileIntoSession`'s
 // tens-of-MB range requests, handed to `session.append_data_chunk` one
 // chunk at a time and finished with `session.finish`, rather than this
-// worker ever assembling the whole ~868MB-to-1.1GB file as one JS
-// buffer -- a single such buffer crossing the JS/wasm boundary in one
-// call was, on its own, enough to crash a real phone's tab (confirmed
-// on a brand-new, high-RAM iPhone, in both Safari and Chrome, with only
-// one tab open). Chunking bounds every single buffer this worker or
-// `budget_calc::smart_parse_model` ever handles in one call to tens of
-// MB, regardless of how large the overall model file is.
-//
-// Beyond bounding any single buffer, each of the three models now also
-// loads into its *own* wasm module (`vision`/`embed`/`decoder` below,
-// each from a separately `import()`ed lazy crate) -- the actual fix for
-// the crash this whole investigation chased down: `rten` doubles a
-// model's resident memory at load time (eager fp16-to-f32 upconversion),
-// and three ~2.2GB-fp16 models sharing one wasm32 module's 4GiB linear
-// memory exceeded that ceiling by construction. See
-// budget-wasm-glmocr-vision/src/lib.rs's own doc comment for the full
-// writeup.
+// worker ever assembling the whole file as one JS buffer -- a single such
+// buffer crossing the JS/wasm boundary in one call was, on its own,
+// enough to crash a real phone's tab (confirmed on a brand-new, high-RAM
+// iPhone, in both Safari and Chrome, with only one tab open). Chunking
+// bounds every single buffer this worker or `budget_calc::smart_parse_model`
+// ever handles in one call to tens of MB, regardless of how large the
+// overall model file is.
 //
 // Reset to null on rejection, same reasoning as loadModels above but far
-// more likely to matter here: a ~2.2GB download takes minutes even on a
-// fast connection, and mobile browsers routinely interrupt a long fetch
+// more likely to matter here: this download takes minutes even on a fast
+// connection, and mobile browsers routinely interrupt a long fetch
 // (screen lock, backgrounding, switching between wifi and cellular).
 // Without the reset, that first interruption would permanently wedge
-// Smart Parse until a full page reload. `fetchDataChunkCached` and
-// `fetchBytesCached` both check Cache Storage before fetching, so a
-// retry after this reset only re-fetches whatever chunk was in flight
-// when the interruption hit, not the whole download.
-function loadGlmOcrModels(onProgress) {
+// Smart Parse until a full page reload. The shared `glmOcrFetch.js`
+// helpers both check Cache Storage before fetching, so a retry after this
+// reset only re-fetches whatever chunk was in flight when the
+// interruption hit, not the whole download.
+// `track(delta)` is a shared accumulator owned by the caller (see the
+// `'smart-parse'` case in `self.onmessage` below) rather than built
+// locally here -- `runVisionInSubworker`'s own download progress needs to
+// fold into the same running total this function's embed/decoder/
+// tokenizer downloads report into, since vision (unlike those three) is
+// never memoized and re-reports progress on every single call.
+function loadGlmOcrModels(track) {
   if (!glmOcrModelsPromise) {
-    let loaded = 0;
-    const track = (delta) => {
-      loaded += delta;
-      onProgress(loaded);
-    };
     glmOcrModelsPromise = (async () => {
-      const [visionWasm, embedWasm, decoderWasm, orchestrate] = await Promise.all([
-        loadGlmVisionWasm(),
+      const [embedWasm, decoderWasm, orchestrate] = await Promise.all([
         loadGlmEmbedWasm(),
         loadGlmDecoderWasm(),
         loadGlmOrchestrateWasm(),
       ]);
-
-      const vision = new visionWasm.VisionEncoder();
-      {
-        const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionGraph, track);
-        await fetchDataFileIntoSession(vision, GLM_OCR_MODEL_PATHS.visionData, track);
-        throwIfLoadError(vision.finish(graph));
-      }
 
       const embed = new embedWasm.TokenEmbedder();
       {
@@ -530,7 +308,7 @@ function loadGlmOcrModels(onProgress) {
       }
 
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
-      return { vision, embed, decoder, orchestrate, tokenizerJson };
+      return { embed, decoder, orchestrate, tokenizerJson };
     })().catch((err) => {
       glmOcrModelsPromise = null;
       throw err;
@@ -539,30 +317,32 @@ function loadGlmOcrModels(onProgress) {
   return glmOcrModelsPromise;
 }
 
-function throwIfLoadError(loadResult) {
-  if (loadResult?.error) throw new Error(loadResult.error);
-}
-
-// A `Message`-shaped value (`{ code, params, text }`) is what every
-// hot-path Smart Parse call (`vision.encode`/`embed.embed`/
-// `decoder.step`, and every `budget-wasm-glmocr-orchestrate` function)
-// throws directly on a calc failure -- see
-// budget-wasm-glmocr-vision/src/vision.rs's own doc comment for why
-// those bypass the usual `{ error, error_message }` DTO convention that
-// `vision.finish`/`embed.finish`/`decoder.finish` (checked via
-// `throwIfLoadError` above) still use. `runSmartParseGeneration`'s
-// caller needs to tell the two apart: a thrown `Message` is a known calc
-// failure that should render through `CalcError` with a translated
-// message, same as any other DTO-shaped result ever has; anything else
-// (a network error, a wasm instantiation failure) is an infra failure
-// with no i18n code to show.
-function isMessageShaped(value) {
-  return (
-    value != null &&
-    typeof value === 'object' &&
-    typeof value.code === 'string' &&
-    typeof value.text === 'string'
-  );
+// Runs vision encoding in its own dedicated worker, spawned fresh and
+// terminated the moment it settles (success or failure) -- see
+// `glmVisionWorker.js`'s own doc comment for the full reasoning. `track`
+// is the same running-total accumulator `loadGlmOcrModels` above uses,
+// so vision's download progress (re-fetched from Cache Storage on every
+// call, since vision is never memoized) folds into the same progress
+// total the caller already reports.
+function runVisionInSubworker(pixelValues, gridH, gridW, track) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./glmVisionWorker.js', import.meta.url));
+    const settle = (fn, arg) => {
+      worker.terminate();
+      fn(arg);
+    };
+    worker.onmessage = (event) => {
+      const { progress, ok, imageFeatures, error } = event.data;
+      if (progress) {
+        track(progress.loadedBytes);
+        return;
+      }
+      if (ok) settle(resolve, imageFeatures);
+      else settle(reject, isMessageShaped(error) ? error : new Error(error));
+    };
+    worker.onerror = (event) => settle(reject, new Error(event.message));
+    worker.postMessage({ pixelValues, gridH, gridW }, [pixelValues.buffer]);
+  });
 }
 
 // Runs GLM-OCR's full text-recognition pipeline over one image: resize +
@@ -572,14 +352,14 @@ function isMessageShaped(value) {
 // end-of-sequence or `orchestrate.max_new_tokens()`. This is the control
 // flow that used to live in Rust as
 // `budget_calc::smart_parse::SmartParseSession::run` -- moved here
-// because `vision`/`embed`/`decoder` are now three separate wasm module
-// instances (see `loadGlmOcrModels` above) that cannot call each other
-// directly; only JS can sequence calls across them. Every actual
-// calculation stays in Rust, individually unit-tested in
-// `budget_calc::smart_parse_orchestrate` -- this loop only decides which
-// model to call next and shuttles buffers between them.
-function runSmartParseGeneration(models, imageRgb, width, height) {
-  const { vision, embed, decoder, orchestrate, tokenizerJson } = models;
+// because `vision`/`embed`/`decoder` are three separate wasm module
+// instances (see `loadGlmOcrModels` and `runVisionInSubworker` above)
+// that cannot call each other directly; only JS can sequence calls across
+// them. Every actual calculation stays in Rust, individually unit-tested
+// in `budget_calc::smart_parse_orchestrate` -- this loop only decides
+// which model to call next and shuttles buffers between them.
+async function runSmartParseGeneration(models, imageRgb, width, height, track) {
+  const { embed, decoder, orchestrate, tokenizerJson } = models;
 
   // Clears the decoder's internal KV cache -- required before every new
   // image's generation, or this call would silently continue a previous
@@ -589,7 +369,7 @@ function runSmartParseGeneration(models, imageRgb, width, height) {
 
   const [gridH, gridW] = orchestrate.patch_grid(width, height);
   const pixelValues = orchestrate.patchify(imageRgb, width, height);
-  const imageFeatures = vision.encode(pixelValues, gridH, gridW);
+  const imageFeatures = await runVisionInSubworker(pixelValues, gridH, gridW, track);
 
   const hiddenSize = orchestrate.hidden_size();
   const numImageTokens = imageFeatures.length / hiddenSize;
@@ -663,12 +443,15 @@ self.onmessage = async (event) => {
       const [modelBytes, tokenizerJson] = await loadLlmModel();
       result = wasm.classify_statement_rows(modelBytes, tokenizerJson, event.data.descriptions);
     } else if (type === 'smart-parse') {
-      const models = await loadGlmOcrModels((loadedBytes) => {
-        self.postMessage({ id, progress: { loadedBytes } });
-      });
+      let loaded = 0;
+      const track = (delta) => {
+        loaded += delta;
+        self.postMessage({ id, progress: { loadedBytes: loaded } });
+      };
+      const models = await loadGlmOcrModels(track);
       const { imageRgb, width, height } = event.data;
       try {
-        result = { text: runSmartParseGeneration(models, imageRgb, width, height) };
+        result = { text: await runSmartParseGeneration(models, imageRgb, width, height, track) };
       } catch (genError) {
         // A thrown `Message` (see `isMessageShaped` above) is a known
         // calc failure -- normalize it back into the same
