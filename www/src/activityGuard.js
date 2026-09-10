@@ -9,14 +9,36 @@
 // call's cleanup clear the flag while the second is still genuinely busy.
 let count = 0;
 
+// Set when the counter drops back to zero while the tab is hidden. A real
+// report showed the extraction dying (the worker got killed outright, not
+// just left running) while backgrounded -- `endActivity()` still runs via
+// `finally`, so `count` correctly reaches zero, but the visitor hasn't
+// seen the resulting error toast (or a completed draft) yet. Without this,
+// whether the automatic hidden-tab reload beats them back to the tab is a
+// race against whatever next calls `startVersionCheck`'s check (the
+// 5-minute timer, or a visibility flicker) -- sometimes it wins and the
+// result is silently discarded, sometimes it doesn't and they see the
+// toast. Staying "busy" until a `visibilitychange` confirms the tab is
+// actually visible again makes that always the second outcome.
+let pendingReveal = false;
+
 export function beginActivity() {
   count += 1;
 }
 
 export function endActivity() {
   count = Math.max(0, count - 1);
+  if (count === 0 && typeof document !== 'undefined' && document.hidden) {
+    pendingReveal = true;
+  }
 }
 
 export function isActivityInProgress() {
-  return count > 0;
+  return count > 0 || pendingReveal;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pendingReveal = false;
+  });
 }
