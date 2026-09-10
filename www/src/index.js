@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { startVersionCheck } from './version-check';
+import { isActivityInProgress } from './activityGuard';
 import { createUnavailableModule } from './unavailable';
 import './styles/main.css';
 
@@ -27,7 +28,8 @@ export function getWasmModule() {
   return wasmModule;
 }
 
-// A stale-but-visible tab can't be reloaded out from under someone (see
+// A stale-but-visible tab can't be reloaded out from under someone, and
+// neither can one mid-Smart-Parse-scan even while hidden (see
 // version-check.js's own doc comment on why), so the only way to close
 // that gap is to tell them -- otherwise a deploy that landed while their
 // tab stayed open and focused is invisible to them indefinitely, not just
@@ -39,7 +41,7 @@ function notifyStaleVersion(buildId) {
 }
 
 async function main() {
-  startVersionCheck({ onStale: notifyStaleVersion });
+  startVersionCheck({ onStale: notifyStaleVersion, isBusy: isActivityInProgress });
 
   const wasm = await initWasm();
   wasmModule = wasm;

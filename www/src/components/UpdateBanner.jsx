@@ -6,13 +6,13 @@ import { reloadOnto } from '../version-check';
  * Tells someone a new deploy has landed, when the app can't just reload
  * out from under them.
  *
- * `startVersionCheck` already reloads silently and safely once the tab is
- * hidden -- nothing typed is lost, because nothing was in flight. But a
- * tab that stays open and focused (exactly the state someone watching for
- * their own deploy is in) never hits that path, and without this banner
- * the check finds the new version and does nothing visible at all: stuck
- * on stale content indefinitely, not just for GitHub Pages' ten-minute
- * HTML cache window.
+ * `startVersionCheck` already reloads silently once the tab is hidden and
+ * nothing is in flight (see that file's own doc comment for the one
+ * exception -- an in-flight Smart Parse scan). But a tab that stays open
+ * and focused (exactly the state someone watching for their own deploy is
+ * in) never hits that path, and without this banner the check finds the
+ * new version and does nothing visible at all: stuck on stale content
+ * indefinitely, not just for GitHub Pages' ten-minute HTML cache window.
  */
 export default function UpdateBanner() {
   const { t } = useI18n();
@@ -30,7 +30,7 @@ export default function UpdateBanner() {
     <div className="toast-region" aria-live="polite">
       <div className="toast update-toast" role="status">
         <span className="toast-message">{t('app.updateAvailable')}</span>
-        <button className="btn secondary" onClick={() => reloadOnto(buildId)}>
+        <button className="btn secondary" onClick={() => reloadOnto(buildId, { force: true })}>
           {t('app.reload')}
         </button>
         <button

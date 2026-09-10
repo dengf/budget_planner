@@ -13,6 +13,7 @@ import DirectionWarning from './DirectionWarning';
 import { PdfIcon } from './icons';
 import NumberField from './NumberField';
 import { categoryDisplayName } from '../presetCategories';
+import { beginActivity, endActivity } from '../activityGuard';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
 
@@ -134,6 +135,12 @@ export default function ReceiptCapture({
     setProgress(null);
     setTruncated(null);
     setStatus('reading');
+    // Held for the whole extraction, including Smart Parse's multi-minute
+    // model download -- so a deploy landing mid-scan doesn't reload the
+    // page out from under it and silently discard everything downloaded
+    // so far (see version-check.js's own doc comment on why this matters
+    // even while the tab is hidden, not just while it's visible).
+    beginActivity();
     try {
       // Smart Parse reads pixels for a PDF too now (rasterizing each page
       // via `budget-wasm-pdfrender`), not just photographed receipts --
@@ -199,6 +206,8 @@ export default function ReceiptCapture({
       console.error('Receipt extraction failed:', error);
       setCalcError({ error: t('transactions.receiptExtractFailed') });
       setStatus('idle');
+    } finally {
+      endActivity();
     }
   };
 
