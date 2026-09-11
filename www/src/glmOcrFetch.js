@@ -228,14 +228,18 @@ async function fetchDataChunkCached(url, start, end) {
 // `ocrWorker.js`'s `taggedModelLoadError`) can sample it there. A trap
 // leaves that module's own `memory.buffer` unreadable afterwards, so
 // sampling only after the fact (in a catch block) isn't reliable; sampling
-// before each attempt is.
+// before each attempt is. Awaited (not just called) so a hook that also
+// needs to durably persist that sample before the risky call -- see
+// `ocrWorker.js`'s `checkpointBeforeChunk`, guarding against a harder
+// failure than a catchable trap -- can hold this loop here until that's
+// actually landed.
 export async function fetchDataFileIntoSession(session, url, track, onBeforeChunk) {
   const totalLength = await fetchContentLength(url);
   session.begin_data(totalLength);
   for (let start = 0; start < totalLength; start += GLM_OCR_CHUNK_BYTES) {
     const end = Math.min(start + GLM_OCR_CHUNK_BYTES, totalLength) - 1;
     const chunk = await fetchDataChunkCached(url, start, end);
-    onBeforeChunk?.();
+    await onBeforeChunk?.();
     session.append_data_chunk(chunk);
     track(chunk.byteLength);
   }

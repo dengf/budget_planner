@@ -8,6 +8,15 @@ import { readLastReceiptFailure } from '../receiptFailureBreadcrumb';
  * fresh tab after a crash/reload with no live devtools connection at all --
  * the one real diagnostic path when there's no Mac around for Safari's
  * remote Web Inspector.
+ *
+ * The record's `outcome` is one of `'checkpoint'` (written right before a
+ * risky step, in case what follows is a hard OS-level tab kill rather than
+ * a catchable exception -- see `recordReceiptCheckpoint`'s own doc
+ * comment), `'failed'` (a catchable failure did happen, with `message`),
+ * or `'succeeded'` (the last scan finished cleanly). A `'checkpoint'` with
+ * a recent `timestamp` and no later `'failed'`/`'succeeded'` after it is
+ * itself the diagnostic for that harder crash: the app never got a chance
+ * to report anything past that point.
  */
 export default function DebugPanel() {
   const [copied, setCopied] = useState(false);
@@ -26,7 +35,7 @@ export default function DebugPanel() {
 
   return (
     <div className="debug-panel">
-      <h1>Last receipt-extraction failure</h1>
+      <h1>Last receipt-extraction event</h1>
       {json ? (
         <>
           <pre className="debug-panel-json">{json}</pre>
