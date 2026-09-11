@@ -284,6 +284,28 @@ function loadGlmOrchestrateWasm() {
 // fold into the same running total this function's embed/decoder/
 // tokenizer downloads report into, since vision (unlike those three) is
 // never memoized and re-reports progress on every single call.
+// Tags which of GLM-OCR's models was loading when a failure happened, and
+// that module's actual wasm linear memory size at that exact moment --
+// straight from its own exported `memory.buffer`, a plain JS property
+// read rather than a call back into wasm, so it's safe even right after a
+// trap in that same module. This is the same question this repo's own
+// PR #51 needed a temporary Rust-side `wasm_memory_bytes()` export and
+// manual Console.app watching to answer for the vision+embed+decoder
+// crash that led to splitting them into separate modules -- reading
+// `--target web`'s already-exported `memory` gets the same number for
+// free, and `receiptFailureBreadcrumb.js` persists it, so a real-device
+// repro doesn't need a live console attached at all.
+function taggedModelLoadError(err, stage, wasm) {
+  const tagged = err instanceof Error ? err : new Error(String(err));
+  tagged.smartParseStage = stage;
+  try {
+    tagged.smartParseWasmMemoryBytes = wasm.memory.buffer.byteLength;
+  } catch {
+    // Nice-to-have; the error itself is still real without it.
+  }
+  return tagged;
+}
+
 function loadGlmOcrModels(track) {
   if (!glmOcrModelsPromise) {
     glmOcrModelsPromise = (async () => {
@@ -294,17 +316,21 @@ function loadGlmOcrModels(track) {
       ]);
 
       const embed = new embedWasm.TokenEmbedder();
-      {
+      try {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track);
         await fetchDataFileIntoSession(embed, GLM_OCR_MODEL_PATHS.embedData, track);
         throwIfLoadError(embed.finish(graph));
+      } catch (err) {
+        throw taggedModelLoadError(err, 'embed', embedWasm);
       }
 
       const decoder = new decoderWasm.DecoderSession();
-      {
+      try {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderGraph, track);
         await fetchDataFileIntoSession(decoder, GLM_OCR_MODEL_PATHS.decoderData, track);
         throwIfLoadError(decoder.finish(graph));
+      } catch (err) {
+        throw taggedModelLoadError(err, 'decoder', decoderWasm);
       }
 
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
@@ -467,6 +493,18 @@ self.onmessage = async (event) => {
     }
     self.postMessage({ id, ok: true, result }, transfer ?? []);
   } catch (error) {
-    self.postMessage({ id, ok: false, error: error?.message ?? String(error) });
+    self.postMessage({
+      id,
+      ok: false,
+      error: error?.message ?? String(error),
+      // Only ever set for a 'smart-parse' failure during model loading --
+      // see `taggedModelLoadError` above. Passed through untouched so
+      // `receiptCapture.js`/`receiptFailureBreadcrumb.js` can persist
+      // exactly which model was loading and how large its wasm linear
+      // memory had grown, without this worker knowing anything about how
+      // that ends up displayed or stored.
+      stage: error?.smartParseStage ?? null,
+      wasmMemoryBytes: error?.smartParseWasmMemoryBytes ?? null,
+    });
   }
 };

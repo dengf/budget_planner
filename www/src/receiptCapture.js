@@ -43,7 +43,7 @@ function getWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./ocrWorker.js', import.meta.url));
   worker.onmessage = (event) => {
-    const { id, ok, result, error, progress } = event.data;
+    const { id, ok, result, error, stage, wasmMemoryBytes, progress } = event.data;
     const call = pending.get(id);
     if (!call) return; // already settled, or from a worker instance we've moved past
     // A progress event (Smart Parse's model download) isn't terminal --
@@ -54,8 +54,19 @@ function getWorker() {
       return;
     }
     pending.delete(id);
-    if (ok) call.resolve(result);
-    else call.reject(new Error(error));
+    if (ok) {
+      call.resolve(result);
+      return;
+    }
+    const rejection = new Error(error);
+    // Only ever present for a Smart Parse model-load failure -- see
+    // `ocrWorker.js`'s `taggedModelLoadError`. Carried on the Error object
+    // itself rather than added to this function's signature, since every
+    // other caller/failure path here has no use for them and shouldn't
+    // need to know they exist.
+    if (stage) rejection.smartParseStage = stage;
+    if (wasmMemoryBytes != null) rejection.smartParseWasmMemoryBytes = wasmMemoryBytes;
+    call.reject(rejection);
   };
   // A worker-level crash (e.g. the wasm failed to load at all) has no `id`
   // to route to a specific call -- fail every call still waiting rather
@@ -245,7 +256,9 @@ export async function smartParseReceiptFile(file, onProgress) {
       'smart-parse',
       { imageRgb: rgb, width, height },
       [rgb.buffer],
-      onProgress ? (progress) => onProgress({ phase: 'download', loadedBytes: progress.loadedBytes }) : undefined,
+      onProgress
+        ? (progress) => onProgress({ phase: 'download', loadedBytes: progress.loadedBytes })
+        : undefined,
     );
 
   if (isPdf(file)) {

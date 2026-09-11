@@ -53,6 +53,30 @@ describe('receiptFailureBreadcrumb', () => {
     });
   });
 
+  it('records which model was loading and its wasm memory size, when known', () => {
+    recordReceiptFailure({
+      message: 'Unreachable code should not be executed',
+      progress: { phase: 'download', loadedBytes: 201650415 },
+      smartParseEnabled: true,
+      stage: 'decoder',
+      wasmMemoryBytes: 2214592512,
+    });
+
+    expect(readLastReceiptFailure()).toMatchObject({
+      stage: 'decoder',
+      wasmMemoryBytes: 2214592512,
+    });
+  });
+
+  it('records stage and wasmMemoryBytes as null when not a model-load failure', () => {
+    recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false });
+
+    expect(readLastReceiptFailure()).toMatchObject({
+      stage: null,
+      wasmMemoryBytes: null,
+    });
+  });
+
   it('overwrites the previous record rather than accumulating', () => {
     recordReceiptFailure({ message: 'first', progress: null, smartParseEnabled: false });
     recordReceiptFailure({ message: 'second', progress: null, smartParseEnabled: false });
