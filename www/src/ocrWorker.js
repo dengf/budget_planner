@@ -200,11 +200,22 @@ function loadLlmModel() {
   return llmModelBytesPromise;
 }
 
+// `wasm.default()`'s *return value* is the raw wasm instance's exports
+// object -- the one with `.memory` on it (see each `pkg-glmocr-*`
+// package's own generated glue: `wasm.memory.buffer` there refers to
+// this object, set via `wasm = instance.exports` inside `__wbg_finalize_init`).
+// The `import()`ed module namespace (`wasm` below, before this fix) never
+// re-exports `memory` at all, so reading `.memory` straight off it was
+// always `undefined` -- confirmed on a real repro where the pre-crash
+// memory sample stayed `null` even before any trap could have made it
+// unreadable. `exports` is attached onto the returned object so
+// `taggedModelLoadError`/`sampleMemoryBeforeEachChunk` can read
+// `<wasm>.exports.memory.buffer` instead of the module namespace.
 function loadGlmEmbedWasm() {
   if (!glmEmbedWasmPromise) {
     glmEmbedWasmPromise = import('../pkg-glmocr-embed').then(async (wasm) => {
-      if (wasm.default) await wasm.default();
-      return wasm;
+      const exports = wasm.default ? await wasm.default() : undefined;
+      return { ...wasm, exports };
     });
   }
   return glmEmbedWasmPromise;
@@ -213,8 +224,8 @@ function loadGlmEmbedWasm() {
 function loadGlmDecoderWasm() {
   if (!glmDecoderWasmPromise) {
     glmDecoderWasmPromise = import('../pkg-glmocr-decoder').then(async (wasm) => {
-      if (wasm.default) await wasm.default();
-      return wasm;
+      const exports = wasm.default ? await wasm.default() : undefined;
+      return { ...wasm, exports };
     });
   }
   return glmDecoderWasmPromise;
@@ -286,15 +297,17 @@ function loadGlmOrchestrateWasm() {
 // never memoized and re-reports progress on every single call.
 // Tags which of GLM-OCR's models was loading when a failure happened, and
 // that module's actual wasm linear memory size at that exact moment --
-// straight from its own exported `memory.buffer`, a plain JS property
-// read rather than a call back into wasm, so it's safe even right after a
-// trap in that same module. This is the same question this repo's own
-// PR #51 needed a temporary Rust-side `wasm_memory_bytes()` export and
-// manual Console.app watching to answer for the vision+embed+decoder
-// crash that led to splitting them into separate modules -- reading
-// `--target web`'s already-exported `memory` gets the same number for
-// free, and `receiptFailureBreadcrumb.js` persists it, so a real-device
-// repro doesn't need a live console attached at all.
+// via `wasm.exports.memory.buffer` (see `loadGlmEmbedWasm`/
+// `loadGlmDecoderWasm`'s own doc comment for why it's `.exports.memory`
+// and not just `.memory`), a plain JS property read rather than a call
+// back into wasm, so it's safe even right after a trap in that same
+// module. This is the same question this repo's own PR #51 needed a
+// temporary Rust-side `wasm_memory_bytes()` export and manual Console.app
+// watching to answer for the vision+embed+decoder crash that led to
+// splitting them into separate modules -- reading the wasm instance's own
+// already-exported `memory` gets the same number for free, and
+// `receiptFailureBreadcrumb.js` persists it, so a real-device repro
+// doesn't need a live console attached at all.
 // `lastKnownMemoryBytes` is a pre-crash fallback -- see
 // `sampleMemoryBeforeEachChunk` below -- for exactly the case a real
 // repro already hit: a genuine trap can leave a module's own
@@ -306,22 +319,22 @@ function taggedModelLoadError(err, stage, wasm, lastKnownMemoryBytes) {
   const tagged = err instanceof Error ? err : new Error(String(err));
   tagged.smartParseStage = stage;
   try {
-    tagged.smartParseWasmMemoryBytes = wasm.memory.buffer.byteLength;
+    tagged.smartParseWasmMemoryBytes = wasm.exports.memory.buffer.byteLength;
   } catch {
     tagged.smartParseWasmMemoryBytes = lastKnownMemoryBytes ?? null;
   }
   return tagged;
 }
 
-// Samples `wasm.memory.buffer.byteLength` into `sample.bytes` right before
-// every chunk append -- passed as `fetchDataFileIntoSession`'s
+// Samples `wasm.exports.memory.buffer.byteLength` into `sample.bytes`
+// right before every chunk append -- passed as `fetchDataFileIntoSession`'s
 // `onBeforeChunk` hook -- so `taggedModelLoadError`'s fallback reflects the
 // module's size immediately before the chunk that may have trapped it,
 // not just whatever the last successfully *completed* chunk left behind.
 function sampleMemoryBeforeEachChunk(wasm, sample) {
   return () => {
     try {
-      sample.bytes = wasm.memory.buffer.byteLength;
+      sample.bytes = wasm.exports.memory.buffer.byteLength;
     } catch {
       // Leave the previous sample in place; still better than nothing.
     }
