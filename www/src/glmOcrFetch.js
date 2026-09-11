@@ -214,12 +214,20 @@ async function fetchDataChunkCached(url, start, end) {
 // with only one tab open). Chunking bounds every single buffer this
 // worker or `budget_calc::smart_parse_model` ever handles in one call to
 // tens of MB, regardless of how large the overall model file is.
-export async function fetchDataFileIntoSession(session, url, track) {
+// `onBeforeChunk`, when given, fires right before every `append_data_chunk`
+// call -- including the one that might trap -- so a caller wanting to know
+// the module's wasm memory size right up to the moment of a crash (see
+// `ocrWorker.js`'s `taggedModelLoadError`) can sample it there. A trap
+// leaves that module's own `memory.buffer` unreadable afterwards, so
+// sampling only after the fact (in a catch block) isn't reliable; sampling
+// before each attempt is.
+export async function fetchDataFileIntoSession(session, url, track, onBeforeChunk) {
   const totalLength = await fetchContentLength(url);
   session.begin_data(totalLength);
   for (let start = 0; start < totalLength; start += GLM_OCR_CHUNK_BYTES) {
     const end = Math.min(start + GLM_OCR_CHUNK_BYTES, totalLength) - 1;
     const chunk = await fetchDataChunkCached(url, start, end);
+    onBeforeChunk?.();
     session.append_data_chunk(chunk);
     track(chunk.byteLength);
   }
