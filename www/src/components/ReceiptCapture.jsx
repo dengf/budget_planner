@@ -225,6 +225,8 @@ export default function ReceiptCapture({
         message: error?.message ?? String(error),
         progress: progressRef.current,
         smartParseEnabled,
+        stage: error?.smartParseStage,
+        wasmMemoryBytes: error?.smartParseWasmMemoryBytes,
       });
       setCalcError({ error: t('transactions.receiptExtractFailed') });
       setStatus('idle');

@@ -15,8 +15,21 @@ const KEY = 'bp:lastReceiptExtractionFailure';
  * failure that happened mid-download is distinguishable from one that
  * happened during parsing/generation, and how far the download had
  * gotten is visible without needing to have been watching live.
+ *
+ * `stage`/`wasmMemoryBytes` are only ever set for a Smart Parse model-load
+ * failure -- which of GLM-OCR's models (`'embed'`/`'decoder'`) was loading,
+ * and that module's own wasm linear memory size at the moment it failed
+ * (see `ocrWorker.js`'s `taggedModelLoadError`). `null` for every other
+ * failure, including a Smart Parse failure that happens after loading
+ * (generation) or a non-Smart-Parse OCR/PDF failure.
  */
-export function recordReceiptFailure({ message, progress, smartParseEnabled }) {
+export function recordReceiptFailure({
+  message,
+  progress,
+  smartParseEnabled,
+  stage,
+  wasmMemoryBytes,
+}) {
   try {
     localStorage.setItem(
       KEY,
@@ -25,6 +38,8 @@ export function recordReceiptFailure({ message, progress, smartParseEnabled }) {
         progressPhase: progress?.phase ?? null,
         progressLoadedBytes: progress?.loadedBytes ?? null,
         smartParseEnabled,
+        stage: stage ?? null,
+        wasmMemoryBytes: wasmMemoryBytes ?? null,
         hiddenAtFailure: typeof document !== 'undefined' ? document.hidden : null,
         timestamp: new Date().toISOString(),
       }),
