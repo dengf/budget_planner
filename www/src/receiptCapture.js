@@ -219,13 +219,16 @@ export async function extractReceiptText(file, onProgress) {
  * the caller keeps the heuristic's existing default-to-expense guess for
  * a `null` rather than blocking the review screen on a model load.
  */
-// The combined size of GLM-OCR's six fp16 ONNX files, as served today --
-// used only to turn `loadedBytes` progress events into a percentage and
-// a human-readable estimate before the app commits to downloading them.
-// Not load-bearing: if Hugging Face's actual file sizes drift, the
-// progress bar is off by a little rather than broken (`loadedBytes` can
-// exceed this and the bar just clamps at 100%).
-export const SMART_PARSE_APPROX_TOTAL_BYTES = 2_221_272_382;
+// The combined size of GLM-OCR's six ONNX files as served today -- vision
+// and the token embedder still fp16, the decoder now its 4-bit-quantized
+// (`_q4`) export instead of fp16 (see `budget_calc::smart_parse_model`'s
+// own doc comment for why only the decoder switched) -- used only to turn
+// `loadedBytes` progress events into a percentage and a human-readable
+// estimate before the app commits to downloading them. Not load-bearing:
+// if Hugging Face's actual file sizes drift, the progress bar is off by a
+// little rather than broken (`loadedBytes` can exceed this and the bar
+// just clamps at 100%).
+export const SMART_PARSE_APPROX_TOTAL_BYTES = 1_430_161_592;
 
 /**
  * Reads a photographed receipt, statement PDF, or scanned PDF with Smart

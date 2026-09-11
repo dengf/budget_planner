@@ -25,9 +25,31 @@ serde_json = { workspace = true, optional = true }
 # treats 0.24 and 0.26 as unrelated crates here since they're semver-
 # incompatible, so this is safe -- just needs its own import path
 # (`rten_embed::...`, not `rten::...`) inside `embed_classify.rs`.
-rten-embed = { package = "rten", version = "0.26.0", optional = true }
-rten-tensor = { version = "0.26.0", optional = true }
-rten-text = { version = "0.26.0", optional = true }
+# Pinned to a commit on the crate maintainer's own open, unmerged PR
+# branch (robertknight/rten#1337, "Support zero_points input in
+# MatMulNBits operator"), not a release, because `smart_parse_model`'s
+# `DecoderSession` needs it: GLM-OCR's decoder is the one model of the
+# three where a released rten (through 0.26.0) can't avoid the fp16 ->
+# f32 doubling described above, because there is no smaller export it
+# *can* load -- rten 0.26.0's `MatMulNBits` (the op GLM-OCR's own
+# 4-bit-quantized decoder export uses) hardcodes a 3-input maximum and
+# rejects the 4th `zero_points` input that export wires up. This PR adds
+# that support; without it, the only way to shrink the decoder's real
+# on-device memory footprint (the one directly implicated in the iPhone
+# crash this pin fixes -- see `smart_parse_model.rs`'s own doc comment)
+# is a change rten's maintainer hasn't shipped yet. Confirmed empirically
+# (a real Node.js load + full generation run against the quantized
+# decoder export) that this commit's `MatMulNBits` accepts `zero_points`
+# and produces correct decoded text before landing this pin. Vendoring
+# risk this accepts: the upstream branch could be force-pushed, rebased
+# away, or closed unmerged -- if `cargo build` ever fails to resolve this
+# `rev` again, check the PR's current state first
+# (https://github.com/robertknight/rten/pull/1337) and either re-pin to
+# its latest commit or fork the branch under our own control, rather than
+# reverting to 0.26.0 and losing the decoder's smaller footprint.
+rten-embed = { package = "rten", git = "https://github.com/robertknight/rten", rev = "928c0bb2", optional = true }
+rten-tensor = { package = "rten-tensor", git = "https://github.com/robertknight/rten", rev = "928c0bb2", optional = true }
+rten-text = { package = "rten-text", git = "https://github.com/robertknight/rten", rev = "928c0bb2", optional = true }
 # `smart_parse.rs`'s own image resize/patchify -- default-features off
 # since only PNG/JPEG decoding is needed (a camera capture always
 # encodes as JPEG; a picked file could be either), not the crate's full

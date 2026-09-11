@@ -16,6 +16,24 @@
 //! instance (own linear memory) means no single wasm32 address space
 //! ever needs to hold more than one model's doubled footprint at once.
 //!
+//! Splitting into separate wasm modules fixed the 4GiB *address-space*
+//! ceiling, but a second, lower ceiling remained: real iOS Safari tabs
+//! were still trapping (`unreachable`, confirmed via direct wasm binary
+//! inspection to be a genuine `memory.grow()` refusal, not a declared
+//! max) around ~1.1GiB of *actual* per-tab memory pressure -- the
+//! decoder's own fp16-doubled footprint alone. `DecoderSession::finish`
+//! below therefore loads GLM-OCR's 4-bit-quantized (`MatMulNBits`)
+//! decoder export instead of the fp16 one `VisionEncoder`/`TokenEmbedder`
+//! still use: its weights are native `u8` blocks that `rten`'s
+//! `MatMulNBits` operator reads directly, never upconverted to f32 the
+//! way every other weight tensor here is, cutting the decoder's resident
+//! footprint roughly 6x (measured: ~373MB on-disk/resident quantized vs.
+//! ~1.16GB on-disk -> ~2.16GB resident fp16). Vision and the token
+//! embedder stay on their fp16 exports -- GLM-OCR publishes no quantized
+//! export of either, and neither one was the model actually trapping.
+//! See this crate's `Cargo.toml` for why this requires an unreleased
+//! `rten` commit rather than 0.26.0.
+//!
 //! `VisionEncoder`/`TokenEmbedder` are stateless per call (aside from
 //! the loaded model itself); `DecoderSession` is not -- it holds
 //! `past_key_values` as internal state across `step` calls, growing
@@ -285,7 +303,9 @@ impl DecoderSession {
 
     pub fn finish(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
         let data = std::mem::take(&mut self.staging);
-        let model = LoadedModel::load(graph, "decoder_model_merged_fp16.onnx_data", data)?;
+        // `_q4`, not `_fp16` -- see this module's own doc comment for why
+        // the decoder specifically loads GLM-OCR's quantized export.
+        let model = LoadedModel::load(graph, "decoder_model_merged_q4.onnx_data", data)?;
 
         let mut present_ids = Vec::with_capacity(2 * NUM_LAYERS);
         let mut past_key_value_ids = Vec::with_capacity(NUM_LAYERS);
