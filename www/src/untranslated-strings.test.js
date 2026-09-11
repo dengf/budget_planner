@@ -13,10 +13,16 @@ import en from './i18n/en';
 
 const COMPONENTS = path.join(import.meta.dirname, 'components');
 
+// `?debug=1`'s diagnostic view (see index.js) is never reached by an
+// ordinary visitor and never will be localized -- narrow, exact-name
+// exemption, same pattern as `BRAND`/`PROSE_EXEMPT` below, not a loosened
+// scan.
+const UNLOCALIZED_COMPONENTS = new Set(['DebugPanel.jsx']);
+
 function sources() {
   return fs
     .readdirSync(COMPONENTS)
-    .filter((f) => f.endsWith('.jsx') && !f.endsWith('.test.jsx'))
+    .filter((f) => f.endsWith('.jsx') && !f.endsWith('.test.jsx') && !UNLOCALIZED_COMPONENTS.has(f))
     .map((file) => ({
       file,
       // Comments are prose by design and must not be flagged.

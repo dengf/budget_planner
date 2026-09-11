@@ -3112,3 +3112,32 @@ table.data tr:last-child td {
     bottom: calc(148px + env(safe-area-inset-bottom));
   }
 }
+
+/* DebugPanel (`?debug=1`) -- a full-page diagnostic view, not styled to
+   match the rest of the app since it's never seen in normal use. */
+.debug-panel {
+  min-height: 100vh;
+  padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  color: var(--ink);
+}
+.debug-panel h1 {
+  font-size: 1.1rem;
+  margin: 0 0 16px;
+}
+.debug-panel-json {
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  margin: 0 0 16px;
+}
+.debug-panel-empty {
+  color: var(--muted);
+}
