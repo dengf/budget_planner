@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { startVersionCheck } from './version-check';
 import { isActivityInProgress } from './activityGuard';
+import { readLastReceiptFailure } from './receiptFailureBreadcrumb';
 import { createUnavailableModule } from './unavailable';
 import './styles/main.css';
 
@@ -41,6 +42,13 @@ function notifyStaleVersion(buildId) {
 }
 
 async function main() {
+  // Convenience only -- the record in localStorage is what actually
+  // matters (see receiptFailureBreadcrumb.js), since a live console isn't
+  // necessarily attached at the moment this boot happens. Never cleared,
+  // so it's still inspectable directly even if nothing logged this.
+  const lastFailure = readLastReceiptFailure();
+  if (lastFailure) console.log('Last receipt-capture failure:', lastFailure);
+
   startVersionCheck({ onStale: notifyStaleVersion, isBusy: isActivityInProgress });
 
   const wasm = await initWasm();
