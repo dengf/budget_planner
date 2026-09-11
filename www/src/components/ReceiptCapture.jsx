@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import {
   classifyStatementDescriptions,
@@ -14,6 +14,7 @@ import { PdfIcon } from './icons';
 import NumberField from './NumberField';
 import { categoryDisplayName } from '../presetCategories';
 import { beginActivity, endActivity } from '../activityGuard';
+import { recordReceiptFailure } from '../receiptFailureBreadcrumb';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
 
@@ -71,6 +72,12 @@ export default function ReceiptCapture({
   // multi-page PDF is being rasterized and read one page at a time, or
   // `null` when there's nothing more specific to report than "reading".
   const [progress, setProgress] = useState(null);
+  // Mirrors `progress`, read from `handleFile`'s catch block for
+  // `recordReceiptFailure` -- that closure's own `progress` variable is
+  // whatever it was when this render's `handleFile` was created, not the
+  // live value, since later progress updates re-render with a new closure
+  // this already-running call never sees. A ref always reads current.
+  const progressRef = useRef(null);
   // Set when a PDF had more pages than `receiptCapture.js`'s per-import
   // cap -- shown once processing finishes, alongside whatever the capped
   // pass did manage to extract, rather than silently dropping pages.
@@ -133,6 +140,7 @@ export default function ReceiptCapture({
     if (!file || !wasmModule) return;
     setCalcError(null);
     setProgress(null);
+    progressRef.current = null;
     setTruncated(null);
     setStatus('reading');
     // Held for the whole extraction, including Smart Parse's multi-minute
@@ -141,6 +149,10 @@ export default function ReceiptCapture({
     // so far (see version-check.js's own doc comment on why this matters
     // even while the tab is hidden, not just while it's visible).
     beginActivity();
+    const reportProgress = (p) => {
+      progressRef.current = p;
+      setProgress(p);
+    };
     try {
       // Smart Parse reads pixels for a PDF too now (rasterizing each page
       // via `budget-wasm-pdfrender`), not just photographed receipts --
@@ -151,9 +163,9 @@ export default function ReceiptCapture({
         calcError: extractError,
         truncated: extractTruncated,
       } = smartParseEnabled
-        ? await smartParseReceiptFile(file, setProgress)
-        : await extractReceiptText(file, setProgress);
-      setProgress(null); // done either way; nothing left to report
+        ? await smartParseReceiptFile(file, reportProgress)
+        : await extractReceiptText(file, reportProgress);
+      reportProgress(null); // done either way; nothing left to report
       if (extractError) {
         setCalcError(extractError);
         setStatus('idle');
@@ -204,6 +216,16 @@ export default function ReceiptCapture({
       // real iPhone report of this exact toast couldn't be diagnosed after
       // the fact even with Safari's remote Web Inspector open on a retry.
       console.error('Receipt extraction failed:', error);
+      // Persisted separately from the console log above -- that one is
+      // gone the instant the tab navigates away or gets killed, which is
+      // exactly the scenario this failure itself can trigger (see
+      // activityGuard.js). `progressRef.current` is the live value, not
+      // this closure's stale `progress` from when handleFile started.
+      recordReceiptFailure({
+        message: error?.message ?? String(error),
+        progress: progressRef.current,
+        smartParseEnabled,
+      });
       setCalcError({ error: t('transactions.receiptExtractFailed') });
       setStatus('idle');
     } finally {
