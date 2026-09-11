@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import DebugPanel from './components/DebugPanel';
 import { startVersionCheck } from './version-check';
 import { isActivityInProgress } from './activityGuard';
 import { readLastReceiptFailure } from './receiptFailureBreadcrumb';
@@ -42,6 +43,17 @@ function notifyStaleVersion(buildId) {
 }
 
 async function main() {
+  // `?debug=1` skips the real app entirely -- Safari's remote Web
+  // Inspector needs a Mac and a cable, which isn't always at hand right
+  // after a real-device repro. This reads the same localStorage record
+  // straight from a phone with nothing else, no wasm/version-check
+  // startup cost paid for a view that's just reading one stored value.
+  if (new URLSearchParams(window.location.search).get('debug') === '1') {
+    const container = document.getElementById('root');
+    createRoot(container).render(<DebugPanel />);
+    return;
+  }
+
   // Convenience only -- the record in localStorage is what actually
   // matters (see receiptFailureBreadcrumb.js), since a live console isn't
   // necessarily attached at the moment this boot happens. Never cleared,
