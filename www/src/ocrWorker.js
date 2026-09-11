@@ -295,15 +295,37 @@ function loadGlmOrchestrateWasm() {
 // `--target web`'s already-exported `memory` gets the same number for
 // free, and `receiptFailureBreadcrumb.js` persists it, so a real-device
 // repro doesn't need a live console attached at all.
-function taggedModelLoadError(err, stage, wasm) {
+// `lastKnownMemoryBytes` is a pre-crash fallback -- see
+// `sampleMemoryBeforeEachChunk` below -- for exactly the case a real
+// repro already hit: a genuine trap can leave a module's own
+// `memory.buffer` unreadable afterwards (confirmed on a real device,
+// where this direct read came back empty both times), so the size
+// sampled right before the fatal chunk was attempted is the only number
+// left to report.
+function taggedModelLoadError(err, stage, wasm, lastKnownMemoryBytes) {
   const tagged = err instanceof Error ? err : new Error(String(err));
   tagged.smartParseStage = stage;
   try {
     tagged.smartParseWasmMemoryBytes = wasm.memory.buffer.byteLength;
   } catch {
-    // Nice-to-have; the error itself is still real without it.
+    tagged.smartParseWasmMemoryBytes = lastKnownMemoryBytes ?? null;
   }
   return tagged;
+}
+
+// Samples `wasm.memory.buffer.byteLength` into `sample.bytes` right before
+// every chunk append -- passed as `fetchDataFileIntoSession`'s
+// `onBeforeChunk` hook -- so `taggedModelLoadError`'s fallback reflects the
+// module's size immediately before the chunk that may have trapped it,
+// not just whatever the last successfully *completed* chunk left behind.
+function sampleMemoryBeforeEachChunk(wasm, sample) {
+  return () => {
+    try {
+      sample.bytes = wasm.memory.buffer.byteLength;
+    } catch {
+      // Leave the previous sample in place; still better than nothing.
+    }
+  };
 }
 
 function loadGlmOcrModels(track) {
@@ -316,21 +338,33 @@ function loadGlmOcrModels(track) {
       ]);
 
       const embed = new embedWasm.TokenEmbedder();
+      const embedMemorySample = { bytes: null };
       try {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track);
-        await fetchDataFileIntoSession(embed, GLM_OCR_MODEL_PATHS.embedData, track);
+        await fetchDataFileIntoSession(
+          embed,
+          GLM_OCR_MODEL_PATHS.embedData,
+          track,
+          sampleMemoryBeforeEachChunk(embedWasm, embedMemorySample),
+        );
         throwIfLoadError(embed.finish(graph));
       } catch (err) {
-        throw taggedModelLoadError(err, 'embed', embedWasm);
+        throw taggedModelLoadError(err, 'embed', embedWasm, embedMemorySample.bytes);
       }
 
       const decoder = new decoderWasm.DecoderSession();
+      const decoderMemorySample = { bytes: null };
       try {
         const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.decoderGraph, track);
-        await fetchDataFileIntoSession(decoder, GLM_OCR_MODEL_PATHS.decoderData, track);
+        await fetchDataFileIntoSession(
+          decoder,
+          GLM_OCR_MODEL_PATHS.decoderData,
+          track,
+          sampleMemoryBeforeEachChunk(decoderWasm, decoderMemorySample),
+        );
         throwIfLoadError(decoder.finish(graph));
       } catch (err) {
-        throw taggedModelLoadError(err, 'decoder', decoderWasm);
+        throw taggedModelLoadError(err, 'decoder', decoderWasm, decoderMemorySample.bytes);
       }
 
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
