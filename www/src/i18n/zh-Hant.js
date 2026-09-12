@@ -207,6 +207,8 @@ export default {
     '使用更大的 AI 模型更準確地辨識照片和 PDF，仍完全在您的裝置上執行。首次使用會從 Hugging Face 下載約 {size}——建議在 Wi-Fi 下進行。之後會快取，只需下載一次。',
   'transactions.smartParseDownloading': '正在下載智慧辨識模型…{percent}%（{loaded} / {total}）',
   'transactions.smartParseRunning': '正在用智慧辨識讀取…',
+  'transactions.smartParseEncoding': '正在分析圖片…需要幾分鐘。',
+  'transactions.smartParseGenerating': '正在寫出讀取的內容…已完成 {tokens} 個字。',
   'transactions.statementReviewHint': '發現 {count} 筆交易——新增前請檢查日期、金額和分類。',
   'transactions.statementRowInclude': '新增這一筆',
   'transactions.statementAddAll': '新增 {count} 筆交易',

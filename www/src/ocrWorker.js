@@ -436,7 +436,7 @@ function loadGlmOcrModels(track, id) {
 // so vision's download progress (re-fetched from Cache Storage on every
 // call, since vision is never memoized) folds into the same progress
 // total the caller already reports.
-function runVisionInSubworker(pixelValues, gridH, gridW, track, id) {
+function runVisionInSubworker(pixelValues, gridH, gridW, track, id, reportPhase) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./glmVisionWorker.js', import.meta.url));
     const settle = (fn, arg) => {
@@ -458,6 +458,10 @@ function runVisionInSubworker(pixelValues, gridH, gridW, track, id) {
       // three rounds masquerading as a decoder crash (see
       // `budget_calc::smart_parse_model`'s own doc comment).
       if (checkpoint) {
+        // `'vision-encode'` is posted immediately before `vision.encode`,
+        // the single longest uninterrupted call in the pipeline, so it
+        // doubles as the moment the UI should stop saying "downloading".
+        if (checkpoint.stage === 'vision-encode') reportPhase('encode');
         sendCheckpoint(id, checkpoint.stage, checkpoint.wasmMemoryBytes).then(() =>
           worker.postMessage({ checkpointAck: checkpointId }),
         );
@@ -490,7 +494,14 @@ function runVisionInSubworker(pixelValues, gridH, gridW, track, id) {
 // even loaded -- see `loadGlmOcrModels`'s own doc comment for why --
 // so `orchestrate`/`gridH`/`gridW`/`imageFeatures` arrive here already
 // computed rather than being derived from a raw image.
-async function runSmartParseGeneration(models, orchestrate, gridH, gridW, imageFeatures) {
+async function runSmartParseGeneration(
+  models,
+  orchestrate,
+  gridH,
+  gridW,
+  imageFeatures,
+  reportPhase,
+) {
   const { embed, decoder, tokenizerJson } = models;
 
   // Clears the decoder's internal KV cache -- required before every new
@@ -512,11 +523,19 @@ async function runSmartParseGeneration(models, orchestrate, gridH, gridW, imageF
   const maxNewTokens = orchestrate.max_new_tokens();
   const generated = [];
 
+  // Unlike vision encoding, generation has a genuine unit of progress --
+  // one token per iteration -- so it reports a count rather than just a
+  // phase. There's no honest percentage to show: the loop stops at
+  // end-of-sequence, and how many tokens a receipt takes isn't known
+  // until it's read. A rising count is true; a progress bar would not be.
+  reportPhase('generate', { tokens: 0 });
+
   for (let step = 0; step < maxNewTokens; step++) {
     const logits = decoder.step(embeds, curSeqLen, attentionMask, positionIds);
     const nextId = orchestrate.argmax(logits);
     if (orchestrate.is_eos(nextId)) break;
     generated.push(nextId);
+    reportPhase('generate', { tokens: generated.length });
 
     positionIds = orchestrate.advance_position_ids(positionIds, curSeqLen);
     curSeqLen = 1;
@@ -582,8 +601,16 @@ self.onmessage = async (event) => {
       let loaded = 0;
       const track = (delta) => {
         loaded += delta;
-        self.postMessage({ id, progress: { loadedBytes: loaded } });
+        self.postMessage({ id, progress: { phase: 'download', loadedBytes: loaded } });
       };
+      // Downloading is only about half of a Smart Parse scan's wall clock:
+      // vision encoding and the generation loop each take minutes of
+      // uninterrupted wasm, during which `loaded` never moves. Reporting a
+      // phase alongside it is what lets the UI stop claiming it's still
+      // downloading -- a frozen "35%" for four minutes reads as a hang,
+      // which is exactly how a working scan got reported as a crash.
+      const reportPhase = (phase, extra) =>
+        self.postMessage({ id, progress: { phase, loadedBytes: loaded, ...extra } });
       const { imageRgb, width, height } = event.data;
       try {
         // Vision runs first, against a near-empty baseline, and its
@@ -592,10 +619,24 @@ self.onmessage = async (event) => {
         const orchestrate = await loadGlmOrchestrateWasm();
         const [gridH, gridW] = orchestrate.patch_grid(width, height);
         const pixelValues = orchestrate.patchify(imageRgb, width, height);
-        const imageFeatures = await runVisionInSubworker(pixelValues, gridH, gridW, track, id);
+        const imageFeatures = await runVisionInSubworker(
+          pixelValues,
+          gridH,
+          gridW,
+          track,
+          id,
+          reportPhase,
+        );
         const models = await loadGlmOcrModels(track, id);
         result = {
-          text: await runSmartParseGeneration(models, orchestrate, gridH, gridW, imageFeatures),
+          text: await runSmartParseGeneration(
+            models,
+            orchestrate,
+            gridH,
+            gridW,
+            imageFeatures,
+            reportPhase,
+          ),
         };
       } catch (genError) {
         // A thrown `Message` (see `isMessageShaped` above) is a known
