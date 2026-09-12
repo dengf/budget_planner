@@ -111,6 +111,24 @@
 //! `fetchDataChunkCached` in `www/src/glmOcrFetch.js` trims an over-long
 //! range response (and evicts a cached one) before it ever gets here.
 //!
+//! Fixing the memory ceilings finally let vision *run*, which exposed
+//! what they had been hiding: it is far too slow. One `encode` at 598
+//! vision tokens takes 245.8s in wasm against 43.7s natively
+//! single-threaded -- 5.6x, which is not a SIMD-width difference. The
+//! cause is that `rten-gemm`'s `i8dot.rs` implements its int8 dot-product
+//! kernel for `aarch64` and `x86_64` only; wasm32 falls through to
+//! `GenericInt8Dot`, which declares `const SIMD: bool = false` and sums
+//! products element by element. So the `MatMulNBits` path both this
+//! module's quantized models depend on runs *scalar* on the phone, and
+//! this crate's `.cargo/config.toml` `simd128` flag -- added after the
+//! same class of bug was found on the float OCR path -- never reaches it.
+//!
+//! Measured rten thread scaling on the same model is 3.17x at 4 threads
+//! (43.7s -> 13.8s natively, plateauing at 6 physical cores), so a wasm
+//! SIMD int8 kernel and wasm threads are worth roughly 5.6x and 3.2x
+//! respectively, and they compose. Neither is done yet; `MAX_PIXELS` in
+//! `smart_parse_orchestrate` is capped low in the meantime.
+//!
 //! `TokenEmbedder` doesn't go through `rten` at all, though, avoiding the
 //! problem rather than working around it: its ONNX graph is nothing more
 //! than a `Gather` over one weight tensor followed by a `Cast` to f32 --
