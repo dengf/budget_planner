@@ -271,6 +271,12 @@ export const SMART_PARSE_APPROX_TOTAL_BYTES = 866_376_436;
  * so turning it on shouldn't silently keep using the weaker path just
  * because the file happens to carry embedded text.
  *
+ * `onProgress` fires with `{ phase: 'encode' }` while the vision encoder
+ * runs and `{ phase: 'generate', tokens }` once per decoded token -- both
+ * are minutes-long compute phases during which `loadedBytes` is frozen,
+ * so the caller must not infer "still downloading" from a stalled byte
+ * count (see `ocrWorker.js`'s `reportPhase`).
+ *
  * `onProgress` fires with `{ phase: 'download', loadedBytes }` repeatedly
  * while the ~2.2GB model downloads (only on the very first use per
  * browser -- cached afterwards via Cache Storage, see `ocrWorker.js`),
@@ -283,9 +289,7 @@ export async function smartParseReceiptFile(file, onProgress) {
       'smart-parse',
       { imageRgb: rgb, width, height },
       [rgb.buffer],
-      onProgress
-        ? (progress) => onProgress({ phase: 'download', loadedBytes: progress.loadedBytes })
-        : undefined,
+      onProgress ? (progress) => onProgress(progress) : undefined,
     );
 
   if (isPdf(file)) {

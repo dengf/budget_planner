@@ -52,10 +52,44 @@ chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 # rather than a catchable error.
 pdf-extract = { path = "vendor/pdf-extract-0.12.0" }
 
+# The ML runtimes are the one exception to the size-first profile below, and
+# they are compiled for speed instead. They ride in the lazy `pkg-glmocr-*`,
+# `pkg-ocr` and `pkg-pdfrender` modules, never in the always-downloaded
+# `pkg/budget_wasm_bg.wasm`, so the extra code size is paid only by a session
+# that actually scans something -- and that session is the one that cares.
+#
+# Measured on GLM-OCR's vision encoder, 2,392 patches, Node/wasm, one thread:
+# 245.8s at `opt-level = "z"` against 146.0s here. `"z"` was costing 40% of
+# every Smart Parse scan, on a path that already takes minutes. The comment
+# below ("nothing here is compute-bound") was written before Smart Parse
+# existed and is no longer true of these crates: they run a 0.9B-parameter
+# vision-language model's matmul inner loops.
+[profile.release.package.rten]
+opt-level = 3
+[profile.release.package.rten-base]
+opt-level = 3
+[profile.release.package.rten-gemm]
+opt-level = 3
+[profile.release.package.rten-simd]
+opt-level = 3
+[profile.release.package.rten-tensor]
+opt-level = 3
+[profile.release.package.rten-vecmath]
+opt-level = 3
+[profile.release.package.rten-parallel]
+opt-level = 3
+[profile.release.package.ocrs-cjk]
+opt-level = 3
+[profile.release.package.hayro]
+opt-level = 3
+[profile.release.package.image]
+opt-level = 3
+
 [profile.release]
-# Size, not speed -- same rationale as mortgage_calculator: nothing here is
-# compute-bound (a CSV import of a year of transactions is a few hundred
-# rows), and the wasm binary is most of the download.
+# Size, not speed -- for everything except the ML crates above. Same rationale
+# as mortgage_calculator: nothing here is compute-bound (a CSV import of a year
+# of transactions is a few hundred rows), and the wasm binary is most of the
+# download.
 opt-level = "z"
 lto = "fat"
 codegen-units = 1

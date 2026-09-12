@@ -15,6 +15,7 @@ import NumberField from './NumberField';
 import { categoryDisplayName } from '../presetCategories';
 import { beginActivity, endActivity } from '../activityGuard';
 import { recordReceiptFailure, recordReceiptSuccess } from '../receiptFailureBreadcrumb';
+import { readingStatus } from '../readingStatus';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
 
@@ -68,9 +69,11 @@ export default function ReceiptCapture({
   // that isn't true yet" -- there is no silent, surprise download here.
   const [smartParseEnabled, setSmartParseEnabled] = useState(false);
   // `{ phase: 'download', loadedBytes }` while Smart Parse's model is
-  // still being fetched, `{ phase: 'page', page, totalPages }` while a
-  // multi-page PDF is being rasterized and read one page at a time, or
-  // `null` when there's nothing more specific to report than "reading".
+  // still being fetched, `{ phase: 'encode' }` while its vision encoder
+  // runs, `{ phase: 'generate', tokens }` while it writes out what it
+  // read, `{ phase: 'page', page, totalPages }` while a multi-page PDF is
+  // being rasterized and read one page at a time, or `null` when there's
+  // nothing more specific to report than "reading".
   const [progress, setProgress] = useState(null);
   // Mirrors `progress`, read from `handleFile`'s catch block for
   // `recordReceiptFailure` -- that closure's own `progress` variable is
@@ -333,20 +336,19 @@ export default function ReceiptCapture({
 
       {status === 'reading' && (
         <p className="empty-state">
-          {progress?.phase === 'download' && progress.loadedBytes < SMART_PARSE_APPROX_TOTAL_BYTES
-            ? t('transactions.smartParseDownloading', {
-                percent: Math.min(
-                  100,
-                  Math.round((progress.loadedBytes / SMART_PARSE_APPROX_TOTAL_BYTES) * 100),
-                ),
-                loaded: formatBytes(progress.loadedBytes),
-                total: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES),
-              })
-            : progress?.phase === 'page'
-              ? t('transactions.receiptReadingPage', progress)
-              : smartParseEnabled
-                ? t('transactions.smartParseRunning')
-                : t('transactions.receiptReading')}
+          {(({ key, params }) =>
+            t(
+              key,
+              params && {
+                ...params,
+                // `readingStatus` deals in raw byte counts; only this layer
+                // knows the display locale, so formatting happens here.
+                ...(params.loadedBytes != null && {
+                  loaded: formatBytes(params.loadedBytes),
+                  total: formatBytes(params.totalBytes),
+                }),
+              },
+            ))(readingStatus(progress, smartParseEnabled))}
         </p>
       )}
       {calcError && <CalcError result={calcError} />}
