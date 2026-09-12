@@ -20,20 +20,34 @@
 // OS-level memory kill, not a catchable exception -- nothing was left for
 // any `catch` block to see).
 //
-// Vision is only ever called once per scan, right at the very start;
-// embed and decoder stay resident for the whole generation loop
-// afterwards and can't be freed the same way. Dropping JS references to
-// a loaded `VisionEncoder` and hoping the garbage collector reclaims a
-// ~1.65GB `WebAssembly.Memory` before decoder's own model loads isn't
-// reliable enough at this size -- terminating the worker that
-// instantiated it is the one deterministic way to force it released.
+// Vision is only ever called once per scan; embed and decoder stay
+// resident for the whole generation loop afterwards and can't be freed
+// the same way. Dropping JS references to a loaded `VisionEncoder` and
+// hoping the garbage collector reclaims its `WebAssembly.Memory` before
+// the generation loop runs isn't reliable enough at this size --
+// terminating the worker that instantiated it is the one deterministic
+// way to force it released.
+//
+// A separate worker is a separate process, though, not a separate memory
+// budget, and this file's own numbers above are what made that easy to
+// forget: vision runs *after* `loadGlmOcrModels`, so embed and decoder
+// are both still resident in `ocrWorker.js` while vision loads, and the
+// tab's real peak is all three at once -- around 3.1GB on fp16, and the
+// tab was being killed here, inside vision. With no checkpoints of its
+// own, though, this worker left `?debug=1` showing whichever `'decoder'`
+// checkpoint had been written last, and the crash spent three rounds
+// looking like a decoder problem. Both of those are fixed now: vision
+// loads the 4-bit-quantized export (measured 323.8MB peak, against
+// 2,490.9MB for fp16 -- see `budget_calc::smart_parse_model`'s own doc
+// comment) and reports ack-gated checkpoints through `ocrWorker.js` (see
+// `checkpoint` below).
 //
 // Deliberately NOT memoized the way `ocrWorker.js`'s `loadGlmOcrModels`
 // memoizes embed/decoder/tokenizer: every scan re-parses the vision ONNX
 // graph and re-loads its weights into a brand-new wasm instance in a
 // brand-new worker. The underlying bytes still come from Cache Storage
 // (see glmOcrFetch.js), not a re-download, so this costs a few seconds of
-// re-parsing per scan, not 828MB of network traffic -- an acceptable
+// re-parsing per scan, not 290MB of network traffic -- an acceptable
 // trade for guaranteeing memory release after every single scan, not
 // just avoiding the crash on the first one.
 import {
@@ -44,18 +58,52 @@ import {
   isMessageShaped,
 } from './glmOcrFetch';
 
+// Acks for `checkpoint` below. Vision is two workers away from the only
+// thread that has `localStorage`, so each checkpoint relays through
+// `ocrWorker.js`'s `runVisionInSubworker` and back -- this worker holds at
+// its own `await` until that round trip confirms the write landed, so even
+// an OS-level kill (which runs no JS afterwards, catchable by nothing)
+// leaves a record of exactly which vision step was in flight.
+let nextCheckpointId = 1;
+const pendingCheckpointAcks = new Map();
+
+function checkpoint(stage, exports) {
+  let wasmMemoryBytes = null;
+  try {
+    wasmMemoryBytes = exports.memory.buffer.byteLength;
+  } catch {
+    // Not fatal -- the stage alone still says where this got to.
+  }
+  return new Promise((resolve) => {
+    const checkpointId = nextCheckpointId++;
+    pendingCheckpointAcks.set(checkpointId, resolve);
+    self.postMessage({ checkpointId, checkpoint: { stage, wasmMemoryBytes } });
+  });
+}
+
 self.onmessage = async (event) => {
+  if (event.data?.checkpointAck != null) {
+    pendingCheckpointAcks.get(event.data.checkpointAck)?.();
+    pendingCheckpointAcks.delete(event.data.checkpointAck);
+    return;
+  }
+
   const { pixelValues, gridH, gridW } = event.data;
   try {
     const visionWasm = await import('../pkg-glmocr-vision');
-    if (visionWasm.default) await visionWasm.default();
+    const exports = visionWasm.default ? await visionWasm.default() : undefined;
 
     const vision = new visionWasm.VisionEncoder();
     const track = (delta) => self.postMessage({ progress: { loadedBytes: delta } });
+    await checkpoint('vision-graph', exports);
     const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.visionGraph, track);
-    await fetchDataFileIntoSession(vision, GLM_OCR_MODEL_PATHS.visionData, track);
+    await fetchDataFileIntoSession(vision, GLM_OCR_MODEL_PATHS.visionData, track, () =>
+      checkpoint('vision-data', exports),
+    );
+    await checkpoint('vision-finish', exports);
     throwIfLoadError(vision.finish(graph));
 
+    await checkpoint('vision-encode', exports);
     const imageFeatures = vision.encode(pixelValues, gridH, gridW);
     self.postMessage({ ok: true, imageFeatures }, [imageFeatures.buffer]);
   } catch (error) {

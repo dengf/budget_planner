@@ -48,6 +48,37 @@
 //! decoder's `MatMulNBits`, this is not a gap the same patched-`rten`
 //! approach can close.
 //!
+//! The crash outlived that fix too, and the breadcrumb that finally
+//! located it was an arithmetic one rather than a memory reading: the
+//! cumulative download counter in the recorded checkpoint (570,739,180)
+//! was larger than *everything* `ocrWorker.js` fetches put together
+//! (embed 182,452,224 + decoder graph 1,034 + decoder data 373,217,280 +
+//! tokenizer 5,420,559 = 561,091,097). Embed and decoder had both loaded
+//! fine; the run had already moved on to the vision encoder, and the
+//! checkpoint's `stage` only still said `"decoder"` because the vision
+//! worker had no checkpoints of its own to overwrite it with.
+//!
+//! Vision was always the largest model by a wide margin, and measuring it
+//! directly (loading each export in a real wasm module and reading
+//! `memory.buffer.byteLength` after `finish()`) put the gap past anything
+//! the other two could explain:
+//!
+//! | vision export | peak wasm memory after `finish()` |
+//! |---|---|
+//! | fp16 (828MB on disk) | 2,490.9 MB |
+//! | `_q4` (290MB on disk) | 323.8 MB |
+//!
+//! fp16 peaks well above the ~2x this module's opening paragraph
+//! describes, because `rten` holds the staging buffer *and* the
+//! upconverted f32 tensors at the same time while building the model.
+//! Vision runs in its own worker, but a separate worker is a separate
+//! process, not a separate memory budget: embed and decoder are still
+//! resident in `ocrWorker.js` throughout, so the tab's real peak was all
+//! three at once, around 3.1GB. `VisionEncoder::finish` below therefore
+//! loads the 4-bit-quantized vision export too -- same `MatMulNBits`
+//! operator the decoder already relies on, same patched `rten` -- which
+//! takes that peak down by ~2.17GB on its own.
+//!
 //! `TokenEmbedder` doesn't go through `rten` at all, though, avoiding the
 //! problem rather than working around it: its ONNX graph is nothing more
 //! than a `Gather` over one weight tensor followed by a `Cast` to f32 --
@@ -160,7 +191,7 @@ impl VisionEncoder {
     /// their own doc comments).
     pub fn finish(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
         let data = std::mem::take(&mut self.staging);
-        let model = LoadedModel::load(graph, "vision_encoder_fp16.onnx_data", data)?;
+        let model = LoadedModel::load(graph, "vision_encoder_q4.onnx_data", data)?;
         let nodes = VisionNodes {
             pixel_values: model.node("pixel_values")?,
             image_grid_thw: model.node("image_grid_thw")?,

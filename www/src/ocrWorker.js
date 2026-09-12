@@ -352,6 +352,14 @@ const pendingCheckpointAcks = new Map();
 // separate allocation work the chunk checkpoints have no visibility into.
 // `sample.bytes` still feeds the catchable-trap fallback too, for the
 // ordinary case this worker already handled before.
+function sendCheckpoint(id, stage, wasmMemoryBytes) {
+  return new Promise((resolve) => {
+    const checkpointId = nextCheckpointId++;
+    pendingCheckpointAcks.set(checkpointId, resolve);
+    self.postMessage({ id, checkpointId, checkpoint: { stage, wasmMemoryBytes } });
+  });
+}
+
 function checkpointBeforeChunk(id, stage, wasm, sample) {
   return () => {
     try {
@@ -359,11 +367,7 @@ function checkpointBeforeChunk(id, stage, wasm, sample) {
     } catch {
       // Leave the previous sample in place; still better than nothing.
     }
-    return new Promise((resolve) => {
-      const checkpointId = nextCheckpointId++;
-      pendingCheckpointAcks.set(checkpointId, resolve);
-      self.postMessage({ id, checkpointId, checkpoint: { stage, wasmMemoryBytes: sample.bytes } });
-    });
+    return sendCheckpoint(id, stage, sample.bytes);
   };
 }
 
@@ -407,6 +411,7 @@ function loadGlmOcrModels(track, id) {
         throw taggedModelLoadError(err, 'decoder', decoderWasm, decoderMemorySample.bytes);
       }
 
+      await sendCheckpoint(id, 'tokenizer', null);
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
       return { embed, decoder, orchestrate, tokenizerJson };
     })().catch((err) => {
@@ -424,7 +429,7 @@ function loadGlmOcrModels(track, id) {
 // so vision's download progress (re-fetched from Cache Storage on every
 // call, since vision is never memoized) folds into the same progress
 // total the caller already reports.
-function runVisionInSubworker(pixelValues, gridH, gridW, track) {
+function runVisionInSubworker(pixelValues, gridH, gridW, track, id) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./glmVisionWorker.js', import.meta.url));
     const settle = (fn, arg) => {
@@ -432,9 +437,23 @@ function runVisionInSubworker(pixelValues, gridH, gridW, track) {
       fn(arg);
     };
     worker.onmessage = (event) => {
-      const { progress, ok, imageFeatures, error } = event.data;
+      const { progress, ok, imageFeatures, error, checkpoint, checkpointId } = event.data;
       if (progress) {
         track(progress.loadedBytes);
+        return;
+      }
+      // Vision runs two workers away from the only thread with
+      // `localStorage`, so its checkpoints relay through this one: hold
+      // vision at its own await until the main thread confirms the write
+      // landed, then release it. Without this hop vision's entire load --
+      // by far the largest allocation the pipeline makes -- is invisible
+      // to `?debug=1`, which is exactly how a crash *inside* vision spent
+      // three rounds masquerading as a decoder crash (see
+      // `budget_calc::smart_parse_model`'s own doc comment).
+      if (checkpoint) {
+        sendCheckpoint(id, checkpoint.stage, checkpoint.wasmMemoryBytes).then(() =>
+          worker.postMessage({ checkpointAck: checkpointId }),
+        );
         return;
       }
       if (ok) settle(resolve, imageFeatures);
@@ -458,7 +477,7 @@ function runVisionInSubworker(pixelValues, gridH, gridW, track) {
 // them. Every actual calculation stays in Rust, individually unit-tested
 // in `budget_calc::smart_parse_orchestrate` -- this loop only decides
 // which model to call next and shuttles buffers between them.
-async function runSmartParseGeneration(models, imageRgb, width, height, track) {
+async function runSmartParseGeneration(models, imageRgb, width, height, track, id) {
   const { embed, decoder, orchestrate, tokenizerJson } = models;
 
   // Clears the decoder's internal KV cache -- required before every new
@@ -469,7 +488,7 @@ async function runSmartParseGeneration(models, imageRgb, width, height, track) {
 
   const [gridH, gridW] = orchestrate.patch_grid(width, height);
   const pixelValues = orchestrate.patchify(imageRgb, width, height);
-  const imageFeatures = await runVisionInSubworker(pixelValues, gridH, gridW, track);
+  const imageFeatures = await runVisionInSubworker(pixelValues, gridH, gridW, track, id);
 
   const hiddenSize = orchestrate.hidden_size();
   const numImageTokens = imageFeatures.length / hiddenSize;
@@ -559,7 +578,9 @@ self.onmessage = async (event) => {
       const models = await loadGlmOcrModels(track, id);
       const { imageRgb, width, height } = event.data;
       try {
-        result = { text: await runSmartParseGeneration(models, imageRgb, width, height, track) };
+        result = {
+          text: await runSmartParseGeneration(models, imageRgb, width, height, track, id),
+        };
       } catch (genError) {
         // A thrown `Message` (see `isMessageShaped` above) is a known
         // calc failure -- normalize it back into the same
