@@ -15,16 +15,15 @@ pub fn build_month(params: JsValue) -> JsValue {
 }
 
 fn build_month_impl(params: JsValue) -> BuildMonthResult {
-    let params: BuildMonthParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return BuildMonthResult {
-                error: Some(message.text.clone()),
-                error_message: Some(message),
-                ..Default::default()
-            };
-        }
+    let params: BuildMonthParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return BuildMonthResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
     };
 
     let to_pairs =
@@ -90,16 +89,15 @@ pub fn build_savings_line(params: JsValue) -> JsValue {
 }
 
 fn build_savings_line_impl(params: JsValue) -> BuildSavingsLineResult {
-    let params: BuildSavingsLineParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return BuildSavingsLineResult {
-                error: Some(message.text.clone()),
-                error_message: Some(message),
-                ..Default::default()
-            };
-        }
+    let params: BuildSavingsLineParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return BuildSavingsLineResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
     };
 
     let (Some(planned), Some(income), Some(total_expense_actual)) = (

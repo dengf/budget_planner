@@ -41,11 +41,9 @@ export default function DashboardTab({
   setViewMonth,
   categories,
   transactions,
-  rules,
   budgetPlan,
   goals,
   debts,
-  recurring,
   onNavigateTab,
 }) {
   const { t, locale } = useI18n();

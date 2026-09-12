@@ -34,8 +34,12 @@ export default function SpendChart({ lines, categoryName, formatMoney }) {
     <figure className="chart spend-chart">
       <figcaption className="chart-title">{t('chart.spendTitle')}</figcaption>
       <div className="chart-legend">
-        <span className="chart-key"><i className="key-spent" /> {t('budget.spent')}</span>
-        <span className="chart-key"><i className="key-planned" /> {t('budget.planned')}</span>
+        <span className="chart-key">
+          <i className="key-spent" /> {t('budget.spent')}
+        </span>
+        <span className="chart-key">
+          <i className="key-planned" /> {t('budget.planned')}
+        </span>
       </div>
 
       <div className="spend-rows">
@@ -63,7 +67,9 @@ export default function SpendChart({ lines, categoryName, formatMoney }) {
                   <span className="spend-marker" style={{ left: `${plannedPct.toFixed(2)}%` }} />
                 )}
               </span>
-              <span className={over ? 'spend-figure over' : 'spend-figure'}>{formatMoney(line.spent)}</span>
+              <span className={over ? 'spend-figure over' : 'spend-figure'}>
+                {formatMoney(line.spent)}
+              </span>
             </div>
           );
         })}

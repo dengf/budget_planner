@@ -210,7 +210,6 @@ export function AppShell({ wasmModule }) {
         // Sequential rather than Promise.all: each save is one IndexedDB
         // write through the same store handle, and the list they land in
         // reads better in the order the presets are declared.
-        // eslint-disable-next-line no-await-in-loop
         await categories.save(buildCategoryFromPreset(preset, t, newId));
       }
     },
@@ -292,18 +291,15 @@ export function AppShell({ wasmModule }) {
       // pointing at a category that has already gone.
       for (const name of [...COLLECTIONS].reverse()) {
         for (const item of [...byName[name].items]) {
-          // eslint-disable-next-line no-await-in-loop
           await byName[name].remove(item.id);
         }
       }
       for (const item of [...budgetPlan.items]) {
-        // eslint-disable-next-line no-await-in-loop
         await budgetPlan.remove(item.id);
       }
 
       for (const name of COLLECTIONS) {
         for (const record of backup.collections[name]) {
-          // eslint-disable-next-line no-await-in-loop
           await byName[name].save(record);
         }
       }
@@ -312,7 +308,6 @@ export function AppShell({ wasmModule }) {
       // rows into it would show them under the wrong heading.
       if (backup.budgetPlan.month === viewMonth) {
         for (const entry of backup.budgetPlan.entries) {
-          // eslint-disable-next-line no-await-in-loop
           await budgetPlan.save(entry);
         }
       }
@@ -338,7 +333,6 @@ export function AppShell({ wasmModule }) {
       categories,
     ]) {
       for (const item of [...collection.items]) {
-        // eslint-disable-next-line no-await-in-loop
         await collection.remove(item.id);
       }
     }

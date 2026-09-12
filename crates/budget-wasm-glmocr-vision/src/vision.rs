@@ -61,7 +61,7 @@ impl VisionEncoder {
     /// Returns the flat image-feature buffer as a raw `Float32Array`
     /// (`Result<Vec<f32>, JsValue>`, not this crate's usual
     /// `to_js`-wrapped DTO) -- wrapping a multi-megabyte `Vec<f32>` in a
-    /// serde_wasm_bindgen struct would serialize it as a plain JS array
+    /// `serde_wasm_bindgen` struct would serialize it as a plain JS array
     /// (one boxed float per element), the same cost
     /// `budget-wasm-pdfrender::render_pdf_page` already avoids for its
     /// `Vec<u8>` return -- see that crate's own doc comment. On error,

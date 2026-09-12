@@ -1,0 +1,302 @@
+# Working in this repo
+
+## The rule: business logic lives in Rust
+
+Every calculation, rule, threshold and derived figure belongs in the Rust
+crates. The front end renders results and collects input. It does not
+compute.
+
+- **The tests are in the core.** `budget-calc` carries the entire
+  budgeting logic — zero-based allocation, categorization rules, CSV
+  parsing, sinking-fund contribution math, snowball/avalanche payoff
+  ordering. A rule that migrates into a `.jsx` file is covered by none of
+  it, and nothing fails when it drifts.
+- **The boundary is what makes the core reviewable.** `budget-wasm` is
+  plumbing precisely because no decision hides in it.
+
+When a duplicated rule does drift, the app does not crash: it shows a
+confident, wrong number. A budgeting tool that is quietly wrong is worse
+than one that is visibly broken.
+
+### Where a thing goes
+
+| Layer | Owns |
+|---|---|
+| `budget-core` | Shared vocabulary: `Cadence`, `Region`, rounding, errors |
+| `budget-calc` | Every calculation: allocation, rules, CSV import, goals, debt payoff |
+| `budget-ports` / `budget-ext-redb` | Persistence port + redb/IndexedDB adapter |
+| `budget-wasm` | Bridge only. Parse `JsValue`, call `budget-calc`, serialize back |
+| `budget-wasm-ocr` | Bridge only, same rule — but a *separate* wasm module (see below) |
+| `budget-wasm-pdf` | Bridge only, same rule — a *third*, independent wasm module (see below) |
+| `www/` | Layout, input, formatting for display, i18n |
+
+### Several wasm modules, not one
+
+`budget-wasm-ocr`, `budget-wasm-pdf`, `budget-wasm-pdfrender`,
+`budget-wasm-llm` and Smart Parse's own `budget-wasm-glmocr-vision`/
+`-embed`/`-decoder`/`-orchestrate` exist purely to keep `budget-wasm`'s
+download small, and to keep each other's weight off a session that only
+takes one of the receipt-capture paths. The OCR/PDF split below is the
+original, most-documented case of the pattern; `budget-wasm-pdfrender`
+(rasterizing a PDF page to pixels via `hayro`, a pure-Rust PDF
+interpreter) is its newest instance before Smart Parse's own four, added
+so a scanned PDF (no text layer) and Smart Parse's PDF path both have
+pixels to read without a text-layer PDF or an image-only session ever
+paying for it — see `budget-wasm-pdfrender/src/lib.rs`'s own doc comment.
+
+Smart Parse's four crates are a further, separate instance of the same
+principle applied *within* one feature rather than across features: each
+of GLM-OCR's three ONNX models needs its own independent wasm module (not
+just its own download), because `rten` (the ONNX runtime these bindings
+use) doubles a model's resident memory at load time converting its fp16
+weights to f32, and three such models sharing one wasm32 module's 4GiB
+linear-memory ceiling exceeded it by construction — confirmed as the
+cause of a real iPhone crash. See
+`budget-wasm-glmocr-vision/src/lib.rs`'s own doc comment for the full
+writeup, and `www/src/ocrWorker.js`'s `runSmartParseGeneration` for how
+the generation control-flow loop that used to live in one shared Rust
+session now lives in JS instead, since separate wasm module instances
+cannot call each other directly.
+
+`ocrs-cjk`/`rten` (receipt OCR) pull in a full ML tensor runtime that was most
+of the wasm payload — 3.7MB with them compiled into the main crate,
+~800KB without — despite most sessions never opening "Take a photo" or
+"Upload PDF". They were originally split into one combined
+`budget-wasm-ocr` crate alongside `pdf-extract`. A later size audit
+(`twiggy top` on an unstripped build) found `pdf-extract`'s own dependency
+chain (`lopdf`, `encoding_rs`, `miniz_oxide`, `sha2`) was a real, separable
+fraction of that combined crate — roughly a fifth of it, traced to a
+single data segment of glyph-name and text-encoding tables — despite being
+irrelevant to OCR, and vice versa. A photo scan and a PDF upload are
+independent user paths that never both run in one session, so bundling
+them meant either path always paid for the other's weight. Splitting PDF
+extraction into its own `budget-wasm-pdf` crate dropped the OCR-only
+download from ~2.9MB to ~1.9MB, and a PDF-only session now downloads
+~1.0MB instead of the same ~2.9MB.
+
+`budget-calc`'s `ocr` and `pdf-text` Cargo features (both default off,
+each enabled by exactly one of the two crates) keep `ocrs-cjk`/`rten` and
+`pdf-extract` respectively out of `budget-wasm`'s dependency graph
+entirely, not just unreached at runtime, and out of each other's.
+`www/src/ocrWorker.js` `import()`s `pkg-ocr` or `pkg-pdf` lazily, only the
+first time its own message type (`'ocr'` or `'pdf'`) actually arrives.
+
+`parse_receipt_text` (the amount/date/description heuristics that run on
+whichever module's extracted text) is bound in the main `budget-wasm`
+crate instead of either lazy one — it's plain text/`Decimal` parsing with
+no heavy dependency, so there's no size reason to duplicate it across two
+lazy modules or route it through a worker `import()` neither path may have
+triggered yet. `ReceiptCapture.jsx` calls it directly on the main thread
+via the always-loaded `wasmModule`.
+
+If a future dependency is similarly heavy and similarly rarely used,
+follow this pattern rather than adding it to `budget-calc` unconditionally:
+a Cargo feature gating the heavy crate, a new thin `budget-wasm-*` binding
+crate that enables it, and a lazy `import()` in the one JS entry point that
+needs it. If two such features are genuinely independent (never both
+needed in the same user action), give each its own crate rather than
+bundling them — the OCR/PDF history above is the cautionary example.
+`Message` (the wasm-boundary error convention) lives in `budget-core`, not
+any of the wasm crates, specifically so multiple wasm-bindgen crates
+mapping `BudgetError` never duplicate that mapping — see
+`budget-core/src/message.rs`'s own doc comment. `render_pdf_page`
+(`budget-wasm-pdfrender`) is a deliberate, documented exception: it
+returns a raw `Vec<u8>` instead, because a rendered page's pixels are too
+large to route through the usual serialized `Message`-shaped result
+without a real performance cost — see that binding's own doc comment.
+
+Business logic is anything where a second implementation could give a
+different answer: arithmetic on money, thresholds, deriving one value from
+another, choosing between rulesets. Host layer is anything a wasm module
+cannot reach or has no domain content: reading `localStorage`/`FileReader`,
+DOM/layout/SVG geometry, number and date *formatting* for display.
+
+`www/src/currencySymbol.js` is host-layer by design, not by omission —
+see its own doc comment for why: it's a stored display preference, not a
+budget-calc concept (this app once had a US/SG "region" toggle behind it;
+that layer was removed as unneeded complexity, leaving just the symbol).
+Income used to be a similar case (a number typed into its own field,
+stored in `localStorage` via a since-removed `income.js`) but no longer
+is: it's now `budget_calc::summarize_month` deriving it from the income
+categories' own `planned` amounts, because getting that arithmetic
+right/wrong is exactly the kind of thing this rule exists to keep in the
+core rather than a frontend filter.
+
+### Adding a calculation
+
+1. Write it in `budget-calc`, with tests.
+2. Add a binding in `budget-wasm` that only parses, calls and serializes.
+   The `bridge_coverage` test fails if a public `budget-calc` module has no
+   binding.
+3. Call it from the front end.
+
+## Carried over from mortgage_calculator, verified still true here
+
+- **The blossom is the brand's one constant, and it has five petals, not
+  six.** `goals::petals_filled` divides progress into fifths, matching
+  `meifio-brand/build.py`'s `PETAL` at 72 degrees (five-fold). This was
+  wrong once already this session — written as six from a planning
+  document's loose wording, caught by checking the actual shipped
+  `MeifioMark.jsx` rather than trusting the plan. Check the real asset
+  again if this ever needs revisiting.
+- **`Decimal` has no NaN or Infinity.** Don't write `.is_finite()` on a
+  `Decimal` — it doesn't exist, and the compiler will say so. The
+  non-finite case belongs at the wasm boundary, converting the `f64` a JS
+  caller sent (`convert::f64_to_decimal`), mirroring mortgage-wasm's
+  `percent_to_rate`.
+- **The `Message` convention**: an error crosses the wasm boundary as a
+  code plus params plus an English fallback, never as pre-composed prose —
+  see `budget-wasm/src/message.rs`.
+- **`no_debug_formatted_errors`**: every binding module must serialize via
+  `convert::to_js`, never `serde_wasm_bindgen::to_value`, and must never
+  Debug-format an error into a user-facing field. Guarded by a source-text
+  test in `message.rs`; the `BINDINGS` list there must include every new
+  binding module.
+- **A proper noun is exempt from the untranslated-strings guard by exact
+  match, never by loosening the pattern.** `meifio` is exempted this way in
+  `untranslated-strings.test.js`; an identical-in-every-locale value like
+  an email placeholder gets the same treatment in
+  `i18n/catalogs.test.js`'s `PROSE_EXEMPT` — both documented in place, both
+  narrow.
+- **Never round-trip the i18n catalogs through anything that isn't
+  UTF-8-in, UTF-8-out.** A test bans the Latin-1-supplement range
+  (hex 80 through FF) across all three catalogs; a single mis-encoded
+  write turns Chinese text into mojibake that passes every other check.
+
+## The other rule: it has to be obvious to use
+
+Near-perfect, intuitive user experience is a requirement for every tool we
+ship, not a polish pass afterwards. A tool that is correct but confusing
+has not been delivered.
+
+What this means in practice:
+
+- **Someone opening it for the first time must know what to do next**
+  without being told. If the first screen doesn't make the next action
+  obvious, that is a defect and gets logged like any other.
+- **The number the tool exists to produce is the most prominent thing on
+  the screen.** Supporting figures are subordinate to it.
+- **Never state something that isn't true yet.** A success message on an
+  empty state, a total that omits data, a phrase that only makes sense
+  once the user has done something they haven't done -- these are wrong
+  answers, not cosmetic issues, and rank with a miscalculation.
+- **Defaults must reduce work, not just fill space.** Seeding a screen
+  with rows of zeros only helps if the next action is still obvious.
+- **Every destructive action confirms; every reversible one is quiet.**
+  Visual weight goes to the action people take most, never the rarest one.
+- **If it can be exported it must be importable.** A one-way door beside
+  a delete button is a trap.
+- **Check it on a phone before calling it done.** Layout bugs in this
+  codebase have shown up on narrow screens first, more than once.
+- **A component shared across tabs must look the same everywhere it
+  renders, unless a specific constraint forces a difference.** `dash-header` /
+  `dash-month-nav` / `MonthYearPicker` render on Dashboard, Budget and
+  Transactions; a font size or alignment tweak made while touching one
+  tab's CSS has drifted from the others more than once (e.g. Budget's
+  month label sitting at a different size than Dashboard's until this was
+  caught). When a shared class changes, check every tab that renders it,
+  not just the one on screen. A real exception is still fine — Dashboard's
+  `.dashboard .dash-header h2` font shrink exists only because the title
+  and full month nav don't both fit a 375px row there — but it must be a
+  documented, deliberate exception, not an accidental side effect of
+  editing one tab in isolation.
+
+When a change is reviewed, "does this work?" and "would a first-time user
+understand this?" carry equal weight. The second question is the one that
+gets skipped, so ask it explicitly.
+
+## Verification traps specific to this repo
+
+- **`cargo build --workspace` never compiles `budget-ext-redb::wasm` or
+  `budget-wasm::storage`.** Both are gated to `wasm32-unknown-unknown` and
+  only exist on that target. Two real bugs shipped past a clean native
+  build this session — a missing `serde::Serialize` derive on two DTOs —
+  and were only caught by `cargo build -p budget-wasm --target
+  wasm32-unknown-unknown`. CI runs this as its own `wasm32` job rather than
+  relying on the slower `www-build` job to exercise it indirectly; run it
+  locally before trusting a green native build.
+- **`npm run build` does not rebuild the wasm.** Run `npm run build:wasm`
+  first, or you are testing the previous `pkg/`, `pkg-ocr/`, `pkg-pdf/`,
+  `pkg-pdfrender/`, `pkg-llm/`, `pkg-glmocr-vision/`, `pkg-glmocr-embed/`,
+  `pkg-glmocr-decoder/` and `pkg-glmocr-orchestrate/`.
+- **`cargo build -p budget-wasm --target wasm32-unknown-unknown` alone
+  does not prove any of the lazy crates compile.** `budget-wasm-ocr`,
+  `budget-wasm-pdf`, `budget-wasm-pdfrender`, `budget-wasm-llm` and
+  Smart Parse's own `budget-wasm-glmocr-vision`/`-embed`/`-decoder`/
+  `-orchestrate` are all separate crates with separate wasm-pack builds
+  (`npm run build:wasm:ocr` / `:pdf` / `:pdfrender` / `:llm` /
+  `:glmocr-vision` / `:glmocr-embed` / `:glmocr-decoder` /
+  `:glmocr-orchestrate`); CI's `wasm32` job checks every one of them
+  individually (a real, retroactively-fixed gap: `budget-wasm-llm`/the
+  original single `budget-wasm-glmocr` were added to the crate list
+  without ever being added to this job, and `budget-wasm-pdfrender`
+  shipped the same way in its own first PR, caught only because that
+  PR's own local check happened to build it — CI itself passed that PR
+  without ever building it on wasm32). A local check should too, before
+  trusting any one build. `cargo build --workspace` unifies
+  every one of `budget-calc`'s heavy-dependency features across every
+  member being built together (since each lazy crate requests its own),
+  which masks whether `budget-wasm` alone still excludes all of them, and
+  whether the lazy crates still exclude each other's features — the only
+  way to confirm the size split still holds is building each crate in
+  isolation (`cd crates/budget-wasm && wasm-pack build --target web
+  --out-dir ../../www/pkg`, and the equivalent for each other crate into
+  its own `pkg-*` directory) and checking each `*_bg.wasm`'s size directly.
+- **jsdom has no `localStorage`** on `window` or as a bare global; every
+  storage path (`currencySymbol.js`, `commitments.js`) runs into its catch
+  block under test unless the test stands up a fake.
+- **`wasm-opt` is off deliberately**, same measured tradeoff as
+  mortgage_calculator's `mortgage-wasm/Cargo.toml` — see that crate's
+  comment. Do not "fix" it here either.
+- **`window.prompt`/`window.alert` are not available in every environment
+  that renders this app** (including this project's own browser-preview
+  tooling) and are poor UX regardless — blocking, unstyled, untestable.
+  Every interaction in this app uses an inline control instead; keep it
+  that way.
+- **A new category has no budget-plan entry until one is saved.**
+  `BudgetTab` builds its `planned` list from every known category
+  (defaulting to 0), not from `budgetPlan.items` alone — the latter would
+  make a freshly-added category invisible until something else created a
+  plan row for it. This was a real bug caught in the first browser smoke
+  test; don't reintroduce it by "simplifying" back to filtering on
+  `budgetPlan.items`.
+
+## What's simplified in this round, on purpose
+
+- **`previous_remaining` (rollover) is always `[]`.** Every month is
+  planned independently; `budget_calc::build_month` already accepts a
+  prior month's remaining balances, but the frontend doesn't yet carry
+  them forward month-over-month. That's real, sizeable state (finding and
+  summing the actual previous month) for a follow-up round, not a Rust
+  limitation.
+- **No shared crate with `mortgage_calculator`.** Both repos independently
+  implement the same *pattern* (hexagonal storage port, redb-over-
+  IndexedDB, the `Message` convention) rather than sharing code, so the two
+  apps' release cycles stay decoupled. Revisit only once the pattern has
+  proven stable across a third tool.
+
+## Landing changes
+
+One branch per round of work, focused commits, then a PR with a Summary
+and Test plan. **Do not self-merge** — wait for approval. Verify
+`state == "MERGED"` before deleting any branch.
+
+### Tunneling a local preview for the user to look at
+
+Use **`cloudflared tunnel --url http://localhost:3002`** (the dev
+server's port, per `webpack.config.js`), not `localtunnel`/`lt`.
+`cloudflared`'s quick tunnel (`*.trycloudflare.com`, no account or config
+needed) opens straight to the app; `localtunnel` interposes its own
+"Tunnel website ahead!" interstitial that requires typing in a shown IP
+address before every first visit from a given network, which is exactly
+the kind of avoidable step to skip when the point is a quick look. Read
+the assigned `https://*.trycloudflare.com` URL from `cloudflared`'s own
+stdout (`INF ... Your quick Tunnel has been created! ... https://...`)
+rather than guessing it. `devServer.allowedHosts: 'all'` in
+`webpack.config.js` is already set to accept a tunnel's Host header, for
+either tool.
+
+**Never push to a remote, or run `gh repo create`, without the user asking
+in that exact moment** — a plan having said the repo would be public is
+not the same as permission to publish it. Build, commit and test locally;
+ask before the first push.

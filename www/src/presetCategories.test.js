@@ -8,10 +8,7 @@ const translate = (key) => NAMES[key];
 
 describe('availablePresets', () => {
   it('offers every preset when nothing exists yet', () => {
-    expect(availablePresets([HOUSING, UTILITIES], [], translate)).toEqual([
-      HOUSING,
-      UTILITIES,
-    ]);
+    expect(availablePresets([HOUSING, UTILITIES], [], translate)).toEqual([HOUSING, UTILITIES]);
   });
 
   it('excludes a preset whose translated name is already a category, case- and whitespace-insensitive', () => {
@@ -50,9 +47,11 @@ describe('buildCategoryFromPreset', () => {
       is_income: false,
     };
     const t = (key) =>
-      ({ 'cat.housing': 'Housing', 'group.expenses': 'Expenses', 'desc.housing': 'Rent, mortgage, etc.' })[
-        key
-      ];
+      ({
+        'cat.housing': 'Housing',
+        'group.expenses': 'Expenses',
+        'desc.housing': 'Rent, mortgage, etc.',
+      })[key];
 
     expect(buildCategoryFromPreset(preset, t, newId)).toEqual({
       id: 'new-id',

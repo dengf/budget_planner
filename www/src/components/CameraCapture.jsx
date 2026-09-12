@@ -83,13 +83,18 @@ export default function CameraCapture({ onFile }) {
   if (phase === 'live') {
     return (
       <div className="camera-live">
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- a live viewfinder, not recorded media */}
+        {/* a live viewfinder, not recorded media, so `media-has-caption` does not apply */}
         <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
         <div className="camera-controls">
           <button type="button" className="btn secondary" onClick={cancel}>
             {t('confirm.cancel')}
           </button>
-          <button type="button" className="btn camera-shutter" onClick={capture} aria-label={t('transactions.takePhoto')} />
+          <button
+            type="button"
+            className="btn camera-shutter"
+            onClick={capture}
+            aria-label={t('transactions.takePhoto')}
+          />
         </div>
       </div>
     );
@@ -97,7 +102,12 @@ export default function CameraCapture({ onFile }) {
 
   return (
     <>
-      <button type="button" className="btn secondary" onClick={start} disabled={phase === 'starting'}>
+      <button
+        type="button"
+        className="btn secondary"
+        onClick={start}
+        disabled={phase === 'starting'}
+      >
         <CameraIcon />
         {phase === 'starting' ? t('transactions.cameraStarting') : t('transactions.takePhoto')}
       </button>

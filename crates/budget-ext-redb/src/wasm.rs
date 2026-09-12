@@ -1,9 +1,9 @@
 //! `wasm32` construction: `redb` running against a
 //! [`redb::StorageBackend`] backed by an in-memory buffer, asynchronously
-//! flushed to IndexedDB (via `rexie`) after each write and preloaded from
-//! IndexedDB once at startup.
+//! flushed to `IndexedDB` (via `rexie`) after each write and preloaded from
+//! `IndexedDB` once at startup.
 //!
-//! Ported from mortgage_calculator's `mortgage-ext-redb::wasm`, which
+//! Ported from `mortgage_calculator`'s `mortgage-ext-redb::wasm`, which
 //! explains the tradeoff at length: this deliberately does *not* use the
 //! Origin Private File System's synchronous access handles (the approach
 //! browser-native SQLite builds use) -- that API only exists inside a
@@ -35,7 +35,7 @@ const BLOB_KEY: &str = "db";
 const CACHE_SIZE_BYTES: usize = 4 * 1024 * 1024;
 
 impl RedbBudgetStore {
-    /// Loads any previously-persisted database bytes from IndexedDB, then
+    /// Loads any previously-persisted database bytes from `IndexedDB`, then
     /// opens (or initializes) redb against an in-memory-backed
     /// [`IndexedDbBackend`]. Must run before any other wasm-bindgen call
     /// touches storage.
@@ -61,10 +61,10 @@ struct IndexedDbBackend {
     writer: Rc<PersistState>,
 }
 
-/// Coalescing single-flight writer: at most one IndexedDB persist runs at
+/// Coalescing single-flight writer: at most one `IndexedDB` persist runs at
 /// a time. A `sync_data()` call that lands while a flush is already in
 /// progress just replaces `pending` with its (newer) snapshot rather than
-/// opening a second, independent IndexedDB transaction -- two overlapping
+/// opening a second, independent `IndexedDB` transaction -- two overlapping
 /// writes have no ordering guarantee relative to each other, and the
 /// older one finishing last would silently leave stale data as the final
 /// state. `pending` is drained in a loop after each flush so the *latest*
@@ -78,7 +78,14 @@ struct PersistState {
 // Safety: wasm32-unknown-unknown is single-threaded, so there is no actual
 // concurrent access for these bounds to protect against -- they exist
 // only because `redb::StorageBackend` requires them.
+//
+// `unsafe_code = "deny"` in the workspace lints (see root Cargo.toml)
+// exists so a case like this has to be named explicitly rather than
+// blending into a file that also does normal safe Rust -- this pair of
+// impls is genuinely the only unsafe code in the crate.
+#[allow(unsafe_code)]
 unsafe impl Send for IndexedDbBackend {}
+#[allow(unsafe_code)]
 unsafe impl Sync for IndexedDbBackend {}
 
 impl StorageBackend for IndexedDbBackend {

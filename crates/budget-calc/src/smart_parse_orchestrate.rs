@@ -8,7 +8,7 @@
 //! transformers runtime. Every magic number below (patch size, special
 //! token IDs, the chat-template token sequence) is fixed to this one
 //! model, confirmed against the model's own real ONNX export and
-//! cross-checked byte-for-byte against its PyTorch reference output on
+//! cross-checked byte-for-byte against its `PyTorch` reference output on
 //! two test images before ever being written here. This module always
 //! implements the model's "Text Recognition" task -- not "Table
 //! Recognition" or a custom schema -- specifically so its output is
@@ -296,7 +296,7 @@ pub fn get_rope_index(input_ids: &[i32], grid_h: i64, grid_w: i64) -> Vec<i32> {
             current_pos += llm_h.max(llm_w) as i32;
             i += (llm_h * llm_w) as usize;
         } else {
-            for c in channels.iter_mut() {
+            for c in &mut channels {
                 c.push(current_pos);
             }
             current_pos += 1;

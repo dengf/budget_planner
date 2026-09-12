@@ -4,11 +4,16 @@ import { EXPORT_FORMAT, readBackup } from './backup';
 const valid = (over = {}) => ({
   format: EXPORT_FORMAT,
   categories: [{ id: 'c1', name: 'Groceries', group: 'Food' }],
-  transactions: [{ id: 't1', date: '2026-08-27', description: 'NTUC', amount: -20, category_id: 'c1' }],
+  transactions: [
+    { id: 't1', date: '2026-08-27', description: 'NTUC', amount: -20, category_id: 'c1' },
+  ],
   rules: [],
   goals: [],
   debts: [],
-  budget_plan: { month: '2026-08', entries: [{ id: 'p1', month: '2026-08', category_id: 'c1', planned: 400 }] },
+  budget_plan: {
+    month: '2026-08',
+    entries: [{ id: 'p1', month: '2026-08', category_id: 'c1', planned: 400 }],
+  },
   ...over,
 });
 
@@ -56,5 +61,4 @@ describe('readBackup', () => {
     expect(result.ok).toBe(true);
     expect(result.collections.goals).toEqual([]);
   });
-
 });

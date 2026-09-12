@@ -25,16 +25,15 @@ pub fn build_payoff_plan(params: JsValue) -> JsValue {
 }
 
 fn build_payoff_plan_impl(params: JsValue) -> BuildPlanResult {
-    let params: BuildPlanParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return BuildPlanResult {
-                error: Some(message.text.clone()),
-                error_message: Some(message),
-                ..Default::default()
-            };
-        }
+    let params: BuildPlanParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return BuildPlanResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
     };
 
     let mut debts = Vec::with_capacity(params.debts.len());

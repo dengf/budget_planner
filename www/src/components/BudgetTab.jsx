@@ -122,7 +122,6 @@ export default function BudgetTab({
       if (includeCommitments) {
         for (const goal of goals?.items ?? []) {
           const months = monthsBetween(todayIso(), goal.target_date);
-          // eslint-disable-next-line no-await-in-loop
           const contribution = await wasmModule.required_contribution?.({
             target_amount: goal.target_amount,
             current_amount: goal.current_amount,
@@ -771,6 +770,11 @@ export default function BudgetTab({
                           inputMode="decimal"
                           step="any"
                           min="0"
+                          // Focus moves into the amount field of a panel the user just
+                          // opened in order to type an amount -- not on page load, which
+                          // is what the rule guards against. Typing is the only thing
+                          // there is to do here.
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
                           autoFocus
                           value={spendDraft.amount}
                           onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })}
@@ -920,6 +924,7 @@ export default function BudgetTab({
               role="presentation"
               onClick={() => setCategoryPanelOpen(false)}
             >
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- this handler only stops a click from reaching the backdrop's dismiss handler above; the panel itself is not something to activate, so there is no keyboard equivalent to add. Focus and Escape are handled by the dialog role. */}
               <div
                 className="fab-picker category-add-panel"
                 role="dialog"

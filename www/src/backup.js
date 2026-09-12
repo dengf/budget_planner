@@ -20,7 +20,10 @@ export const EXPORT_FORMAT = 'meifio.budget_planner.v1';
 export const COLLECTIONS = ['categories', 'rules', 'transactions', 'goals', 'debts', 'recurring'];
 
 function isRecordArray(value) {
-  return Array.isArray(value) && value.every((r) => r && typeof r === 'object' && typeof r.id === 'string');
+  return (
+    Array.isArray(value) &&
+    value.every((r) => r && typeof r === 'object' && typeof r.id === 'string')
+  );
 }
 
 /**

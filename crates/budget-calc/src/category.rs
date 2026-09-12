@@ -104,7 +104,7 @@ pub struct PlannedAmount {
 /// `spent`: this month's actual spend per category, from summing
 /// categorized transactions (see `transaction::spend_by_category`).
 ///
-/// Every `Decimal` argument must be finite -- rust_decimal has no NaN/Inf,
+/// Every `Decimal` argument must be finite -- `rust_decimal` has no NaN/Inf,
 /// so a validation error here only fires for a negative planned amount,
 /// which is the one shape that would silently invert the zero-based math
 /// (a category "planned" at -50 would show as 50 already spent).
@@ -123,15 +123,13 @@ pub fn build_month(
         previous_remaining
             .iter()
             .find(|(cid, _)| cid == id)
-            .map(|(_, v)| *v)
-            .unwrap_or(Decimal::ZERO)
+            .map_or(Decimal::ZERO, |(_, v)| *v)
     };
     let spent_of = |id: &str| -> Decimal {
         spent
             .iter()
             .find(|(cid, _)| cid == id)
-            .map(|(_, v)| *v)
-            .unwrap_or(Decimal::ZERO)
+            .map_or(Decimal::ZERO, |(_, v)| *v)
     };
 
     Ok(planned

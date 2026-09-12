@@ -40,7 +40,7 @@ pub fn decimal_to_string(value: Decimal) -> String {
 }
 
 /// The inverse of `decimal_to_string`. `None` on a corrupted record rather
-/// than panicking -- a hand-edited IndexedDB entry is a real, if rare,
+/// than panicking -- a hand-edited `IndexedDB` entry is a real, if rare,
 /// way for this to happen.
 pub fn string_to_decimal(value: &str) -> Option<Decimal> {
     value.parse().ok()
@@ -78,9 +78,9 @@ pub fn cadence_name(cadence: Cadence) -> &'static str {
 pub fn parse_cadence(cadence: Option<&str>) -> Cadence {
     match cadence.map(str::to_lowercase).as_deref() {
         Some("weekly") => Cadence::Weekly,
-        Some("fortnightly") | Some("bi-weekly") | Some("biweekly") => Cadence::Fortnightly,
+        Some("fortnightly" | "bi-weekly" | "biweekly") => Cadence::Fortnightly,
         Some("quarterly") => Cadence::Quarterly,
-        Some("yearly") | Some("annual") | Some("annually") => Cadence::Yearly,
+        Some("yearly" | "annual" | "annually") => Cadence::Yearly,
         _ => Cadence::Monthly,
     }
 }

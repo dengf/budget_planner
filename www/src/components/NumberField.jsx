@@ -85,7 +85,9 @@ export default function NumberField({
             type="button"
             className={`sign-toggle ${isNegative ? 'negative' : 'positive'}`}
             onClick={flipSign}
-            aria-label={isNegative ? t('transactions.switchToIncome') : t('transactions.switchToSpending')}
+            aria-label={
+              isNegative ? t('transactions.switchToIncome') : t('transactions.switchToSpending')
+            }
           >
             {isNegative ? '−' : '+'}
           </button>

@@ -64,7 +64,6 @@ describe('MonthYearPicker', () => {
     const onChange = vi.fn();
     render(<Harness value="2026-08" onChange={onChange} />);
     await userEvent.click(screen.getByText('August 2026'));
-    // eslint-disable-next-line testing-library/no-node-access
     await userEvent.click(document.querySelector('.monthpicker-backdrop'));
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

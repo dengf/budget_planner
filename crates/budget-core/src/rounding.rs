@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 /// Rounds to whole cents.
 ///
 /// `Decimal::round_dp` uses banker's rounding (half to even) at the
-/// midpoint, matching rust_decimal's own default -- not "half up". A
+/// midpoint, matching `rust_decimal`'s own default -- not "half up". A
 /// transaction amount is never a computed midpoint in practice (it comes
 /// from a bank statement, already at the cent), so this only matters for
 /// *derived* figures like a required monthly contribution.

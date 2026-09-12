@@ -80,7 +80,11 @@ export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, de
                   <td className="num">{formatMoney(d.balance)}</td>
                   <td className="num">{d.apr_percent.toFixed(2)}%</td>
                   <td className="num">{formatMoney(d.min_payment)}</td>
-                  <td><button className="btn ghost" onClick={() => removeDebt(d)}>{t('budget.remove')}</button></td>
+                  <td>
+                    <button className="btn ghost" onClick={() => removeDebt(d)}>
+                      {t('budget.remove')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -91,21 +95,52 @@ export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, de
       <form className="form-grid" onSubmit={addDebt}>
         <label className="field">
           <span className="field-label">{t('debt.name')}</span>
-          <div className="field-input"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            />
+          </div>
         </label>
-        <NumberField label={t('debt.balance')} value={draft.balance} onChange={(v) => setDraft({ ...draft, balance: v })} grouped />
-        <NumberField label={t('debt.apr')} value={draft.apr_percent} onChange={(v) => setDraft({ ...draft, apr_percent: v })} suffix="%" />
-        <NumberField label={t('debt.minPayment')} value={draft.min_payment} onChange={(v) => setDraft({ ...draft, min_payment: v })} grouped />
-        <button className="btn" type="submit">{t('debt.add')}</button>
+        <NumberField
+          label={t('debt.balance')}
+          value={draft.balance}
+          onChange={(v) => setDraft({ ...draft, balance: v })}
+          grouped
+        />
+        <NumberField
+          label={t('debt.apr')}
+          value={draft.apr_percent}
+          onChange={(v) => setDraft({ ...draft, apr_percent: v })}
+          suffix="%"
+        />
+        <NumberField
+          label={t('debt.minPayment')}
+          value={draft.min_payment}
+          onChange={(v) => setDraft({ ...draft, min_payment: v })}
+          grouped
+        />
+        <button className="btn" type="submit">
+          {t('debt.add')}
+        </button>
       </form>
 
       {debts.items.length > 0 && (
         <>
           <div className="form-grid">
-            <NumberField label={t('debt.extraPayment')} value={extraPayment} onChange={setExtraPayment} grouped />
+            <NumberField
+              label={t('debt.extraPayment')}
+              value={extraPayment}
+              onChange={setExtraPayment}
+              grouped
+            />
             <label className="field">
               <span className="field-label">{t('debt.strategy')}</span>
-              <select className="field-select" value={strategy} onChange={(e) => setStrategy(e.target.value)}>
+              <select
+                className="field-select"
+                value={strategy}
+                onChange={(e) => setStrategy(e.target.value)}
+              >
                 <option value="snowball">{t('debt.snowball')}</option>
                 <option value="avalanche">{t('debt.avalanche')}</option>
               </select>

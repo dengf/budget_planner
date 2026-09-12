@@ -18,7 +18,7 @@ describe('CalcError', () => {
     // English -- in the middle of an otherwise fully translated page.
     show(
       {
-        error: "Category name cannot be blank.",
+        error: 'Category name cannot be blank.',
         error_message: { code: 'err.blankCategoryName', params: {} },
       },
       'zh-Hans',

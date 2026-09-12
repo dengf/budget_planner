@@ -2,7 +2,7 @@
 //! `redb::StorageBackend` implementation. Pulled out of that (wasm32-only)
 //! module so this -- including the offset-overflow guards -- can be
 //! unit-tested with a plain `cargo test`, without needing a wasm32 target
-//! or a browser to run in. Ported unchanged from mortgage_calculator's
+//! or a browser to run in. Ported unchanged from `mortgage_calculator`'s
 //! `mortgage-ext-redb`: this logic has no schema, so nothing about a
 //! second app's record types changes it.
 

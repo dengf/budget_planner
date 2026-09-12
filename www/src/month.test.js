@@ -78,8 +78,18 @@ describe('weeksInMonth', () => {
     const weeks = weeksInMonth('2026-02');
     const days = weeks.flatMap(({ start, end }) => {
       const out = [];
-      let d = new Date(...start.split('-').map(Number).map((n, i) => (i === 1 ? n - 1 : n)));
-      const last = new Date(...end.split('-').map(Number).map((n, i) => (i === 1 ? n - 1 : n)));
+      let d = new Date(
+        ...start
+          .split('-')
+          .map(Number)
+          .map((n, i) => (i === 1 ? n - 1 : n)),
+      );
+      const last = new Date(
+        ...end
+          .split('-')
+          .map(Number)
+          .map((n, i) => (i === 1 ? n - 1 : n)),
+      );
       while (d <= last) {
         out.push(todayIso(d));
         d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
