@@ -28,11 +28,36 @@
 //! `MatMulNBits` operator reads directly, never upconverted to f32 the
 //! way every other weight tensor here is, cutting the decoder's resident
 //! footprint roughly 6x (measured: ~373MB on-disk/resident quantized vs.
-//! ~1.16GB on-disk -> ~2.16GB resident fp16). Vision and the token
-//! embedder stay on their fp16 exports -- GLM-OCR publishes no quantized
-//! export of either, and neither one was the model actually trapping.
-//! See this crate's `Cargo.toml` for why this requires an unreleased
-//! `rten` commit rather than 0.26.0.
+//! ~1.16GB on-disk -> ~2.16GB resident fp16). See this crate's
+//! `Cargo.toml` for why this requires an unreleased `rten` commit rather
+//! than 0.26.0.
+//!
+//! A real device (iPhone 17, Safari) still crashed after the decoder fix
+//! landed, but with no catchable error at all this time -- a checkpoint
+//! written just before the trap (see `www/src/receiptFailureBreadcrumb.js`'s
+//! own doc comment for that mechanism) showed the decoder's *own* module
+//! memory at a small, unremarkable ~389MB, ruling the decoder back out as
+//! the direct cause. Suspicion fell on `TokenEmbedder`, the other model
+//! sharing `ocrWorker.js`'s single OS process with the decoder: it still
+//! loaded its fp16 export through `rten`, doubling its ~174MB on-disk size
+//! to ~348MB resident, on top of whatever the decoder had grown to by
+//! then. GLM-OCR does publish a quantized `embed_tokens` export, but it
+//! uses `GatherBlockQuantized`, a `com.microsoft` ONNX operator `rten` has
+//! no implementation of anywhere in its codebase (confirmed by grepping
+//! rten's own source, not just a disabled feature flag) -- unlike the
+//! decoder's `MatMulNBits`, this is not a gap the same patched-`rten`
+//! approach can close.
+//!
+//! `TokenEmbedder` doesn't go through `rten` at all, though, avoiding the
+//! problem rather than working around it: its ONNX graph is nothing more
+//! than a `Gather` over one weight tensor followed by a `Cast` to f32 --
+//! an embedding table lookup, not a real computation graph. `finish`
+//! below keeps the raw fp16 bytes exactly as downloaded and `embed`
+//! decodes only the rows a given call actually asks for, so this model's
+//! resident memory is its on-disk fp16 size, not double it -- the same
+//! "don't upconvert what you don't have to" principle as the decoder's
+//! quantized export, just implemented by hand instead of via an ONNX
+//! operator, because this graph is simple enough not to need one.
 //!
 //! `VisionEncoder`/`TokenEmbedder` are stateless per call (aside from
 //! the loaded model itself); `DecoderSession` is not -- it holds
@@ -189,21 +214,62 @@ impl VisionEncoder {
     }
 }
 
-struct EmbedNodes {
-    input_ids: NodeId,
-    output: NodeId,
+/// Converts one fp16 value (as its raw bit pattern) to f32.
+///
+/// `rten` isn't in the picture for `TokenEmbedder` (see this module's own
+/// doc comment), so there's no borrowed conversion routine to call into --
+/// this is the same well-known bit-manipulation algorithm rten's own
+/// `rten-base::half::f16_to_f32` uses internally, credited there as
+/// "copied from the `half` crate" (<https://github.com/VoidStarKat/half-rs>).
+/// Copied here rather than depending on `rten-base` directly, since it's
+/// small, self-contained, and not part of any crate this workspace already
+/// depends on for its own sake.
+fn f16_to_f32(bits: u16) -> f32 {
+    if bits & 0x7FFF == 0 {
+        return f32::from_bits((bits as u32) << 16);
+    }
+    let sign = (bits & 0x8000) as u32;
+    let exp = (bits & 0x7C00) as u32;
+    let man = (bits & 0x03FF) as u32;
+
+    if exp == 0x7C00 {
+        return if man == 0 {
+            f32::from_bits((sign << 16) | 0x7F80_0000)
+        } else {
+            f32::from_bits((sign << 16) | 0x7FC0_0000 | (man << 13))
+        };
+    }
+
+    if exp == 0 {
+        // Subnormal: normalize by shifting until the implicit leading bit
+        // would land, adjusting the exponent to match.
+        let e = (man as u16).leading_zeros() - 6;
+        let out_exp = (127 - 15 - e) << 23;
+        let out_man = (man << (14 + e)) & 0x7F_FFFF;
+        return f32::from_bits((sign << 16) | out_exp | out_man);
+    }
+
+    let unbiased_exp = ((exp as i32) >> 10) - 15;
+    let out_exp = ((unbiased_exp + 127) as u32) << 23;
+    let out_man = man << 13;
+    f32::from_bits((sign << 16) | out_exp | out_man)
 }
 
 /// GLM-OCR's token embedder: token ids in, one flat embedding buffer
 /// out. Called once for the whole initial prompt and once per generated
 /// token thereafter (up to `smart_parse_orchestrate::MAX_NEW_TOKENS`
-/// times), so caching `nodes` in `finish()` rather than re-resolving
-/// them per call matters here -- re-resolving by name on every one of
-/// ~800 calls would be hundreds of redundant lookups per scan.
+/// times).
+///
+/// Unlike `VisionEncoder`/`DecoderSession`, this holds no `rten` model at
+/// all -- just the raw fp16 weight table exactly as downloaded (see this
+/// module's own doc comment for why bypassing `rten` here is possible and
+/// worthwhile). `weights` is `[vocab_size * HIDDEN_SIZE]` fp16 values,
+/// row-major by token id, matching GLM-OCR's `embed_tokens_fp16.onnx_data`
+/// external-data layout exactly -- there is no ONNX graph left to parse,
+/// so `finish` takes no graph argument.
 #[derive(Default)]
 pub struct TokenEmbedder {
-    model: Option<LoadedModel>,
-    nodes: Option<EmbedNodes>,
+    weights: Vec<u8>,
     staging: Vec<u8>,
 }
 
@@ -220,45 +286,47 @@ impl TokenEmbedder {
         self.staging.extend_from_slice(chunk);
     }
 
-    pub fn finish(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
+    pub fn finish(&mut self) -> Result<(), BudgetError> {
         let data = std::mem::take(&mut self.staging);
-        let model = LoadedModel::load(graph, "embed_tokens_fp16.onnx_data", data)?;
-        let nodes = EmbedNodes {
-            input_ids: model.node("input_ids")?,
-            output: model.model.output_ids()[0],
-        };
-        self.model = Some(model);
-        self.nodes = Some(nodes);
+        if !data.len().is_multiple_of(HIDDEN_SIZE * 2) {
+            return Err(BudgetError::SmartParseModelLoadFailed(
+                "embed_tokens weight file size is not a whole number of rows".into(),
+            ));
+        }
+        self.weights = data;
         Ok(())
     }
 
     /// Embeds `input_ids` (the whole prompt, or a single next-token id),
-    /// returning a flat `[input_ids.len() * HIDDEN_SIZE]` buffer.
+    /// returning a flat `[input_ids.len() * HIDDEN_SIZE]` buffer. Each id
+    /// only ever touches its own `HIDDEN_SIZE`-row slice of `weights` --
+    /// nothing here ever materializes the whole table as f32.
     pub fn embed(&self, input_ids: &[i32]) -> Result<Vec<f32>, BudgetError> {
-        let model = self.model.as_ref().ok_or_else(|| {
-            BudgetError::SmartParseModelLoadFailed("embed model not loaded".into())
-        })?;
-        let nodes = self
-            .nodes
-            .as_ref()
-            .expect("nodes set alongside model in finish()");
+        if self.weights.is_empty() {
+            return Err(BudgetError::SmartParseModelLoadFailed(
+                "embed model not loaded".into(),
+            ));
+        }
+        let vocab_size = self.weights.len() / (HIDDEN_SIZE * 2);
 
-        let seq_len = input_ids.len();
-        let ids_tensor = Tensor::from_data(&[1, seq_len], input_ids.to_vec());
-        let [embeds_val] = model
-            .model
-            .run_n(
-                vec![(nodes.input_ids, ids_tensor.into())],
-                [nodes.output],
-                None,
-            )
-            .map_err(|e| BudgetError::SmartParseFailed(e.to_string()))?;
-        let embeds: Tensor<f32> = embeds_val.try_into().map_err(|_| {
-            BudgetError::SmartParseFailed("unexpected embedding output shape".into())
-        })?;
-        embeds.data().map(|d| d.to_vec()).ok_or_else(|| {
-            BudgetError::SmartParseFailed("embedding output is not contiguous".into())
-        })
+        let mut out = Vec::with_capacity(input_ids.len() * HIDDEN_SIZE);
+        for &id in input_ids {
+            let id = usize::try_from(id).ok().filter(|&id| id < vocab_size);
+            let Some(id) = id else {
+                return Err(BudgetError::SmartParseFailed(format!(
+                    "token id out of range for embed_tokens (vocab_size={vocab_size})"
+                )));
+            };
+            let row_start = id * HIDDEN_SIZE * 2;
+            let row = &self.weights[row_start..row_start + HIDDEN_SIZE * 2];
+            out.extend(
+                row.as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|b| f16_to_f32(u16::from_le_bytes(*b))),
+            );
+        }
+        Ok(out)
     }
 }
 
@@ -402,5 +470,104 @@ impl DecoderSession {
         }
 
         Ok(logits_data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn f16_to_f32_matches_known_bit_patterns() {
+        // IEEE 754 half-precision bit patterns for a handful of exactly
+        // representable values, plus zero/negative-zero/subnormal edge
+        // cases -- these are the cases most likely to be wrong in a
+        // hand-rolled bit-manipulation routine, since they're the ones
+        // that take a different branch than the common normalized case.
+        assert_eq!(f16_to_f32(0x0000), 0.0);
+        assert_eq!(f16_to_f32(0x8000), -0.0);
+        assert_eq!(f16_to_f32(0x3C00), 1.0);
+        assert_eq!(f16_to_f32(0xBC00), -1.0);
+        assert_eq!(f16_to_f32(0x4000), 2.0);
+        assert_eq!(f16_to_f32(0x3800), 0.5);
+        assert_eq!(f16_to_f32(0x7C00), f32::INFINITY);
+        assert_eq!(f16_to_f32(0xFC00), f32::NEG_INFINITY);
+        assert!(f16_to_f32(0x7E00).is_nan());
+        // Smallest subnormal (2^-24), the case that exercises the
+        // leading-zero-count renormalization branch.
+        assert_eq!(f16_to_f32(0x0001), 2f32.powi(-24));
+    }
+
+    /// Builds a fake `embed_tokens_fp16.onnx_data`-shaped buffer for
+    /// `vocab_size` rows, where every value in row `id` is the fp16
+    /// encoding of `id as f32` -- enough to tell rows apart without
+    /// needing a real downloaded weight file.
+    fn fake_weights(vocab_size: usize) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(vocab_size * HIDDEN_SIZE * 2);
+        for id in 0..vocab_size {
+            let bits = half_bits_for_small_integer(id as u16);
+            for _ in 0..HIDDEN_SIZE {
+                bytes.extend_from_slice(&bits.to_le_bytes());
+            }
+        }
+        bytes
+    }
+
+    /// fp16 encodes small non-negative integers (0..=2048) as a
+    /// normalized value with no rounding, so this is exact for every
+    /// `id` this test module uses -- avoids needing `f16_to_f32`'s
+    /// inverse just to build fixtures for `f16_to_f32` itself.
+    fn half_bits_for_small_integer(n: u16) -> u16 {
+        if n == 0 {
+            return 0;
+        }
+        let shift = 15 - n.leading_zeros(); // position of the MSB, 0-based
+        let mantissa = ((n as u32) << (10 - shift)) & 0x03FF;
+        let exponent = (15 + shift as i32) as u16;
+        (exponent << 10) | mantissa as u16
+    }
+
+    #[test]
+    fn embed_looks_up_the_row_for_each_token_id() {
+        let mut embedder = TokenEmbedder::new();
+        let weights = fake_weights(4);
+        embedder.begin_data(weights.len());
+        embedder.append_data_chunk(&weights);
+        embedder.finish().unwrap();
+
+        let out = embedder.embed(&[2, 0, 3]).unwrap();
+        assert_eq!(out.len(), 3 * HIDDEN_SIZE);
+        assert!(out[0..HIDDEN_SIZE].iter().all(|&v| v == 2.0));
+        assert!(out[HIDDEN_SIZE..2 * HIDDEN_SIZE].iter().all(|&v| v == 0.0));
+        assert!(out[2 * HIDDEN_SIZE..3 * HIDDEN_SIZE]
+            .iter()
+            .all(|&v| v == 3.0));
+    }
+
+    #[test]
+    fn embed_rejects_a_token_id_past_vocab_size() {
+        let mut embedder = TokenEmbedder::new();
+        let weights = fake_weights(2);
+        embedder.begin_data(weights.len());
+        embedder.append_data_chunk(&weights);
+        embedder.finish().unwrap();
+
+        assert!(embedder.embed(&[5]).is_err());
+    }
+
+    #[test]
+    fn embed_before_finish_is_an_error_not_a_panic() {
+        let embedder = TokenEmbedder::new();
+        assert!(embedder.embed(&[0]).is_err());
+    }
+
+    #[test]
+    fn finish_rejects_a_weight_buffer_with_a_partial_row() {
+        let mut embedder = TokenEmbedder::new();
+        let mut weights = fake_weights(1);
+        weights.pop(); // one byte short of a whole row
+        embedder.begin_data(weights.len());
+        embedder.append_data_chunk(&weights);
+        assert!(embedder.finish().is_err());
     }
 }
