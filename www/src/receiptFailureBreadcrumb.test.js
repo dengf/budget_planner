@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { recordReceiptFailure, readLastReceiptFailure } from './receiptFailureBreadcrumb';
+import {
+  recordReceiptFailure,
+  recordReceiptCheckpoint,
+  recordReceiptSuccess,
+  readLastReceiptFailure,
+} from './receiptFailureBreadcrumb';
 
 // jsdom doesn't expose `localStorage` as a bare global in this test
 // environment (see this repo's own CLAUDE.md note on the same gap
@@ -90,5 +95,42 @@ describe('receiptFailureBreadcrumb', () => {
       recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false }),
     ).not.toThrow();
     expect(readLastReceiptFailure()).toBeNull();
+  });
+
+  it('tags a recorded failure with outcome "failed"', () => {
+    recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false });
+    expect(readLastReceiptFailure()).toMatchObject({ outcome: 'failed' });
+  });
+
+  it('records a checkpoint distinctly from a failure, including which model and its memory size', () => {
+    recordReceiptCheckpoint({
+      stage: 'decoder',
+      wasmMemoryBytes: 391168000,
+      progress: { phase: 'download', loadedBytes: 201650415 },
+      smartParseEnabled: true,
+    });
+
+    expect(readLastReceiptFailure()).toMatchObject({
+      outcome: 'checkpoint',
+      stage: 'decoder',
+      wasmMemoryBytes: 391168000,
+      progressPhase: 'download',
+      progressLoadedBytes: 201650415,
+      smartParseEnabled: true,
+    });
+  });
+
+  it('overwrites a lingering checkpoint/failure once the scan succeeds', () => {
+    recordReceiptCheckpoint({
+      stage: 'decoder',
+      wasmMemoryBytes: 1000,
+      progress: null,
+      smartParseEnabled: true,
+    });
+    recordReceiptSuccess();
+
+    const record = readLastReceiptFailure();
+    expect(record.outcome).toBe('succeeded');
+    expect(typeof record.timestamp).toBe('string');
   });
 });

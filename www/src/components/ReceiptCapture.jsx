@@ -14,7 +14,7 @@ import { PdfIcon } from './icons';
 import NumberField from './NumberField';
 import { categoryDisplayName } from '../presetCategories';
 import { beginActivity, endActivity } from '../activityGuard';
-import { recordReceiptFailure } from '../receiptFailureBreadcrumb';
+import { recordReceiptFailure, recordReceiptSuccess } from '../receiptFailureBreadcrumb';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
 
@@ -171,6 +171,11 @@ export default function ReceiptCapture({
         setStatus('idle');
         return;
       }
+      // Overwrites any lingering checkpoint/failure from earlier in this
+      // tab's lifetime -- see `recordReceiptCheckpoint`'s own doc comment
+      // for why a stale record left in place would otherwise read as an
+      // unresolved crash on a later look at `?debug=1`.
+      recordReceiptSuccess();
       if (extractTruncated) setTruncated(extractTruncated);
 
       if (isPdf(file)) {

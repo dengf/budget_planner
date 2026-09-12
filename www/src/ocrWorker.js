@@ -326,22 +326,38 @@ function taggedModelLoadError(err, stage, wasm, lastKnownMemoryBytes) {
   return tagged;
 }
 
-// Samples `wasm.exports.memory.buffer.byteLength` into `sample.bytes`
-// right before every chunk append -- passed as `fetchDataFileIntoSession`'s
-// `onBeforeChunk` hook -- so `taggedModelLoadError`'s fallback reflects the
-// module's size immediately before the chunk that may have trapped it,
-// not just whatever the last successfully *completed* chunk left behind.
-function sampleMemoryBeforeEachChunk(wasm, sample) {
+// Acks for `checkpointBeforeChunk` below, keyed by the `checkpointId` this
+// worker minted when it sent the checkpoint -- `self.onmessage` resolves
+// the matching entry the moment `receiptCapture.js` confirms the write
+// landed in `localStorage` (this worker has no storage access of its own).
+let nextCheckpointId = 1;
+const pendingCheckpointAcks = new Map();
+
+// Samples `wasm.exports.memory.buffer.byteLength` into `sample.bytes` and
+// posts it to the main thread as a checkpoint right before every chunk
+// append -- passed as `fetchDataFileIntoSession`'s `onBeforeChunk` hook --
+// then *awaits the main thread's ack* before letting the caller proceed to
+// the actual append that might trap or, worse, hard-crash the whole tab
+// with no catchable exception at all (see `recordReceiptCheckpoint`'s own
+// doc comment for why that case needs more than `taggedModelLoadError`'s
+// after-the-fact tagging). `sample.bytes` still feeds that fallback too,
+// for the ordinary catchable-trap case this worker already handled before.
+function checkpointBeforeChunk(id, stage, wasm, sample) {
   return () => {
     try {
       sample.bytes = wasm.exports.memory.buffer.byteLength;
     } catch {
       // Leave the previous sample in place; still better than nothing.
     }
+    return new Promise((resolve) => {
+      const checkpointId = nextCheckpointId++;
+      pendingCheckpointAcks.set(checkpointId, resolve);
+      self.postMessage({ id, checkpointId, checkpoint: { stage, wasmMemoryBytes: sample.bytes } });
+    });
   };
 }
 
-function loadGlmOcrModels(track) {
+function loadGlmOcrModels(track, id) {
   if (!glmOcrModelsPromise) {
     glmOcrModelsPromise = (async () => {
       const [embedWasm, decoderWasm, orchestrate] = await Promise.all([
@@ -358,7 +374,7 @@ function loadGlmOcrModels(track) {
           embed,
           GLM_OCR_MODEL_PATHS.embedData,
           track,
-          sampleMemoryBeforeEachChunk(embedWasm, embedMemorySample),
+          checkpointBeforeChunk(id, 'embed', embedWasm, embedMemorySample),
         );
         throwIfLoadError(embed.finish(graph));
       } catch (err) {
@@ -373,7 +389,7 @@ function loadGlmOcrModels(track) {
           decoder,
           GLM_OCR_MODEL_PATHS.decoderData,
           track,
-          sampleMemoryBeforeEachChunk(decoderWasm, decoderMemorySample),
+          checkpointBeforeChunk(id, 'decoder', decoderWasm, decoderMemorySample),
         );
         throwIfLoadError(decoder.finish(graph));
       } catch (err) {
@@ -473,6 +489,14 @@ async function runSmartParseGeneration(models, imageRgb, width, height, track) {
 }
 
 self.onmessage = async (event) => {
+  // An ack for `checkpointBeforeChunk` above, not a dispatchable call --
+  // resolves the matching pending checkpoint and returns before touching
+  // `type` at all, since this message shape has none.
+  if (event.data?.checkpointAck != null) {
+    pendingCheckpointAcks.get(event.data.checkpointAck)?.();
+    pendingCheckpointAcks.delete(event.data.checkpointAck);
+    return;
+  }
   const { id, type } = event.data;
   try {
     let result;
@@ -521,7 +545,7 @@ self.onmessage = async (event) => {
         loaded += delta;
         self.postMessage({ id, progress: { loadedBytes: loaded } });
       };
-      const models = await loadGlmOcrModels(track);
+      const models = await loadGlmOcrModels(track, id);
       const { imageRgb, width, height } = event.data;
       try {
         result = { text: await runSmartParseGeneration(models, imageRgb, width, height, track) };

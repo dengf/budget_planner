@@ -35,6 +35,8 @@
 // of either wasm module directly; see its own doc comment for the rest
 // of the story.
 
+import { recordReceiptCheckpoint } from './receiptFailureBreadcrumb';
+
 let worker = null;
 let nextId = 1;
 const pending = new Map();
@@ -43,13 +45,34 @@ function getWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./ocrWorker.js', import.meta.url));
   worker.onmessage = (event) => {
-    const { id, ok, result, error, stage, wasmMemoryBytes, progress } = event.data;
+    const { id, ok, result, error, stage, wasmMemoryBytes, progress, checkpoint, checkpointId } =
+      event.data;
+    // A checkpoint (see `ocrWorker.js`'s `checkpointBeforeChunk`) isn't
+    // routed through `pending` at all -- it's not a call settling, and it
+    // can arrive for an `id` whose call has already moved on (a retry
+    // after an earlier interruption). Written to `localStorage` here
+    // rather than in the worker itself, since a worker has no storage
+    // access of its own -- this is the one place that can. Acked
+    // synchronously right after the write so the worker's own await
+    // (blocking the actual risky chunk append) only resolves once this
+    // has genuinely landed, not just been sent.
+    if (checkpoint) {
+      recordReceiptCheckpoint({
+        stage: checkpoint.stage,
+        wasmMemoryBytes: checkpoint.wasmMemoryBytes,
+        progress: pending.get(id)?.lastProgress ?? null,
+        smartParseEnabled: true,
+      });
+      worker.postMessage({ checkpointAck: checkpointId });
+      return;
+    }
     const call = pending.get(id);
     if (!call) return; // already settled, or from a worker instance we've moved past
     // A progress event (Smart Parse's model download) isn't terminal --
     // it carries no `ok` field and the call stays pending afterwards,
     // unlike every other message this worker ever posts.
     if (progress) {
+      call.lastProgress = progress;
       call.onProgress?.(progress);
       return;
     }
