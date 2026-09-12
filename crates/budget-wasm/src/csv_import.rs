@@ -47,16 +47,15 @@ pub fn import_csv(params: JsValue) -> JsValue {
 }
 
 fn import_csv_impl(params: JsValue) -> ImportCsvResult {
-    let params: ImportCsvParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return ImportCsvResult {
-                error: Some(message.text.clone()),
-                error_message: Some(message),
-                ..Default::default()
-            };
-        }
+    let params: ImportCsvParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return ImportCsvResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
     };
 
     match budget_calc::import_csv(

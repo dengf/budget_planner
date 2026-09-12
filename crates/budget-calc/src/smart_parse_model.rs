@@ -358,7 +358,7 @@ impl VisionEncoder {
         let image_features: Tensor<f32> = image_features_val.try_into().map_err(|_| {
             BudgetError::SmartParseFailed("unexpected vision encoder output shape".into())
         })?;
-        image_features.data().map(|d| d.to_vec()).ok_or_else(|| {
+        image_features.data().map(<[f32]>::to_vec).ok_or_else(|| {
             BudgetError::SmartParseFailed("vision encoder output is not contiguous".into())
         })
     }
@@ -583,7 +583,7 @@ impl DecoderSession {
         let attn_tensor = Tensor::from_data(&[1, attention_mask.len()], attention_mask.to_vec());
         let ntk = Tensor::from_data(&[] as &[usize], vec![1i32]);
 
-        let mut inputs: Vec<(NodeId, rten_embed::ValueOrView)> = vec![
+        let mut inputs: Vec<(NodeId, rten_embed::ValueOrView<'_>)> = vec![
             (nodes.inputs_embeds, embeds_tensor.into()),
             (nodes.attention_mask, attn_tensor.into()),
             (nodes.position_ids, pos_tensor.into()),
@@ -605,7 +605,7 @@ impl DecoderSession {
             .clone()
             .try_into()
             .map_err(|_| BudgetError::SmartParseFailed("unexpected decoder output shape".into()))?;
-        let logits_data = logits.data().map(|d| d.to_vec()).ok_or_else(|| {
+        let logits_data = logits.data().map(<[f32]>::to_vec).ok_or_else(|| {
             BudgetError::SmartParseFailed("decoder logits are not contiguous".into())
         })?;
 

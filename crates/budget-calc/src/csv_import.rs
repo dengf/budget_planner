@@ -259,7 +259,7 @@ pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
     let rows: Vec<Vec<String>> = reader
         .records()
         .take(11) // a possible header, plus up to 10 data rows to sample
-        .filter_map(|r| r.ok())
+        .filter_map(Result::ok)
         .map(|r| r.iter().map(str::to_string).collect())
         .collect();
 
@@ -366,9 +366,8 @@ pub fn import_csv(
         // debit as spending (negative) and a credit as income (positive),
         // matching Transaction's own sign convention.
         let amount = match (debit, credit, mapping.credit_col) {
-            (Some(d), _, None) => d,
             (Some(d), None, Some(_)) if d.is_sign_positive() => -d,
-            (Some(d), None, Some(_)) => d,
+            (Some(d), _, None) | (Some(d), None, Some(_)) => d,
             (None, Some(c), Some(_)) => c.abs(),
             _ => {
                 outcome.skipped.push(SkippedRow {

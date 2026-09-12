@@ -1,12 +1,12 @@
 //! [`budget_ports::BudgetStore`] implemented on top of `redb`.
 //!
-//! Same split as mortgage_calculator's `mortgage-ext-redb`: the table
+//! Same split as `mortgage_calculator`'s `mortgage-ext-redb`: the table
 //! logic (schema, save/list/delete) is identical on every platform, and
 //! only *how the bytes get durable* differs --
 //!
 //! - Native targets ([`native`]): `redb`'s ordinary file backend.
 //! - `wasm32` ([`wasm`]): a custom [`redb::StorageBackend`] backed by an
-//!   in-memory buffer, asynchronously flushed to the browser's IndexedDB.
+//!   in-memory buffer, asynchronously flushed to the browser's `IndexedDB`.
 //!
 //! Six record types share one `redb::Database`, one table per type, all
 //! keyed by the record's own `id`. A macro generates the six
@@ -55,7 +55,7 @@ impl RedbBudgetStore {
 
     fn save_record<T: Serialize>(
         &self,
-        table: TableDefinition<&str, &[u8]>,
+        table: TableDefinition<'_, &str, &[u8]>,
         id: &str,
         record: &T,
     ) -> Result<(), StoreError> {
@@ -73,7 +73,7 @@ impl RedbBudgetStore {
 
     fn list_records<T: DeserializeOwned>(
         &self,
-        table: TableDefinition<&str, &[u8]>,
+        table: TableDefinition<'_, &str, &[u8]>,
     ) -> Result<Vec<T>, StoreError> {
         let read_txn = self.db.begin_read().map_err(Self::backend_err)?;
         let table = match read_txn.open_table(table) {
@@ -92,7 +92,7 @@ impl RedbBudgetStore {
 
     fn delete_record(
         &self,
-        table: TableDefinition<&str, &[u8]>,
+        table: TableDefinition<'_, &str, &[u8]>,
         id: &str,
     ) -> Result<(), StoreError> {
         let write_txn = self.db.begin_write().map_err(Self::backend_err)?;
@@ -109,7 +109,7 @@ impl RedbBudgetStore {
 /// the generic helpers above with a fixed table and record type.
 macro_rules! collection {
     ($table_const:ident, $table_name:literal, $save:ident, $list:ident, $delete:ident, $record:ty) => {
-        const $table_const: TableDefinition<&str, &[u8]> = TableDefinition::new($table_name);
+        const $table_const: TableDefinition<'_, &str, &[u8]> = TableDefinition::new($table_name);
 
         async fn $save(store: &RedbBudgetStore, record: $record) -> Result<(), StoreError> {
             store.save_record($table_const, &record.id.clone(), &record)

@@ -102,3 +102,6 @@ pdf-render = ["dep:hayro"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }
+
+[lints]
+workspace = true

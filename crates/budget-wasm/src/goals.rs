@@ -91,16 +91,15 @@ pub fn required_contribution(params: JsValue) -> JsValue {
 }
 
 fn required_contribution_impl(params: JsValue) -> RequiredContributionResult {
-    let params: RequiredContributionParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return RequiredContributionResult {
-                error: Some(message.text.clone()),
-                error_message: Some(message),
-                ..Default::default()
-            };
-        }
+    let params: RequiredContributionParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return RequiredContributionResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
     };
     let (Some(target), Some(current)) = (
         f64_to_decimal(params.target_amount),

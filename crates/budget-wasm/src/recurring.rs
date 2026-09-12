@@ -24,16 +24,15 @@ pub fn recurring_occurrences(params: JsValue) -> JsValue {
 }
 
 fn recurring_occurrences_impl(params: JsValue) -> OccurrencesResult {
-    let params: OccurrencesParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return OccurrencesResult {
-                error: Some(message.text.clone()),
-                error_message: Some(message),
-                ..Default::default()
-            };
-        }
+    let params: OccurrencesParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return OccurrencesResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        };
     };
 
     // A malformed individual record (bad amount, corrupted from storage)

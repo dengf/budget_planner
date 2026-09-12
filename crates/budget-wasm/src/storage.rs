@@ -37,7 +37,7 @@ fn get_store() -> Result<Rc<budget_ext_redb::RedbBudgetStore>, String> {
 }
 
 /// Must be called (and awaited) once before any other function in this
-/// module -- it loads any previously-persisted data from IndexedDB and
+/// module -- it loads any previously-persisted data from `IndexedDB` and
 /// opens the in-memory-backed redb database against it.
 #[wasm_bindgen]
 pub async fn init_storage() -> Result<(), JsValue> {
@@ -89,9 +89,8 @@ pub async fn save_category(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_categories() -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<CategoryDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<CategoryDto>::new());
     };
     match store.list_categories().await {
         Ok(records) => to_js(
@@ -193,9 +192,8 @@ pub async fn save_transaction(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_transactions() -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<TransactionDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<TransactionDto>::new());
     };
     match store.list_transactions().await {
         Ok(records) => to_js(
@@ -281,9 +279,8 @@ pub async fn save_goal(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_goals() -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<GoalDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<GoalDto>::new());
     };
     match store.list_goals().await {
         Ok(records) => to_js(
@@ -378,9 +375,8 @@ pub async fn save_debt(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_debts() -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<DebtRecordDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<DebtRecordDto>::new());
     };
     match store.list_debts().await {
         Ok(records) => to_js(
@@ -469,9 +465,8 @@ pub async fn save_budget_plan_entry(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_budget_plan(month: String) -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<BudgetPlanEntryDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<BudgetPlanEntryDto>::new());
     };
     match store.list_budget_plan(&month).await {
         Ok(records) => to_js(
@@ -553,9 +548,8 @@ pub async fn save_rule(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_rules() -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<RuleDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<RuleDto>::new());
     };
     match store.list_rules().await {
         Ok(records) => to_js(
@@ -643,9 +637,8 @@ pub async fn save_recurring_expense(dto: JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub async fn list_recurring_expenses() -> JsValue {
-    let store = match get_store() {
-        Ok(s) => s,
-        Err(_) => return to_js(&Vec::<RecurringExpenseDto>::new()),
+    let Ok(store) = get_store() else {
+        return to_js(&Vec::<RecurringExpenseDto>::new());
     };
     match store.list_recurring_expenses().await {
         Ok(records) => to_js(

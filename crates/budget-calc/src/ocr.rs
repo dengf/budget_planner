@@ -22,7 +22,7 @@
 //! fixed per model, not something a caller could meaningfully vary.
 //! Critical, non-obvious detail: this dictionary must come from the
 //! model's own `inference.yml` (`PostProcess.character_dict`, plus a
-//! trailing space -- PaddleOCR's `CTCLabelDecode` defaults
+//! trailing space -- `PaddleOCR`'s `CTCLabelDecode` defaults
 //! `use_space_char` to true even when the yml doesn't mention it) in
 //! exact training order. `ocrs_cjk::cjk_alphabet()`, the crate's own
 //! convenience helper, builds its alphabet by walking Unicode codepoint

@@ -44,15 +44,14 @@ pub fn apply_rules(params: JsValue) -> JsValue {
 }
 
 fn apply_rules_impl(params: JsValue) -> ApplyRulesResult {
-    let params: ApplyRulesParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return ApplyRulesResult {
-                error: Some(message.text),
-                ..Default::default()
-            };
-        }
+    let params: ApplyRulesParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return ApplyRulesResult {
+            error: Some(message.text),
+            ..Default::default()
+        };
     };
 
     let Some(mut transactions): Option<Vec<_>> = params.transactions.iter().map(from_dto).collect()

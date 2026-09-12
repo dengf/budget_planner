@@ -25,6 +25,57 @@ members = [
 ]
 resolver = "2"
 
+# Lints live here rather than only in CI's `clippy -- -D warnings` flag, so
+# a local `cargo clippy` sees exactly what CI sees. With the policy only in
+# the workflow file, a clean local run proved nothing and the first signal
+# of a violation was a red PR.
+#
+# Each crate opts in with `[lints] workspace = true` -- Cargo does not
+# inherit these automatically.
+[workspace.lints.rust]
+# Two `unsafe impl Send/Sync` exist, both in `budget-ext-redb`'s wasm32
+# IndexedDB backend and both sound only because wasm32 is single-threaded.
+# `deny` here forces that reasoning to be written down at the one place it
+# applies instead of being assumed everywhere.
+unsafe_code = "deny"
+unused_qualifications = "warn"
+# A `dyn Trait` without the keyword and an unnamed lifetime in a path both
+# read as something simpler than they are.
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+# `-D warnings` in CI already promotes clippy's default groups. These are
+# the additional ones worth having in an app whose whole job is arithmetic
+# on other people's money.
+#
+# `pedantic` as a group is NOT enabled: it reports 114 findings here, of
+# which 38 are `cast_possible_truncation` in the ML tensor code where the
+# casts are deliberate and checked. Enabling it wholesale would mean 114
+# suppressions, which is a rule set fighting the codebase. The individually
+# valuable members are listed instead.
+doc_markdown = "warn"
+explicit_iter_loop = "warn"
+inefficient_to_string = "warn"
+manual_let_else = "warn"
+map_unwrap_or = "warn"
+match_same_arms = "warn"
+needless_continue = "warn"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+single_match_else = "warn"
+unnested_or_patterns = "warn"
+# `float_cmp` was tried and reverted: money in this codebase is `Decimal`,
+# never `f64` (CLAUDE.md's rule, and the reason `Decimal` has no NaN), so
+# the lint has no money-path bugs to catch here. What it did find was
+# every bit-exact fp16-conversion and fixed-fixture-value test in the
+# Smart Parse crates -- `assert_eq!(f16_to_f32(0x3C00), 1.0)` is exactly
+# right, not a rounding-tolerance bug, and there are enough of those
+# tests that suppressing it per-site would be noise, not signal.
+lossy_float_literal = "warn"
+# A silently-swallowed `Result` in a persistence or parse path is how a
+# budgeting tool ends up confidently wrong rather than visibly broken.
+let_underscore_must_use = "warn"
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
