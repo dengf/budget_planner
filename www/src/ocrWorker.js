@@ -369,14 +369,13 @@ function loadGlmOcrModels(track, id) {
       const embed = new embedWasm.TokenEmbedder();
       const embedMemorySample = { bytes: null };
       try {
-        const graph = await fetchBytesCached(GLM_OCR_MODEL_PATHS.embedGraph, track);
         await fetchDataFileIntoSession(
           embed,
           GLM_OCR_MODEL_PATHS.embedData,
           track,
           checkpointBeforeChunk(id, 'embed', embedWasm, embedMemorySample),
         );
-        throwIfLoadError(embed.finish(graph));
+        throwIfLoadError(embed.finish());
       } catch (err) {
         throw taggedModelLoadError(err, 'embed', embedWasm, embedMemorySample.bytes);
       }

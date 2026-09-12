@@ -38,8 +38,8 @@ impl TokenEmbedder {
         self.inner.append_data_chunk(chunk);
     }
 
-    pub fn finish(&mut self, graph: Vec<u8>) -> JsValue {
-        to_js(&match self.inner.finish(graph) {
+    pub fn finish(&mut self) -> JsValue {
+        to_js(&match self.inner.finish() {
             Ok(()) => LoadModelResult::default(),
             Err(e) => {
                 let message = Message::from(&e);
