@@ -246,13 +246,13 @@ export async function extractReceiptText(file, onProgress) {
 // today: vision graph + data (`_q4`, 424,697 + 304,547,840), the token
 // embedder's raw fp16 weights (182,452,224, no graph -- see
 // `budget_calc::smart_parse_model`'s own doc comment), decoder graph +
-// data (`_q4`, 1,034 + 373,217,280) and tokenizer.json (5,420,559). Used
+// data (`_q4`, 313,836 + 373,217,280) and tokenizer.json (5,420,559). Used
 // only to turn `loadedBytes` progress events into a percentage and a
 // human-readable estimate before the app commits to downloading them. Not
 // load-bearing: if Hugging Face's actual file sizes drift, the progress
 // bar is off by a little rather than broken (`loadedBytes` can exceed
 // this and the bar just clamps at 100%).
-export const SMART_PARSE_APPROX_TOTAL_BYTES = 866_063_634;
+export const SMART_PARSE_APPROX_TOTAL_BYTES = 866_376_436;
 
 /**
  * Reads a photographed receipt, statement PDF, or scanned PDF with Smart
