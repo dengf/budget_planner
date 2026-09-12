@@ -242,7 +242,7 @@ function loadGlmOrchestrateWasm() {
 }
 
 // Same one-fetch-per-worker-lifetime memoization as `loadModels` above,
-// for embed, decoder and the tokenizer -- `onProgress(loadedBytes)` is
+// for embed and decoder plus the tokenizer -- `onProgress(loadedBytes)` is
 // called with the running total as they stream in, so a caller can show
 // real download progress rather than a UI that looks frozen for however
 // long a multi-hundred-MB fetch takes. Only called once per worker
@@ -254,15 +254,23 @@ function loadGlmOrchestrateWasm() {
 // Smart Parse call in the same worker lifetime reuses them directly,
 // without re-fetching or re-parsing either model.
 //
-// Vision is deliberately NOT loaded or memoized here -- see
-// `runVisionInSubworker` below and `glmVisionWorker.js`'s own doc comment
-// for why it runs in its own, separately-terminated worker instead:
-// embed (~0.35GB doubled) and decoder (~2.2GB doubled, before its
-// KV-cache even starts growing) both need to stay resident for the whole
-// generation loop, but vision (~1.65GB doubled) is only ever called once,
-// right at the start, and holding all three simultaneously reliably
-// exceeds a real iPhone's actual per-tab memory budget even though no
-// single wasm32 module ever approaches its own 4GiB ceiling.
+// Vision is deliberately NOT loaded here -- see `runVisionInSubworker`
+// below and `glmVisionWorker.js`'s own doc comment for why it runs in its
+// own, separately-terminated worker instead. Orchestrate isn't loaded
+// here either, even though it's tiny and memoized just like embed/decoder
+// (`loadGlmOrchestrateWasm` above) -- it's needed for `patch_grid`/
+// `patchify` *before* vision runs, and the `'smart-parse'` handler below
+// calls it directly rather than waiting on this function, specifically so
+// vision can run and its worker terminate -- releasing its memory --
+// before embed and decoder ever load. embed (~0.35GB doubled) and decoder
+// (~2.2GB doubled, before its KV-cache even starts growing) both need to
+// stay resident for the whole generation loop, but vision is only ever
+// called once, right at the start; loading it first, against a near-empty
+// baseline instead of ~552MB of already-resident embed+decoder+tokenizer,
+// was the fix for a real-device crash landing inside vision's own load
+// even after it was switched to its much smaller `_q4` export -- see
+// `budget_calc::smart_parse_model`'s own doc comment for the measured
+// numbers.
 //
 // Sequential, deliberately not concurrent -- downloading both files at
 // once meant two buffers resident simultaneously, and decoder's own file
@@ -374,10 +382,9 @@ function checkpointBeforeChunk(id, stage, wasm, sample) {
 function loadGlmOcrModels(track, id) {
   if (!glmOcrModelsPromise) {
     glmOcrModelsPromise = (async () => {
-      const [embedWasm, decoderWasm, orchestrate] = await Promise.all([
+      const [embedWasm, decoderWasm] = await Promise.all([
         loadGlmEmbedWasm(),
         loadGlmDecoderWasm(),
-        loadGlmOrchestrateWasm(),
       ]);
 
       const embed = new embedWasm.TokenEmbedder();
@@ -413,7 +420,7 @@ function loadGlmOcrModels(track, id) {
 
       await sendCheckpoint(id, 'tokenizer', null);
       const tokenizerJson = await fetchBytesCached(GLM_OCR_MODEL_PATHS.tokenizer, track);
-      return { embed, decoder, orchestrate, tokenizerJson };
+      return { embed, decoder, tokenizerJson };
     })().catch((err) => {
       glmOcrModelsPromise = null;
       throw err;
@@ -464,31 +471,33 @@ function runVisionInSubworker(pixelValues, gridH, gridW, track, id) {
   });
 }
 
-// Runs GLM-OCR's full text-recognition pipeline over one image: resize +
-// patchify, vision encoder, chat-template + mrope position ids, token
+// Runs GLM-OCR's text-generation pipeline over one image's already-
+// computed vision features: chat-template + mrope position ids, token
 // embedding (with image features spliced into the image-token
 // positions), then a greedy-decoded, KV-cached generation loop until
 // end-of-sequence or `orchestrate.max_new_tokens()`. This is the control
 // flow that used to live in Rust as
 // `budget_calc::smart_parse::SmartParseSession::run` -- moved here
-// because `vision`/`embed`/`decoder` are three separate wasm module
-// instances (see `loadGlmOcrModels` and `runVisionInSubworker` above)
-// that cannot call each other directly; only JS can sequence calls across
-// them. Every actual calculation stays in Rust, individually unit-tested
-// in `budget_calc::smart_parse_orchestrate` -- this loop only decides
-// which model to call next and shuttles buffers between them.
-async function runSmartParseGeneration(models, imageRgb, width, height, track, id) {
-  const { embed, decoder, orchestrate, tokenizerJson } = models;
+// because `embed`/`decoder` are separate wasm module instances (see
+// `loadGlmOcrModels` above) that cannot call each other directly; only JS
+// can sequence calls across them. Every actual calculation stays in Rust,
+// individually unit-tested in `budget_calc::smart_parse_orchestrate` --
+// this loop only decides which model to call next and shuttles buffers
+// between them.
+//
+// Resize + patchify and the vision encoder itself run in the
+// `'smart-parse'` handler below, *before* `models` (embed/decoder) is
+// even loaded -- see `loadGlmOcrModels`'s own doc comment for why --
+// so `orchestrate`/`gridH`/`gridW`/`imageFeatures` arrive here already
+// computed rather than being derived from a raw image.
+async function runSmartParseGeneration(models, orchestrate, gridH, gridW, imageFeatures) {
+  const { embed, decoder, tokenizerJson } = models;
 
   // Clears the decoder's internal KV cache -- required before every new
   // image's generation, or this call would silently continue a previous
   // image's cache instead of starting fresh (wrong output, not a crash;
   // see budget-wasm-glmocr-decoder/src/lib.rs's own doc comment).
   decoder.reset();
-
-  const [gridH, gridW] = orchestrate.patch_grid(width, height);
-  const pixelValues = orchestrate.patchify(imageRgb, width, height);
-  const imageFeatures = await runVisionInSubworker(pixelValues, gridH, gridW, track, id);
 
   const hiddenSize = orchestrate.hidden_size();
   const numImageTokens = imageFeatures.length / hiddenSize;
@@ -575,11 +584,18 @@ self.onmessage = async (event) => {
         loaded += delta;
         self.postMessage({ id, progress: { loadedBytes: loaded } });
       };
-      const models = await loadGlmOcrModels(track, id);
       const { imageRgb, width, height } = event.data;
       try {
+        // Vision runs first, against a near-empty baseline, and its
+        // worker terminates (releasing its memory) before embed/decoder
+        // ever load -- see `loadGlmOcrModels`'s own doc comment for why.
+        const orchestrate = await loadGlmOrchestrateWasm();
+        const [gridH, gridW] = orchestrate.patch_grid(width, height);
+        const pixelValues = orchestrate.patchify(imageRgb, width, height);
+        const imageFeatures = await runVisionInSubworker(pixelValues, gridH, gridW, track, id);
+        const models = await loadGlmOcrModels(track, id);
         result = {
-          text: await runSmartParseGeneration(models, imageRgb, width, height, track, id),
+          text: await runSmartParseGeneration(models, orchestrate, gridH, gridW, imageFeatures),
         };
       } catch (genError) {
         // A thrown `Message` (see `isMessageShaped` above) is a known

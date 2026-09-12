@@ -79,6 +79,21 @@
 //! operator the decoder already relies on, same patched `rten` -- which
 //! takes that peak down by ~2.17GB on its own.
 //!
+//! A real device still crashed after the `_q4` vision fix shipped, though
+//! now with a checkpoint (`www/src/glmVisionWorker.js`'s own) landing at
+//! `"vision-data"`, ~99% through vision's own data download
+//! (863,818,484 of ~866,063,634 total bytes; 339,476,480 bytes of wasm
+//! memory). The 2.17GB win was real, but it didn't change *when* vision
+//! ran: `www/src/ocrWorker.js`'s `'smart-parse'` handler still loaded
+//! embed+decoder+tokenizer (~561MB combined, see the arithmetic above)
+//! before ever calling into vision, so vision's own ~324MB peak was still
+//! being measured against that ~561MB baseline rather than a clean one --
+//! enough, together, to still be right at a real iPhone's ceiling. Vision
+//! has no dependency on embed or decoder at all, so `ocrWorker.js` now
+//! runs vision to completion -- and terminates its worker, releasing its
+//! memory -- *before* `loadGlmOcrModels` ever loads embed/decoder, on
+//! every fresh worker's first scan. See that function's own doc comment.
+//!
 //! `TokenEmbedder` doesn't go through `rten` at all, though, avoiding the
 //! problem rather than working around it: its ONNX graph is nothing more
 //! than a `Gather` over one weight tensor followed by a `Cast` to f32 --

@@ -30,17 +30,23 @@
 //
 // A separate worker is a separate process, though, not a separate memory
 // budget, and this file's own numbers above are what made that easy to
-// forget: vision runs *after* `loadGlmOcrModels`, so embed and decoder
-// are both still resident in `ocrWorker.js` while vision loads, and the
-// tab's real peak is all three at once -- around 3.1GB on fp16, and the
-// tab was being killed here, inside vision. With no checkpoints of its
-// own, though, this worker left `?debug=1` showing whichever `'decoder'`
-// checkpoint had been written last, and the crash spent three rounds
-// looking like a decoder problem. Both of those are fixed now: vision
-// loads the 4-bit-quantized export (measured 323.8MB peak, against
-// 2,490.9MB for fp16 -- see `budget_calc::smart_parse_model`'s own doc
-// comment) and reports ack-gated checkpoints through `ocrWorker.js` (see
-// `checkpoint` below).
+// forget: vision used to run *after* `loadGlmOcrModels`, so embed and
+// decoder were both already resident in `ocrWorker.js` while vision
+// loaded, and the tab's real peak was all three at once -- around 3.1GB
+// on fp16, and the tab was being killed here, inside vision. With no
+// checkpoints of its own, though, this worker left `?debug=1` showing
+// whichever `'decoder'` checkpoint had been written last, and the crash
+// spent three rounds looking like a decoder problem. All three of those
+// are fixed now: vision loads the 4-bit-quantized export (measured
+// 323.8MB peak, against 2,490.9MB for fp16 -- see
+// `budget_calc::smart_parse_model`'s own doc comment), reports ack-gated
+// checkpoints through `ocrWorker.js` (see `checkpoint` below), and --
+// since even the quantized export still crashed a real device at ~99%
+// through its own data download, measured against embed+decoder's
+// ~561MB already resident -- `ocrWorker.js`'s `'smart-parse'` handler now
+// runs this worker to completion, and terminates it, *before*
+// `loadGlmOcrModels` ever loads embed/decoder at all. See
+// `loadGlmOcrModels`'s own doc comment in `ocrWorker.js`.
 //
 // Deliberately NOT memoized the way `ocrWorker.js`'s `loadGlmOcrModels`
 // memoizes embed/decoder/tokenizer: every scan re-parses the vision ONNX
