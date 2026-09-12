@@ -17,7 +17,10 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
     let cancelled = false;
     async function run() {
       if (!wasmModule?.goal_progress || !wasmModule?.required_contribution) return;
-      const p = await wasmModule.goal_progress({ current_amount: goal.current_amount, target_amount: goal.target_amount });
+      const p = await wasmModule.goal_progress({
+        current_amount: goal.current_amount,
+        target_amount: goal.target_amount,
+      });
       const months = monthsBetween(todayIso(), goal.target_date);
       const c = await wasmModule.required_contribution({
         target_amount: goal.target_amount,
@@ -44,11 +47,19 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
     const previous = goal.current_amount;
     const next = previous + delta;
     const milestoneResult = wasmModule?.milestone_crossed
-      ? await wasmModule.milestone_crossed({ previous_amount: previous, new_amount: next, target_amount: goal.target_amount })
+      ? await wasmModule.milestone_crossed({
+          previous_amount: previous,
+          new_amount: next,
+          target_amount: goal.target_amount,
+        })
       : null;
     await onSave({ ...goal, current_amount: next });
     setAddAmount('');
-    setMilestoneMsg(milestoneResult?.milestone ? t(`goals.milestone.${milestoneResult.milestone}`, { name: goal.name }) : null);
+    setMilestoneMsg(
+      milestoneResult?.milestone
+        ? t(`goals.milestone.${milestoneResult.milestone}`, { name: goal.name })
+        : null,
+    );
   };
 
   return (
@@ -61,7 +72,10 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
         </span>
         {contribution?.amount != null && (
           <span className="goal-contribution">
-            {t('goals.requiredContribution', { amount: formatMoney(contribution.amount), cadence: t(`freq.${goal.cadence}`) })}
+            {t('goals.requiredContribution', {
+              amount: formatMoney(contribution.amount),
+              cadence: t(`freq.${goal.cadence}`),
+            })}
           </span>
         )}
         {milestoneMsg && <span className="goal-milestone">{milestoneMsg}</span>}
@@ -75,7 +89,9 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
           onChange={(e) => setAddAmount(e.target.value)}
         />
       </form>
-      <button className="btn secondary" onClick={addFunds}>+</button>
+      <button className="btn secondary" onClick={addFunds}>
+        +
+      </button>
       <button
         className="btn danger"
         onClick={async () => {
@@ -92,7 +108,12 @@ function GoalCard({ goal, wasmModule, formatMoney, t, confirm, onSave, onRemove 
 export default function GoalsTab({ wasmModule, currencySymbol, newId, confirm, goals }) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const [draft, setDraft] = useState({ name: '', target_amount: '', target_date: '', cadence: 'monthly' });
+  const [draft, setDraft] = useState({
+    name: '',
+    target_amount: '',
+    target_date: '',
+    cadence: 'monthly',
+  });
 
   const addGoal = async (e) => {
     e.preventDefault();
@@ -134,7 +155,12 @@ export default function GoalsTab({ wasmModule, currencySymbol, newId, confirm, g
       <form className="form-grid" onSubmit={addGoal}>
         <label className="field">
           <span className="field-label">{t('goals.name')}</span>
-          <div className="field-input"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            />
+          </div>
         </label>
         <NumberField
           label={t('goals.target')}
@@ -144,15 +170,31 @@ export default function GoalsTab({ wasmModule, currencySymbol, newId, confirm, g
         />
         <label className="field">
           <span className="field-label">{t('goals.targetDate')}</span>
-          <div className="field-input"><input type="date" value={draft.target_date} onChange={(e) => setDraft({ ...draft, target_date: e.target.value })} /></div>
+          <div className="field-input">
+            <input
+              type="date"
+              value={draft.target_date}
+              onChange={(e) => setDraft({ ...draft, target_date: e.target.value })}
+            />
+          </div>
         </label>
         <label className="field">
           <span className="field-label">{t('goals.cadence')}</span>
-          <select className="field-select" value={draft.cadence} onChange={(e) => setDraft({ ...draft, cadence: e.target.value })}>
-            {CADENCES.map((c) => <option key={c} value={c}>{t(`freq.${c}`)}</option>)}
+          <select
+            className="field-select"
+            value={draft.cadence}
+            onChange={(e) => setDraft({ ...draft, cadence: e.target.value })}
+          >
+            {CADENCES.map((c) => (
+              <option key={c} value={c}>
+                {t(`freq.${c}`)}
+              </option>
+            ))}
           </select>
         </label>
-        <button className="btn" type="submit">{t('goals.add')}</button>
+        <button className="btn" type="submit">
+          {t('goals.add')}
+        </button>
       </form>
     </div>
   );

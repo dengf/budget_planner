@@ -53,6 +53,7 @@ export default function MonthYearPicker({ value, onChange, todayMonth, locale })
 
       {open && (
         <div className="monthpicker-backdrop" role="presentation" onClick={() => setOpen(false)}>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- this handler only stops a click from reaching the backdrop's dismiss handler above; the panel itself is not something to activate, so there is no keyboard equivalent to add. Focus and Escape are handled by the dialog role. */}
           <div
             className="monthpicker-dialog"
             role="dialog"
@@ -111,7 +112,11 @@ export default function MonthYearPicker({ value, onChange, todayMonth, locale })
               })}
             </div>
 
-            <button type="button" className="btn secondary monthpicker-today-btn" onClick={() => pick(todayMonth)}>
+            <button
+              type="button"
+              className="btn secondary monthpicker-today-btn"
+              onClick={() => pick(todayMonth)}
+            >
               {t('monthpicker.jumpToday')}
             </button>
           </div>

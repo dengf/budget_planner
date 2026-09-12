@@ -217,7 +217,8 @@ export default {
   'transactions.cameraStarting': 'Opening camera…',
   'transactions.receiptReading': 'Reading receipt…',
   'transactions.receiptReadingPage': 'Reading page {page} of {totalPages}…',
-  'transactions.receiptPagesTruncated': 'Only the first {processed} of {total} pages were processed.',
+  'transactions.receiptPagesTruncated':
+    'Only the first {processed} of {total} pages were processed.',
   'transactions.receiptReviewHint': "OCR isn't perfect — check these before adding.",
   'transactions.receiptIncomeHint': 'Looks like a refund or credit — check the sign on the amount.',
   'transactions.receiptExtractFailed':
@@ -225,7 +226,8 @@ export default {
   'transactions.smartParseToggle': 'Smart Parse (beta)',
   'transactions.smartParseHint':
     'Reads photos and PDFs far more accurately using a bigger AI model, still entirely on your device. Downloads about {size} from Hugging Face the first time — best on Wi-Fi. Cached afterwards, so it only downloads once.',
-  'transactions.smartParseDownloading': 'Downloading Smart Parse model… {percent}% ({loaded} of {total})',
+  'transactions.smartParseDownloading':
+    'Downloading Smart Parse model… {percent}% ({loaded} of {total})',
   'transactions.smartParseRunning': 'Reading with Smart Parse…',
   'transactions.statementReviewHint':
     '{count} transactions found — check dates, amounts and categories before adding.',
@@ -332,7 +334,8 @@ export default {
   'err.embedClassifyFailed': "Couldn't classify a row ({value}).",
   'err.smartParseModelLoadFailed': "Smart Parse's model couldn't load ({value}). Try again.",
   'err.smartParseTokenizerLoadFailed': "Smart Parse's tokenizer couldn't load ({value}).",
-  'err.smartParseFailed': "Smart Parse couldn't read that image ({value}). Try again or turn Smart Parse off.",
+  'err.smartParseFailed':
+    "Smart Parse couldn't read that image ({value}). Try again or turn Smart Parse off.",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.importFailed': "Couldn't read that file. Try again.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",

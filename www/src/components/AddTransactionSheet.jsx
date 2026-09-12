@@ -139,6 +139,7 @@ export default function AddTransactionSheet({
 
   return (
     <div className="add-txn-backdrop" role="presentation" onClick={closeAndReset}>
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- this handler only stops a click from reaching the backdrop's dismiss handler above; the panel itself is not something to activate, so there is no keyboard equivalent to add. Focus and Escape are handled by the dialog role. */}
       <div
         className="add-txn-dialog"
         role="dialog"

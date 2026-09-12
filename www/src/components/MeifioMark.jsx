@@ -39,7 +39,10 @@ export default function MeifioMark({ height = '1.4em' }) {
         <path d="M11.20 62.00 H77.20" transform="translate(115.40 0)" />
         <path d="M77.20 62.00 A33.0 33.0 0 1 0 71.23 80.93" transform="translate(115.40 0)" />
         <path d="M11.2 24.0 V100.0" transform="translate(200.80 0)" />
-        <path d="M14.799999999999999 100.0 V12.0 a24 24 0 0 1 24 -24" transform="translate(220.20 0)" />
+        <path
+          d="M14.799999999999999 100.0 V12.0 a24 24 0 0 1 24 -24"
+          transform="translate(220.20 0)"
+        />
         <path d="M-3.200000000000001 24.0 H37.599999999999994" transform="translate(220.20 0)" />
         <path d="M11.2 24.0 V100.0" transform="translate(262.40 0)" />
         <path d="M44.2 29.0 a33.0 33.0 0 1 1 -0.01 0 z" transform="translate(281.80 0)" />

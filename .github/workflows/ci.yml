@@ -156,7 +156,7 @@ jobs:
         run: cargo llvm-cov --workspace --fail-under-lines 65
 
   www-test:
-    name: www/ (React) unit tests
+    name: www/ (React) lint + unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -168,6 +168,17 @@ jobs:
           cache-dependency-path: www/package-lock.json
 
       - run: npm ci
+        working-directory: www
+
+      # Fails on errors only; the config's remaining findings are
+      # deliberately warnings (see eslint.config.mjs), so they stay
+      # visible in the log without blocking unrelated work.
+      - run: npm run lint
+        working-directory: www
+
+      # Prettier was configured but never enforced anywhere -- the repo
+      # has a .prettierrc and a format:check script that nothing ran.
+      - run: npm run format:check
         working-directory: www
 
       - run: npm test

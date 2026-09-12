@@ -49,7 +49,14 @@ function pathFrom(values, max, { close = false } = {}) {
  * source of truth means switching the toggle never itself makes the
  * chart appear or disappear.
  */
-export default function SpendOverTimeChart({ dailyTotals, weeklyTotals, month, daysInMonth: dayCount, formatMoney, locale }) {
+export default function SpendOverTimeChart({
+  dailyTotals,
+  weeklyTotals,
+  month,
+  daysInMonth: dayCount,
+  formatMoney,
+  locale,
+}) {
   const { t } = useI18n();
   const gradientId = useId();
   const [granularity, setGranularity] = useState('daily');
@@ -72,7 +79,10 @@ export default function SpendOverTimeChart({ dailyTotals, weeklyTotals, month, d
 
   const ariaLabel =
     granularity === 'weekly'
-      ? t('chart.weeklySpendAria', { amount: formatMoney(total), week: weekLabel(weeks[peakIndex].start, weeks[peakIndex].end, locale) })
+      ? t('chart.weeklySpendAria', {
+          amount: formatMoney(total),
+          week: weekLabel(weeks[peakIndex].start, weeks[peakIndex].end, locale),
+        })
       : t('chart.dailySpendAria', { amount: formatMoney(total), day: peakIndex + 1 });
 
   return (
@@ -125,7 +135,13 @@ export default function SpendOverTimeChart({ dailyTotals, weeklyTotals, month, d
           />
         ))}
         <path d={pathFrom(values, max, { close: true })} fill={`url(#${gradientId})`} />
-        <path d={pathFrom(values, max)} fill="none" stroke={BLUE} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <path
+          d={pathFrom(values, max)}
+          fill="none"
+          stroke={BLUE}
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
       </svg>
       <div className="chart-axis">
         {granularity === 'weekly' ? (
@@ -141,7 +157,9 @@ export default function SpendOverTimeChart({ dailyTotals, weeklyTotals, month, d
         )}
       </div>
       <p className="chart-note">
-        {t(granularity === 'weekly' ? 'chart.weeklySpendTotal' : 'chart.dailySpendTotal', { amount: formatMoney(total) })}
+        {t(granularity === 'weekly' ? 'chart.weeklySpendTotal' : 'chart.dailySpendTotal', {
+          amount: formatMoney(total),
+        })}
       </p>
     </figure>
   );

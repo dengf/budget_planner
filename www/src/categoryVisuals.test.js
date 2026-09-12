@@ -41,7 +41,9 @@ describe('categoryVisuals', () => {
     // A known preset_key always resolves through PRESET_KEY_ORDER, never
     // categoryColor's djb2-hash fallback (that path is only for a
     // hand-typed category with no preset_key at all).
-    expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.subscriptionsMemberships' }));
+    expect(CATEGORY_PALETTE).toContain(
+      categoryColor({ preset_key: 'cat.subscriptionsMemberships' }),
+    );
     expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.giftsDonations' }));
   });
 

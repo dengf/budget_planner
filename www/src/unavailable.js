@@ -9,7 +9,11 @@ export function createUnavailableModule() {
 
   const unavailable = () => ({
     error: 'The calculator engine could not be loaded.',
-    error_message: { code: 'err.engineUnavailable', params: {}, text: 'The calculator engine could not be loaded.' },
+    error_message: {
+      code: 'err.engineUnavailable',
+      params: {},
+      text: 'The calculator engine could not be loaded.',
+    },
   });
 
   // One in-memory collection per storage function, keyed the same way
