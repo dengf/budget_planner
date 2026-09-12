@@ -26,10 +26,7 @@ export default {
 
   'intro.lede':
     'A monthly budget, savings goals and a debt payoff plan — worked out where you can see the working.',
-  'intro.privacy':
-    'Everything is calculated in your browser. Nothing you type is sent anywhere, stored, or logged.',
-  'intro.privacyDetail':
-    "Don't take our word for it — open your browser's network tab and watch it stay empty.",
+  'intro.privacyShort': 'Stored only in this browser — nothing is uploaded.',
   'intro.privacyLink': 'Privacy',
 
   'freq.weekly': 'weekly',
@@ -173,8 +170,15 @@ export default {
   'transactions.methodRecurring': 'Recurring',
   'transactions.date': 'Date',
   'transactions.description': 'Description',
+  'transactions.entryType': 'Entry type',
+  'transactions.expense': 'Expense',
+  'transactions.income': 'Income',
+  'transactions.addExpense': 'Add expense',
+  'transactions.addIncome': 'Add income',
   'transactions.amount': 'Amount',
-  'transactions.amountHint': 'Negative for spending, positive for income',
+  'transactions.amountHintExpense': 'Recorded as money spent.',
+  'transactions.amountHintIncome': 'Recorded as money received.',
+  'transactions.logCta': 'Log a transaction',
   'transactions.directionMismatchExpense':
     '{category} is an expense category, but a positive amount counts as income and won’t show up as spending. Did you mean {flipped}?',
   'transactions.directionMismatchIncome':
@@ -287,9 +291,18 @@ export default {
   'debt.balanceRemaining': 'Remaining',
 
   'dashboard.title': 'Dashboard',
-  'dashboard.welcome':
-    'New here? Set your income and budget amounts on the Budget tab, then log spending — this page fills in as you go.',
-  'dashboard.welcomeCta': 'Go to Budget',
+  'dashboard.setup.planIncomeTitle': 'Plan your income',
+  'dashboard.setup.planIncomeDetail':
+    'Add how much you expect to receive this month so the budget has something to work with.',
+  'dashboard.setup.planIncomeCta': 'Plan income',
+  'dashboard.setup.assignRemainingTitle': 'Assign the rest of your income',
+  'dashboard.setup.assignRemainingDetail':
+    'Every dollar needs a job — give the remaining amount a category.',
+  'dashboard.setup.assignRemainingCta': 'Assign remaining money',
+  'dashboard.setup.logTransactionTitle': 'Log your first transaction',
+  'dashboard.setup.logTransactionDetail':
+    'Your budget is ready — record spending or income to see this page fill in.',
+  'dashboard.setup.logTransactionCta': 'Log a transaction',
   'dashboard.income': 'Income',
   'dashboard.totalIncome': 'Total income',
   'dashboard.totalExpenses': 'Expenses',

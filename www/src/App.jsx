@@ -217,6 +217,28 @@ export function AppShell({ wasmModule }) {
   );
 
   /**
+   * Seeds the compact five-category starter set -- one income category,
+   * four of the expenses nearly every household has -- rather than
+   * `addCommonCategories`'s full sixteen. Used only where a budget is
+   * landing on its *very first* screen (a genuine first run, or right
+   * after "Clear all data"): the full catalogue stays reachable from
+   * there through `CategoryChipPicker` and the "Add common categories"
+   * button, one tap at a time, once there's a reason to reach for it.
+   * See `docs/superpowers/specs/2026-09-12-onboarding-and-transaction-entry-design.md`
+   * for the product reasoning.
+   */
+  const seedStarterCategories = useCallback(
+    async (existingItems = categories.items) => {
+      if (!wasmModule?.compact_preset_categories) return;
+      const presets = (await wasmModule.compact_preset_categories()) ?? [];
+      for (const preset of availablePresets(presets, existingItems, t)) {
+        await categories.save(buildCategoryFromPreset(preset, t, newId));
+      }
+    },
+    [wasmModule, categories, newId, t],
+  );
+
+  /**
    * Adds exactly one starter preset -- the Budget tab's chip picker calls
    * this once per tap, unlike `addCommonCategories` above which seeds
    * every not-yet-taken preset in one shot. Same save shape, just one
@@ -256,8 +278,8 @@ export function AppShell({ wasmModule }) {
   useEffect(() => {
     if (!categories.loaded || seedingRef.current) return;
     seedingRef.current = true;
-    if (categories.items.length === 0) addCommonCategories();
-  }, [categories.loaded, categories.items.length, addCommonCategories]);
+    if (categories.items.length === 0) seedStarterCategories();
+  }, [categories.loaded, categories.items.length, seedStarterCategories]);
 
   /**
    * Replaces everything in the app with the contents of an export file.
@@ -343,7 +365,7 @@ export function AppShell({ wasmModule }) {
     // `categories.items` -- the removal loop above just emptied it, but
     // this closure's own `categories.items` still reads the pre-clear
     // list until a re-render catches up.
-    await addCommonCategories([]);
+    await seedStarterCategories([]);
   }, [
     transactions,
     budgetPlan,
@@ -354,7 +376,7 @@ export function AppShell({ wasmModule }) {
     categories,
     confirm,
     t,
-    addCommonCategories,
+    seedStarterCategories,
   ]);
 
   const ActivePanel = TABS.find((tab) => tab.id === activeTab)?.Component;

@@ -26,6 +26,37 @@ function breakableMoney(str) {
 }
 
 /**
+ * The setup-state ladder's three steps, each naming its own i18n keys and
+ * which tab its call to action opens -- a lookup table rather than
+ * building keys with a template literal (`` `dashboard.setup.${step}Title` ``),
+ * so every key `t()` is ever called with stays a plain string literal.
+ * `untranslated-strings.test.js` reads this file's source text looking
+ * for hardcoded English; it can't resolve a template literal's dynamic
+ * half, and reads a literal suffix like "Title" sitting next to `${...}`
+ * as exactly the hardcoded English it exists to catch.
+ */
+const SETUP_STEPS = {
+  planIncome: {
+    titleKey: 'dashboard.setup.planIncomeTitle',
+    detailKey: 'dashboard.setup.planIncomeDetail',
+    ctaKey: 'dashboard.setup.planIncomeCta',
+    tab: 'budget',
+  },
+  assignRemaining: {
+    titleKey: 'dashboard.setup.assignRemainingTitle',
+    detailKey: 'dashboard.setup.assignRemainingDetail',
+    ctaKey: 'dashboard.setup.assignRemainingCta',
+    tab: 'budget',
+  },
+  logTransaction: {
+    titleKey: 'dashboard.setup.logTransactionTitle',
+    detailKey: 'dashboard.setup.logTransactionDetail',
+    ctaKey: 'dashboard.setup.logTransactionCta',
+    tab: 'transactions',
+  },
+};
+
+/**
  * The landing tab: this month's headline numbers first, the full
  * category table below. `viewMonth` is shared app-wide (App.jsx) --
  * paging Dashboard back to a prior month is the same month
@@ -245,15 +276,28 @@ export default function DashboardTab({
   // does with `expenseTotals.spent`.
   const incomeTotals = sumLines(incomeLines);
 
-  // The 16 starter categories are auto-seeded (App.jsx), so a fresh
-  // install never lands on an empty category list -- but it does land
-  // here, on a wall of $0.00 cards, with nothing on screen saying where
-  // to go next. `transactions.items` isn't scoped to `viewMonth` (see
-  // App.jsx's useCollection call), so "never logged anything, anywhere"
-  // is a stable signal that survives paging the month picker; a planned
-  // amount is scoped to `viewMonth`, matching `budgetPlan`'s own scope.
-  const isFreshStart =
-    transactions.items.length === 0 && !budgetPlan.items.some((p) => p.planned > 0);
+  // The compact five-category starter set is auto-seeded (App.jsx), so a
+  // fresh install never lands on an empty category list -- but it does
+  // land here, on a wall of $0.00 cards and an empty chart, with nothing
+  // on screen saying where to go next. Rather than one blanket
+  // "fresh start" flag, this derives which single step is next -- the
+  // same setup-state ladder the design spec lays out -- so the card can
+  // say exactly what to do instead of a generic "get started."
+  //
+  // `summary.income` already reflects only the viewed month's planned
+  // income (build_month derives it from this month's income-category
+  // planned amounts), so checking it instead of `budgetPlan.items`
+  // directly is what makes this correct on a past or future month too.
+  const hasIncome = (summary?.income ?? 0) > 0;
+  const unassigned = summary?.unassigned ?? 0;
+  const monthHasTransactions = transactions.items.some((tx) => tx.date?.startsWith(viewMonth));
+  const setupStep = !hasIncome
+    ? 'planIncome'
+    : unassigned !== 0
+      ? 'assignRemaining'
+      : !monthHasTransactions
+        ? 'logTransaction'
+        : null;
 
   /**
    * The row tapped open below one of the two charts -- income and expense
@@ -339,84 +383,105 @@ export default function DashboardTab({
         />
       </div>
 
-      {isFreshStart && (
-        <div className="dash-welcome">
-          <p className="dash-welcome-text">{t('dashboard.welcome')}</p>
-          <button type="button" className="btn" onClick={() => onNavigateTab?.('budget')}>
-            {t('dashboard.welcomeCta')}
+      {setupStep ? (
+        // Replaces the summary cards and both charts, not just adds a
+        // banner above them -- a wall of $0.00 cards and an empty chart
+        // said nothing a first-time visitor needed, and competed with the
+        // one thing that did. `budget`/`transactions` both stay reachable
+        // through the primary tab bar regardless of this card's own CTA.
+        <div className="dash-setup-card money-card">
+          <span className="dash-setup-badge" aria-hidden="true">
+            →
+          </span>
+          <div className="dash-setup-body">
+            <span className="dash-setup-title">{t(SETUP_STEPS[setupStep].titleKey)}</span>
+            <p className="dash-setup-detail">{t(SETUP_STEPS[setupStep].detailKey)}</p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => onNavigateTab?.(SETUP_STEPS[setupStep].tab)}
+          >
+            {t(SETUP_STEPS[setupStep].ctaKey)}
           </button>
         </div>
-      )}
-
-      <div className="dash-summary-cards">
-        {savingsLine && (
-          <div className="dash-card dash-card-hero dash-card-savings">
-            <BlossomWatermark className="dash-blossom-watermark" />
-            <div className="dash-card-hero-top">
-              <span className="dash-card-label">{t('budget.savings')}</span>
-              <div
-                className={`dash-card-blossom ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}
-              >
-                <BlossomProgress filled={savingsLine.spent >= 0 ? 5 : 0} size={26} />
+      ) : (
+        <>
+          <div className="dash-summary-cards">
+            {savingsLine && (
+              <div className="dash-card dash-card-hero dash-card-savings">
+                <BlossomWatermark className="dash-blossom-watermark" />
+                <div className="dash-card-hero-top">
+                  <span className="dash-card-label">{t('budget.savings')}</span>
+                  <div
+                    className={`dash-card-blossom ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}
+                  >
+                    <BlossomProgress filled={savingsLine.spent >= 0 ? 5 : 0} size={26} />
+                  </div>
+                </div>
+                <span
+                  className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}
+                >
+                  {breakableMoney(formatMoney(savingsLine.spent))}
+                </span>
+              </div>
+            )}
+            <div className="dash-summary-secondary">
+              <div className="dash-card">
+                <span className="dash-card-label">{t('dashboard.income')}</span>
+                <span className="dash-card-value positive">
+                  {breakableMoney(formatMoney(summary?.income ?? 0))}
+                </span>
+              </div>
+              <div className="dash-card">
+                <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
+                <span className="dash-card-value negative">
+                  {breakableMoney(formatMoney(expenseTotals.spent))}
+                </span>
               </div>
             </div>
-            <span className={`dash-card-value ${savingsLine.spent >= 0 ? 'positive' : 'negative'}`}>
-              {breakableMoney(formatMoney(savingsLine.spent))}
-            </span>
           </div>
-        )}
-        <div className="dash-summary-secondary">
-          <div className="dash-card">
-            <span className="dash-card-label">{t('dashboard.income')}</span>
-            <span className="dash-card-value positive">
-              {breakableMoney(formatMoney(summary?.income ?? 0))}
-            </span>
-          </div>
-          <div className="dash-card">
-            <span className="dash-card-label">{t('dashboard.totalExpenses')}</span>
-            <span className="dash-card-value negative">
-              {breakableMoney(formatMoney(expenseTotals.spent))}
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <CategoryBreakdown
-        tabs={[
-          {
-            key: 'expense',
-            label: t('chart.expenseBreakdown'),
-            items: expenseSlices,
-            ariaLabel: t('chart.expenseBreakdownAria', { month: monthLabel(viewMonth, locale) }),
-            hint: t('dashboard.bubbleHint'),
-            totalLabel: formatMoney(expenseTotals.spent),
-            emptyHint: t('chart.noExpenseYet'),
-          },
-          {
-            key: 'income',
-            label: t('chart.incomeBreakdown'),
-            items: incomeSlices,
-            ariaLabel: t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) }),
-            totalLabel: formatMoney(incomeTotals.spent),
-            emptyHint: t('chart.noIncomeYet'),
-          },
-        ]}
-        formatMoney={formatMoney}
-        selectedId={selectedCategoryId}
-        onSelect={setSelectedCategoryId}
-        detail={
-          drilldown(expenseSlices.map((s) => s.id)) ?? drilldown(incomeSlices.map((s) => s.id))
-        }
-      />
+          <CategoryBreakdown
+            tabs={[
+              {
+                key: 'expense',
+                label: t('chart.expenseBreakdown'),
+                items: expenseSlices,
+                ariaLabel: t('chart.expenseBreakdownAria', {
+                  month: monthLabel(viewMonth, locale),
+                }),
+                hint: t('dashboard.bubbleHint'),
+                totalLabel: formatMoney(expenseTotals.spent),
+                emptyHint: t('chart.noExpenseYet'),
+              },
+              {
+                key: 'income',
+                label: t('chart.incomeBreakdown'),
+                items: incomeSlices,
+                ariaLabel: t('chart.incomeBreakdownAria', { month: monthLabel(viewMonth, locale) }),
+                totalLabel: formatMoney(incomeTotals.spent),
+                emptyHint: t('chart.noIncomeYet'),
+              },
+            ]}
+            formatMoney={formatMoney}
+            selectedId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
+            detail={
+              drilldown(expenseSlices.map((s) => s.id)) ?? drilldown(incomeSlices.map((s) => s.id))
+            }
+          />
 
-      <SpendOverTimeChart
-        dailyTotals={dailyTotals}
-        weeklyTotals={weeklyTotals}
-        month={viewMonth}
-        daysInMonth={daysInMonth(viewMonth)}
-        formatMoney={formatMoney}
-        locale={locale}
-      />
+          <SpendOverTimeChart
+            dailyTotals={dailyTotals}
+            weeklyTotals={weeklyTotals}
+            month={viewMonth}
+            daysInMonth={daysInMonth(viewMonth)}
+            formatMoney={formatMoney}
+            locale={locale}
+          />
+        </>
+      )}
 
       {goals.items.length > 0 && (
         <>

@@ -441,14 +441,15 @@ export default function BudgetTab({
   // flag picks the one that instead says where to add the first one.
   const hasIncomeCategory = categories.items.some((c) => c.is_income);
   const mode = budgetMode({ isPastMonth, hasIncome, unassigned });
-  // Every fresh or cleared budget lands on all 16 starter categories at
-  // once (App.jsx re-seeds the moment the list is empty, deliberately --
-  // see its own comment), not the empty-table-plus-chip-picker state the
-  // tap-to-add-one-at-a-time picker was designed around. The assign
-  // banner already says "start with income," but with the Income and
-  // Expense sections sitting at equal visual weight, that's a sentence
-  // to apply to five specific rows out of sixteen, not something the eye
-  // finds on its own. Dimming the Expense side (rows and its section
+  // Every fresh or cleared budget lands on the compact five-category
+  // starter set at once (App.jsx re-seeds the moment the list is empty,
+  // deliberately -- see its own comment), not the empty-table-plus-chip-
+  // picker state the tap-to-add-one-at-a-time picker was designed around.
+  // The assign banner already says "start with income," but with the
+  // Income and Expense sections sitting at equal visual weight, that's a
+  // sentence to apply to one specific row out of five (and more once
+  // someone adds from the full catalogue), not something the eye finds
+  // on its own. Dimming the Expense side (rows and its section
   // header) until an income category has something planned turns that
   // instruction into a visual one instead. `:focus-within` (main.css)
   // restores full opacity, so nothing here is actually harder to reach,

@@ -225,6 +225,43 @@ pub fn starter_categories() -> Vec<PresetCategory> {
         .collect()
 }
 
+/// The five keys a genuinely fresh budget (or one just cleared back to
+/// nothing) is auto-seeded with, in place of all sixteen of
+/// `starter_categories()`.
+///
+/// Onboarding research on this app (a real product-review pass, not a
+/// hunch) found the full sixteen-category table read as machinery before
+/// anyone had typed a dollar figure: a phone session opened straight onto
+/// sixteen expanded rows before a first budget existed to fill them.
+/// Five rows -- one income source, four of the expenses nearly every
+/// household actually has -- gets someone to a usable first plan in one
+/// screen; `CategoryChipPicker` and the explicit "add category" flow
+/// still offer the other eleven, one tap at a time, once there's a reason
+/// to reach for them.
+const COMPACT_STARTER_KEYS: &[&str] = &[
+    "cat.primaryEarnedIncome",
+    "cat.housing",
+    "cat.utilities",
+    "cat.foodGroceries",
+    "cat.transportation",
+];
+
+/// The compact starter set, in `COMPACT_STARTER_KEYS`'s declared order --
+/// filtered from `starter_categories()` rather than declared as its own
+/// preset list, so the two can never drift into naming the same category
+/// two different ways.
+pub fn compact_starter_categories() -> Vec<PresetCategory> {
+    let all = starter_categories();
+    COMPACT_STARTER_KEYS
+        .iter()
+        .map(|key| {
+            *all.iter()
+                .find(|p| p.key == *key)
+                .unwrap_or_else(|| panic!("{key} is not a starter_categories() preset"))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,6 +392,32 @@ mod tests {
                 p.description_key
             );
         }
+    }
+
+    #[test]
+    fn compact_starter_set_has_one_income_and_four_expense_categories() {
+        let compact = compact_starter_categories();
+        assert_eq!(compact.len(), 5);
+        assert_eq!(compact.iter().filter(|p| p.is_income).count(), 1);
+        assert_eq!(compact.iter().filter(|p| !p.is_income).count(), 4);
+    }
+
+    #[test]
+    fn compact_starter_set_is_a_subset_of_the_full_catalogue() {
+        let full: Vec<_> = starter_categories().iter().map(|p| p.key).collect();
+        for p in compact_starter_categories() {
+            assert!(
+                full.contains(&p.key),
+                "{} is not one of starter_categories()'s own presets",
+                p.key
+            );
+        }
+    }
+
+    #[test]
+    fn compact_starter_set_keeps_its_declared_order() {
+        let keys: Vec<_> = compact_starter_categories().iter().map(|p| p.key).collect();
+        assert_eq!(keys, COMPACT_STARTER_KEYS);
     }
 
     #[test]

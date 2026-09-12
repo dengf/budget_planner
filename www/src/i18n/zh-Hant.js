@@ -24,8 +24,7 @@ export default {
   'nav.debt': '還債計劃',
 
   'intro.lede': '每月預算、儲蓄目標與還債計劃——每一步都看得見推算過程。',
-  'intro.privacy': '所有計算都在您的瀏覽器中完成。您輸入的內容不會被傳送、儲存或記錄到任何地方。',
-  'intro.privacyDetail': '不必只聽我們說——打開瀏覽器的網路面板，您會看到它始終是空的。',
+  'intro.privacyShort': '僅保存在此瀏覽器中——不會上傳任何內容。',
   'intro.privacyLink': '隱私政策',
 
   'freq.weekly': '每週',
@@ -156,8 +155,15 @@ export default {
   'transactions.methodRecurring': '定期',
   'transactions.date': '日期',
   'transactions.description': '說明',
+  'transactions.entryType': '類型',
+  'transactions.expense': '支出',
+  'transactions.income': '收入',
+  'transactions.addExpense': '新增支出',
+  'transactions.addIncome': '新增收入',
   'transactions.amount': '金額',
-  'transactions.amountHint': '支出為負數，收入為正數',
+  'transactions.amountHintExpense': '將記錄為支出金額。',
+  'transactions.amountHintIncome': '將記錄為收入金額。',
+  'transactions.logCta': '記錄交易',
   'transactions.directionMismatchExpense':
     '{category}是支出分類，但金額是正數，會被計為收入，不會顯示為支出。是不是想輸入 {flipped}？',
   'transactions.directionMismatchIncome':
@@ -262,9 +268,15 @@ export default {
   'debt.balanceRemaining': '剩餘',
 
   'dashboard.title': '儀表板',
-  'dashboard.welcome':
-    '剛開始使用？在「預算」頁面設定收入和預算金額，然後記錄支出——本頁會隨之更新。',
-  'dashboard.welcomeCta': '前往預算',
+  'dashboard.setup.planIncomeTitle': '規劃您的收入',
+  'dashboard.setup.planIncomeDetail': '新增您這個月預計收到的金額，讓預算有據可依。',
+  'dashboard.setup.planIncomeCta': '規劃收入',
+  'dashboard.setup.assignRemainingTitle': '分配剩餘收入',
+  'dashboard.setup.assignRemainingDetail': '讓每一元都有去處——為剩餘金額指定類別。',
+  'dashboard.setup.assignRemainingCta': '分配剩餘金額',
+  'dashboard.setup.logTransactionTitle': '記錄第一筆交易',
+  'dashboard.setup.logTransactionDetail': '預算已經準備好——記錄一筆支出或收入，看看本頁如何更新。',
+  'dashboard.setup.logTransactionCta': '記錄交易',
   'dashboard.income': '收入',
   'dashboard.totalIncome': '收入總計',
   'dashboard.totalExpenses': '支出',

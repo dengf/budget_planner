@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import CalcError from './CalcError';
-import DirectionWarning from './DirectionWarning';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
 import { SpreadsheetIcon } from './icons';
@@ -15,7 +14,7 @@ const DEFAULT_MAPPING = {
   has_header: true,
 };
 
-const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
+const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '', isIncome: false };
 
 const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
@@ -50,9 +49,18 @@ export default function AddTransactionSheet({
   transactions,
   recurring,
   formatMoney,
+  initialMethod = 'manual',
 }) {
   const { t } = useI18n();
-  const [method, setMethod] = useState('manual'); // 'manual' | 'receipt' | 'csv' | 'recurring'
+  const [method, setMethod] = useState(initialMethod); // 'manual' | 'receipt' | 'csv' | 'recurring'
+
+  // The sheet stays mounted (and its state alive) even while closed, so a
+  // caller that reopens it wanting a specific tab -- the Transactions
+  // empty state's "Import CSV" button -- needs this to actually take
+  // effect on each open, not just the first mount.
+  useEffect(() => {
+    if (open) setMethod(initialMethod);
+  }, [open, initialMethod]);
 
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [csvText, setCsvText] = useState('');
@@ -66,14 +74,20 @@ export default function AddTransactionSheet({
   const addTransaction = async (e) => {
     e.preventDefault();
     if (!draft.date || !draft.description || draft.amount === '') return;
+    // The Expense/Income toggle below is the one place the sign gets
+    // decided -- the amount field only ever collects a plain positive
+    // magnitude now, so there is nothing left to get backwards by typing
+    // (or forgetting) a minus sign. See DirectionWarning.jsx for why that
+    // used to be a real, easy-to-make mistake.
+    const magnitude = Math.abs(Number(draft.amount));
     await transactions.save({
       id: newId(),
       date: draft.date,
       description: draft.description,
-      amount: Number(draft.amount),
+      amount: draft.isIncome ? magnitude : -magnitude,
       category_id: draft.category_id || null,
     });
-    setDraft(EMPTY_DRAFT);
+    setDraft({ ...EMPTY_DRAFT, isIncome: draft.isIncome });
     onClose();
   };
 
@@ -201,6 +215,37 @@ export default function AddTransactionSheet({
         <div className="add-txn-body">
           {method === 'manual' && (
             <>
+              {/* The direction of money is decided once, here, rather than
+                  by the amount field's sign -- see NumberField.jsx's own
+                  doc comment for the mobile keyboard bug (no minus key on
+                  at least one major browser) that made a signed amount
+                  field an actual trap, not just a clarity complaint. Both
+                  the submit label and the category list below follow this
+                  choice, so nothing past this point asks for a sign. */}
+              <div
+                className="txn-type-toggle"
+                role="tablist"
+                aria-label={t('transactions.entryType')}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!draft.isIncome}
+                  className={`txn-type-btn${!draft.isIncome ? ' active' : ''}`}
+                  onClick={() => setDraft({ ...draft, isIncome: false, category_id: '' })}
+                >
+                  {t('transactions.expense')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={draft.isIncome}
+                  className={`txn-type-btn${draft.isIncome ? ' active' : ''}`}
+                  onClick={() => setDraft({ ...draft, isIncome: true, category_id: '' })}
+                >
+                  {t('transactions.income')}
+                </button>
+              </div>
               <form className="form-grid" onSubmit={addTransaction}>
                 <label className="field">
                   <span className="field-label">{t('transactions.date')}</span>
@@ -226,7 +271,6 @@ export default function AddTransactionSheet({
                   value={draft.amount}
                   onChange={(v) => setDraft({ ...draft, amount: v })}
                   grouped
-                  signed
                 />
                 <label className="field">
                   <span className="field-label">{t('transactions.category')}</span>
@@ -236,24 +280,26 @@ export default function AddTransactionSheet({
                     onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}
                   >
                     <option value="">{t('transactions.uncategorized')}</option>
-                    {categories.items.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {categoryDisplayName(c, t)}
-                      </option>
-                    ))}
+                    {categories.items
+                      .filter((c) => c.is_income === draft.isIncome)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {categoryDisplayName(c, t)}
+                        </option>
+                      ))}
                   </select>
                 </label>
                 <button className="btn" type="submit">
-                  {t('transactions.add')}
+                  {t(draft.isIncome ? 'transactions.addIncome' : 'transactions.addExpense')}
                 </button>
               </form>
-              <p className="field-label">{t('transactions.amountHint')}</p>
-              <DirectionWarning
-                amount={draft.amount}
-                category={categories.items.find((c) => c.id === draft.category_id)}
-                formatMoney={formatMoney}
-                onUseFlipped={(flipped) => setDraft({ ...draft, amount: String(flipped) })}
-              />
+              <p className="field-label">
+                {t(
+                  draft.isIncome
+                    ? 'transactions.amountHintIncome'
+                    : 'transactions.amountHintExpense',
+                )}
+              </p>
             </>
           )}
 

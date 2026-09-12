@@ -46,7 +46,7 @@ pub use ocr::run_ocr;
 pub use pdf_render::{pdf_page_count, render_pdf_page, RenderedPage};
 #[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
-pub use presets::{starter_categories, PresetCategory};
+pub use presets::{compact_starter_categories, starter_categories, PresetCategory};
 pub use receipt::{
     classify_by_similarity, parse_receipt_text, parse_statement_text, ParsedReceipt, StatementRow,
     EXPENSE_EXAMPLE_PHRASES, INCOME_EXAMPLE_PHRASES,
