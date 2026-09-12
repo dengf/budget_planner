@@ -120,7 +120,7 @@ after the primary logging/import workflow and transaction history.
 | Area | Responsibility |
 | --- | --- |
 | `crates/budget-calc/src/presets.rs` | Define and test the compact essential starter preset set from the canonical category taxonomy. |
-| `crates/budget-wasm/src/category.rs` | Add a thin binding that serializes the compact starter set without duplicating category selection logic. |
+| `crates/budget-wasm/src/presets.rs` | Add a thin binding that serializes the compact starter set without duplicating category selection logic. |
 | `www/src/App.jsx` | Seed compact first-run presets and derive setup readiness from loaded collections. |
 | `www/src/components/DashboardTab.jsx` | Render the setup checklist/next action or the established dashboard summary. |
 | `www/src/components/BudgetTab.jsx` | Prioritize starter categories and retain the existing planning interface. |

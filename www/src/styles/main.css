@@ -459,9 +459,6 @@ body {
   font-size: 0.9rem;
   color: var(--muted);
 }
-.intro-privacy b {
-  color: var(--positive);
-}
 .intro-privacy a {
   color: var(--positive);
 }
@@ -1032,6 +1029,31 @@ table.data tr:last-child td {
   color: var(--muted-2);
   font-size: 0.88rem;
   padding: 12px 0;
+}
+
+/* Transactions' empty history: logging and importing are the two things
+   this tab is actually for, so the empty state offers both directly
+   rather than just naming the problem. Stacked, full-width buttons on a
+   narrow phone -- side by side past 480px, where two 44px buttons no
+   longer compete for one thumb's reach. */
+.txn-empty-state .empty-state {
+  padding-bottom: 4px;
+}
+.txn-empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.txn-empty-actions .btn {
+  width: 100%;
+}
+@media (min-width: 480px) {
+  .txn-empty-actions {
+    flex-direction: row;
+  }
+  .txn-empty-actions .btn {
+    width: auto;
+  }
 }
 
 .error {
@@ -2337,35 +2359,62 @@ table.data tr:last-child td {
   min-height: 44px;
 }
 
-/* Shown only while `isFreshStart` holds (DashboardTab.jsx) -- the
-   instruction a brand-new install needs before the wall of $0.00 cards
-   below means anything. Styled like `.assign-banner-start` (panel-alt +
-   line border, not the positive-tinted default) for the same reason that
-   rule gives: this is an instruction, not a result. Wraps to a stacked
-   layout under its own `min-width: 220px` on the text rather than a
-   dedicated mobile breakpoint -- the button already meets the 44px
-   touch-target floor via `.btn`. */
-.dash-welcome {
+/* Replaces the summary cards and both charts while a setup step remains
+   (DashboardTab.jsx's `setupStep`) -- a wall of $0.00 cards and an empty
+   chart said nothing a first-time visitor needed, one step at a time is
+   more useful than all of it appearing to matter equally. Styled like
+   `.assign-banner-start` (panel-alt + line border, not the
+   positive-tinted default) for the same reason that rule gives: this is
+   an instruction, not a result. Wraps to a stacked layout under its own
+   `min-width: 220px` on the text rather than a dedicated mobile
+   breakpoint -- the button already meets the 44px touch-target floor via
+   `.btn`. */
+.dash-setup-card {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   padding: 16px 18px;
   margin-bottom: 12px;
   background: var(--panel-alt);
   border: 1px solid var(--line);
   border-radius: 16px;
 }
-.dash-welcome-text {
+.dash-setup-badge {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--positive);
+  font-size: 1.1rem;
+}
+.dash-setup-body {
   flex: 1 1 220px;
   min-width: 0;
-  margin: 0;
-  color: var(--ink);
-  font-size: 0.95rem;
 }
-.dash-welcome .btn {
+.dash-setup-title {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+.dash-setup-detail {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.dash-setup-card .btn {
   flex: none;
+  width: 100%;
+}
+@media (min-width: 480px) {
+  .dash-setup-card .btn {
+    width: auto;
+  }
 }
 
 .dash-summary-cards {
@@ -2711,6 +2760,36 @@ table.data tr:last-child td {
   background: var(--accent);
   color: var(--accent-ink);
 }
+
+/* Expense/Income, decided once before the amount field rather than by its
+   sign -- see AddTransactionSheet.jsx's own comment. Same shape as
+   `.add-txn-methods` above (pill track, 44px segments) so the two
+   segmented controls in one sheet read as the same kind of control. */
+.txn-type-toggle {
+  display: flex;
+  gap: 6px;
+  background: var(--panel-alt);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.txn-type-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 6px;
+  min-height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.txn-type-btn.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
 .add-txn-body {
   display: flex;
   flex-direction: column;

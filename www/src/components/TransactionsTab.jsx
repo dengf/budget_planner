@@ -23,6 +23,16 @@ export default function TransactionsTab({
   const formatMoney = makeFormatMoney(currencySymbol);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [addMethod, setAddMethod] = useState('manual');
+
+  /** Opens the Add sheet on a specific tab -- the empty state's two
+   *  buttons (Log a transaction / Import CSV) both go through this
+   *  rather than always landing on Manual, since a "Import CSV" button
+   *  that opens onto the Manual form would read as broken. */
+  const openAdd = (method = 'manual') => {
+    setAddMethod(method);
+    setAddOpen(true);
+  };
 
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
 
@@ -88,7 +98,7 @@ export default function TransactionsTab({
           type="button"
           className="icon-add-btn"
           aria-label={t('budget.logTransaction')}
-          onClick={() => setAddOpen(true)}
+          onClick={() => openAdd('manual')}
         >
           <span aria-hidden="true">+</span>
         </button>
@@ -97,6 +107,7 @@ export default function TransactionsTab({
       <AddTransactionSheet
         open={addOpen}
         onClose={() => setAddOpen(false)}
+        initialMethod={addMethod}
         wasmModule={wasmModule}
         newId={newId}
         categories={categories}
@@ -106,132 +117,29 @@ export default function TransactionsTab({
         formatMoney={formatMoney}
       />
 
-      <h2 className="section-start">{t('transactions.rulesTitle')}</h2>
-      <p className="panel-subtitle">{t('transactions.rulesHint')}</p>
-      {rules.items.length === 0 ? (
-        <p className="empty-state">{t('transactions.noRules')}</p>
-      ) : (
-        <div className="table-scroll">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('transactions.ruleKeyword')}</th>
-                <th>{t('transactions.category')}</th>
-                <th>{t('transactions.rulePriority')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rules.items.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.keyword}</td>
-                  <td>
-                    <span className="category-cell">
-                      <CategoryBadge category={categoryFor(r.category_id)} />
-                      {categoryName(r.category_id)}
-                    </span>
-                  </td>
-                  <td className="num">{r.priority}</td>
-                  <td>
-                    <button className="btn ghost" onClick={() => removeRule(r)}>
-                      {t('budget.remove')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <form className="form-grid" onSubmit={addRule}>
-        <label className="field">
-          <span className="field-label">{t('transactions.ruleKeyword')}</span>
-          <div className="field-input">
-            <input
-              value={ruleDraft.keyword}
-              onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
-            />
-          </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.category')}</span>
-          <select
-            className="field-select"
-            value={ruleDraft.category_id}
-            onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
-          >
-            <option value="">—</option>
-            {categories.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {categoryDisplayName(c, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.rulePriority')}</span>
-          <div className="field-input">
-            <input
-              type="number"
-              value={ruleDraft.priority}
-              onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
-            />
-          </div>
-        </label>
-        <button className="btn" type="submit">
-          {t('transactions.addRule')}
-        </button>
-        <button className="btn secondary" type="button" onClick={applyRules}>
-          {t('transactions.applyRules')}
-        </button>
-      </form>
-
-      <h2 className="section-start">{t('recurring.title')}</h2>
-      <p className="panel-subtitle">{t('recurring.hint')}</p>
-      {recurring.items.length === 0 ? (
-        <p className="empty-state">{t('recurring.none')}</p>
-      ) : (
-        <div className="table-scroll">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('recurring.description')}</th>
-                <th>{t('transactions.category')}</th>
-                <th>{t('budget.planned')}</th>
-                <th>{t('recurring.cadence')}</th>
-                <th>{t('recurring.anchorDate')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {recurring.items.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.description}</td>
-                  <td>
-                    <span className="category-cell">
-                      <CategoryBadge category={categoryFor(r.category_id)} />
-                      {categoryName(r.category_id)}
-                    </span>
-                  </td>
-                  <td className="num">{formatMoney(r.amount)}</td>
-                  <td>{t(`freq.${r.cadence}`)}</td>
-                  <td>{r.anchor_date}</td>
-                  <td>
-                    <button className="btn ghost" onClick={() => removeRecurring(r)}>
-                      {t('budget.remove')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
+      {/* Logging and importing are what a first-time (and every later)
+          visit to this tab is actually for -- categorization rules and
+          recurring setup below are real, useful features, but neither one
+          means anything before a transaction history exists to apply
+          them to. Putting the transaction list, and its two loudest ways
+          to start one, ahead of both is what makes that order obvious
+          instead of the opposite of what actually happens: rules and
+          recurring used to render first, above an empty list they had
+          nothing to act on yet. */}
       {transactions.items.length === 0 ? (
         <>
           <h2 className="section-start">{t('transactions.listTitle')}</h2>
-          <p className="empty-state">{t('transactions.noTransactions')}</p>
+          <div className="txn-empty-state">
+            <p className="empty-state">{t('transactions.noTransactions')}</p>
+            <div className="txn-empty-actions">
+              <button type="button" className="btn" onClick={() => openAdd('manual')}>
+                {t('transactions.logCta')}
+              </button>
+              <button type="button" className="btn secondary" onClick={() => openAdd('csv')}>
+                {t('transactions.methodImport')}
+              </button>
+            </div>
+          </div>
         </>
       ) : (
         <>
@@ -293,6 +201,135 @@ export default function TransactionsTab({
           )}
         </>
       )}
+
+      {/* Rules and recurring setup: real features, kept out of the way
+          until someone goes looking for them -- collapsed by default,
+          same disclosure pattern as Budget's own collapsible sections. */}
+      <details className="collapsible-panel">
+        <summary>{t('transactions.rulesTitle')}</summary>
+        <p className="panel-subtitle">{t('transactions.rulesHint')}</p>
+        {rules.items.length === 0 ? (
+          <p className="empty-state">{t('transactions.noRules')}</p>
+        ) : (
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>{t('transactions.ruleKeyword')}</th>
+                  <th>{t('transactions.category')}</th>
+                  <th>{t('transactions.rulePriority')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rules.items.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.keyword}</td>
+                    <td>
+                      <span className="category-cell">
+                        <CategoryBadge category={categoryFor(r.category_id)} />
+                        {categoryName(r.category_id)}
+                      </span>
+                    </td>
+                    <td className="num">{r.priority}</td>
+                    <td>
+                      <button className="btn ghost" onClick={() => removeRule(r)}>
+                        {t('budget.remove')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <form className="form-grid" onSubmit={addRule}>
+          <label className="field">
+            <span className="field-label">{t('transactions.ruleKeyword')}</span>
+            <div className="field-input">
+              <input
+                value={ruleDraft.keyword}
+                onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
+              />
+            </div>
+          </label>
+          <label className="field">
+            <span className="field-label">{t('transactions.category')}</span>
+            <select
+              className="field-select"
+              value={ruleDraft.category_id}
+              onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
+            >
+              <option value="">—</option>
+              {categories.items.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {categoryDisplayName(c, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">{t('transactions.rulePriority')}</span>
+            <div className="field-input">
+              <input
+                type="number"
+                value={ruleDraft.priority}
+                onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
+              />
+            </div>
+          </label>
+          <button className="btn" type="submit">
+            {t('transactions.addRule')}
+          </button>
+          <button className="btn secondary" type="button" onClick={applyRules}>
+            {t('transactions.applyRules')}
+          </button>
+        </form>
+      </details>
+
+      <details className="collapsible-panel">
+        <summary>{t('recurring.title')}</summary>
+        <p className="panel-subtitle">{t('recurring.hint')}</p>
+        {recurring.items.length === 0 ? (
+          <p className="empty-state">{t('recurring.none')}</p>
+        ) : (
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>{t('recurring.description')}</th>
+                  <th>{t('transactions.category')}</th>
+                  <th>{t('budget.planned')}</th>
+                  <th>{t('recurring.cadence')}</th>
+                  <th>{t('recurring.anchorDate')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {recurring.items.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.description}</td>
+                    <td>
+                      <span className="category-cell">
+                        <CategoryBadge category={categoryFor(r.category_id)} />
+                        {categoryName(r.category_id)}
+                      </span>
+                    </td>
+                    <td className="num">{formatMoney(r.amount)}</td>
+                    <td>{t(`freq.${r.cadence}`)}</td>
+                    <td>{r.anchor_date}</td>
+                    <td>
+                      <button className="btn ghost" onClick={() => removeRecurring(r)}>
+                        {t('budget.remove')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </details>
     </div>
   );
 }
