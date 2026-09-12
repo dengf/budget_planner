@@ -26,9 +26,12 @@ function writeRecord(record) {
  * gotten is visible without needing to have been watching live.
  *
  * `stage`/`wasmMemoryBytes` are only ever set for a Smart Parse model-load
- * failure -- which of GLM-OCR's models (`'embed'`/`'decoder'`) was loading,
- * and that module's own wasm linear memory size at the moment it failed
- * (see `ocrWorker.js`'s `taggedModelLoadError`). `null` for every other
+ * failure -- which of GLM-OCR's models was loading (`'embed'`/`'decoder'`
+ * for a chunk-download failure, `'embed-finish'`/`'decoder-finish'` for a
+ * failure during that model's own `finish()` call -- see `ocrWorker.js`'s
+ * `checkpointBeforeChunk` for why those are distinguished), and that
+ * module's own wasm linear memory size at the moment it failed (see
+ * `ocrWorker.js`'s `taggedModelLoadError`). `null` for every other
  * failure, including a Smart Parse failure that happens after loading
  * (generation) or a non-Smart-Parse OCR/PDF failure.
  */

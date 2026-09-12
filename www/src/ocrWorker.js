@@ -334,14 +334,24 @@ let nextCheckpointId = 1;
 const pendingCheckpointAcks = new Map();
 
 // Samples `wasm.exports.memory.buffer.byteLength` into `sample.bytes` and
-// posts it to the main thread as a checkpoint right before every chunk
-// append -- passed as `fetchDataFileIntoSession`'s `onBeforeChunk` hook --
-// then *awaits the main thread's ack* before letting the caller proceed to
-// the actual append that might trap or, worse, hard-crash the whole tab
-// with no catchable exception at all (see `recordReceiptCheckpoint`'s own
-// doc comment for why that case needs more than `taggedModelLoadError`'s
-// after-the-fact tagging). `sample.bytes` still feeds that fallback too,
-// for the ordinary catchable-trap case this worker already handled before.
+// posts it to the main thread as a checkpoint, then *awaits the main
+// thread's ack* before letting the caller proceed to whatever risky step
+// comes next -- a chunk append (passed as `fetchDataFileIntoSession`'s
+// `onBeforeChunk` hook, stage `'embed'`/`'decoder'`) or a model's own
+// `finish()` call (invoked directly, stage `'embed-finish'`/
+// `'decoder-finish'`) -- either of which might trap or, worse, hard-crash
+// the whole tab with no catchable exception at all (see
+// `recordReceiptCheckpoint`'s own doc comment for why that case needs more
+// than `taggedModelLoadError`'s after-the-fact tagging). The `-finish`
+// checkpoints exist because `begin_data` reserves a model's *entire*
+// buffer upfront (`Vec::with_capacity`, see `smart_parse_model.rs`), so a
+// chunk-append checkpoint's `wasmMemoryBytes` plateaus almost immediately
+// and stays flat regardless of how much of the file has actually
+// downloaded -- it can't tell a crash during the download apart from one
+// during `finish()`'s own `rten` graph construction, which is real,
+// separate allocation work the chunk checkpoints have no visibility into.
+// `sample.bytes` still feeds the catchable-trap fallback too, for the
+// ordinary case this worker already handled before.
 function checkpointBeforeChunk(id, stage, wasm, sample) {
   return () => {
     try {
@@ -375,6 +385,7 @@ function loadGlmOcrModels(track, id) {
           track,
           checkpointBeforeChunk(id, 'embed', embedWasm, embedMemorySample),
         );
+        await checkpointBeforeChunk(id, 'embed-finish', embedWasm, embedMemorySample)();
         throwIfLoadError(embed.finish());
       } catch (err) {
         throw taggedModelLoadError(err, 'embed', embedWasm, embedMemorySample.bytes);
@@ -390,6 +401,7 @@ function loadGlmOcrModels(track, id) {
           track,
           checkpointBeforeChunk(id, 'decoder', decoderWasm, decoderMemorySample),
         );
+        await checkpointBeforeChunk(id, 'decoder-finish', decoderWasm, decoderMemorySample)();
         throwIfLoadError(decoder.finish(graph));
       } catch (err) {
         throw taggedModelLoadError(err, 'decoder', decoderWasm, decoderMemorySample.bytes);
