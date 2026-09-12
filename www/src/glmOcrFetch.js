@@ -199,8 +199,17 @@ export async function fetchContentLength(url) {
 async function fetchDataChunkCached(url, start, end) {
   const cache = await caches.open(GLM_OCR_CACHE_NAME);
   const chunkKey = `${url}#bytes=${start}-${end}`;
+  const expectedLength = end - start + 1;
   const cached = await cache.match(chunkKey);
-  if (cached) return new Uint8Array(await cached.arrayBuffer());
+  if (cached) {
+    const bytes = new Uint8Array(await cached.arrayBuffer());
+    if (bytes.byteLength === expectedLength) return bytes;
+    // A cached body that doesn't match the range its own key names is
+    // poisoned -- drop it and re-fetch, or every future scan on this
+    // device replays the same bad chunk (Cache Storage outlives a reload,
+    // so nothing else would ever evict it).
+    await cache.delete(chunkKey).catch(() => {});
+  }
 
   const bytes = await withTransientFetchRetry(async () => {
     const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
@@ -209,7 +218,22 @@ async function fetchDataChunkCached(url, start, end) {
         `expected a 206 Partial Content response to a ranged request for ${url}, got ${res.status}`,
       );
     }
-    return new Uint8Array(await res.arrayBuffer());
+    const body = new Uint8Array(await res.arrayBuffer());
+    if (body.byteLength < expectedLength) {
+      throw new Error(
+        `ranged request for ${url} bytes=${start}-${end} returned ${body.byteLength} of ${expectedLength} bytes`,
+      );
+    }
+    // A 206 body longer than the range it was asked for is malformed, but
+    // it does happen: a real device took a full 32MiB for a final
+    // 2,557,952-byte tail request, which used to overrun the session's
+    // exactly-sized staging buffer and cost ~600MB in `Vec` realloc
+    // doubling (see `budget_calc::smart_parse_model`'s `StagingBuffer`).
+    // The leading `expectedLength` bytes still start at `start`, so
+    // copying just those keeps the download correct -- and `.slice`, not
+    // `.subarray`, so the oversized buffer is released rather than kept
+    // alive by a view into it.
+    return body.byteLength === expectedLength ? body : body.slice(0, expectedLength);
   });
   try {
     await cache.put(chunkKey, new Response(bytes));

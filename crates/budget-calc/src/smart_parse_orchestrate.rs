@@ -40,7 +40,37 @@ const MERGE_SIZE: i64 = 2;
 const TEMPORAL_PATCH_SIZE: i64 = 2;
 const FACTOR: i64 = PATCH_SIZE * MERGE_SIZE;
 const MIN_PIXELS: i64 = 112 * 112;
-const MAX_PIXELS: i64 = 14 * 14 * 2 * 2 * 2 * 6144;
+/// GLM-OCR's processor defaults to `... * 6144` here -- 6,144 merged
+/// vision tokens, so 24,576 patches. That is not reachable on wasm32 at
+/// all, and not for a memory-budget reason: the vision encoder attends
+/// over the *patch* sequence, so its attention matrix is `patches^2`
+/// f32s, and `Vec` refuses any allocation past `isize::MAX` bytes. At
+/// 24,576 patches that matrix is 2.4GB against a 2GiB hard ceiling, so a
+/// full-resolution phone photo traps with `capacity overflow` in
+/// `raw_vec` before memory pressure is even the question (reproduced
+/// locally at 24,120 patches -- see `smart_parse_model`'s own doc comment
+/// for the crash generations that preceded this one).
+///
+/// Measured on this exact model, varying only the image size (wasm,
+/// `simd128`, single-threaded), peak is `VisionEncoder`'s own module
+/// memory and time is one `encode` call:
+///
+/// | patches | tokens | peak | encode |
+/// |---|---|---|---|
+/// | 320 | 80 | 348MB | 27.8s |
+/// | 1,216 | 304 | 432MB | 107.4s |
+/// | 2,392 | 598 | 549MB | 245.8s |
+/// | 4,920 | 1,230 | 889MB | 711.1s |
+///
+/// 640 tokens (2,560 patches) is where that stops being reckless on both
+/// axes: ~560MB leaves real headroom under the ~1GB a tab has actually
+/// died at here, and the quadratic attention term hasn't yet taken over
+/// from the linear ~0.087s/patch cost. It is *not* a comfortable number
+/// -- a scan at this size is minutes, because the quantized matmul the
+/// whole pipeline leans on has no wasm SIMD kernel and runs scalar (see
+/// `smart_parse_model`'s own doc comment). Raise this once that is fixed,
+/// against fresh measurements rather than by guessing.
+const MAX_PIXELS: i64 = 14 * 14 * 2 * 2 * 2 * 640;
 
 // OpenAI CLIP normalization constants -- this image processor's own
 // `image_mean`/`image_std` defaults.

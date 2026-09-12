@@ -94,6 +94,41 @@
 //! memory -- *before* `loadGlmOcrModels` ever loads embed/decoder, on
 //! every fresh worker's first scan. See that function's own doc comment.
 //!
+//! That reordering worked -- vision then downloaded and `finish`ed
+//! cleanly for the first time -- and the next checkpoint moved to
+//! `"vision-encode"`, with one number that didn't fit anything above:
+//! 948,633,600 bytes of wasm memory where loading the very same file
+//! locally measures 323.8MB. The download counter explained it. It read
+//! 335,969,017 for a graph plus data totalling 304,972,537, exactly
+//! 30,996,480 too many -- which is exactly the difference between a full
+//! 32MiB chunk and the 2,557,952-byte tail the last range request should
+//! have returned. One over-long chunk overran `begin_data`'s
+//! exactly-sized reservation, and `Vec`'s doubling then held the old
+//! 304,547,840-byte buffer and a new 609,095,680-byte one at the same
+//! time: 913,643,520, plus the 32MiB chunk itself and ~1.4MB of module
+//! baseline, is the 948,633,600 that was recorded. `StagingBuffer` below
+//! refuses the overrun rather than absorbing it, and
+//! `fetchDataChunkCached` in `www/src/glmOcrFetch.js` trims an over-long
+//! range response (and evicts a cached one) before it ever gets here.
+//!
+//! Fixing the memory ceilings finally let vision *run*, which exposed
+//! what they had been hiding: it is far too slow. One `encode` at 598
+//! vision tokens takes 245.8s in wasm against 43.7s natively
+//! single-threaded -- 5.6x, which is not a SIMD-width difference. The
+//! cause is that `rten-gemm`'s `i8dot.rs` implements its int8 dot-product
+//! kernel for `aarch64` and `x86_64` only; wasm32 falls through to
+//! `GenericInt8Dot`, which declares `const SIMD: bool = false` and sums
+//! products element by element. So the `MatMulNBits` path both this
+//! module's quantized models depend on runs *scalar* on the phone, and
+//! this crate's `.cargo/config.toml` `simd128` flag -- added after the
+//! same class of bug was found on the float OCR path -- never reaches it.
+//!
+//! Measured rten thread scaling on the same model is 3.17x at 4 threads
+//! (43.7s -> 13.8s natively, plateauing at 6 physical cores), so a wasm
+//! SIMD int8 kernel and wasm threads are worth roughly 5.6x and 3.2x
+//! respectively, and they compose. Neither is done yet; `MAX_PIXELS` in
+//! `smart_parse_orchestrate` is capped low in the meantime.
+//!
 //! `TokenEmbedder` doesn't go through `rten` at all, though, avoiding the
 //! problem rather than working around it: its ONNX graph is nothing more
 //! than a `Gather` over one weight tensor followed by a `Cast` to f32 --
@@ -173,6 +208,75 @@ struct VisionNodes {
     output: NodeId,
 }
 
+/// Fixed-capacity staging area for one model's external-data file,
+/// filled chunk by chunk from JS (see `fetchDataFileIntoSession` in
+/// `www/src/glmOcrFetch.js`).
+///
+/// The capacity `begin` reserves is load-bearing, not an optimization.
+/// `Vec` grows by *doubling*: a chunk that overruns the reservation
+/// allocates a second buffer twice the size and copies the first into
+/// it, holding both at once. A real device hit exactly that -- the final
+/// range request for vision's 2,557,952-byte tail came back a full 32MiB
+/// instead, 30,996,480 bytes too many, turning a 290MB buffer into a
+/// ~913MB realloc spike (948,633,600 bytes of wasm memory recorded in a
+/// pre-crash checkpoint, against the 323.8MB a clean load of the same
+/// file measures) and leaving `encode` no headroom left to run in.
+///
+/// So an overrun is refused here rather than absorbed, and `take`
+/// reports it: a mis-sized download fails loudly at load time instead of
+/// silently costing three times the memory it should. `take` also
+/// rejects an *under*-filled buffer, which would otherwise load a
+/// truncated weight file as though it were whole -- wrong output rather
+/// than a crash, and nothing downstream would catch it.
+#[derive(Default)]
+struct StagingBuffer {
+    bytes: Vec<u8>,
+    capacity: usize,
+    overran: bool,
+}
+
+impl StagingBuffer {
+    fn begin(&mut self, total_len: usize) {
+        self.bytes = Vec::with_capacity(total_len);
+        self.capacity = total_len;
+        self.overran = false;
+    }
+
+    fn append(&mut self, chunk: &[u8]) {
+        if self.bytes.len() + chunk.len() > self.capacity {
+            self.overran = true;
+            return;
+        }
+        self.bytes.extend_from_slice(chunk);
+    }
+
+    /// Takes the completed buffer, leaving this staging area empty --
+    /// the bytes are released here even on the error paths, so a failed
+    /// load doesn't strand a several-hundred-MB allocation.
+    fn take(&mut self, file: &str) -> Result<Vec<u8>, BudgetError> {
+        let filled = self.bytes.len();
+        let expected = self.capacity;
+        let overran = self.overran;
+        let bytes = std::mem::take(&mut self.bytes);
+        self.capacity = 0;
+        self.overran = false;
+
+        if overran {
+            drop(bytes);
+            return Err(BudgetError::SmartParseModelLoadFailed(format!(
+                "{file} delivered more bytes than its declared length of {expected}"
+            )));
+        }
+        if filled != expected {
+            drop(bytes);
+            return Err(BudgetError::SmartParseModelLoadFailed(format!(
+                "{file} is incomplete: {filled} of {expected} bytes"
+            )));
+        }
+        Ok(bytes)
+    }
+}
+
 /// GLM-OCR's vision encoder: patchified pixels + grid dims in, one flat
 /// image-feature buffer out. Loaded incrementally the same way as every
 /// other lazy wasm model in this app -- `begin_data`/`append_data_chunk`
@@ -183,7 +287,7 @@ struct VisionNodes {
 pub struct VisionEncoder {
     model: Option<LoadedModel>,
     nodes: Option<VisionNodes>,
-    staging: Vec<u8>,
+    staging: StagingBuffer,
 }
 
 impl VisionEncoder {
@@ -192,11 +296,11 @@ impl VisionEncoder {
     }
 
     pub fn begin_data(&mut self, total_len: usize) {
-        self.staging = Vec::with_capacity(total_len);
+        self.staging.begin(total_len);
     }
 
     pub fn append_data_chunk(&mut self, chunk: &[u8]) {
-        self.staging.extend_from_slice(chunk);
+        self.staging.append(chunk);
     }
 
     /// Finishes loading and resolves every `NodeId` this model needs up
@@ -205,7 +309,7 @@ impl VisionEncoder {
     /// `TokenEmbedder`/`DecoderSession`, where it matters far more (see
     /// their own doc comments).
     pub fn finish(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
-        let data = std::mem::take(&mut self.staging);
+        let data = self.staging.take("vision_encoder_q4.onnx_data")?;
         let model = LoadedModel::load(graph, "vision_encoder_q4.onnx_data", data)?;
         let nodes = VisionNodes {
             pixel_values: model.node("pixel_values")?,
@@ -316,7 +420,7 @@ fn f16_to_f32(bits: u16) -> f32 {
 #[derive(Default)]
 pub struct TokenEmbedder {
     weights: Vec<u8>,
-    staging: Vec<u8>,
+    staging: StagingBuffer,
 }
 
 impl TokenEmbedder {
@@ -325,15 +429,15 @@ impl TokenEmbedder {
     }
 
     pub fn begin_data(&mut self, total_len: usize) {
-        self.staging = Vec::with_capacity(total_len);
+        self.staging.begin(total_len);
     }
 
     pub fn append_data_chunk(&mut self, chunk: &[u8]) {
-        self.staging.extend_from_slice(chunk);
+        self.staging.append(chunk);
     }
 
     pub fn finish(&mut self) -> Result<(), BudgetError> {
-        let data = std::mem::take(&mut self.staging);
+        let data = self.staging.take("embed_tokens_fp16.onnx_data")?;
         if !data.len().is_multiple_of(HIDDEN_SIZE * 2) {
             return Err(BudgetError::SmartParseModelLoadFailed(
                 "embed_tokens weight file size is not a whole number of rows".into(),
@@ -398,7 +502,7 @@ struct DecoderNodes {
 pub struct DecoderSession {
     model: Option<LoadedModel>,
     nodes: Option<DecoderNodes>,
-    staging: Vec<u8>,
+    staging: StagingBuffer,
     past: Vec<(Tensor<f32>, Tensor<f32>)>,
 }
 
@@ -408,15 +512,15 @@ impl DecoderSession {
     }
 
     pub fn begin_data(&mut self, total_len: usize) {
-        self.staging = Vec::with_capacity(total_len);
+        self.staging.begin(total_len);
     }
 
     pub fn append_data_chunk(&mut self, chunk: &[u8]) {
-        self.staging.extend_from_slice(chunk);
+        self.staging.append(chunk);
     }
 
     pub fn finish(&mut self, graph: Vec<u8>) -> Result<(), BudgetError> {
-        let data = std::mem::take(&mut self.staging);
+        let data = self.staging.take("decoder_model_merged_q4.onnx_data")?;
         // `_q4`, not `_fp16` -- see this module's own doc comment for why
         // the decoder specifically loads GLM-OCR's quantized export.
         let model = LoadedModel::load(graph, "decoder_model_merged_q4.onnx_data", data)?;
@@ -615,5 +719,58 @@ mod tests {
         embedder.begin_data(weights.len());
         embedder.append_data_chunk(&weights);
         assert!(embedder.finish().is_err());
+    }
+
+    /// The invariant the whole chunked-download design rests on: an
+    /// over-long chunk must never make the buffer reallocate, because
+    /// `Vec`'s doubling would briefly hold two multi-hundred-MB buffers
+    /// at once -- see `StagingBuffer`'s own doc comment for the real
+    /// device this was measured on.
+    #[test]
+    fn staging_never_reallocates_when_a_chunk_overruns_its_reservation() {
+        let mut staging = StagingBuffer::default();
+        staging.begin(8);
+        let capacity_before = staging.bytes.capacity();
+
+        staging.append(&[1, 2, 3, 4]);
+        staging.append(&[5, 6, 7, 8, 9]); // one byte too many
+
+        assert_eq!(staging.bytes.capacity(), capacity_before);
+        assert_eq!(staging.bytes.len(), 4, "the overrunning chunk is refused");
+        assert!(staging.take("test.onnx_data").is_err());
+    }
+
+    #[test]
+    fn staging_accepts_chunks_that_exactly_fill_the_reservation() {
+        let mut staging = StagingBuffer::default();
+        staging.begin(6);
+        staging.append(&[1, 2, 3, 4]);
+        staging.append(&[5, 6]);
+
+        assert_eq!(
+            staging.take("test.onnx_data").unwrap(),
+            vec![1, 2, 3, 4, 5, 6]
+        );
+    }
+
+    #[test]
+    fn staging_rejects_an_under_filled_buffer() {
+        let mut staging = StagingBuffer::default();
+        staging.begin(6);
+        staging.append(&[1, 2, 3]);
+
+        assert!(staging.take("test.onnx_data").is_err());
+    }
+
+    #[test]
+    fn staging_is_reusable_after_a_failed_take() {
+        let mut staging = StagingBuffer::default();
+        staging.begin(4);
+        staging.append(&[1, 2, 3, 4, 5]);
+        assert!(staging.take("test.onnx_data").is_err());
+
+        staging.begin(2);
+        staging.append(&[7, 8]);
+        assert_eq!(staging.take("test.onnx_data").unwrap(), vec![7, 8]);
     }
 }
