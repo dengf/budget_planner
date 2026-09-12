@@ -17,21 +17,25 @@
 // browser's ordinary HTTP cache) so a second use, even in a later
 // session, doesn't re-download 2.2GB.
 export const GLM_OCR_BASE = 'https://huggingface.co/onnx-community/GLM-OCR-ONNX/resolve/main';
-// The decoder fetches GLM-OCR's 4-bit-quantized (`_q4`) export, not the
-// fp16 one vision still uses below -- see `budget_calc::smart_parse_model`'s
-// own doc comment for why: it's the one model whose fp16-doubled memory
-// footprint was actually trapping real iOS Safari tabs, and rten's
-// `MatMulNBits` operator (this export's quantization scheme) reads its
-// weights as native `u8` blocks rather than upconverting them, so this
-// file's on-disk size (~373MB) is close to its real resident footprint
-// too, unlike fp16's ~2x blowup.
+// Vision and the decoder both fetch GLM-OCR's 4-bit-quantized (`_q4`)
+// exports rather than its fp16 ones -- see
+// `budget_calc::smart_parse_model`'s own doc comment for why: `rten`
+// upconverts fp16 weights to f32 at load time, roughly doubling each
+// model's resident memory over its on-disk size, and these two are large
+// enough that the doubling was killing real iOS Safari tabs outright.
+// `MatMulNBits` (these exports' quantization scheme) reads its weights as
+// native `u8` blocks instead, so each file's on-disk size (~290MB vision,
+// ~373MB decoder) is close to its real resident footprint too.
 //
 // `embedData` has no matching `embedGraph` -- `TokenEmbedder` doesn't
 // parse an ONNX graph at all (see `budget_calc::smart_parse_model`'s own
-// doc comment), just this file's raw fp16 weight bytes directly.
+// doc comment), just this file's raw fp16 weight bytes directly. It stays
+// on fp16 because its quantized export uses `GatherBlockQuantized`, an
+// operator `rten` doesn't implement -- moot now that nothing upconverts
+// it anyway.
 export const GLM_OCR_MODEL_PATHS = {
-  visionGraph: `${GLM_OCR_BASE}/onnx/vision_encoder_fp16.onnx`,
-  visionData: `${GLM_OCR_BASE}/onnx/vision_encoder_fp16.onnx_data`,
+  visionGraph: `${GLM_OCR_BASE}/onnx/vision_encoder_q4.onnx`,
+  visionData: `${GLM_OCR_BASE}/onnx/vision_encoder_q4.onnx_data`,
   embedData: `${GLM_OCR_BASE}/onnx/embed_tokens_fp16.onnx_data`,
   decoderGraph: `${GLM_OCR_BASE}/onnx/decoder_model_merged_q4.onnx`,
   decoderData: `${GLM_OCR_BASE}/onnx/decoder_model_merged_q4.onnx_data`,
