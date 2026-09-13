@@ -1,22 +1,16 @@
 //! Lazily-loaded WebAssembly bindings for rasterizing a PDF page to pixels.
 //!
-//! A fourth independent lazy wasm module, alongside `budget-wasm-ocr`,
-//! `budget-wasm-pdf` and Smart Parse's own `budget-wasm-glmocr-vision`/
-//! `-embed`/`-decoder`/`-orchestrate` crates -- see this repo's own
-//! CLAUDE.md for why each heavy, rarely-used capability gets its own
-//! crate rather than growing one shared one. `hayro` (a pure-Rust PDF
-//! interpreter/rasterizer) is only reachable from `budget-calc`'s
-//! `pdf-render` feature, which only this crate enables, so a session that
-//! never touches a PDF -- and a PDF session whose file already has a text
-//! layer and doesn't need Smart Parse -- never downloads it.
+//! A fourth independent lazy wasm module, alongside `budget-wasm-ocr` and
+//! `budget-wasm-pdf` -- see this repo's own CLAUDE.md for why each heavy,
+//! rarely-used capability gets its own crate rather than growing one
+//! shared one. `hayro` (a pure-Rust PDF interpreter/rasterizer) is only
+//! reachable from `budget-calc`'s `pdf-render` feature, which only this
+//! crate enables, so a session whose PDF already has a text layer never
+//! downloads it.
 //!
 //! `www/src/ocrWorker.js` `import()`s this crate's own `pkg-pdfrender`
 //! output only when a PDF page actually needs rasterizing: a scanned PDF
-//! with no text layer, or any PDF page when Smart Parse is turned on
-//! (Smart Parse's GLM-OCR reads pixels, not `pdf-extract`'s heuristic
-//! text, on the theory that vision-based extraction is more accurate than
-//! text-layer heuristics for the same reason it was worth adding for
-//! photographed receipts in the first place).
+//! with no text layer.
 //!
 //! No business logic lives in this crate either -- `pdf_page_count` and
 //! `render_pdf_page` parse bytes, call into `budget-calc`, and serialize

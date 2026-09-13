@@ -21,10 +21,6 @@ pub mod presets;
 pub mod receipt;
 pub mod recurring;
 pub mod rules;
-#[cfg(feature = "smart-parse-model")]
-pub mod smart_parse_model;
-#[cfg(feature = "smart-parse-orchestrate")]
-pub mod smart_parse_orchestrate;
 pub mod transaction;
 
 pub use category::{
@@ -55,14 +51,6 @@ pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };
 pub use rules::{apply_rules, CategorizationRule};
-#[cfg(feature = "smart-parse-model")]
-pub use smart_parse_model::{DecoderSession, TokenEmbedder, VisionEncoder};
-#[cfg(feature = "smart-parse-orchestrate")]
-pub use smart_parse_orchestrate::{
-    advance_position_ids, argmax, build_input_ids, build_input_ids_from_json, decode_tokens,
-    get_rope_index, is_eos, patch_grid, patchify, splice_image_features, HIDDEN_SIZE,
-    MAX_NEW_TOKENS,
-};
 pub use transaction::{
     daily_spend, income_by_category, spend_by_category, weekly_spend, Transaction,
 };

@@ -18,10 +18,6 @@ members = [
     "crates/budget-wasm-pdf",
     "crates/budget-wasm-pdfrender",
     "crates/budget-wasm-llm",
-    "crates/budget-wasm-glmocr-vision",
-    "crates/budget-wasm-glmocr-embed",
-    "crates/budget-wasm-glmocr-decoder",
-    "crates/budget-wasm-glmocr-orchestrate",
 ]
 resolver = "2"
 
@@ -68,9 +64,7 @@ unnested_or_patterns = "warn"
 # never `f64` (CLAUDE.md's rule, and the reason `Decimal` has no NaN), so
 # the lint has no money-path bugs to catch here. What it did find was
 # every bit-exact fp16-conversion and fixed-fixture-value test in the
-# Smart Parse crates -- `assert_eq!(f16_to_f32(0x3C00), 1.0)` is exactly
-# right, not a rounding-tolerance bug, and there are enough of those
-# tests that suppressing it per-site would be noise, not signal.
+# embedding-classifier's ONNX plumbing -- not a rounding-tolerance bug.
 lossy_float_literal = "warn"
 # A silently-swallowed `Result` in a persistence or parse path is how a
 # budgeting tool ends up confidently wrong rather than visibly broken.
@@ -104,17 +98,13 @@ chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 pdf-extract = { path = "vendor/pdf-extract-0.12.0" }
 
 # The ML runtimes are the one exception to the size-first profile below, and
-# they are compiled for speed instead. They ride in the lazy `pkg-glmocr-*`,
-# `pkg-ocr` and `pkg-pdfrender` modules, never in the always-downloaded
-# `pkg/budget_wasm_bg.wasm`, so the extra code size is paid only by a session
-# that actually scans something -- and that session is the one that cares.
-#
-# Measured on GLM-OCR's vision encoder, 2,392 patches, Node/wasm, one thread:
-# 245.8s at `opt-level = "z"` against 146.0s here. `"z"` was costing 40% of
-# every Smart Parse scan, on a path that already takes minutes. The comment
-# below ("nothing here is compute-bound") was written before Smart Parse
-# existed and is no longer true of these crates: they run a 0.9B-parameter
-# vision-language model's matmul inner loops.
+# they are compiled for speed instead. They ride in the lazy `pkg-ocr` and
+# `pkg-llm` modules, never in the always-downloaded `pkg/budget_wasm_bg.wasm`,
+# so the extra code size is paid only by a session that actually scans
+# something -- and that session is the one that cares. The comment below
+# ("nothing here is compute-bound") is about the budgeting math everywhere
+# else in this workspace; OCR/classification inference is the one real
+# exception to it.
 [profile.release.package.rten]
 opt-level = 3
 [profile.release.package.rten-base]

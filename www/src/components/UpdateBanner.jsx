@@ -8,7 +8,7 @@ import { reloadOnto } from '../version-check';
  *
  * `startVersionCheck` already reloads silently once the tab is hidden and
  * nothing is in flight (see that file's own doc comment for the one
- * exception -- an in-flight Smart Parse scan). But a tab that stays open
+ * exception -- an in-flight receipt extraction). But a tab that stays open
  * and focused (exactly the state someone watching for their own deploy is
  * in) never hits that path, and without this banner the check finds the
  * new version and does nothing visible at all: stuck on stale content

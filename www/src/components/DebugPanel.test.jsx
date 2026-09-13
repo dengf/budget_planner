@@ -22,9 +22,7 @@ describe('DebugPanel', () => {
   it('shows the recorded failure as readable JSON', () => {
     vi.spyOn(breadcrumb, 'readLastReceiptFailure').mockReturnValue({
       message: 'boom',
-      progressPhase: 'download',
-      progressLoadedBytes: 12345,
-      smartParseEnabled: true,
+      progress: { phase: 'page', page: 2, totalPages: 5 },
       hiddenAtFailure: true,
       timestamp: '2026-09-11T00:00:00.000Z',
     });
@@ -32,7 +30,7 @@ describe('DebugPanel', () => {
     render(<DebugPanel />);
 
     expect(screen.getByText(/"message": "boom"/)).toBeInTheDocument();
-    expect(screen.getByText(/"progressLoadedBytes": 12345/)).toBeInTheDocument();
+    expect(screen.getByText(/"totalPages": 5/)).toBeInTheDocument();
   });
 
   it('copies the JSON to the clipboard on request', async () => {

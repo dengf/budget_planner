@@ -9,12 +9,9 @@
 //! this dependency, same discipline as every other engine in this app.
 //!
 //! Output is plain RGB (no alpha), the exact same shape `ocr::run_ocr`
-//! and `smart_parse::SmartParseSession::run` already expect from a
-//! photographed image -- a rendered PDF page is just another image to
-//! either engine, so this module adds no new OCR pipeline, only a new
-//! way to produce pixels the existing ones already accept.
-//! `www/src/receiptCapture.js` is what actually chooses which engine
-//! reads the rendered page.
+//! already expects from a photographed image -- a rendered PDF page is
+//! just another image to that engine, so this module adds no new OCR
+//! pipeline, only a new way to produce pixels it already accepts.
 //!
 //! Rendered at a fixed 200 DPI (`RENDER_DPI`) rather than reading the
 //! PDF's own resolution hints -- a PDF page has no inherent pixel density

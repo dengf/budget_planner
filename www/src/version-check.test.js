@@ -109,9 +109,9 @@ describe('startVersionCheck', () => {
   });
 
   it('defers to onStale instead of reloading a hidden tab while busy', async () => {
-    // The real-device regression this covers: a Smart Parse download in
+    // The real-device regression this covers: a receipt extraction in
     // flight, tab briefly backgrounded, page silently reloaded and lost
-    // the whole download with no error at all.
+    // whatever had been read so far with no error at all.
     setHidden(true);
     const onStale = vi.fn();
     stop = startVersionCheck({ onStale, isBusy: () => true });
