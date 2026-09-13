@@ -22,6 +22,9 @@ pub mod receipt;
 pub mod recurring;
 pub mod rules;
 pub mod transaction;
+#[cfg(feature = "voice")]
+pub mod voice;
+pub mod voice_parse;
 
 pub use category::{
     build_month, build_savings_line, summarize_month, Category, CategoryLine, MonthSummary,
@@ -54,3 +57,6 @@ pub use rules::{apply_rules, CategorizationRule};
 pub use transaction::{
     daily_spend, income_by_category, spend_by_category, weekly_spend, Transaction,
 };
+#[cfg(feature = "voice")]
+pub use voice::transcribe_voice_command;
+pub use voice_parse::{parse_voice_command, VoiceCategoryCandidate, VoiceDraft};

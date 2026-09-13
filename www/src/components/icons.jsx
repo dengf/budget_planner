@@ -40,6 +40,16 @@ export function PdfIcon() {
   );
 }
 
+export function MicIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3M9 21h6" />
+    </svg>
+  );
+}
+
 export function SpreadsheetIcon() {
   return (
     <svg {...ICON_PROPS}>

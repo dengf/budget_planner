@@ -80,4 +80,10 @@ describe('AddTransactionSheet manual entry', () => {
       'true',
     );
   });
+
+  it('offers a Voice tab that shows the mic control without touching the microphone until tapped', () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole('tab', { name: 'Voice' }));
+    expect(screen.getByRole('button', { name: 'Tap to speak' })).toBeInTheDocument();
+  });
 });
