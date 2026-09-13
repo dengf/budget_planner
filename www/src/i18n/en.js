@@ -227,14 +227,6 @@ export default {
   'transactions.receiptIncomeHint': 'Looks like a refund or credit — check the sign on the amount.',
   'transactions.receiptExtractFailed':
     "Couldn't read that file. Try a clearer photo or a different file.",
-  'transactions.smartParseToggle': 'Smart Parse (beta)',
-  'transactions.smartParseHint':
-    'Reads photos and PDFs far more accurately using a bigger AI model, still entirely on your device. Downloads about {size} from Hugging Face the first time — best on Wi-Fi. Cached afterwards, so it only downloads once.',
-  'transactions.smartParseDownloading':
-    'Downloading Smart Parse model… {percent}% ({loaded} of {total})',
-  'transactions.smartParseRunning': 'Reading with Smart Parse…',
-  'transactions.smartParseEncoding': 'Looking at the image… this takes a few minutes.',
-  'transactions.smartParseGenerating': 'Writing out what it read… {tokens} characters so far.',
   'transactions.statementReviewHint':
     '{count} transactions found — check dates, amounts and categories before adding.',
   'transactions.statementRowInclude': 'Add this one',
@@ -347,10 +339,6 @@ export default {
   'err.embedModelLoadFailed': "The classification model couldn't load ({value}).",
   'err.embedTokenizerLoadFailed': "The classification tokenizer couldn't load ({value}).",
   'err.embedClassifyFailed': "Couldn't classify a row ({value}).",
-  'err.smartParseModelLoadFailed': "Smart Parse's model couldn't load ({value}). Try again.",
-  'err.smartParseTokenizerLoadFailed': "Smart Parse's tokenizer couldn't load ({value}).",
-  'err.smartParseFailed':
-    "Smart Parse couldn't read that image ({value}). Try again or turn Smart Parse off.",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.importFailed': "Couldn't read that file. Try again.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",

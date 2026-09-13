@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   recordReceiptFailure,
-  recordReceiptCheckpoint,
   recordReceiptSuccess,
   readLastReceiptFailure,
 } from './receiptFailureBreadcrumb';
@@ -32,101 +31,46 @@ describe('receiptFailureBreadcrumb', () => {
     expect(readLastReceiptFailure()).toBeNull();
   });
 
-  it('round-trips a recorded failure, including download progress', () => {
+  it('round-trips a recorded failure, including page-read progress', () => {
     recordReceiptFailure({
       message: 'boom',
-      progress: { phase: 'download', loadedBytes: 12345 },
-      smartParseEnabled: true,
+      progress: { phase: 'page', page: 2, totalPages: 5 },
     });
 
     const record = readLastReceiptFailure();
     expect(record).toMatchObject({
       message: 'boom',
-      progressPhase: 'download',
-      progressLoadedBytes: 12345,
-      smartParseEnabled: true,
+      progress: { phase: 'page', page: 2, totalPages: 5 },
     });
     expect(typeof record.timestamp).toBe('string');
   });
 
-  it('records a null progress as null fields rather than crashing', () => {
-    recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false });
+  it('records a null progress as null rather than crashing', () => {
+    recordReceiptFailure({ message: 'boom', progress: null });
 
-    expect(readLastReceiptFailure()).toMatchObject({
-      progressPhase: null,
-      progressLoadedBytes: null,
-    });
-  });
-
-  it('records which model was loading and its wasm memory size, when known', () => {
-    recordReceiptFailure({
-      message: 'Unreachable code should not be executed',
-      progress: { phase: 'download', loadedBytes: 201650415 },
-      smartParseEnabled: true,
-      stage: 'decoder',
-      wasmMemoryBytes: 2214592512,
-    });
-
-    expect(readLastReceiptFailure()).toMatchObject({
-      stage: 'decoder',
-      wasmMemoryBytes: 2214592512,
-    });
-  });
-
-  it('records stage and wasmMemoryBytes as null when not a model-load failure', () => {
-    recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false });
-
-    expect(readLastReceiptFailure()).toMatchObject({
-      stage: null,
-      wasmMemoryBytes: null,
-    });
+    expect(readLastReceiptFailure()).toMatchObject({ progress: null });
   });
 
   it('overwrites the previous record rather than accumulating', () => {
-    recordReceiptFailure({ message: 'first', progress: null, smartParseEnabled: false });
-    recordReceiptFailure({ message: 'second', progress: null, smartParseEnabled: false });
+    recordReceiptFailure({ message: 'first', progress: null });
+    recordReceiptFailure({ message: 'second', progress: null });
 
     expect(readLastReceiptFailure().message).toBe('second');
   });
 
   it('does not throw when localStorage is unavailable', () => {
     vi.stubGlobal('localStorage', undefined);
-    expect(() =>
-      recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false }),
-    ).not.toThrow();
+    expect(() => recordReceiptFailure({ message: 'boom', progress: null })).not.toThrow();
     expect(readLastReceiptFailure()).toBeNull();
   });
 
   it('tags a recorded failure with outcome "failed"', () => {
-    recordReceiptFailure({ message: 'boom', progress: null, smartParseEnabled: false });
+    recordReceiptFailure({ message: 'boom', progress: null });
     expect(readLastReceiptFailure()).toMatchObject({ outcome: 'failed' });
   });
 
-  it('records a checkpoint distinctly from a failure, including which model and its memory size', () => {
-    recordReceiptCheckpoint({
-      stage: 'decoder',
-      wasmMemoryBytes: 391168000,
-      progress: { phase: 'download', loadedBytes: 201650415 },
-      smartParseEnabled: true,
-    });
-
-    expect(readLastReceiptFailure()).toMatchObject({
-      outcome: 'checkpoint',
-      stage: 'decoder',
-      wasmMemoryBytes: 391168000,
-      progressPhase: 'download',
-      progressLoadedBytes: 201650415,
-      smartParseEnabled: true,
-    });
-  });
-
-  it('overwrites a lingering checkpoint/failure once the scan succeeds', () => {
-    recordReceiptCheckpoint({
-      stage: 'decoder',
-      wasmMemoryBytes: 1000,
-      progress: null,
-      smartParseEnabled: true,
-    });
+  it('overwrites a lingering failure once the scan succeeds', () => {
+    recordReceiptFailure({ message: 'boom', progress: null });
     recordReceiptSuccess();
 
     const record = readLastReceiptFailure();

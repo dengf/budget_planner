@@ -36,13 +36,3 @@ pure-Rust `rten` inference runtime.
 The full Apache License 2.0 text is included in
 `RUST-THIRD-PARTY-LICENSES.html` alongside every other Apache-2.0
 component this app uses.
-
-## Smart Parse: GLM-OCR (opt-in)
-
-Not vendored or committed to this repo. When a user explicitly opts in
-to Smart Parse and takes a scan, the browser fetches model weights
-directly from Hugging Face:
-<https://huggingface.co/onnx-community/GLM-OCR-ONNX>, which declares
-its own license as MIT in its model card metadata. Because this repo
-never copies or redistributes those bytes itself, no separate notice
-file is required here, but it's recorded for completeness.

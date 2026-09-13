@@ -9,14 +9,9 @@ import { readLastReceiptFailure } from '../receiptFailureBreadcrumb';
  * the one real diagnostic path when there's no Mac around for Safari's
  * remote Web Inspector.
  *
- * The record's `outcome` is one of `'checkpoint'` (written right before a
- * risky step, in case what follows is a hard OS-level tab kill rather than
- * a catchable exception -- see `recordReceiptCheckpoint`'s own doc
- * comment), `'failed'` (a catchable failure did happen, with `message`),
- * or `'succeeded'` (the last scan finished cleanly). A `'checkpoint'` with
- * a recent `timestamp` and no later `'failed'`/`'succeeded'` after it is
- * itself the diagnostic for that harder crash: the app never got a chance
- * to report anything past that point.
+ * The record's `outcome` is either `'failed'` (a catchable failure did
+ * happen, with `message`) or `'succeeded'` (the last scan finished
+ * cleanly).
  */
 export default function DebugPanel() {
   const [copied, setCopied] = useState(false);

@@ -1,12 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
-import {
-  classifyStatementDescriptions,
-  extractReceiptText,
-  isPdf,
-  smartParseReceiptFile,
-  SMART_PARSE_APPROX_TOTAL_BYTES,
-} from '../receiptCapture';
+import { classifyStatementDescriptions, extractReceiptText, isPdf } from '../receiptCapture';
 import CalcError from './CalcError';
 import CameraCapture from './CameraCapture';
 import DirectionWarning from './DirectionWarning';
@@ -18,15 +12,6 @@ import { recordReceiptFailure, recordReceiptSuccess } from '../receiptFailureBre
 import { readingStatus } from '../readingStatus';
 
 const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '' };
-
-// One decimal place is plenty for a download-progress readout -- nobody
-// needs "2.10 GB" over "2.1 GB" here, and a byte-exact figure would just
-// be noise given `SMART_PARSE_APPROX_TOTAL_BYTES` is itself an estimate.
-function formatBytes(bytes) {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
-  return `${(bytes / 1e3).toFixed(0)} KB`;
-}
 
 // A statement PDF (several transaction lines) needs at least two rows to
 // be worth a bulk-review screen instead of the single-draft form below --
@@ -63,17 +48,9 @@ export default function ReceiptCapture({
   const [isIncomeHint, setIsIncomeHint] = useState(false);
   const [calcError, setCalcError] = useState(null);
   const [statementRows, setStatementRows] = useState([]);
-  // Opt-in, not a default -- see `transactions.smartParseHint`, shown
-  // right next to this toggle: it names the ~2.2GB one-time download
-  // before anyone turns it on, per CLAUDE.md's "never state something
-  // that isn't true yet" -- there is no silent, surprise download here.
-  const [smartParseEnabled, setSmartParseEnabled] = useState(false);
-  // `{ phase: 'download', loadedBytes }` while Smart Parse's model is
-  // still being fetched, `{ phase: 'encode' }` while its vision encoder
-  // runs, `{ phase: 'generate', tokens }` while it writes out what it
-  // read, `{ phase: 'page', page, totalPages }` while a multi-page PDF is
-  // being rasterized and read one page at a time, or `null` when there's
-  // nothing more specific to report than "reading".
+  // `{ phase: 'page', page, totalPages }` while a multi-page PDF is being
+  // rasterized and read one page at a time, or `null` when there's nothing
+  // more specific to report than "reading".
   const [progress, setProgress] = useState(null);
   // Mirrors `progress`, read from `handleFile`'s catch block for
   // `recordReceiptFailure` -- that closure's own `progress` variable is
@@ -146,29 +123,22 @@ export default function ReceiptCapture({
     progressRef.current = null;
     setTruncated(null);
     setStatus('reading');
-    // Held for the whole extraction, including Smart Parse's multi-minute
-    // model download -- so a deploy landing mid-scan doesn't reload the
-    // page out from under it and silently discard everything downloaded
-    // so far (see version-check.js's own doc comment on why this matters
-    // even while the tab is hidden, not just while it's visible).
+    // Held for the whole extraction, so a deploy landing mid-scan doesn't
+    // reload the page out from under it (see version-check.js's own doc
+    // comment on why this matters even while the tab is hidden, not just
+    // while it's visible).
     beginActivity();
     const reportProgress = (p) => {
       progressRef.current = p;
       setProgress(p);
     };
     try {
-      // Smart Parse reads pixels for a PDF too now (rasterizing each page
-      // via `budget-wasm-pdfrender`), not just photographed receipts --
-      // see `smartParseReceiptFile`'s own doc comment for why that's true
-      // even for a PDF that already has a text layer.
       const {
         text,
         calcError: extractError,
         truncated: extractTruncated,
-      } = smartParseEnabled
-        ? await smartParseReceiptFile(file, reportProgress)
-        : await extractReceiptText(file, reportProgress);
-      reportProgress(null); // done either way; nothing left to report
+      } = await extractReceiptText(file, reportProgress);
+      reportProgress(null); // done; nothing left to report
       if (extractError) {
         setCalcError(extractError);
         setStatus('idle');
@@ -219,10 +189,10 @@ export default function ReceiptCapture({
     } catch (error) {
       // Surfaced only to the console, not the user -- the toast below
       // stays generic and translated either way. Before this, a failure
-      // here (a worker crash, a Smart Parse model-download error) left no
-      // trace anywhere: this `catch` had no error parameter at all, so a
-      // real iPhone report of this exact toast couldn't be diagnosed after
-      // the fact even with Safari's remote Web Inspector open on a retry.
+      // here (a worker crash) left no trace anywhere: this `catch` had no
+      // error parameter at all, so a real iPhone report of this exact
+      // toast couldn't be diagnosed after the fact even with Safari's
+      // remote Web Inspector open on a retry.
       console.error('Receipt extraction failed:', error);
       // Persisted separately from the console log above -- that one is
       // gone the instant the tab navigates away or gets killed, which is
@@ -232,9 +202,6 @@ export default function ReceiptCapture({
       recordReceiptFailure({
         message: error?.message ?? String(error),
         progress: progressRef.current,
-        smartParseEnabled,
-        stage: error?.smartParseStage,
-        wasmMemoryBytes: error?.smartParseWasmMemoryBytes,
       });
       setCalcError({ error: t('transactions.receiptExtractFailed') });
       setStatus('idle');
@@ -315,40 +282,12 @@ export default function ReceiptCapture({
               />
             </label>
           </div>
-          <label className="field field-check">
-            <input
-              type="checkbox"
-              checked={smartParseEnabled}
-              onChange={(e) => setSmartParseEnabled(e.target.checked)}
-              disabled={status === 'reading'}
-            />
-            <span>{t('transactions.smartParseToggle')}</span>
-          </label>
-          {smartParseEnabled && (
-            <p className="panel-subtitle">
-              {t('transactions.smartParseHint', {
-                size: formatBytes(SMART_PARSE_APPROX_TOTAL_BYTES),
-              })}
-            </p>
-          )}
         </>
       )}
 
       {status === 'reading' && (
         <p className="empty-state">
-          {(({ key, params }) =>
-            t(
-              key,
-              params && {
-                ...params,
-                // `readingStatus` deals in raw byte counts; only this layer
-                // knows the display locale, so formatting happens here.
-                ...(params.loadedBytes != null && {
-                  loaded: formatBytes(params.loadedBytes),
-                  total: formatBytes(params.totalBytes),
-                }),
-              },
-            ))(readingStatus(progress, smartParseEnabled))}
+          {(({ key, params }) => t(key, params))(readingStatus(progress))}
         </p>
       )}
       {calcError && <CalcError result={calcError} />}

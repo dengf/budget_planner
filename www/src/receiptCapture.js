@@ -1,8 +1,7 @@
 // Turns a picked receipt file into plain text: OCR (`budget-wasm-ocr`)
 // for a photographed receipt, `pdf-extract` (`budget-wasm-pdf`) for a
 // PDF's text layer, and `budget-wasm-pdfrender` (`hayro`) to rasterize a
-// PDF page to pixels for either OCR engine when there's no text layer to
-// read, or when Smart Parse is on and wants pixels regardless. This
+// PDF page to pixels for OCR when there's no text layer to read. This
 // module's own job is exactly the browser I/O nothing else can do: decode
 // an image via canvas (native, no library -- see CLAUDE.md's rule on
 // where a thing goes), read a PDF's bytes, and fetch this app's own
@@ -35,8 +34,6 @@
 // of either wasm module directly; see its own doc comment for the rest
 // of the story.
 
-import { recordReceiptCheckpoint } from './receiptFailureBreadcrumb';
-
 let worker = null;
 let nextId = 1;
 const pending = new Map();
@@ -45,51 +42,15 @@ function getWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./ocrWorker.js', import.meta.url));
   worker.onmessage = (event) => {
-    const { id, ok, result, error, stage, wasmMemoryBytes, progress, checkpoint, checkpointId } =
-      event.data;
-    // A checkpoint (see `ocrWorker.js`'s `checkpointBeforeChunk`) isn't
-    // routed through `pending` at all -- it's not a call settling, and it
-    // can arrive for an `id` whose call has already moved on (a retry
-    // after an earlier interruption). Written to `localStorage` here
-    // rather than in the worker itself, since a worker has no storage
-    // access of its own -- this is the one place that can. Acked
-    // synchronously right after the write so the worker's own await
-    // (blocking the actual risky chunk append) only resolves once this
-    // has genuinely landed, not just been sent.
-    if (checkpoint) {
-      recordReceiptCheckpoint({
-        stage: checkpoint.stage,
-        wasmMemoryBytes: checkpoint.wasmMemoryBytes,
-        progress: pending.get(id)?.lastProgress ?? null,
-        smartParseEnabled: true,
-      });
-      worker.postMessage({ checkpointAck: checkpointId });
-      return;
-    }
+    const { id, ok, result, error } = event.data;
     const call = pending.get(id);
     if (!call) return; // already settled, or from a worker instance we've moved past
-    // A progress event (Smart Parse's model download) isn't terminal --
-    // it carries no `ok` field and the call stays pending afterwards,
-    // unlike every other message this worker ever posts.
-    if (progress) {
-      call.lastProgress = progress;
-      call.onProgress?.(progress);
-      return;
-    }
     pending.delete(id);
     if (ok) {
       call.resolve(result);
       return;
     }
-    const rejection = new Error(error);
-    // Only ever present for a Smart Parse model-load failure -- see
-    // `ocrWorker.js`'s `taggedModelLoadError`. Carried on the Error object
-    // itself rather than added to this function's signature, since every
-    // other caller/failure path here has no use for them and shouldn't
-    // need to know they exist.
-    if (stage) rejection.smartParseStage = stage;
-    if (wasmMemoryBytes != null) rejection.smartParseWasmMemoryBytes = wasmMemoryBytes;
-    call.reject(rejection);
+    call.reject(new Error(error));
   };
   // A worker-level crash (e.g. the wasm failed to load at all) has no `id`
   // to route to a specific call -- fail every call still waiting rather
@@ -106,10 +67,10 @@ function getWorker() {
   return worker;
 }
 
-function callWorker(type, payload, transfer, onProgress) {
+function callWorker(type, payload, transfer) {
   const id = nextId++;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, onProgress });
+    pending.set(id, { resolve, reject });
     getWorker().postMessage({ id, type, ...payload }, transfer);
   });
 }
@@ -242,67 +203,6 @@ export async function extractReceiptText(file, onProgress) {
  * the caller keeps the heuristic's existing default-to-expense guess for
  * a `null` rather than blocking the review screen on a model load.
  */
-// The combined size of the GLM-OCR files Smart Parse fetches as served
-// today: vision graph + data (`_q4`, 424,697 + 304,547,840), the token
-// embedder's raw fp16 weights (182,452,224, no graph -- see
-// `budget_calc::smart_parse_model`'s own doc comment), decoder graph +
-// data (`_q4`, 313,836 + 373,217,280) and tokenizer.json (5,420,559). Used
-// only to turn `loadedBytes` progress events into a percentage and a
-// human-readable estimate before the app commits to downloading them. Not
-// load-bearing: if Hugging Face's actual file sizes drift, the progress
-// bar is off by a little rather than broken (`loadedBytes` can exceed
-// this and the bar just clamps at 100%).
-export const SMART_PARSE_APPROX_TOTAL_BYTES = 866_376_436;
-
-/**
- * Reads a photographed receipt, statement PDF, or scanned PDF with Smart
- * Parse (GLM-OCR) instead of the always-available OCR engine
- * `extractReceiptText` uses -- see `budget-calc::smart_parse`'s own doc
- * comment for why this is a second engine, not a replacement. Returns
- * plain text through the exact same shape `extractReceiptText` does, so
- * the caller feeds it into `parse_receipt_text`/`parse_statement_text`
- * identically either way.
- *
- * A PDF always goes through `budget-wasm-pdfrender` here, even one that
- * already has a text layer `pdf-extract` could read directly: the whole
- * point of Smart Parse is that vision-based reading is more accurate than
- * either engine's text-layer or glyph heuristics, the same reasoning that
- * justified adding GLM-OCR for photographed receipts in the first place,
- * so turning it on shouldn't silently keep using the weaker path just
- * because the file happens to carry embedded text.
- *
- * `onProgress` fires with `{ phase: 'encode' }` while the vision encoder
- * runs and `{ phase: 'generate', tokens }` once per decoded token -- both
- * are minutes-long compute phases during which `loadedBytes` is frozen,
- * so the caller must not infer "still downloading" from a stalled byte
- * count (see `ocrWorker.js`'s `reportPhase`).
- *
- * `onProgress` fires with `{ phase: 'download', loadedBytes }` repeatedly
- * while the ~2.2GB model downloads (only on the very first use per
- * browser -- cached afterwards via Cache Storage, see `ocrWorker.js`),
- * and with `{ phase: 'page', page, totalPages }` once per PDF page
- * instead, after the model (if not already cached) is ready.
- */
-export async function smartParseReceiptFile(file, onProgress) {
-  const runSmartParse = (rgb, width, height) =>
-    callWorker(
-      'smart-parse',
-      { imageRgb: rgb, width, height },
-      [rgb.buffer],
-      onProgress ? (progress) => onProgress(progress) : undefined,
-    );
-
-  if (isPdf(file)) {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return ocrPdfPages(bytes, runSmartParse, onProgress);
-  }
-
-  const { rgb, width, height } = await imageToRgb(file);
-  const result = await runSmartParse(rgb, width, height);
-  if (result?.error) return { text: '', calcError: result, truncated: null };
-  return { text: result.text, calcError: null, truncated: null };
-}
-
 export async function classifyStatementDescriptions(descriptions) {
   if (descriptions.length === 0) return [];
   try {

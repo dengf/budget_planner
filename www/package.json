@@ -3,16 +3,12 @@
   "version": "0.1.0",
   "description": "Zero-based budgeting, CSV import, savings goals and debt payoff, powered by Rust/WASM",
   "scripts": {
-    "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:pdfrender && npm run build:wasm:llm && npm run build:wasm:glmocr-vision && npm run build:wasm:glmocr-embed && npm run build:wasm:glmocr-decoder && npm run build:wasm:glmocr-orchestrate",
+    "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:pdfrender && npm run build:wasm:llm",
     "build:wasm:core": "cd ../crates/budget-wasm && wasm-pack build --target web --out-dir ../../www/pkg",
     "build:wasm:ocr": "cd ../crates/budget-wasm-ocr && wasm-pack build --target web --out-dir ../../www/pkg-ocr",
     "build:wasm:pdf": "cd ../crates/budget-wasm-pdf && wasm-pack build --target web --out-dir ../../www/pkg-pdf",
     "build:wasm:pdfrender": "cd ../crates/budget-wasm-pdfrender && wasm-pack build --target web --out-dir ../../www/pkg-pdfrender",
     "build:wasm:llm": "cd ../crates/budget-wasm-llm && wasm-pack build --target web --out-dir ../../www/pkg-llm",
-    "build:wasm:glmocr-vision": "cd ../crates/budget-wasm-glmocr-vision && wasm-pack build --target web --out-dir ../../www/pkg-glmocr-vision",
-    "build:wasm:glmocr-embed": "cd ../crates/budget-wasm-glmocr-embed && wasm-pack build --target web --out-dir ../../www/pkg-glmocr-embed",
-    "build:wasm:glmocr-decoder": "cd ../crates/budget-wasm-glmocr-decoder && wasm-pack build --target web --out-dir ../../www/pkg-glmocr-decoder",
-    "build:wasm:glmocr-orchestrate": "cd ../crates/budget-wasm-glmocr-orchestrate && wasm-pack build --target web --out-dir ../../www/pkg-glmocr-orchestrate",
     "start": "npm run build:wasm && webpack serve --mode development",
     "build": "webpack --mode production",
     "deploy": "npm run build:wasm && npm run build",
@@ -20,9 +16,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test:watch": "vitest",
-    "test:e2e:smart-parse": "npm run build && node e2e/smart-parse-repro.mjs",
-    "format": "prettier --write \"{src,e2e}/**/*.{js,jsx,mjs}\" \"*.{js,mjs}\"",
-    "format:check": "prettier --check \"{src,e2e}/**/*.{js,jsx,mjs}\" \"*.{js,mjs}\""
+    "format": "prettier --write \"src/**/*.{js,jsx,mjs}\" \"*.{js,mjs}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,mjs}\" \"*.{js,mjs}\""
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -49,7 +44,6 @@
     "globals": "^17.12.0",
     "html-webpack-plugin": "^5.5.3",
     "jsdom": "^30.0.1",
-    "playwright": "^1.63.0",
     "prettier": "3.9.6",
     "style-loader": "^3.3.3",
     "vitest": "^4.1.11",

@@ -47,7 +47,7 @@ describe('activityGuard', () => {
   });
 
   it('stays in progress after ending while hidden, until the tab is revisited', () => {
-    // The real-device regression this covers: a Smart Parse extraction
+    // The real-device regression this covers: a receipt extraction
     // crashing (or finishing) while the tab is backgrounded shouldn't hand
     // version-check's hidden-tab reload a green light before the visitor
     // has had a chance to see the result.

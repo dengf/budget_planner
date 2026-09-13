@@ -131,15 +131,6 @@ impl From<&BudgetError> for Message {
             BudgetError::EmbedClassifyFailed(v) => {
                 Message::with_value("err.embedClassifyFailed", v.clone(), text)
             }
-            BudgetError::SmartParseModelLoadFailed(v) => {
-                Message::with_value("err.smartParseModelLoadFailed", v.clone(), text)
-            }
-            BudgetError::SmartParseTokenizerLoadFailed(v) => {
-                Message::with_value("err.smartParseTokenizerLoadFailed", v.clone(), text)
-            }
-            BudgetError::SmartParseFailed(v) => {
-                Message::with_value("err.smartParseFailed", v.clone(), text)
-            }
             BudgetError::PdfPageOutOfRange(v) => {
                 Message::with_value("err.pdfPageOutOfRange", v.clone(), text)
             }
@@ -208,9 +199,6 @@ mod tests {
             BudgetError::EmbedModelLoadFailed("1".into()),
             BudgetError::EmbedTokenizerLoadFailed("1".into()),
             BudgetError::EmbedClassifyFailed("1".into()),
-            BudgetError::SmartParseModelLoadFailed("1".into()),
-            BudgetError::SmartParseTokenizerLoadFailed("1".into()),
-            BudgetError::SmartParseFailed("1".into()),
             BudgetError::PdfPageOutOfRange("1".into()),
             BudgetError::PdfRenderFailed("1".into()),
         ];

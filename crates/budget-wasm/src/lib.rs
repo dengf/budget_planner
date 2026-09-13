@@ -23,23 +23,17 @@
 //!
 //! Receipt OCR (`run_ocr`), PDF text extraction (`extract_pdf_text`),
 //! statement-row income/expense classification
-//! (`classify_statement_descriptions`), PDF page rasterization
-//! (`pdf_page_count`, `render_pdf_page`) and Smart Parse (GLM-OCR) live
-//! in the sibling `budget-wasm-ocr`, `budget-wasm-pdf`,
-//! `budget-wasm-llm`, `budget-wasm-pdfrender` and Smart Parse's own four
-//! `budget-wasm-glmocr-vision`/`-embed`/`-decoder`/`-orchestrate` crates
-//! instead, each compiled to its own separate `.wasm` file that
-//! `www/src/ocrWorker.js` only loads the first time someone actually
-//! takes that path (a photo scan never downloads the PDF, classifier,
-//! rasterizer or Smart Parse crates' weight, and vice versa).
-//! `ocrs-cjk`/`rten`, `pdf-extract`, a BERT-family embedding model,
-//! `hayro` and GLM-OCR's ~2.2GB of vision-language weights respectively
-//! are why -- see each crate's own doc comment for the measured size.
-//! Smart Parse's three model-holding crates are further split from each
-//! other, one model per crate (not just from this crate) -- see
-//! `budget-wasm-glmocr-vision/src/lib.rs`'s own doc comment for why one
-//! shared wasm module for all three models isn't safe. This crate's own
-//! [`receipt`] module, by contrast, is `parse_receipt_text`/
+//! (`classify_statement_descriptions`) and PDF page rasterization
+//! (`pdf_page_count`, `render_pdf_page`) live in the sibling
+//! `budget-wasm-ocr`, `budget-wasm-pdf`, `budget-wasm-llm` and
+//! `budget-wasm-pdfrender` crates instead, each compiled to its own
+//! separate `.wasm` file that `www/src/ocrWorker.js` only loads the first
+//! time someone actually takes that path (a photo scan never downloads
+//! the PDF, classifier or rasterizer crate's weight, and vice versa).
+//! `ocrs-cjk`/`rten`, `pdf-extract`, a BERT-family embedding model and
+//! `hayro` respectively are why -- see each crate's own doc comment for
+//! the measured size. This crate's own [`receipt`] module, by contrast,
+//! is `parse_receipt_text`/
 //! `parse_statement_text`: plain text/`Decimal` parsing with no heavy
 //! dependency, so it lives here in the always-loaded core instead of
 //! duplicated across the lazy crates.
@@ -104,14 +98,6 @@ mod bridge_coverage {
         (
             "embed_classify",
             "bridged in the sibling budget-wasm-llm crate, not here -- see this crate's lib.rs doc comment",
-        ),
-        (
-            "smart_parse_model",
-            "bridged in the sibling budget-wasm-glmocr-vision/-embed/-decoder crates, not here -- see this crate's lib.rs doc comment",
-        ),
-        (
-            "smart_parse_orchestrate",
-            "bridged in the sibling budget-wasm-glmocr-orchestrate crate, not here -- see this crate's lib.rs doc comment",
         ),
         (
             "pdf_render",

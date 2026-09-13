@@ -92,15 +92,15 @@ function tidyUrl() {
  * IndexedDB and survive either way; unsaved field values do not.
  *
  * `isBusy` is the one exception to "hidden means safe to reload": a real
- * report from an in-flight Smart Parse scan (a multi-minute download, no
- * saved state until it finishes) showed the page reloading mid-download
- * with no error at all — indistinguishable from a crash, but actually
- * this same "safe" hidden-tab reload firing while the tab had simply been
- * backgrounded for a moment. `isBusy()` (backed by `activityGuard.js`) is
- * checked alongside `document.hidden` so this path defers to `onStale`
- * instead — the banner it renders is inert while the tab stays hidden,
- * costing nothing, and the next check (the 5-minute timer, or the next
- * visibility change) reloads normally once the scan has finished.
+ * report from an in-flight receipt extraction (no saved state until it
+ * finishes) showed the page reloading mid-extraction with no error at
+ * all — indistinguishable from a crash, but actually this same "safe"
+ * hidden-tab reload firing while the tab had simply been backgrounded for
+ * a moment. `isBusy()` (backed by `activityGuard.js`) is checked alongside
+ * `document.hidden` so this path defers to `onStale` instead — the banner
+ * it renders is inert while the tab stays hidden, costing nothing, and the
+ * next check (the 5-minute timer, or the next visibility change) reloads
+ * normally once the extraction has finished.
  */
 export function startVersionCheck({ onStale, isBusy } = {}) {
   const current = currentBuildId();

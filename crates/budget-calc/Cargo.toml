@@ -25,36 +25,9 @@ serde_json = { workspace = true, optional = true }
 # treats 0.24 and 0.26 as unrelated crates here since they're semver-
 # incompatible, so this is safe -- just needs its own import path
 # (`rten_embed::...`, not `rten::...`) inside `embed_classify.rs`.
-# Pinned to a commit on the crate maintainer's own open, unmerged PR
-# branch (robertknight/rten#1337, "Support zero_points input in
-# MatMulNBits operator"), not a release, because `smart_parse_model`'s
-# `DecoderSession` needs it: GLM-OCR's decoder is the one model of the
-# three where a released rten (through 0.26.0) can't avoid the fp16 ->
-# f32 doubling described above, because there is no smaller export it
-# *can* load -- rten 0.26.0's `MatMulNBits` (the op GLM-OCR's own
-# 4-bit-quantized decoder export uses) hardcodes a 3-input maximum and
-# rejects the 4th `zero_points` input that export wires up. This PR adds
-# that support; without it, the only way to shrink the decoder's real
-# on-device memory footprint (the one directly implicated in the iPhone
-# crash this pin fixes -- see `smart_parse_model.rs`'s own doc comment)
-# is a change rten's maintainer hasn't shipped yet. Confirmed empirically
-# (a real Node.js load + full generation run against the quantized
-# decoder export) that this commit's `MatMulNBits` accepts `zero_points`
-# and produces correct decoded text before landing this pin. Vendoring
-# risk this accepts: the upstream branch could be force-pushed, rebased
-# away, or closed unmerged -- if `cargo build` ever fails to resolve this
-# `rev` again, check the PR's current state first
-# (https://github.com/robertknight/rten/pull/1337) and either re-pin to
-# its latest commit or fork the branch under our own control, rather than
-# reverting to 0.26.0 and losing the decoder's smaller footprint.
-rten-embed = { package = "rten", git = "https://github.com/robertknight/rten", rev = "928c0bb2", optional = true }
-rten-tensor = { package = "rten-tensor", git = "https://github.com/robertknight/rten", rev = "928c0bb2", optional = true }
-rten-text = { package = "rten-text", git = "https://github.com/robertknight/rten", rev = "928c0bb2", optional = true }
-# `smart_parse.rs`'s own image resize/patchify -- default-features off
-# since only PNG/JPEG decoding is needed (a camera capture always
-# encodes as JPEG; a picked file could be either), not the crate's full
-# format zoo.
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
+rten-embed = { package = "rten", version = "0.26.0", optional = true }
+rten-tensor = { package = "rten-tensor", version = "0.26.0", optional = true }
+rten-text = { package = "rten-text", version = "0.26.0", optional = true }
 # Rasterizes a PDF page to pixels -- see `pdf_render.rs`'s own doc comment
 # for why this closes a real v1 gap (`pdf_text.rs` has no answer for a
 # scanned/image-only PDF) and for the wasm32 spike that justified adding
@@ -80,24 +53,11 @@ pdf-text = ["dep:pdf-extract"]
 # `resolve_statement_amount` had to guess -- see `embed_classify.rs`'s
 # own doc comment for why an embedding classifier and not a chat LLM.
 embed-classify = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text"]
-# GLM-OCR (0.9B vision-language model) for "Smart Parse" -- see
-# `smart_parse_model.rs`'s own doc comment for why this is a second OCR
-# engine rather than a replacement for `ocr`'s PP-OCRv6_tiny, and for why
-# it's split into two features (one per sibling `budget-wasm-glmocr-*`
-# crate group) rather than the single `smart-parse` feature this used to
-# be: each of the three model-holding wasm crates needs `rten`/
-# `rten-tensor` but not `image`/`rten-text`, and the orchestration wasm
-# crate needs the reverse -- a shared feature would compile the wrong
-# half of this into every one of them. Shares the same `rten` 0.26 pin as
-# `embed-classify` (both aliased as `rten-embed`) rather than introducing
-# a third version to coexist -- see the comment on that dependency above.
-smart-parse-model = ["dep:rten-embed", "dep:rten-tensor"]
-smart-parse-orchestrate = ["dep:rten-text", "dep:image"]
 # Independent of both `ocr` and `pdf-text` for the same reason those two
 # are independent of each other -- see `pdf_render.rs`'s own doc comment.
 # `hayro` pulls a real dependency tree of its own (a font-and-path
 # rasterizer, `vello_cpu`), so a session that never touches a scanned PDF
-# or Smart Parse-for-PDF shouldn't pay for it.
+# shouldn't pay for it.
 pdf-render = ["dep:hayro"]
 
 [dev-dependencies]
