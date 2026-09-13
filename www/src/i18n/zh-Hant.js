@@ -324,6 +324,8 @@ export default {
   'err.emptyAudio': '該錄音沒有音訊可讀取。',
   'err.voiceModelLoadFailed': '語音辨識引擎無法載入（{value}）。',
   'err.voiceTranscribeFailed': '無法轉錄該錄音（{value}）。',
+  'err.microphoneNotFound': '未能在此裝置上找到麥克風。',
+  'err.voiceCaptureUnexpected': '無法錄音（{value}）。',
   'err.badImportFile': '該檔案不是預算規劃匯出的備份——未做任何變更。',
   'err.importFailed': '無法讀取該檔案，請再試一次。',
   'err.invalidRecurringAmount': '該金額無效（收到 {value}）。',

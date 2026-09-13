@@ -89,13 +89,27 @@ async function resampleToMono16k(audioBuffer) {
  * unavailable; the caller (`VoiceCapture.jsx`) is responsible for showing
  * that as a recoverable error, not a crash.
  */
+// Safari's `MediaRecorder` doesn't reliably pick a working default encoding
+// for an audio-only stream the way Chrome/Firefox do -- constructing it with
+// no `mimeType` has been observed throwing synchronously on WebKit. Trying
+// the codecs it's actually known to support first, and falling back to
+// letting the browser choose only if none of them report as supported,
+// avoids relying on that implicit default.
+const PREFERRED_MIME_TYPES = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
+
+function pickSupportedMimeType() {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return undefined;
+  return PREFERRED_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
 export function startRecording() {
   let recorder = null;
   let stopRequested = false;
 
   const samples = (async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recorder = new MediaRecorder(stream);
+    const mimeType = pickSupportedMimeType();
+    recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     const chunks = [];
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data);
