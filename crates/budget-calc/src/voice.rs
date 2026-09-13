@@ -1,4 +1,4 @@
-//! Speech-to-text for voice-entered transactions, using QuartzNet15x5 (a
+//! Speech-to-text for voice-entered transactions, using `QuartzNet15x5` (a
 //! CTC acoustic model) via `rten` -- one forward pass over precomputed
 //! log-mel features, no autoregressive decode loop.
 //!
@@ -6,8 +6,8 @@
 //! tried first in a throwaway spike and rejected on the same grounds as
 //! the GLM-OCR VLM this app already pulled: multi-hundred-MB to GB scale,
 //! fragile on real phones, not the shape that has worked here (`ocr.rs`'s
-//! PP-OCRv6_tiny and `embed_classify.rs`'s MiniLM are both single-forward-
-//! pass). QuartzNet15x5 (72MB fp32) was the smallest CTC model measured
+//! `PP-OCRv6_tiny` and `embed_classify.rs`'s `MiniLM` are both single-forward-
+//! pass). `QuartzNet15x5` (72MB fp32) was the smallest CTC model measured
 //! that stayed above 90% *parsed-transaction* accuracy -- not word-error
 //! rate, which stayed poor (single digits) even on much larger models.
 //! `voice_parse.rs`'s constrained matching against a closed category
@@ -40,14 +40,14 @@ const WIN_LENGTH: usize = 320; // 20ms
 const HOP_LENGTH: usize = 160; // 10ms
 const N_MELS: usize = 64;
 const PREEMPHASIS: f64 = 0.97;
-/// `2f64.powi(-24)`, NeMo's log guard against a zero-energy mel bin.
+/// `2f64.powi(-24)`, `NeMo`'s log guard against a zero-energy mel bin.
 const LOG_GUARD: f64 = 5.960_464_477_539_063e-8;
-/// QuartzNet's conv stack needs the time axis padded to a multiple of
+/// `QuartzNet`'s conv stack needs the time axis padded to a multiple of
 /// this, or the model produces a shape mismatch rather than a wrong
 /// answer -- an error, not a silent-garbage risk, but worth avoiding.
 const FRAME_PAD_MULTIPLE: usize = 16;
 
-/// QuartzNet15x5's own label set: index 0 is the word separator, 28 is
+/// `QuartzNet15x5`'s own label set: index 0 is the word separator, 28 is
 /// the CTC blank -- note the blank is *last* here, unlike some CTC
 /// models (wav2vec2, spiked and rejected above) that put it first.
 /// Getting this wrong produces confident nonsense, not an error, so it
@@ -96,12 +96,14 @@ fn mel_to_hz(m: f64) -> f64 {
 }
 
 /// `librosa.filters.mel(sr=16000, n_fft=512, n_mels=64, norm="slaney",
-/// htk=False)` -- NeMo's default mel filterbank, reimplemented rather
+/// htk=False)` -- `NeMo`'s default mel filterbank, reimplemented rather
 /// than depended on (no pure-Rust equivalent exists that matches
 /// librosa's exact normalization).
 fn mel_filterbank() -> Vec<Vec<f64>> {
     let n_bins = N_FFT / 2 + 1;
-    let fftfreqs: Vec<f64> = (0..n_bins).map(|k| k as f64 * SAMPLE_RATE / N_FFT as f64).collect();
+    let fftfreqs: Vec<f64> = (0..n_bins)
+        .map(|k| k as f64 * SAMPLE_RATE / N_FFT as f64)
+        .collect();
 
     let lo = hz_to_mel(0.0);
     let hi = hz_to_mel(SAMPLE_RATE / 2.0);
@@ -140,7 +142,7 @@ fn hann_window() -> Vec<f64> {
 }
 
 /// 16kHz mono samples in; `(features, n_mels, n_frames)` out, row-major
-/// `[n_mels, n_frames]` -- the layout QuartzNet's `audio_signal` input
+/// `[n_mels, n_frames]` -- the layout `QuartzNet`'s `audio_signal` input
 /// wants. `n_frames` is already padded to a multiple of
 /// `FRAME_PAD_MULTIPLE`.
 fn log_mel_features(samples: &[f32], filterbank: &[Vec<f64>]) -> (Vec<f32>, usize, usize) {
@@ -182,10 +184,14 @@ fn log_mel_features(samples: &[f32], filterbank: &[Vec<f64>]) -> (Vec<f32>, usiz
     let mut buf = vec![rustfft::num_complex::Complex::new(0.0f64, 0.0); N_FFT];
     for t in 0..n_frames {
         for i in 0..N_FFT {
-            buf[i] = rustfft::num_complex::Complex::new(padded[t * HOP_LENGTH + i] * window[i], 0.0);
+            buf[i] =
+                rustfft::num_complex::Complex::new(padded[t * HOP_LENGTH + i] * window[i], 0.0);
         }
         fft.process(&mut buf);
-        let power: Vec<f64> = buf[..n_bins].iter().map(|c| c.norm_sqr()).collect();
+        let power: Vec<f64> = buf[..n_bins]
+            .iter()
+            .map(rustfft::num_complex::Complex::norm_sqr)
+            .collect();
         for m in 0..N_MELS {
             let mut acc = 0.0f64;
             for k in 0..n_bins {
@@ -247,7 +253,7 @@ fn ctc_greedy_decode(logits: &Tensor<f32>) -> String {
 }
 
 /// Transcribes one spoken command. `samples` is 16kHz mono `f32` in
-/// `[-1.0, 1.0]`; `model_bytes` is QuartzNet15x5's `.rten` file, fetched
+/// `[-1.0, 1.0]`; `model_bytes` is `QuartzNet15x5`'s `.rten` file, fetched
 /// by the host layer (no filesystem inside wasm).
 ///
 /// Returns the raw, often-misheard transcript -- never the parsed

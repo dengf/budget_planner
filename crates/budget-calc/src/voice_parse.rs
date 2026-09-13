@@ -61,35 +61,102 @@ pub struct VoiceDraft {
 fn aliases_for_preset(preset_key: &str) -> &'static [&'static str] {
     match preset_key {
         "cat.primaryEarnedIncome" => &["salary", "wage", "wages", "paycheck", "paycheque", "pay"],
-        "cat.selfEmploymentBusiness" => {
-            &["freelance", "freelancing", "business", "consulting", "gig", "side hustle"]
-        }
-        "cat.investmentCapitalIncome" => {
-            &["investment", "investments", "dividend", "dividends", "interest", "capital gains", "stocks"]
-        }
-        "cat.governmentSupplemental" => {
-            &["government", "benefits", "welfare", "unemployment", "social security"]
-        }
+        "cat.selfEmploymentBusiness" => &[
+            "freelance",
+            "freelancing",
+            "business",
+            "consulting",
+            "gig",
+            "side hustle",
+        ],
+        "cat.investmentCapitalIncome" => &[
+            "investment",
+            "investments",
+            "dividend",
+            "dividends",
+            "interest",
+            "capital gains",
+            "stocks",
+        ],
+        "cat.governmentSupplemental" => &[
+            "government",
+            "benefits",
+            "welfare",
+            "unemployment",
+            "social security",
+        ],
         "cat.otherIncome" => &["other income", "misc income"],
         "cat.housing" => &["housing", "rent", "mortgage"],
-        "cat.utilities" => &["utilities", "utility", "electricity", "water bill", "gas bill", "internet bill"],
-        "cat.foodGroceries" => &["food", "groceries", "grocery", "restaurant", "dining", "takeout"],
-        "cat.transportation" => {
-            &["transportation", "transport", "gas", "fuel", "uber", "lyft", "taxi", "parking", "car"]
-        }
-        "cat.healthcareInsurance" => {
-            &["healthcare", "health", "insurance", "medical", "doctor", "pharmacy", "dental"]
-        }
-        "cat.debtServicing" => &["debt", "loan", "loans", "credit card payment", "student loan"],
-        "cat.personalLifestyle" => {
-            &["personal", "lifestyle", "shopping", "entertainment", "clothes", "clothing", "movies"]
-        }
-        "cat.subscriptionsMemberships" => {
-            &["subscription", "subscriptions", "membership", "memberships", "netflix", "spotify", "gym"]
-        }
-        "cat.familyDependents" => {
-            &["family", "dependents", "dependent", "kids", "children", "childcare", "school"]
-        }
+        "cat.utilities" => &[
+            "utilities",
+            "utility",
+            "electricity",
+            "water bill",
+            "gas bill",
+            "internet bill",
+        ],
+        "cat.foodGroceries" => &[
+            "food",
+            "groceries",
+            "grocery",
+            "restaurant",
+            "dining",
+            "takeout",
+        ],
+        "cat.transportation" => &[
+            "transportation",
+            "transport",
+            "gas",
+            "fuel",
+            "uber",
+            "lyft",
+            "taxi",
+            "parking",
+            "car",
+        ],
+        "cat.healthcareInsurance" => &[
+            "healthcare",
+            "health",
+            "insurance",
+            "medical",
+            "doctor",
+            "pharmacy",
+            "dental",
+        ],
+        "cat.debtServicing" => &[
+            "debt",
+            "loan",
+            "loans",
+            "credit card payment",
+            "student loan",
+        ],
+        "cat.personalLifestyle" => &[
+            "personal",
+            "lifestyle",
+            "shopping",
+            "entertainment",
+            "clothes",
+            "clothing",
+            "movies",
+        ],
+        "cat.subscriptionsMemberships" => &[
+            "subscription",
+            "subscriptions",
+            "membership",
+            "memberships",
+            "netflix",
+            "spotify",
+            "gym",
+        ],
+        "cat.familyDependents" => &[
+            "family",
+            "dependents",
+            "dependent",
+            "kids",
+            "children",
+            "childcare",
+            "school",
+        ],
         "cat.giftsDonations" => &["gifts", "gift", "donation", "donations", "charity"],
         "cat.otherExpenses" => &["other", "misc", "miscellaneous"],
         _ => &[],
@@ -97,15 +164,37 @@ fn aliases_for_preset(preset_key: &str) -> &'static [&'static str] {
 }
 
 const ONES: &[(&str, u64)] = &[
-    ("zero", 0), ("one", 1), ("two", 2), ("three", 3), ("four", 4), ("five", 5),
-    ("six", 6), ("seven", 7), ("eight", 8), ("nine", 9), ("ten", 10), ("eleven", 11),
-    ("twelve", 12), ("thirteen", 13), ("fourteen", 14), ("fifteen", 15), ("sixteen", 16),
-    ("seventeen", 17), ("eighteen", 18), ("nineteen", 19),
+    ("zero", 0),
+    ("one", 1),
+    ("two", 2),
+    ("three", 3),
+    ("four", 4),
+    ("five", 5),
+    ("six", 6),
+    ("seven", 7),
+    ("eight", 8),
+    ("nine", 9),
+    ("ten", 10),
+    ("eleven", 11),
+    ("twelve", 12),
+    ("thirteen", 13),
+    ("fourteen", 14),
+    ("fifteen", 15),
+    ("sixteen", 16),
+    ("seventeen", 17),
+    ("eighteen", 18),
+    ("nineteen", 19),
 ];
 
 const TENS: &[(&str, u64)] = &[
-    ("twenty", 20), ("thirty", 30), ("forty", 40), ("fifty", 50),
-    ("sixty", 60), ("seventy", 70), ("eighty", 80), ("ninety", 90),
+    ("twenty", 20),
+    ("thirty", 30),
+    ("forty", 40),
+    ("fifty", 50),
+    ("sixty", 60),
+    ("seventy", 70),
+    ("eighty", 80),
+    ("ninety", 90),
 ];
 
 /// Parses a run of number words ("four hundred fifty") starting at
@@ -119,7 +208,7 @@ fn parse_number_words(words: &[&str]) -> Option<(u64, usize)> {
 
     for word in words {
         let word = word.trim_end_matches(',');
-        if let Some(digits) = word.parse::<u64>().ok() {
+        if let Ok(digits) = word.parse::<u64>() {
             current += digits;
             saw_any = true;
             consumed += 1;
@@ -264,7 +353,7 @@ fn match_category<'a>(
     for category in categories {
         let mut aliases: Vec<String> = vec![category.name.to_lowercase()];
         if let Some(key) = &category.preset_key {
-            aliases.extend(aliases_for_preset(key).iter().map(|s| s.to_string()));
+            aliases.extend(aliases_for_preset(key).iter().map(ToString::to_string));
         }
 
         for alias in &aliases {
@@ -302,22 +391,21 @@ pub fn parse_voice_command(transcript: &str, categories: &[VoiceCategoryCandidat
     let amount = extract_amount(&words);
     let matched = match_category(&words, categories);
 
-    let is_income = match matched {
-        Some(category) => Some(category.is_income),
-        None => {
-            // No category matched at all -- fall back to whatever verb
-            // was spoken, purely as a last resort (see module doc for
-            // why a matched category always outranks this).
-            let mut verb_income = None;
-            for w in &words {
-                if *w == "income" {
-                    verb_income = Some(true);
-                } else if *w == "expense" || *w == "expenses" {
-                    verb_income = Some(false);
-                }
+    let is_income = if let Some(category) = matched {
+        Some(category.is_income)
+    } else {
+        // No category matched at all -- fall back to whatever verb
+        // was spoken, purely as a last resort (see module doc for
+        // why a matched category always outranks this).
+        let mut verb_income = None;
+        for w in &words {
+            if *w == "income" {
+                verb_income = Some(true);
+            } else if *w == "expense" || *w == "expenses" {
+                verb_income = Some(false);
             }
-            verb_income
         }
+        verb_income
     };
 
     VoiceDraft {
@@ -331,7 +419,12 @@ pub fn parse_voice_command(transcript: &str, categories: &[VoiceCategoryCandidat
 mod tests {
     use super::*;
 
-    fn category(id: &str, name: &str, is_income: bool, preset_key: Option<&str>) -> VoiceCategoryCandidate {
+    fn category(
+        id: &str,
+        name: &str,
+        is_income: bool,
+        preset_key: Option<&str>,
+    ) -> VoiceCategoryCandidate {
         VoiceCategoryCandidate {
             id: id.to_string(),
             name: name.to_string(),
@@ -342,19 +435,47 @@ mod tests {
 
     fn starter_categories() -> Vec<VoiceCategoryCandidate> {
         vec![
-            category("inc-1", "Primary/Earned Income", true, Some("cat.primaryEarnedIncome")),
-            category("inc-2", "Self-Employment/Business Income", true, Some("cat.selfEmploymentBusiness")),
-            category("exp-1", "Food & Groceries", false, Some("cat.foodGroceries")),
+            category(
+                "inc-1",
+                "Primary/Earned Income",
+                true,
+                Some("cat.primaryEarnedIncome"),
+            ),
+            category(
+                "inc-2",
+                "Self-Employment/Business Income",
+                true,
+                Some("cat.selfEmploymentBusiness"),
+            ),
+            category(
+                "exp-1",
+                "Food & Groceries",
+                false,
+                Some("cat.foodGroceries"),
+            ),
             category("exp-2", "Transportation", false, Some("cat.transportation")),
             category("exp-3", "Debt Servicing", false, Some("cat.debtServicing")),
-            category("exp-4", "Healthcare & Insurance", false, Some("cat.healthcareInsurance")),
-            category("exp-5", "Subscriptions & Memberships", false, Some("cat.subscriptionsMemberships")),
+            category(
+                "exp-4",
+                "Healthcare & Insurance",
+                false,
+                Some("cat.healthcareInsurance"),
+            ),
+            category(
+                "exp-5",
+                "Subscriptions & Memberships",
+                false,
+                Some("cat.subscriptionsMemberships"),
+            ),
         ]
     }
 
     #[test]
     fn parses_a_clean_expense_with_a_whole_dollar_amount() {
-        let draft = parse_voice_command("add expense twelve dollars groceries", &starter_categories());
+        let draft = parse_voice_command(
+            "add expense twelve dollars groceries",
+            &starter_categories(),
+        );
         assert_eq!(draft.amount, Some(12.0));
         assert_eq!(draft.is_income, Some(false));
         assert_eq!(draft.category_id.as_deref(), Some("exp-1"));
@@ -362,7 +483,10 @@ mod tests {
 
     #[test]
     fn parses_a_clean_income_with_an_alias_word() {
-        let draft = parse_voice_command("add income four hundred fifty dollars salary", &starter_categories());
+        let draft = parse_voice_command(
+            "add income four hundred fifty dollars salary",
+            &starter_categories(),
+        );
         assert_eq!(draft.amount, Some(450.0));
         assert_eq!(draft.is_income, Some(true));
         assert_eq!(draft.category_id.as_deref(), Some("inc-1"));
@@ -370,7 +494,10 @@ mod tests {
 
     #[test]
     fn parses_dollars_and_cents_together() {
-        let draft = parse_voice_command("add expense four dollars fifty cents transportation", &starter_categories());
+        let draft = parse_voice_command(
+            "add expense four dollars fifty cents transportation",
+            &starter_categories(),
+        );
         assert_eq!(draft.amount, Some(4.5));
         assert_eq!(draft.category_id.as_deref(), Some("exp-2"));
     }
@@ -378,7 +505,10 @@ mod tests {
     #[test]
     fn recovers_a_word_the_model_split_in_two() {
         // The spike's own recorded ASR mistake: "insurance" -> "in surance".
-        let draft = parse_voice_command("add expense thirty dollars in surance", &starter_categories());
+        let draft = parse_voice_command(
+            "add expense thirty dollars in surance",
+            &starter_categories(),
+        );
         assert_eq!(draft.category_id.as_deref(), Some("exp-4"));
     }
 

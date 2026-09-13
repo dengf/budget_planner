@@ -25,15 +25,14 @@ pub fn parse_voice_command(params: JsValue) -> JsValue {
 }
 
 fn parse_voice_command_impl(params: JsValue) -> ParseVoiceCommandResult {
-    let params: ParseVoiceCommandParams = match serde_wasm_bindgen::from_value(params) {
-        Ok(p) => p,
-        Err(_) => {
-            let message = Message::bad_request();
-            return ParseVoiceCommandResult {
-                error: Some(message.text),
-                ..Default::default()
-            };
-        }
+    let params: ParseVoiceCommandParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        let message = Message::bad_request();
+        return ParseVoiceCommandResult {
+            error: Some(message.text),
+            ..Default::default()
+        };
     };
 
     let categories: Vec<_> = params.categories.iter().map(candidate_from_dto).collect();

@@ -2,7 +2,7 @@
 //!
 //! Split out from `budget-wasm` for the same reason as
 //! `budget-wasm-ocr`/`budget-wasm-pdf`/`budget-wasm-llm`/
-//! `budget-wasm-pdfrender`: the CTC ASR model this binds (QuartzNet15x5,
+//! `budget-wasm-pdfrender`: the CTC ASR model this binds (`QuartzNet15x5`,
 //! fp32 -- see `voice.rs`'s own doc comment in `budget-calc` for why fp32
 //! and why this architecture) plus `rten-embed`/`rten-tensor`/`rustfft`
 //! would otherwise sit in every session's always-loaded download even

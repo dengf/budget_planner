@@ -14,19 +14,21 @@ use crate::dto::TranscribeVoiceCommandResult;
 
 #[wasm_bindgen]
 pub fn transcribe_voice_command(model_bytes: &[u8], samples: &[f32]) -> JsValue {
-    to_js(&match budget_calc::transcribe_voice_command(model_bytes.to_vec(), samples) {
-        Ok(transcript) => TranscribeVoiceCommandResult {
-            transcript,
-            error: None,
-            error_message: None,
-        },
-        Err(e) => {
-            let message = Message::from(&e);
-            TranscribeVoiceCommandResult {
-                transcript: String::new(),
-                error: Some(message.text.clone()),
-                error_message: Some(message),
+    to_js(
+        &match budget_calc::transcribe_voice_command(model_bytes.to_vec(), samples) {
+            Ok(transcript) => TranscribeVoiceCommandResult {
+                transcript,
+                error: None,
+                error_message: None,
+            },
+            Err(e) => {
+                let message = Message::from(&e);
+                TranscribeVoiceCommandResult {
+                    transcript: String::new(),
+                    error: Some(message.text.clone()),
+                    error_message: Some(message),
+                }
             }
-        }
-    })
+        },
+    )
 }
