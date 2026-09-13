@@ -19,6 +19,7 @@ members = [
     "crates/budget-wasm-pdfrender",
     "crates/budget-wasm-llm",
     "crates/budget-wasm-voice",
+    "crates/budget-wasm-voice-cmn",
 ]
 resolver = "2"
 

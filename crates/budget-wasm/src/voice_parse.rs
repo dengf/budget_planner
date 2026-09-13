@@ -19,6 +19,16 @@ fn candidate_from_dto(dto: &CategoryDto) -> budget_calc::VoiceCategoryCandidate 
     }
 }
 
+fn language_from_str(s: &str) -> budget_calc::VoiceLanguage {
+    match s {
+        "cmn" => budget_calc::VoiceLanguage::Cmn,
+        "yue" => budget_calc::VoiceLanguage::Yue,
+        // Unrecognized (including a stale JS bundle sending nothing at
+        // all) defaults to English rather than failing the request.
+        _ => budget_calc::VoiceLanguage::En,
+    }
+}
+
 #[wasm_bindgen]
 pub fn parse_voice_command(params: JsValue) -> JsValue {
     to_js(&parse_voice_command_impl(params))
@@ -36,7 +46,8 @@ fn parse_voice_command_impl(params: JsValue) -> ParseVoiceCommandResult {
     };
 
     let categories: Vec<_> = params.categories.iter().map(candidate_from_dto).collect();
-    let draft = budget_calc::parse_voice_command(&params.transcript, &categories);
+    let language = language_from_str(&params.language);
+    let draft = budget_calc::parse_voice_command(&params.transcript, &categories, language);
 
     ParseVoiceCommandResult {
         category_id: draft.category_id,

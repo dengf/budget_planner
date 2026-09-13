@@ -201,6 +201,13 @@ pub struct DateAmountDto {
 pub struct ParseVoiceCommandParams {
     pub transcript: String,
     pub categories: Vec<CategoryDto>,
+    /// `"en"`/`"cmn"`/`"yue"` -- a plain string rather than a typed enum
+    /// for JS-friendliness. `#[serde(default)]` so a stale cached JS
+    /// bundle mid-deploy that predates this field still deserializes;
+    /// an empty or unrecognized value defaults to `VoiceLanguage::En`,
+    /// same as it always behaved before this field existed.
+    #[serde(default)]
+    pub language: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
