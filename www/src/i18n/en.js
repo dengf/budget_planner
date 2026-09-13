@@ -351,6 +351,8 @@ export default {
   'err.emptyAudio': 'That recording has no audio to read.',
   'err.voiceModelLoadFailed': "The voice-recognition engine couldn't load ({value}).",
   'err.voiceTranscribeFailed': "Couldn't transcribe that recording ({value}).",
+  'err.microphoneNotFound': "Couldn't find a microphone on this device.",
+  'err.voiceCaptureUnexpected': "Couldn't record that ({value}).",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.importFailed': "Couldn't read that file. Try again.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",

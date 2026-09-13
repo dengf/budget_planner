@@ -7,6 +7,29 @@ import CalcError from './CalcError';
 import { beginActivity, endActivity } from '../activityGuard';
 
 /**
+ * Turns a `getUserMedia`/`MediaRecorder` failure into a translated
+ * sentence. These never reach the wasm boundary, so they can't use the
+ * `Message` code+params convention `budget-wasm-voice` itself uses for a
+ * model-load or transcription failure -- but the same idea applies: only
+ * `NotAllowedError`/`SecurityError` (a real permission denial) gets the
+ * permission-specific copy, and anything else surfaces the browser's own
+ * `error.name`/`error.message` rather than guessing, since a silently
+ * wrong "check your permission" message for e.g. a `MediaRecorder`
+ * encoding failure sends someone chasing the wrong fix.
+ */
+function captureErrorMessage(error, t) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+    return t('transactions.voiceCaptureFailed');
+  }
+  if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
+    return t('err.microphoneNotFound');
+  }
+  return t('err.voiceCaptureUnexpected', {
+    value: `${error?.name ?? 'Error'}: ${error?.message ?? error}`,
+  });
+}
+
+/**
  * Adds a transaction by voice ("add expense twelve dollars groceries")
  * instead of typing it in. Deliberately does not add anything itself --
  * see `AddTransactionSheet.jsx`'s `onParsed`, which fills the ordinary
@@ -59,7 +82,7 @@ export default function VoiceCapture({ wasmModule, categories, onParsed }) {
       setPhase('idle');
     } catch (error) {
       console.error('Voice capture failed:', error);
-      setCalcError({ error: t('transactions.voiceCaptureFailed') });
+      setCalcError({ error: captureErrorMessage(error, t) });
       setPhase('idle');
     } finally {
       setRecorder(null);

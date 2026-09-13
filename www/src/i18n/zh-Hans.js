@@ -324,6 +324,8 @@ export default {
   'err.emptyAudio': '该录音没有音频可读取。',
   'err.voiceModelLoadFailed': '语音识别引擎无法加载（{value}）。',
   'err.voiceTranscribeFailed': '无法转录该录音（{value}）。',
+  'err.microphoneNotFound': '未能在此设备上找到麦克风。',
+  'err.voiceCaptureUnexpected': '无法录音（{value}）。',
   'err.badImportFile': '该文件不是预算规划导出的备份——未做任何更改。',
   'err.importFailed': '无法读取该文件，请重试。',
   'err.invalidRecurringAmount': '该金额无效（收到 {value}）。',
