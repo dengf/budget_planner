@@ -429,7 +429,7 @@ mod tests {
             id: id.to_string(),
             name: name.to_string(),
             is_income,
-            preset_key: preset_key.map(|s| s.to_string()),
+            preset_key: preset_key.map(ToString::to_string),
         }
     }
 
