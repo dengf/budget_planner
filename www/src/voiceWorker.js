@@ -24,11 +24,28 @@ const VOICE_MODEL_PATH = new URL('voice/quartznet15x5-fp32.rten', self.location.
 // worker-lifetime memoization doesn't address at all.
 const MODEL_CACHE_NAME = 'budget-planner-voice-model-v1';
 
+// The real model is ~72MB; a git-lfs pointer text file (what a misconfigured
+// deploy can serve at the same URL with a perfectly valid 200 OK -- this bit
+// us for real, see deploy-web.yml's `lfs: true` fix) is ~130 bytes. Cache
+// Storage has no concept of "this response is wrong," so without this check
+// a pointer file fetched during a broken deploy gets cached as if it were
+// the model and served back indefinitely, long after the server is fixed --
+// nothing else would ever invalidate it. This threshold is what actually
+// catches that, for bytes already sitting in the cache and for anything
+// freshly fetched before it's allowed to be cached.
+const MIN_VALID_MODEL_BYTES = 10 * 1024 * 1024;
+
 async function fetchModelBytes(url) {
   try {
     const cache = await caches.open(MODEL_CACHE_NAME);
     const cached = await cache.match(url);
-    if (cached) return new Uint8Array(await cached.arrayBuffer());
+    if (cached) {
+      const bytes = new Uint8Array(await cached.arrayBuffer());
+      if (bytes.length >= MIN_VALID_MODEL_BYTES) return bytes;
+      // Stale/corrupt entry from a past broken deploy -- drop it and fall
+      // through to a real fetch instead of serving it forever.
+      await cache.delete(url);
+    }
   } catch {
     // Cache Storage unavailable (private browsing in some browsers) --
     // fall through to a plain fetch below. A slower repeat download beats
@@ -39,13 +56,17 @@ async function fetchModelBytes(url) {
   // `res.clone()` before reading the body -- once `.arrayBuffer()` is
   // called below, the original response's body is consumed and can't be
   // handed to `cache.put` afterward.
+  const bytes = new Uint8Array(await res.clone().arrayBuffer());
+  if (bytes.length < MIN_VALID_MODEL_BYTES) {
+    throw new Error(`model at ${url} looks truncated (${bytes.length} bytes)`);
+  }
   try {
     const cache = await caches.open(MODEL_CACHE_NAME);
     await cache.put(url, res.clone());
   } catch {
     // Best-effort, see above -- the fetch itself still succeeds.
   }
-  return new Uint8Array(await res.arrayBuffer());
+  return bytes;
 }
 
 let voiceWasmPromise = null;
