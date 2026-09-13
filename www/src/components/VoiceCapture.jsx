@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import { startRecording, transcribeVoiceCommand } from '../voiceCapture';
+import { getVoiceLanguage, setVoiceLanguage, VOICE_LANGUAGES } from '../voiceLanguage';
 import { todayIso } from '../month';
 import { MicIcon } from './icons';
 import CalcError from './CalcError';
@@ -51,6 +52,10 @@ export default function VoiceCapture({ wasmModule, categories, onParsed }) {
   const [phase, setPhase] = useState('idle'); // idle | recording | processing
   const [calcError, setCalcError] = useState(null);
   const [recorder, setRecorder] = useState(null);
+  // Deliberately its own stored preference, not the app's display locale
+  // (`useI18n`'s `locale`) -- someone may read the app in one language
+  // while speaking transactions in another. See voiceLanguage.js.
+  const [language, setLanguage] = useState(getVoiceLanguage);
 
   const start = async () => {
     setCalcError(null);
@@ -61,7 +66,7 @@ export default function VoiceCapture({ wasmModule, categories, onParsed }) {
       const samples = await handle.samples;
       setPhase('processing');
       beginActivity();
-      const result = await transcribeVoiceCommand(samples);
+      const result = await transcribeVoiceCommand(samples, language);
       if (result?.error) {
         setCalcError(result);
         setPhase('idle');
@@ -71,6 +76,7 @@ export default function VoiceCapture({ wasmModule, categories, onParsed }) {
       const draft = wasmModule.parse_voice_command({
         transcript,
         categories: categories.items,
+        language,
       });
       onParsed({
         date: todayIso(),
@@ -100,6 +106,23 @@ export default function VoiceCapture({ wasmModule, categories, onParsed }) {
       <p className="panel-subtitle">{t('transactions.voiceHint')}</p>
 
       <div className="form-grid">
+        {phase === 'idle' && (
+          <select
+            className="field-select"
+            aria-label={t('transactions.voiceLanguageLabel')}
+            value={language}
+            onChange={(e) => {
+              setLanguage(e.target.value);
+              setVoiceLanguage(e.target.value);
+            }}
+          >
+            {VOICE_LANGUAGES.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        )}
         {phase === 'idle' && (
           <button type="button" className="btn secondary" onClick={start}>
             <MicIcon />

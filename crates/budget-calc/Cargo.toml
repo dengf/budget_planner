@@ -72,6 +72,14 @@ pdf-render = ["dep:hayro"]
 # voice command never touches OCR, PDF or statement-classification code,
 # and vice versa.
 voice = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
+# Mandarin voice entry (`voice_cmn.rs`): `zh-citrinet-512`, the same NeMo
+# single-forward-pass CTC family as `voice` above, sharing `voice_mel.rs`'s
+# DSP -- so this reuses the identical trio of deps, no new dependency.
+# Its own crate (`budget-wasm-voice-cmn`) is the only one that enables
+# this, same reasoning as `voice`/`budget-wasm-voice`: mutually exclusive
+# per user action (one spoken language at a time), so it gets its own
+# lazy-loaded wasm crate rather than bundling with English's model.
+voice-cmn = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

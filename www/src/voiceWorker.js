@@ -1,47 +1,64 @@
 // Runs voice-to-transaction ASR off the main thread.
 //
-// Same lazy-`import()`, worker-isolated pattern as `ocrWorker.js`, its own
-// separate wasm module (`budget-wasm-voice`, wrapping `budget-calc`'s
-// `voice` feature) for the same reason OCR/PDF/LLM are each their own:
-// the QuartzNet15x5 model and `rten-embed`/`rten-tensor`/`rustfft` are
-// weight only a session that actually opens the voice tab should pay for
-// -- see budget-wasm-voice/src/lib.rs's own doc comment for the
+// Same lazy-`import()`, worker-isolated pattern as `ocrWorker.js`, and now
+// its own multi-model dispatcher following that file's template: one
+// worker file, one `self.onmessage`, a per-language wasm module and model
+// path, each loaded only the first time that language's own message type
+// actually arrives. English (`budget-wasm-voice`, QuartzNet15x5, ~72MB) and
+// Mandarin (`budget-wasm-voice-cmn`, zh-citrinet-512, ~159.7MB) are
+// mutually exclusive per user action -- a session that only ever speaks
+// English never downloads Mandarin's model or wasm module, and vice versa
+// -- see budget-wasm-voice-cmn/src/lib.rs's own doc comment for the
 // architecture rationale (CTC, not autoregressive; fp32, not int8 -- both
 // measured, not assumed).
 //
 // Resolved against this worker's own runtime location (`self.location`),
 // not a root-relative or page-relative path -- see `ocrWorker.js`'s own
 // doc comment for the exact GitHub Pages subpath bug this avoids.
-const VOICE_MODEL_PATH = new URL('voice/quartznet15x5-fp32.rten', self.location.href).href;
+const VOICE_MODEL_PATHS = {
+  en: new URL('voice/quartznet15x5-fp32.rten', self.location.href).href,
+  cmn: new URL('voice/zh-citrinet-512-fp32.rten', self.location.href).href,
+};
 
-// The voice model is far larger than OCR's (tens of MB, fp32 -- see
-// budget-wasm-voice's doc comment for why fp32 specifically), so unlike
-// `ocrWorker.js`'s `modelBytesPromise` (memoized only for the lifetime of
-// one worker instance), this also persists the bytes across page reloads
-// via the Cache Storage API. Without it, reopening the voice tab in a new
-// tab or after a refresh re-downloads the whole model from scratch every
-// time -- a real, measured gap found during phone testing that plain
-// worker-lifetime memoization doesn't address at all.
-const MODEL_CACHE_NAME = 'budget-planner-voice-model-v1';
+// Voice models are far larger than OCR's (tens to low hundreds of MB,
+// fp32 -- see budget-wasm-voice/budget-wasm-voice-cmn's doc comments for
+// why fp32 specifically), so unlike `ocrWorker.js`'s `modelBytesPromise`
+// (memoized only for the lifetime of one worker instance), this also
+// persists the bytes across page reloads via the Cache Storage API.
+// Without it, reopening the voice tab in a new tab or after a refresh
+// re-downloads the whole model from scratch every time -- a real, measured
+// gap found during phone testing that plain worker-lifetime memoization
+// doesn't address at all.
+//
+// Bumped to v2 (was v1, English-only) now that this cache holds more than
+// one language's model keyed by URL -- old v1 entries simply go unused
+// rather than needing an explicit migration.
+const MODEL_CACHE_NAME = 'budget-planner-voice-model-v2';
 
-// The real model is ~72MB; a git-lfs pointer text file (what a misconfigured
-// deploy can serve at the same URL with a perfectly valid 200 OK -- this bit
-// us for real, see deploy-web.yml's `lfs: true` fix) is ~130 bytes. Cache
-// Storage has no concept of "this response is wrong," so without this check
-// a pointer file fetched during a broken deploy gets cached as if it were
-// the model and served back indefinitely, long after the server is fixed --
-// nothing else would ever invalidate it. This threshold is what actually
-// catches that, for bytes already sitting in the cache and for anything
-// freshly fetched before it's allowed to be cached.
-const MIN_VALID_MODEL_BYTES = 10 * 1024 * 1024;
+// Each language's real model is comfortably larger than this; a git-lfs
+// pointer text file (what a misconfigured deploy can serve at the same URL
+// with a perfectly valid 200 OK -- this bit us for real, see
+// deploy-web.yml's `lfs: true` fix) is ~130 bytes. Cache Storage has no
+// concept of "this response is wrong," so without this check a pointer
+// file fetched during a broken deploy gets cached as if it were the model
+// and served back indefinitely, long after the server is fixed -- nothing
+// else would ever invalidate it. This threshold is what actually catches
+// that, for bytes already sitting in the cache and for anything freshly
+// fetched before it's allowed to be cached. Mandarin's floor is well below
+// its real ~159.7MB file, same margin English's 10MB floor keeps below its
+// real ~72MB file.
+const MIN_VALID_MODEL_BYTES = {
+  en: 10 * 1024 * 1024,
+  cmn: 50 * 1024 * 1024,
+};
 
-async function fetchModelBytes(url) {
+async function fetchModelBytes(url, minValidBytes) {
   try {
     const cache = await caches.open(MODEL_CACHE_NAME);
     const cached = await cache.match(url);
     if (cached) {
       const bytes = new Uint8Array(await cached.arrayBuffer());
-      if (bytes.length >= MIN_VALID_MODEL_BYTES) return bytes;
+      if (bytes.length >= minValidBytes) return bytes;
       // Stale/corrupt entry from a past broken deploy -- drop it and fall
       // through to a real fetch instead of serving it forever.
       await cache.delete(url);
@@ -57,7 +74,7 @@ async function fetchModelBytes(url) {
   // called below, the original response's body is consumed and can't be
   // handed to `cache.put` afterward.
   const bytes = new Uint8Array(await res.clone().arrayBuffer());
-  if (bytes.length < MIN_VALID_MODEL_BYTES) {
+  if (bytes.length < minValidBytes) {
     throw new Error(`model at ${url} looks truncated (${bytes.length} bytes)`);
   }
   try {
@@ -69,41 +86,66 @@ async function fetchModelBytes(url) {
   return bytes;
 }
 
-let voiceWasmPromise = null;
-let modelBytesPromise = null;
+const voiceWasmPromises = {};
+const modelBytesPromises = {};
 
-function loadVoiceWasm() {
-  if (!voiceWasmPromise) {
-    voiceWasmPromise = import('../pkg-voice').then(async (wasm) => {
+// Two separate literal `import()` calls, not one call with a variable
+// path -- webpack needs a static string to know which lazy chunk to
+// bundle and split, the same reason `ocrWorker.js` never computes its
+// `import()` targets either.
+function loadEnWasm() {
+  if (!voiceWasmPromises.en) {
+    voiceWasmPromises.en = import('../pkg-voice').then(async (wasm) => {
       if (wasm.default) await wasm.default();
       return wasm;
     });
   }
-  return voiceWasmPromise;
+  return voiceWasmPromises.en;
+}
+
+function loadCmnWasm() {
+  if (!voiceWasmPromises.cmn) {
+    voiceWasmPromises.cmn = import('../pkg-voice-cmn').then(async (wasm) => {
+      if (wasm.default) await wasm.default();
+      return wasm;
+    });
+  }
+  return voiceWasmPromises.cmn;
+}
+
+function loadVoiceWasm(language) {
+  return language === 'cmn' ? loadCmnWasm() : loadEnWasm();
 }
 
 // Same reset-on-rejection as `ocrWorker.js`'s `loadModels` -- a dropped
 // connection during the very first (uncached) fetch shouldn't permanently
 // poison every later attempt in this worker's lifetime.
-function loadModel() {
-  if (!modelBytesPromise) {
-    modelBytesPromise = fetchModelBytes(VOICE_MODEL_PATH).catch((err) => {
-      modelBytesPromise = null;
+function loadModel(language) {
+  if (!modelBytesPromises[language]) {
+    modelBytesPromises[language] = fetchModelBytes(
+      VOICE_MODEL_PATHS[language],
+      MIN_VALID_MODEL_BYTES[language],
+    ).catch((err) => {
+      modelBytesPromises[language] = null;
       throw err;
     });
   }
-  return modelBytesPromise;
+  return modelBytesPromises[language];
 }
 
 self.onmessage = async (event) => {
   const { id, type } = event.data;
   try {
     let result;
-    if (type === 'transcribe') {
-      const wasm = await loadVoiceWasm();
-      const modelBytes = await loadModel();
+    if (type === 'transcribe-en' || type === 'transcribe-cmn') {
+      const language = type === 'transcribe-cmn' ? 'cmn' : 'en';
+      const wasm = await loadVoiceWasm(language);
+      const modelBytes = await loadModel(language);
       const { samples } = event.data;
-      result = wasm.transcribe_voice_command(modelBytes, samples);
+      result =
+        language === 'cmn'
+          ? wasm.transcribe_voice_command_cmn(modelBytes, samples)
+          : wasm.transcribe_voice_command(modelBytes, samples);
     } else {
       throw new Error(`voiceWorker: unknown message type "${type}"`);
     }

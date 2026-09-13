@@ -151,11 +151,14 @@ export function startRecording() {
 
 /**
  * Runs the ASR model over already-decoded 16kHz mono samples, returning
- * the raw transcript. Empty/silent recordings and model-load failures
- * both surface via `result.error`, mirroring every other worker call in
- * this app (`extractReceiptText`, `classifyStatementDescriptions`) rather
- * than throwing.
+ * the raw transcript. `language` is one of `voiceLanguage.js`'s
+ * `VOICE_LANGUAGES` ids (`'en'`/`'cmn'`) and selects which model
+ * `voiceWorker.js` loads -- see that file's own doc comment for why each
+ * language is its own lazy wasm module. Empty/silent recordings and
+ * model-load failures both surface via `result.error`, mirroring every
+ * other worker call in this app (`extractReceiptText`,
+ * `classifyStatementDescriptions`) rather than throwing.
  */
-export async function transcribeVoiceCommand(samples) {
-  return callWorker('transcribe', { samples }, [samples.buffer]);
+export async function transcribeVoiceCommand(samples, language) {
+  return callWorker(`transcribe-${language}`, { samples }, [samples.buffer]);
 }

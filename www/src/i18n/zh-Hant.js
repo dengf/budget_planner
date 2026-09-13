@@ -215,6 +215,7 @@ export default {
   'transactions.voiceTitle': '語音新增',
   'transactions.voiceHint':
     '說一句類似「新增支出十二元 食品雜貨」的話。全部在您的裝置上轉錄——不會上傳任何內容。',
+  'transactions.voiceLanguageLabel': '語言',
   'transactions.voiceStart': '點按說話',
   'transactions.voiceRecording': '正在聆聽…點按停止',
   'transactions.voiceProcessing': '正在處理…',

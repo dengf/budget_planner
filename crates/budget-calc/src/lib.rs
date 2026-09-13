@@ -24,6 +24,10 @@ pub mod rules;
 pub mod transaction;
 #[cfg(feature = "voice")]
 pub mod voice;
+#[cfg(feature = "voice-cmn")]
+pub mod voice_cmn;
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
+mod voice_mel;
 pub mod voice_parse;
 
 pub use category::{
@@ -59,4 +63,6 @@ pub use transaction::{
 };
 #[cfg(feature = "voice")]
 pub use voice::transcribe_voice_command;
-pub use voice_parse::{parse_voice_command, VoiceCategoryCandidate, VoiceDraft};
+#[cfg(feature = "voice-cmn")]
+pub use voice_cmn::transcribe_voice_command_cmn;
+pub use voice_parse::{parse_voice_command, VoiceCategoryCandidate, VoiceDraft, VoiceLanguage};

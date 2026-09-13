@@ -235,6 +235,7 @@ export default {
   'transactions.voiceTitle': 'Add by voice',
   'transactions.voiceHint':
     'Say something like "add expense twelve dollars groceries." It is transcribed entirely on your device — nothing is uploaded.',
+  'transactions.voiceLanguageLabel': 'Spoken language',
   'transactions.voiceStart': 'Tap to speak',
   'transactions.voiceRecording': 'Listening… tap to stop',
   'transactions.voiceProcessing': 'Working it out…',
