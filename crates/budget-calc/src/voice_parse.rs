@@ -210,21 +210,85 @@ fn aliases_for_preset_en(preset_key: &str) -> &'static [&'static str] {
 fn aliases_for_preset_cmn(preset_key: &str) -> &'static [&'static str] {
     match preset_key {
         "cat.primaryEarnedIncome" => &["工资", "薪水", "薪资", "工钱", "加班费", "小费", "奖金"],
-        "cat.selfEmploymentBusiness" => &["自由职业", "自雇", "生意", "兼职", "副业", "咨询费", "零工"],
-        "cat.investmentCapitalIncome" => &["投资", "分红", "股息", "利息", "股票", "租金收入", "资本利得"],
-        "cat.governmentSupplemental" => {
-            &["政府补贴", "福利", "养老金", "社保", "社会保障金", "退税", "抚养费", "赡养费"]
+        "cat.selfEmploymentBusiness" => {
+            &["自由职业", "自雇", "生意", "兼职", "副业", "咨询费", "零工"]
         }
+        "cat.investmentCapitalIncome" => &[
+            "投资",
+            "分红",
+            "股息",
+            "利息",
+            "股票",
+            "租金收入",
+            "资本利得",
+        ],
+        "cat.governmentSupplemental" => &[
+            "政府补贴",
+            "福利",
+            "养老金",
+            "社保",
+            "社会保障金",
+            "退税",
+            "抚养费",
+            "赡养费",
+        ],
         "cat.otherIncome" => &["其他收入", "外快", "红包", "退款"],
         "cat.housing" => &["房租", "房贷", "租金", "住房", "物业费"],
-        "cat.utilities" => &["水电费", "电费", "水费", "燃气费", "网费", "话费", "网络费", "垃圾清运费"],
-        "cat.foodGroceries" => &["杂货", "食品", "餐厅", "吃饭", "外卖", "咖啡", "日用品", "水果"],
-        "cat.transportation" => &["交通费", "打车", "停车费", "加油", "车费", "地铁", "公交", "汽油"],
-        "cat.healthcareInsurance" => &["医疗", "保险费", "看病", "药", "医药费", "牙科", "视力保险"],
+        "cat.utilities" => &[
+            "水电费",
+            "电费",
+            "水费",
+            "燃气费",
+            "网费",
+            "话费",
+            "网络费",
+            "垃圾清运费",
+        ],
+        "cat.foodGroceries" => &[
+            "杂货",
+            "食品",
+            "餐厅",
+            "吃饭",
+            "外卖",
+            "咖啡",
+            "日用品",
+            "水果",
+        ],
+        "cat.transportation" => &[
+            "交通费",
+            "打车",
+            "停车费",
+            "加油",
+            "车费",
+            "地铁",
+            "公交",
+            "汽油",
+        ],
+        "cat.healthcareInsurance" => {
+            &["医疗", "保险费", "看病", "药", "医药费", "牙科", "视力保险"]
+        }
         "cat.debtServicing" => &["债务", "贷款", "还款", "信用卡还款", "学生贷款", "欠款"],
-        "cat.personalLifestyle" => &["购物", "衣服", "娱乐", "电影", "化妆品", "个人护理", "爱好", "鞋"],
+        "cat.personalLifestyle" => &[
+            "购物",
+            "衣服",
+            "娱乐",
+            "电影",
+            "化妆品",
+            "个人护理",
+            "爱好",
+            "鞋",
+        ],
         "cat.subscriptionsMemberships" => &["订阅", "会员", "健身房", "流媒体", "软件订阅"],
-        "cat.familyDependents" => &["家庭", "孩子", "育儿", "学费", "托儿费", "课外活动", "宠物", "兽医"],
+        "cat.familyDependents" => &[
+            "家庭",
+            "孩子",
+            "育儿",
+            "学费",
+            "托儿费",
+            "课外活动",
+            "宠物",
+            "兽医",
+        ],
         "cat.giftsDonations" => &["礼物", "捐款", "慈善", "捐赠", "生日礼物"],
         "cat.otherExpenses" => &["其他", "杂项", "其他支出"],
         _ => &[],
@@ -903,7 +967,12 @@ mod tests {
             ),
             category("exp-1", "饮食与日用品", false, Some("cat.foodGroceries")),
             category("exp-2", "交通", false, Some("cat.transportation")),
-            category("exp-3", "医疗与保险", false, Some("cat.healthcareInsurance")),
+            category(
+                "exp-3",
+                "医疗与保险",
+                false,
+                Some("cat.healthcareInsurance"),
+            ),
         ]
     }
 

@@ -162,8 +162,8 @@ mod tests {
         let classes = vocab().len();
         let frames = 2;
         let mut data = vec![-10.0f32; frames * classes];
-        data[0 * classes + 2] = 10.0; // 'A'
-        data[1 * classes + BLANK_ID] = 10.0; // blank -- dropped
+        data[2] = 10.0; // frame 0: 'A'
+        data[classes + BLANK_ID] = 10.0; // frame 1: blank -- dropped
         let logits = Tensor::from_data(&[1, frames, classes], data);
         assert_eq!(ctc_greedy_decode(&logits), "A");
     }

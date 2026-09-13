@@ -296,8 +296,8 @@ mod tests {
         let frames = 2;
         let blank = 2;
         let mut data = vec![-10.0f32; frames * classes];
-        data[0 * classes + blank] = 10.0;
-        data[1 * classes + 3] = 10.0;
+        data[blank] = 10.0; // frame 0
+        data[classes + 3] = 10.0; // frame 1
         let logits = rten_tensor::Tensor::from_data(&[1, frames, classes], data);
         assert_eq!(ctc_greedy_decode_indices(&logits, blank), vec![3usize]);
     }
