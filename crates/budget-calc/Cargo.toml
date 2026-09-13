@@ -28,6 +28,10 @@ serde_json = { workspace = true, optional = true }
 rten-embed = { package = "rten", version = "0.26.0", optional = true }
 rten-tensor = { package = "rten-tensor", version = "0.26.0", optional = true }
 rten-text = { package = "rten-text", version = "0.26.0", optional = true }
+# FFT for voice's log-mel feature extraction. Pure Rust, no other
+# dependency of its own -- unlike the ML runtime above, there was no
+# existing pin to reuse.
+rustfft = { version = "6", optional = true }
 # Rasterizes a PDF page to pixels -- see `pdf_render.rs`'s own doc comment
 # for why this closes a real v1 gap (`pdf_text.rs` has no answer for a
 # scanned/image-only PDF) and for the wasm32 spike that justified adding
@@ -59,6 +63,15 @@ embed-classify = ["dep:rten-embed", "dep:rten-tensor", "dep:rten-text"]
 # rasterizer, `vello_cpu`), so a session that never touches a scanned PDF
 # shouldn't pay for it.
 pdf-render = ["dep:hayro"]
+# Voice-to-transaction entry (`voice.rs`): reuses the same 0.26.0-pinned
+# `rten`/`rten-tensor` as `embed-classify` above rather than adding a
+# third pin -- both are single-forward-pass models on that runtime, just
+# different ONNX graphs. `rustfft` is voice's own addition, for the
+# log-mel features the model takes as input. Independent of every other
+# feature here for the same reason they're independent of each other: a
+# voice command never touches OCR, PDF or statement-classification code,
+# and vice versa.
+voice = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

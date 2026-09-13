@@ -8,6 +8,7 @@ www/pkg-ocr/
 www/pkg-pdf/
 www/pkg-pdfrender/
 www/pkg-llm/
+www/pkg-voice/
 
 # wasm-pack
 crates/budget-wasm/pkg/
@@ -20,6 +21,8 @@ crates/budget-wasm-pdfrender/pkg/
 crates/budget-wasm-pdfrender/target/
 crates/budget-wasm-llm/pkg/
 crates/budget-wasm-llm/target/
+crates/budget-wasm-voice/pkg/
+crates/budget-wasm-voice/target/
 
 .DS_Store
 __pycache__/

@@ -137,6 +137,13 @@ impl From<&BudgetError> for Message {
             BudgetError::PdfRenderFailed(v) => {
                 Message::with_value("err.pdfRenderFailed", v.clone(), text)
             }
+            BudgetError::EmptyAudio => Message::bare("err.emptyAudio", text),
+            BudgetError::VoiceModelLoadFailed(v) => {
+                Message::with_value("err.voiceModelLoadFailed", v.clone(), text)
+            }
+            BudgetError::VoiceTranscribeFailed(v) => {
+                Message::with_value("err.voiceTranscribeFailed", v.clone(), text)
+            }
         }
     }
 }
@@ -201,6 +208,9 @@ mod tests {
             BudgetError::EmbedClassifyFailed("1".into()),
             BudgetError::PdfPageOutOfRange("1".into()),
             BudgetError::PdfRenderFailed("1".into()),
+            BudgetError::EmptyAudio,
+            BudgetError::VoiceModelLoadFailed("1".into()),
+            BudgetError::VoiceTranscribeFailed("1".into()),
         ];
         let codes: std::collections::BTreeSet<_> =
             all.iter().map(|e| Message::from(e).code).collect();

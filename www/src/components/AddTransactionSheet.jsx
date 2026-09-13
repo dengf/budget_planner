@@ -3,6 +3,7 @@ import { useI18n } from '../i18n';
 import CalcError from './CalcError';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
+import VoiceCapture from './VoiceCapture';
 import { SpreadsheetIcon } from './icons';
 import { categoryDisplayName } from '../presetCategories';
 
@@ -52,7 +53,7 @@ export default function AddTransactionSheet({
   initialMethod = 'manual',
 }) {
   const { t } = useI18n();
-  const [method, setMethod] = useState(initialMethod); // 'manual' | 'receipt' | 'csv' | 'recurring'
+  const [method, setMethod] = useState(initialMethod); // 'manual' | 'receipt' | 'voice' | 'csv' | 'recurring'
 
   // The sheet stays mounted (and its state alive) even while closed, so a
   // caller that reopens it wanting a specific tab -- the Transactions
@@ -145,6 +146,22 @@ export default function AddTransactionSheet({
     }
   };
 
+  // Fills the ordinary manual form and switches back to it, rather than
+  // saving directly -- see VoiceCapture.jsx's own doc comment for why: a
+  // mis-transcribed word or a missed category should go through the same
+  // review step every other entry method already requires, and this
+  // keeps `transactions.save` called from exactly one place in this file.
+  const onVoiceParsed = (patch) => {
+    setDraft({
+      date: patch.date,
+      description: patch.description,
+      amount: patch.amount,
+      category_id: patch.category_id,
+      isIncome: patch.isIncome,
+    });
+    setMethod('manual');
+  };
+
   const closeAndReset = () => {
     setDraft(EMPTY_DRAFT);
     setRecurringDraft(EMPTY_RECURRING_DRAFT);
@@ -191,6 +208,15 @@ export default function AddTransactionSheet({
             onClick={() => setMethod('receipt')}
           >
             {t('transactions.methodReceipt')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={method === 'voice'}
+            className={`add-txn-method-btn${method === 'voice' ? ' active' : ''}`}
+            onClick={() => setMethod('voice')}
+          >
+            {t('transactions.methodVoice')}
           </button>
           <button
             type="button"
@@ -311,6 +337,14 @@ export default function AddTransactionSheet({
               rules={rules}
               transactions={transactions}
               formatMoney={formatMoney}
+            />
+          )}
+
+          {method === 'voice' && (
+            <VoiceCapture
+              wasmModule={wasmModule}
+              categories={categories}
+              onParsed={onVoiceParsed}
             />
           )}
 

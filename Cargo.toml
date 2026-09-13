@@ -18,6 +18,7 @@ members = [
     "crates/budget-wasm-pdf",
     "crates/budget-wasm-pdfrender",
     "crates/budget-wasm-llm",
+    "crates/budget-wasm-voice",
 ]
 resolver = "2"
 
@@ -124,6 +125,12 @@ opt-level = 3
 [profile.release.package.hayro]
 opt-level = 3
 [profile.release.package.image]
+opt-level = 3
+# The FFT voice's log-mel feature extraction runs per-frame over every
+# recording -- the same "actually compute-bound" exception as the ML
+# runtimes above, not the budgeting math the `opt-level = "z"` comment
+# below is about.
+[profile.release.package.rustfft]
 opt-level = 3
 
 [profile.release]

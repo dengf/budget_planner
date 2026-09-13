@@ -194,6 +194,23 @@ pub struct DateAmountDto {
     pub amount: f64,
 }
 
+// ---- voice entry (grammar parsing only -- ASR itself lives in the
+// sibling budget-wasm-voice crate) ------------------------------------------
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ParseVoiceCommandParams {
+    pub transcript: String,
+    pub categories: Vec<CategoryDto>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ParseVoiceCommandResult {
+    pub category_id: Option<String>,
+    pub is_income: Option<bool>,
+    pub amount: Option<f64>,
+    pub error: Option<String>,
+}
+
 // ---- CSV import -----------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

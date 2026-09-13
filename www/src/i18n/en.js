@@ -166,6 +166,7 @@ export default {
   'transactions.addManual': 'Add a transaction',
   'transactions.methodManual': 'Manual',
   'transactions.methodReceipt': 'Receipt',
+  'transactions.methodVoice': 'Voice',
   'transactions.methodImport': 'Import CSV',
   'transactions.methodRecurring': 'Recurring',
   'transactions.date': 'Date',
@@ -231,6 +232,14 @@ export default {
     '{count} transactions found — check dates, amounts and categories before adding.',
   'transactions.statementRowInclude': 'Add this one',
   'transactions.statementAddAll': 'Add {count} transactions',
+  'transactions.voiceTitle': 'Add by voice',
+  'transactions.voiceHint':
+    'Say something like "add expense twelve dollars groceries." It is transcribed entirely on your device — nothing is uploaded.',
+  'transactions.voiceStart': 'Tap to speak',
+  'transactions.voiceRecording': 'Listening… tap to stop',
+  'transactions.voiceProcessing': 'Working it out…',
+  'transactions.voiceCaptureFailed':
+    "Couldn't hear that. Check your microphone permission and try again.",
   'recurring.title': 'Recurring expenses',
   'recurring.hint':
     'Rent, subscriptions, anything on a schedule. Set one up once and see it coming before it posts.',
@@ -339,6 +348,9 @@ export default {
   'err.embedModelLoadFailed': "The classification model couldn't load ({value}).",
   'err.embedTokenizerLoadFailed': "The classification tokenizer couldn't load ({value}).",
   'err.embedClassifyFailed': "Couldn't classify a row ({value}).",
+  'err.emptyAudio': 'That recording has no audio to read.',
+  'err.voiceModelLoadFailed': "The voice-recognition engine couldn't load ({value}).",
+  'err.voiceTranscribeFailed': "Couldn't transcribe that recording ({value}).",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.importFailed': "Couldn't read that file. Try again.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",

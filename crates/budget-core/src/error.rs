@@ -81,4 +81,13 @@ pub enum BudgetError {
 
     #[error("could not render this PDF page: {0}")]
     PdfRenderFailed(String),
+
+    #[error("the recording has no audio to read")]
+    EmptyAudio,
+
+    #[error("could not load the voice model: {0}")]
+    VoiceModelLoadFailed(String),
+
+    #[error("could not transcribe this recording: {0}")]
+    VoiceTranscribeFailed(String),
 }

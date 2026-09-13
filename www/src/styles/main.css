@@ -2761,6 +2761,31 @@ table.data tr:last-child td {
   color: var(--accent-ink);
 }
 
+/* VoiceCapture.jsx's record/stop button while a recording is in
+   progress -- a plain color swap plus a gentle pulse is the whole
+   "recording" affordance, no separate waveform/timer UI. `.btn`'s own
+   44px floor and tap-scale feedback still apply, so this only adds the
+   recording-specific look on top. */
+.voice-recording {
+  background: var(--negative);
+  color: #fff;
+  animation: voice-recording-pulse 1.4s ease-in-out infinite;
+}
+@keyframes voice-recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-recording {
+    animation: none;
+  }
+}
+
 /* Expense/Income, decided once before the amount field rather than by its
    sign -- see AddTransactionSheet.jsx's own comment. Same shape as
    `.add-txn-methods` above (pill track, 44px segments) so the two
