@@ -844,8 +844,18 @@ label.btn {
   padding: 6px 10px;
   min-height: auto;
 }
+/* Flat muted colors, not opacity -- opacity fades a button's own
+   background and text toward whatever sits behind it, and in dark mode
+   that backdrop is near-black, which drags a light accent-ink label and
+   a mid-tone accent background toward each other faster than either
+   moves toward the page: the result reads as washed-out, low-contrast
+   pink-on-pink instead of "disabled". `--panel-alt`/`--muted` already
+   clear WCAG AA against each other in both themes (see this file's own
+   contrast notes at the top), so this stays legible regardless of
+   what's behind it. */
 .btn:disabled {
-  opacity: 0.5;
+  background: var(--panel-alt);
+  color: var(--muted);
   cursor: not-allowed;
 }
 
