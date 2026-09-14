@@ -191,6 +191,38 @@ pub struct RankedCategoryDto {
     pub uses: u32,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct CategorySharesParams {
+    pub entries: Vec<AmountEntryDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CategoryShareDto {
+    pub category_id: String,
+    pub amount: f64,
+    pub share: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CategorySharesResult {
+    pub shares: Vec<CategoryShareDto>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MonthSetupStateParams {
+    pub is_current_month: bool,
+    pub has_transactions: bool,
+    pub income: f64,
+    pub unassigned: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct MonthSetupStateResult {
+    pub state: Option<String>,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SpendByCategoryResult {
     pub totals: Vec<AmountResultDto>,

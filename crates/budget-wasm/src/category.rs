@@ -1,11 +1,14 @@
-//! `build_month`, `summarize_month`, `category_rank`.
+//! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
+//! `month_setup_state`.
 
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{f64_to_decimal, to_js};
 use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
-    CategoryLineDto, CategoryRankParams, CategoryRankResult, MonthSummaryDto, RankedCategoryDto,
+    CategoryLineDto, CategoryRankParams, CategoryRankResult, CategoryShareDto,
+    CategorySharesParams, CategorySharesResult, MonthSetupStateParams, MonthSetupStateResult,
+    MonthSummaryDto, RankedCategoryDto,
 };
 use crate::message::Message;
 
@@ -214,6 +217,98 @@ fn category_rank_impl(params: JsValue) -> CategoryRankResult {
                 uses: r.uses,
             })
             .collect(),
+        error: None,
+    }
+}
+
+/// Each category's share of a total -- the donut's wedge sizes and the
+/// ranked rows' percent labels. See `budget_calc::category_shares`.
+#[wasm_bindgen]
+pub fn category_shares(params: JsValue) -> JsValue {
+    to_js(&category_shares_impl(params))
+}
+
+fn category_shares_impl(params: JsValue) -> CategorySharesResult {
+    let params: CategorySharesParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        return CategorySharesResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let entries: Option<Vec<(String, rust_decimal::Decimal)>> = params
+        .entries
+        .iter()
+        .map(|e| Some((e.category_id.clone(), f64_to_decimal(e.amount)?)))
+        .collect();
+
+    let Some(entries) = entries else {
+        return CategorySharesResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    CategorySharesResult {
+        shares: budget_calc::category_shares(&entries)
+            .into_iter()
+            .map(|s| CategoryShareDto {
+                category_id: s.category_id,
+                amount: crate::convert::decimal_to_f64(s.amount),
+                share: crate::convert::decimal_to_f64(s.share),
+            })
+            .collect(),
+        error: None,
+    }
+}
+
+/// Which of the Overview hero's seven states a month is in. See
+/// `budget_calc::month_setup_state`.
+#[wasm_bindgen]
+pub fn month_setup_state(params: JsValue) -> JsValue {
+    to_js(&month_setup_state_impl(params))
+}
+
+fn month_setup_state_impl(params: JsValue) -> MonthSetupStateResult {
+    let params: MonthSetupStateParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        return MonthSetupStateResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let (Some(income), Some(unassigned)) = (
+        f64_to_decimal(params.income),
+        f64_to_decimal(params.unassigned),
+    ) else {
+        return MonthSetupStateResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let state = budget_calc::month_setup_state(
+        params.is_current_month,
+        params.has_transactions,
+        income,
+        unassigned,
+    );
+    let state = match state {
+        budget_calc::MonthSetupState::OtherMonthEmpty => "other_month_empty",
+        budget_calc::MonthSetupState::SetupPlanIncome => "setup_plan_income",
+        budget_calc::MonthSetupState::SetupAssignRemaining => "setup_assign_remaining",
+        budget_calc::MonthSetupState::SetupLogTransaction => "setup_log_transaction",
+        budget_calc::MonthSetupState::SpentSoFar => "spent_so_far",
+        budget_calc::MonthSetupState::SavingsUnassigned => "savings_unassigned",
+        budget_calc::MonthSetupState::SavingsComplete => "savings_complete",
+    };
+
+    MonthSetupStateResult {
+        state: Some(state.to_string()),
         error: None,
     }
 }
