@@ -107,21 +107,23 @@ export default function VoiceCapture({ wasmModule, categories, onParsed }) {
 
       <div className="form-grid">
         {phase === 'idle' && (
-          <select
-            className="field-select"
-            aria-label={t('transactions.voiceLanguageLabel')}
-            value={language}
-            onChange={(e) => {
-              setLanguage(e.target.value);
-              setVoiceLanguage(e.target.value);
-            }}
-          >
-            {VOICE_LANGUAGES.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </select>
+          <label className="field">
+            <span className="field-label">{t('transactions.voiceLanguageLabel')}</span>
+            <select
+              className="field-select"
+              value={language}
+              onChange={(e) => {
+                setLanguage(e.target.value);
+                setVoiceLanguage(e.target.value);
+              }}
+            >
+              {VOICE_LANGUAGES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         {phase === 'idle' && (
           <button type="button" className="btn secondary" onClick={start}>
