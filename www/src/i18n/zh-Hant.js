@@ -41,7 +41,6 @@ export default {
   'freq.quarterly': '每季',
   'freq.yearly': '每年',
 
-  'budget.title': '預算',
   'budget.viewingPastMonth': '該月已結束 — 你仍然可以調整它的計劃。',
   'budget.viewingFutureMonth': '正在為{month}提前規劃。',
   'budget.income': '本月收入',
@@ -146,7 +145,6 @@ export default {
   'cat.otherExpenses': '其他支出',
   'cat.otherExpenses.desc': '不屬於以上分類的其他支出。',
 
-  'transactions.title': '帳目',
   'transactions.listTitle': '記錄',
   'transactions.addManual': '新增一筆帳目',
   'transactions.methodManual': '手動',
@@ -277,7 +275,6 @@ export default {
   'debt.interest': '利息',
   'debt.balanceRemaining': '剩餘',
 
-  'dashboard.title': '儀表板',
   'dashboard.setup.planIncomeTitle': '規劃您的收入',
   'dashboard.setup.planIncomeDetail': '新增您這個月預計收到的金額，讓預算有據可依。',
   'dashboard.setup.planIncomeCta': '規劃收入',

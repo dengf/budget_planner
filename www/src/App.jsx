@@ -497,6 +497,7 @@ export function AppShell({ wasmModule }) {
         wasmModule={wasmModule}
         today={today}
         viewMonth={viewMonth}
+        setViewMonth={setViewMonth}
         categories={categories}
         transactions={transactions}
         rules={rules}

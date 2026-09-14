@@ -7,7 +7,6 @@ import CategoryBreakdown from './CategoryBreakdown';
 import DonutChart from './DonutChart';
 import BlossomProgress, { BlossomWatermark } from './BlossomProgress';
 import SpendOverTimeChart from './SpendOverTimeChart';
-import MonthYearPicker from './MonthYearPicker';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 import { categoryDisplayName } from '../presetCategories';
 import { categoryColor } from '../categoryVisuals';
@@ -553,16 +552,6 @@ export default function DashboardTab({
 
   return (
     <div className="panel report dashboard">
-      <div className="dash-header">
-        <h2>{t('dashboard.title')}</h2>
-        <MonthYearPicker
-          value={viewMonth}
-          onChange={setViewMonth}
-          todayMonth={today}
-          locale={locale}
-        />
-      </div>
-
       {hero()}
 
       {goals.items.length > 0 && (

@@ -43,7 +43,6 @@ export default {
   'freq.quarterly': 'quarterly',
   'freq.yearly': 'yearly',
 
-  'budget.title': 'Budget',
   'budget.viewingPastMonth': 'This month has ended — you can still adjust its plan.',
   'budget.viewingFutureMonth': 'Planning ahead for {month}.',
   'budget.income': 'Income this month',
@@ -161,7 +160,6 @@ export default {
   'cat.otherExpenses': 'Other Expenses',
   'cat.otherExpenses.desc': "Any other expense that doesn't fit the categories above.",
 
-  'transactions.title': 'Transactions',
   'transactions.listTitle': 'History',
   'transactions.addManual': 'Add a transaction',
   'transactions.methodManual': 'Manual',
@@ -300,7 +298,6 @@ export default {
   'debt.interest': 'Interest',
   'debt.balanceRemaining': 'Remaining',
 
-  'dashboard.title': 'Dashboard',
   'dashboard.setup.planIncomeTitle': 'Plan your income',
   'dashboard.setup.planIncomeDetail':
     'Add how much you expect to receive this month so the budget has something to work with.',
