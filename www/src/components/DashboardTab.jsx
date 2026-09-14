@@ -48,11 +48,15 @@ const SETUP_STEPS = {
     ctaKey: 'dashboard.setup.assignRemainingCta',
     tab: 'budget',
   },
+  // The only step whose CTA opens the Add sheet rather than changing
+  // tab: "Log a transaction" that dropped someone on the Transactions
+  // tab left them looking at an empty list, one tap short of the thing
+  // the button had just offered to do.
   logTransaction: {
     titleKey: 'dashboard.setup.logTransactionTitle',
     detailKey: 'dashboard.setup.logTransactionDetail',
     ctaKey: 'dashboard.setup.logTransactionCta',
-    tab: 'transactions',
+    add: 'manual',
   },
 };
 
@@ -76,6 +80,7 @@ export default function DashboardTab({
   goals,
   debts,
   onNavigateTab,
+  onOpenAdd,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
@@ -400,7 +405,11 @@ export default function DashboardTab({
           <button
             type="button"
             className="btn"
-            onClick={() => onNavigateTab?.(SETUP_STEPS[setupStep].tab)}
+            onClick={() =>
+              SETUP_STEPS[setupStep].add
+                ? onOpenAdd?.(SETUP_STEPS[setupStep].add)
+                : onNavigateTab?.(SETUP_STEPS[setupStep].tab)
+            }
           >
             {t(SETUP_STEPS[setupStep].ctaKey)}
           </button>

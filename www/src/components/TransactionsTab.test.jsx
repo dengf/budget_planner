@@ -8,17 +8,13 @@ function renderTab(props) {
   return render(
     <I18nProvider initialLocale="en">
       <TransactionsTab
-        wasmModule={{}}
         currencySymbol="$"
         today="2026-01-01"
         viewMonth="2026-01-01"
         setViewMonth={() => {}}
-        newId={() => 'new-id'}
         confirm={() => Promise.resolve(true)}
         categories={{ items: [] }}
         transactions={{ items: [], save: vi.fn(), remove: vi.fn() }}
-        rules={{ items: [], save: vi.fn(), remove: vi.fn() }}
-        recurring={{ items: [], save: vi.fn(), remove: vi.fn() }}
         {...props}
       />
     </I18nProvider>,
@@ -32,32 +28,31 @@ describe('TransactionsTab', () => {
     expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument();
   });
 
-  it('opens the add sheet on Manual when "Log a transaction" is tapped', () => {
-    renderTab();
+  // The sheet itself lives in AppShell now, behind the nav bar's centre
+  // "+", so what this tab owns is which method it asks for -- and asking
+  // for the right one is the whole point of having two buttons: an
+  // "Import CSV" button that opened onto the Manual form would read as
+  // broken.
+  it('asks the shell for the Manual method when "Log a transaction" is tapped', () => {
+    const onOpenAdd = vi.fn();
+    renderTab({ onOpenAdd });
     fireEvent.click(screen.getByRole('button', { name: 'Log a transaction' }));
-    expect(screen.getByRole('tab', { name: 'Manual', selected: true })).toBeInTheDocument();
+    expect(onOpenAdd).toHaveBeenCalledWith('manual');
   });
 
-  it('opens the add sheet on Import CSV when "Import CSV" is tapped', () => {
-    renderTab();
+  it('asks the shell for the CSV method when "Import CSV" is tapped', () => {
+    const onOpenAdd = vi.fn();
+    renderTab({ onOpenAdd });
     fireEvent.click(screen.getByRole('button', { name: 'Import CSV' }));
-    expect(screen.getByRole('tab', { name: 'Import CSV', selected: true })).toBeInTheDocument();
+    expect(onOpenAdd).toHaveBeenCalledWith('csv');
   });
 
-  it('keeps categorization rules and recurring setup collapsed behind a disclosure', () => {
+  // Both used to render as collapsed <details> under the list. They are
+  // setup, not daily use, so they moved to More -- and the point of the
+  // move is that this tab is the list and nothing else.
+  it('leaves categorization rules and recurring setup to the More tab', () => {
     renderTab();
-    const rulesDetails = screen.getByText('Categorization rules').closest('details');
-    const recurringDetails = screen.getByText('Recurring expenses').closest('details');
-    expect(rulesDetails).not.toHaveAttribute('open');
-    expect(recurringDetails).not.toHaveAttribute('open');
-  });
-
-  it('renders the transaction history ahead of rules and recurring in document order', () => {
-    renderTab();
-    const headings = Array.from(document.querySelectorAll('h2, summary')).map(
-      (el) => el.textContent,
-    );
-    expect(headings.indexOf('History')).toBeLessThan(headings.indexOf('Categorization rules'));
-    expect(headings.indexOf('History')).toBeLessThan(headings.indexOf('Recurring expenses'));
+    expect(screen.queryByText('Categorization rules')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recurring expenses')).not.toBeInTheDocument();
   });
 });

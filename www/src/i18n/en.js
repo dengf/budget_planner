@@ -23,6 +23,14 @@ export default {
   'nav.transactions': 'Transactions',
   'nav.goals': 'Goals',
   'nav.debt': 'Debt payoff',
+  'nav.more': 'More',
+  'nav.add': 'Add a transaction',
+
+  'more.title': 'More',
+  'more.goalsHint': 'Save towards something, one month at a time.',
+  'more.debtHint': 'Order your debts and see when they clear.',
+  'more.rulesHint': 'Match a keyword once, and every matching transaction files itself.',
+  'more.recurringHint': 'Rent, subscriptions, anything on a schedule.',
 
   'intro.lede':
     'A monthly budget, savings goals and a debt payoff plan — worked out where you can see the working.',
@@ -67,9 +75,6 @@ export default {
   'budget.remove': 'Remove',
 
   'budget.addCommon': 'Add common categories',
-  'budget.logSpending': 'Log spending',
-  'budget.logIncome': 'Log income',
-  'budget.logTransaction': 'Log Transactions',
   'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
   'budget.commitmentsTitle': 'Goals & debt this month',
   'budget.progressAria': '{name}: {spent} of {planned} spent',
@@ -105,8 +110,6 @@ export default {
   'data.importConfirm':
     'Replace everything in this app with the {count} records in that file? What is here now will be gone.',
   'data.imported': '{count} records restored.',
-  'budget.spendAmount': 'Amount spent',
-  'budget.incomeAmount': 'Amount received',
   'budget.spentHint':
     'Spent adds up your transactions for the month — use + on a row to log one here, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
@@ -175,6 +178,14 @@ export default {
   'transactions.expense': 'Expense',
   'transactions.income': 'Income',
   'transactions.addExpense': 'Add expense',
+  'transactions.addAmount': 'Add {amount}',
+  'transactions.addAmountTo': 'Add {amount} to {category}',
+  'transactions.descriptionPlaceholder': 'Optional',
+  'transactions.allCategories': 'All',
+  'transactions.filterCategories': 'Find a category',
+  'transactions.noCategoryMatch': 'No category matches that.',
+  'transactions.noCategoriesYet': 'No categories on this side of the ledger yet.',
+  'transactions.ruleMatched': 'Your rule files this under {category}.',
   'transactions.addIncome': 'Add income',
   'transactions.amount': 'Amount',
   'transactions.amountHintExpense': 'Recorded as money spent.',

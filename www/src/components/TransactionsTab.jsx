@@ -2,85 +2,48 @@ import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
-import AddTransactionSheet from './AddTransactionSheet';
 import CategoryBadge from './CategoryBadge';
 import MonthYearPicker from './MonthYearPicker';
-import { categoryDisplayName } from '../presetCategories';
+import { makeCategoryLookup } from '../presetCategories';
+
+/**
+ * The transaction list, and nothing else.
+ *
+ * Two collapsed <details> used to sit under it -- categorization rules
+ * and recurring expenses. Both are setup: written once, then working
+ * quietly on every transaction added afterwards. They now live in More,
+ * next to Goals and Debt, which leaves this tab as the one thing its
+ * name promises. See RulesSection.jsx / RecurringSection.jsx.
+ */
 export default function TransactionsTab({
-  wasmModule,
   currencySymbol,
   today,
   viewMonth,
   setViewMonth,
-  newId,
   confirm,
   categories,
   transactions,
-  rules,
-  recurring,
+  onOpenAdd,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [showAllMonths, setShowAllMonths] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addMethod, setAddMethod] = useState('manual');
 
-  /** Opens the Add sheet on a specific tab -- the empty state's two
-   *  buttons (Log a transaction / Import CSV) both go through this
-   *  rather than always landing on Manual, since a "Import CSV" button
-   *  that opens onto the Manual form would read as broken. */
-  const openAdd = (method = 'manual') => {
-    setAddMethod(method);
-    setAddOpen(true);
-  };
+  /** Opens the shell's Add sheet on a specific tab -- the empty state's
+   *  two buttons (Log a transaction / Import CSV) both go through this
+   *  rather than always landing on Manual, since an "Import CSV" button
+   *  that opens onto the Manual form would read as broken.
+   *
+   *  The sheet itself lives in AppShell, behind the "+" in the nav bar,
+   *  so it opens the same way from every tab instead of this tab owning
+   *  a second copy of it. */
+  const openAdd = (method = 'manual') => onOpenAdd?.(method);
 
-  const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
-
-  const addRule = async (e) => {
-    e.preventDefault();
-    if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return;
-    await rules.save({
-      id: newId(),
-      keyword: ruleDraft.keyword,
-      category_id: ruleDraft.category_id,
-      priority: Number(ruleDraft.priority) || 0,
-    });
-    setRuleDraft({ keyword: '', category_id: '', priority: 0 });
-  };
-
-  const applyRules = async () => {
-    if (!wasmModule?.apply_rules) return;
-    const result = await wasmModule.apply_rules({
-      transactions: transactions.items,
-      rules: rules.items,
-    });
-    if (!result?.error) {
-      for (const tx of result.transactions) {
-        const before = transactions.items.find((t) => t.id === tx.id);
-        if (before?.category_id !== tx.category_id) await transactions.save(tx);
-      }
-    }
-  };
-
-  const categoryFor = (id) => categories.items.find((c) => c.id === id);
-  const categoryName = (id) => {
-    const c = categoryFor(id);
-    return c ? categoryDisplayName(c, t) : t('transactions.uncategorized');
-  };
+  const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
 
   const removeTransaction = async (tx) => {
     const ok = await confirm(t('confirm.removeTransaction', { description: tx.description }));
     if (ok) await transactions.remove(tx.id);
-  };
-
-  const removeRule = async (rule) => {
-    const ok = await confirm(t('confirm.removeRule', { keyword: rule.keyword }));
-    if (ok) await rules.remove(rule.id);
-  };
-
-  const removeRecurring = async (item) => {
-    const ok = await confirm(t('confirm.removeRecurring', { description: item.description }));
-    if (ok) await recurring.remove(item.id);
   };
 
   // Defaults to the viewed month so the list stays short and fast to scan
@@ -92,40 +55,18 @@ export default function TransactionsTab({
 
   return (
     <div className="panel txn-panel">
+      {/* No "+" in this header any more. It used to sit here, at the top
+          of the screen -- the furthest point from a thumb on a tall
+          phone, for the action taken most often in the whole app, and
+          present on this tab only. It is now the centre button of the
+          nav bar, within reach on every tab. */}
       <div className="dash-header sticky-title-header sticky-title-header-flush">
         <h2>{t('transactions.title')}</h2>
-        <button
-          type="button"
-          className="icon-add-btn"
-          aria-label={t('budget.logTransaction')}
-          onClick={() => openAdd('manual')}
-        >
-          <span aria-hidden="true">+</span>
-        </button>
       </div>
 
-      <AddTransactionSheet
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        initialMethod={addMethod}
-        wasmModule={wasmModule}
-        newId={newId}
-        categories={categories}
-        rules={rules}
-        transactions={transactions}
-        recurring={recurring}
-        formatMoney={formatMoney}
-      />
-
-      {/* Logging and importing are what a first-time (and every later)
-          visit to this tab is actually for -- categorization rules and
-          recurring setup below are real, useful features, but neither one
-          means anything before a transaction history exists to apply
-          them to. Putting the transaction list, and its two loudest ways
-          to start one, ahead of both is what makes that order obvious
-          instead of the opposite of what actually happens: rules and
-          recurring used to render first, above an empty list they had
-          nothing to act on yet. */}
+      {/* Logging and importing are what a first visit to this tab is
+          actually for, so the empty state leads with both rather than
+          leaving someone to find the "+" on their own. */}
       {transactions.items.length === 0 ? (
         <>
           <h2 className="section-start">{t('transactions.listTitle')}</h2>
@@ -201,135 +142,6 @@ export default function TransactionsTab({
           )}
         </>
       )}
-
-      {/* Rules and recurring setup: real features, kept out of the way
-          until someone goes looking for them -- collapsed by default,
-          same disclosure pattern as Budget's own collapsible sections. */}
-      <details className="collapsible-panel">
-        <summary>{t('transactions.rulesTitle')}</summary>
-        <p className="panel-subtitle">{t('transactions.rulesHint')}</p>
-        {rules.items.length === 0 ? (
-          <p className="empty-state">{t('transactions.noRules')}</p>
-        ) : (
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('transactions.ruleKeyword')}</th>
-                  <th>{t('transactions.category')}</th>
-                  <th>{t('transactions.rulePriority')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rules.items.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.keyword}</td>
-                    <td>
-                      <span className="category-cell">
-                        <CategoryBadge category={categoryFor(r.category_id)} />
-                        {categoryName(r.category_id)}
-                      </span>
-                    </td>
-                    <td className="num">{r.priority}</td>
-                    <td>
-                      <button className="btn ghost" onClick={() => removeRule(r)}>
-                        {t('budget.remove')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <form className="form-grid" onSubmit={addRule}>
-          <label className="field">
-            <span className="field-label">{t('transactions.ruleKeyword')}</span>
-            <div className="field-input">
-              <input
-                value={ruleDraft.keyword}
-                onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
-              />
-            </div>
-          </label>
-          <label className="field">
-            <span className="field-label">{t('transactions.category')}</span>
-            <select
-              className="field-select"
-              value={ruleDraft.category_id}
-              onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
-            >
-              <option value="">—</option>
-              {categories.items.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {categoryDisplayName(c, t)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">{t('transactions.rulePriority')}</span>
-            <div className="field-input">
-              <input
-                type="number"
-                value={ruleDraft.priority}
-                onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
-              />
-            </div>
-          </label>
-          <button className="btn" type="submit">
-            {t('transactions.addRule')}
-          </button>
-          <button className="btn secondary" type="button" onClick={applyRules}>
-            {t('transactions.applyRules')}
-          </button>
-        </form>
-      </details>
-
-      <details className="collapsible-panel">
-        <summary>{t('recurring.title')}</summary>
-        <p className="panel-subtitle">{t('recurring.hint')}</p>
-        {recurring.items.length === 0 ? (
-          <p className="empty-state">{t('recurring.none')}</p>
-        ) : (
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('recurring.description')}</th>
-                  <th>{t('transactions.category')}</th>
-                  <th>{t('budget.planned')}</th>
-                  <th>{t('recurring.cadence')}</th>
-                  <th>{t('recurring.anchorDate')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {recurring.items.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.description}</td>
-                    <td>
-                      <span className="category-cell">
-                        <CategoryBadge category={categoryFor(r.category_id)} />
-                        {categoryName(r.category_id)}
-                      </span>
-                    </td>
-                    <td className="num">{formatMoney(r.amount)}</td>
-                    <td>{t(`freq.${r.cadence}`)}</td>
-                    <td>{r.anchor_date}</td>
-                    <td>
-                      <button className="btn ghost" onClick={() => removeRecurring(r)}>
-                        {t('budget.remove')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </details>
     </div>
   );
 }

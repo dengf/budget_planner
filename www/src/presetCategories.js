@@ -110,3 +110,26 @@ export function categoryDisplayGroup(category, t) {
     ? t(category.is_income ? 'cat.group.income' : 'cat.group.expense')
     : (category.group ?? '');
 }
+
+/**
+ * Look a category up by the id a transaction, rule or recurring item
+ * stores, and name it -- including the one case `categoryDisplayName`
+ * alone can't answer: an id that matches nothing (or none at all), which
+ * has to read as "Uncategorized" rather than an empty cell.
+ *
+ * Lives here rather than in each tab because three screens now render a
+ * category next to a stored id -- Transactions' list, and the rules and
+ * recurring tables that moved to More -- and three private copies of the
+ * same four lines is exactly how one of them ends up saying something
+ * different from the other two.
+ */
+export function makeCategoryLookup(categories, t) {
+  const find = (id) => categories.find((c) => c.id === id);
+  return {
+    categoryFor: find,
+    categoryName: (id) => {
+      const category = find(id);
+      return category ? categoryDisplayName(category, t) : t('transactions.uncategorized');
+    },
+  };
+}

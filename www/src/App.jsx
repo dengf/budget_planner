@@ -1,14 +1,15 @@
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Header from './components/Header';
 import Intro from './components/Intro';
 import SwipeHint from './components/SwipeHint';
 import { useConfirm } from './components/ConfirmDialog';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
+import { makeFormatMoney } from './currency';
 import { loadTheme, saveTheme, applyTheme } from './theme';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
-import { currentMonth } from './month';
+import { currentMonth, todayIso } from './month';
 import { availablePresets, buildCategoryFromPreset } from './presetCategories';
 import { TABS, TAB_ORDER } from './tabs';
 
@@ -100,10 +101,50 @@ export function AppShell({ wasmModule }) {
   // across Dashboard/Budget/Transactions so picking a month in one tab
   // is still picked when another tab opens.
   const [today] = useState(() => currentMonth());
+  // The same anchor at day resolution, for the things that need a date
+  // rather than a month: the Add sheet's default date, and the "as of"
+  // that its category ranking measures recency against. Frozen at mount
+  // like `today` above, for the same reason.
+  const [todayDate] = useState(() => todayIso());
   const [viewMonth, setViewMonth] = useState(today);
   const { t } = useI18n();
   const [confirm, confirmDialog] = useConfirm();
   const [guardResult, setGuardResult] = useState(null);
+  /**
+   * The add-transaction sheet lives here, not inside any one tab.
+   *
+   * It used to belong to TransactionsTab, reachable only from that tab's
+   * own small "+" in the header row, while Budget had a separate
+   * bottom-right floating button that opened a category menu and an
+   * inline per-row form instead -- two different controls, in two
+   * different corners, doing the same job differently, and neither of
+   * them on the tab the app actually opens on. Logging a transaction is
+   * the single most common thing anyone does here, so there is now one
+   * way to do it, reachable from every tab, and it has to outlive any
+   * individual tab's mount to work that way.
+   *
+   * `addMethod` is which method the sheet opens on ('manual', 'csv',
+   * ...) -- the Transactions empty state's "Import CSV" button opening
+   * onto the manual form would read as broken, which is the same reason
+   * that tab kept this state before the sheet moved up here.
+   */
+  const [addOpen, setAddOpen] = useState(false);
+  const [addMethod, setAddMethod] = useState('manual');
+  /**
+   * The sheet is not rendered at all until it is opened for the first
+   * time, and then stays mounted (so a half-typed draft survives a close
+   * and reopen). Rendering a closed one from the start would resolve its
+   * `React.lazy` import during first paint, pulling ReceiptCapture,
+   * VoiceCapture and their worker entry points onto the critical path --
+   * exactly the download this sheet is lazy to avoid.
+   */
+  const [addMounted, setAddMounted] = useState(false);
+  const openAdd = useCallback((method = 'manual') => {
+    setAddMethod(method);
+    setAddMounted(true);
+    setAddOpen(true);
+  }, []);
+  const formatMoney = useMemo(() => makeFormatMoney(currencySymbol), [currencySymbol]);
 
   const categories = useCollection(
     wasmModule,
@@ -441,6 +482,7 @@ export function AppShell({ wasmModule }) {
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        onOpenAdd={openAdd}
         currencySymbol={currencySymbol}
         onCurrencySymbolChange={(next) => {
           saveCurrencySymbol(next);
@@ -494,17 +536,45 @@ export function AppShell({ wasmModule }) {
               recurring={recurring}
               budgetPlan={budgetPlan}
               onNavigateTab={setActiveTab}
+              onOpenAdd={openAdd}
             />
           </div>
         </Suspense>
         <Intro />
       </main>
+      {addMounted && (
+        <Suspense fallback={null}>
+          <AddTransactionSheet
+            open={addOpen}
+            onClose={() => setAddOpen(false)}
+            initialMethod={addMethod}
+            wasmModule={wasmModule}
+            newId={newId}
+            today={todayDate}
+            categories={categories}
+            rules={rules}
+            transactions={transactions}
+            recurring={recurring}
+            formatMoney={formatMoney}
+          />
+        </Suspense>
+      )}
       <CalcErrorPortal result={guardResult} />
       {confirmDialog}
       <UpdateBanner />
     </div>
   );
 }
+
+/**
+ * Lazy like the tab panels, and for the same reason: this pulls in
+ * ReceiptCapture and VoiceCapture (and through them the lazy OCR/PDF/
+ * voice worker entry points), none of which a session that never opens
+ * the sheet should pay for on first paint. It is mounted at shell level
+ * so the "+" works from every tab, which is exactly what would otherwise
+ * have made it a static import on the app's critical path.
+ */
+const AddTransactionSheet = React.lazy(() => import('./components/AddTransactionSheet'));
 
 // Lazy-imported here too, rather than statically at the top -- it's tiny,
 // but every static import at this level is one more thing every tab pays

@@ -327,6 +327,33 @@ body {
   color: var(--accent-ink);
 }
 
+/* The one control this whole app is most often opened to use, given the
+   middle of the nav row and the app's accent fill so it reads as the
+   primary action rather than a fifth destination. Spliced into the row
+   by Header.jsx at `ADD_BUTTON_INDEX`, never a tab -- see tabs.js.
+
+   `flex: 0 0 auto` against the tab buttons' `flex: 1 1 0` (mobile) keeps
+   it a fixed circle while the four labels share whatever is left. */
+.app-tab-add {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--hero-shadow);
+}
+
 /* Five tabs wrapped left-aligned at phone width -- a lopsided 2/3 split
    hugging the left edge, reading as crowded and unbalanced. Every tab
    stays reachable with no scrolling; centering each wrapped row (flex
@@ -376,6 +403,22 @@ body {
   }
   .app-tab-label {
     white-space: nowrap;
+  }
+  /* Raised out of the bar on phone, the way a primary action in a bottom
+     bar is expected to sit. `transform`, not a negative margin, so the
+     bar keeps its own height (and its safe-area padding) unchanged and
+     only the button moves; transforms carry the hit box with them, so
+     the tap target moves too rather than being left behind in the bar.
+
+     The ring is `--bg`, the page's own background, not the bar's: the
+     top of the circle overhangs scrolling content above the bar, and a
+     ring in the bar's colour would draw a grey halo over that content. */
+  .app-tab-add {
+    width: 56px;
+    height: 56px;
+    font-size: 1.9rem;
+    border: 4px solid var(--bg);
+    transform: translateY(-12px);
   }
   .app-main {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
@@ -1724,47 +1767,12 @@ table.data tr:last-child td {
   display: none;
 }
 
-/* "Spent" is derived from transactions, so it needs a way in from here --
-   otherwise the column looks broken to anyone who hasn't found the
-   Transactions tab. */
 .spent-cell {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
-.spend-add {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  line-height: 1;
-  border: 1px solid var(--input-border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 1rem;
-  cursor: pointer;
-}
-.spend-add:hover {
-  color: var(--ink);
-  border-color: var(--accent);
-}
-.spend-add[aria-expanded='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-.spend-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-  align-items: end;
-  padding: 12px;
-  margin-bottom: 8px;
-  background: var(--panel-alt);
-  border-radius: 10px;
-}
-
 @media (max-width: 720px) {
   /* A category used to run 8-9 stacked lines on a phone (name, group,
      progress, a "PLANNED" label row then the input, a "SPENT" label row
@@ -1834,16 +1842,6 @@ table.data tr:last-child td {
     grid-column: 1;
     grid-row: 3;
     justify-content: flex-start;
-  }
-  /* Was a flat 24x24 everywhere -- fine for a mouse, too small for the
-     finger that's doing the tapping on a phone-width layout like this
-     one. Desktop's dense 5-column row keeps the smaller size above; this
-     row has already reflowed to a single wide column by this point, so
-     there's room to grow without crowding anything else in it. */
-  .category-row .spend-add {
-    width: 44px;
-    height: 44px;
-    font-size: 1.1rem;
   }
   .category-row > .num:not(.spent-cell) {
     grid-column: 2;
@@ -2687,10 +2685,9 @@ table.data tr:last-child td {
   min-height: 44px;
 }
 
-/* Backdrop for the sheet the shared .fab-add button opens on this tab --
-   the single entry point for every way a transaction gets added (manual,
-   receipt, CSV), replacing three permanently-expanded sections that used
-   to stack above the transaction list. Also reused by Budget's Add
+/* Backdrop for the sheet the nav bar's centre "+" opens -- the single
+   entry point for every way a transaction gets added (manual, receipt,
+   voice, CSV, recurring), from any tab. Also reused by Budget's Add
    Category panel below -- without a dimmed backdrop it floated directly
    on the page with only a thin border, which read as blending into the
    main page rather than a popup, since --panel and --bg (:root, top of
@@ -3126,33 +3123,10 @@ table.data tr:last-child td {
   line-height: 1;
   cursor: pointer;
 }
-.fab-add {
-  position: fixed;
-  right: 20px;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  z-index: 70;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 56px;
-  padding: 0 22px 0 18px;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 1rem;
-  font-weight: 700;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-.fab-add span:first-child {
-  font-size: 1.6rem;
-  line-height: 1;
-}
 .fab-picker {
   position: fixed;
   right: 20px;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: max(20px, env(safe-area-inset-bottom));
   width: min(280px, calc(100vw - 40px));
   max-height: 60vh;
   overflow-y: auto;
@@ -3163,30 +3137,19 @@ table.data tr:last-child td {
   box-shadow: var(--hero-shadow);
   z-index: 71;
 }
-.fab-picker-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  color: var(--ink);
-  text-align: left;
-  font-size: 0.92rem;
-}
-.fab-picker-item:hover,
-.fab-picker-item:focus-visible {
-  background: var(--panel-alt);
-}
-
-/* Widens/repads the shared .fab-picker shell for form content (the
+/* Widens/repads the .fab-picker shell for form content (the
    category-name/group fields, income checkbox, Add/Add-common buttons)
-   instead of a plain tap-to-pick menu list -- position, z-index and the
-   720px bottom-clearance override all still come from .fab-picker itself
-   since both classes land on the same element. */
+   -- position, z-index and the 720px bottom-clearance override all
+   still come from .fab-picker itself since both classes land on the
+   same element.
+
+   The two classes were once separate things: .fab-picker was the
+   category list a floating "+" button opened on this tab, and this
+   widened the same shell for the add-a-category form. That floating
+   button is gone -- adding a transaction is the nav bar's centre "+"
+   now, from any tab -- so .fab-picker exists only to carry this panel's
+   position, and the two will fold into one rule when the Budget tab
+   itself is rebuilt. */
 .category-add-panel {
   width: min(340px, calc(100vw - 32px));
   max-height: 70vh;
@@ -3198,22 +3161,20 @@ table.data tr:last-child td {
 
 /* Below 720px the bottom tab bar (`.app-tabs`, see its own media query
    above) switches to `position: fixed; bottom: 0` -- so without this the
-   FAB's plain 20px-from-viewport-bottom position sits directly underneath
-   that bar: mostly hidden, and its tap target stolen by the tab bar's own
-   icons. This has to come after the base `.fab-add`/`.fab-picker` rules
-   above in source order -- an identical `@media (max-width: 720px)`
+   panel's plain 20px-from-viewport-bottom position sits directly
+   underneath that bar: mostly hidden, and its tap target stolen by the
+   tab bar's own icons. This has to come after the base `.fab-picker`
+   rule above in source order -- an identical `@media (max-width: 720px)`
    block placed earlier in the file (nearer `.app-tabs`'s own) loses the
-   cascade to these later, equal-specificity unconditional rules, even
+   cascade to this later, equal-specificity unconditional rule, even
    while its condition matches. Same 64px clearance `.app-main` reserves
-   for that bar, plus the FAB's own 20px margin from that now-cleared
-   edge; the picker list adds the FAB's own height and margin on top of
-   that. */
+   for that bar, plus the panel's own 20px margin from that now-cleared
+   edge. The offsets used to be 84/148px, stacked to clear a floating
+   "+" button that stood between the panel and the bar; that button is
+   gone, so the panel drops to sit just above the bar itself. */
 @media (max-width: 720px) {
-  .fab-add {
-    bottom: calc(84px + env(safe-area-inset-bottom));
-  }
   .fab-picker {
-    bottom: calc(148px + env(safe-area-inset-bottom));
+    bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }
 
@@ -3244,4 +3205,174 @@ table.data tr:last-child td {
 }
 .debug-panel-empty {
   color: var(--muted);
+}
+
+/* ---- More tab ------------------------------------------------------ */
+
+/* A list of destinations, not a stack of panels: this screen holds the
+   parts of the app nobody opens daily (Goals and Debt today; the rules
+   and recurring tables, and the settings menu, move in next), and a
+   single long scroll through five full panels is a screen nothing can be
+   found on. Tapping a row swaps the list for that section plus a back
+   link -- MoreTab.jsx's own `section` state, no router. */
+.more-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  /* Comfortably past the 44px floor: these are full-width rows with room
+     to spare, not chips competing for horizontal space. */
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.more-item:hover,
+.more-item:focus-visible {
+  border-color: var(--accent);
+}
+.more-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--panel-alt);
+  color: var(--accent);
+}
+.more-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.more-item-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.more-item-hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.more-item-chevron {
+  color: var(--muted-2);
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.more-back-row {
+  display: flex;
+}
+.more-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px 8px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.more-back span {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+/* The section below renders its own `.panel` with its own heading, so
+   this wrapper contributes only the back row's spacing -- without this
+   the nested panel's padding would stack on top of the outer one's. */
+.more-panel {
+  gap: 12px;
+}
+
+/* ---- Category picker (Add sheet) ----------------------------------- */
+
+/* Chips, not a <select>. A dropdown costs open-scroll-pick and, on a
+   phone, hands the whole screen to a native list of every category in an
+   order unrelated to what this person actually uses. The first six are
+   already ranked by useCategoryRank; the rest live behind "All". */
+.category-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Spans both columns of `.form-grid` -- a chip row squeezed into one
+     half-width column would wrap to one chip per line. */
+  grid-column: 1 / -1;
+}
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* Two of these fit a 375px row with the gap and the sheet's padding;
+     three fit on anything wider. `max-width` keeps a long category name
+     from pushing a chip past the sheet's own edge -- the name ellipsizes
+     instead (see `.category-chip-name`). */
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 14px 6px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.category-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.category-chip:hover,
+.category-chip:focus-visible {
+  border-color: var(--accent);
+}
+/* Filled with the accent, same as `.txn-type-btn.active` right above it
+   in the sheet -- two selected states a few pixels apart have to look
+   like the same idea. The category badge inside keeps its own colour
+   against that fill, which is why the chip's text goes to --accent-ink
+   rather than the badge being asked to carry the selection. */
+.category-chip.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.category-chip-more {
+  padding-left: 14px;
+}
+.category-picker-all {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* The full list can run long; it scrolls inside itself rather than
+     pushing the submit button off the bottom of the sheet. */
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-alt);
 }

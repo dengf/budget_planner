@@ -74,13 +74,19 @@ describe('DashboardTab setup steps', () => {
     expect(onNavigateTab).toHaveBeenCalledWith('budget');
   });
 
-  it('navigates to Transactions for the logTransaction step', async () => {
+  // This one step opens the Add sheet instead of changing tab: dropping
+  // someone on an empty Transactions list leaves them one tap short of
+  // what the button just offered to do.
+  it('opens the add sheet for the logTransaction step rather than changing tab', async () => {
     const onNavigateTab = vi.fn();
+    const onOpenAdd = vi.fn();
     renderDashboard({
       wasmModule: makeWasm({ income: 1000, total_planned: 1000, unassigned: 0 }),
       onNavigateTab,
+      onOpenAdd,
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Log a transaction' }));
-    expect(onNavigateTab).toHaveBeenCalledWith('transactions');
+    expect(onOpenAdd).toHaveBeenCalledWith('manual');
+    expect(onNavigateTab).not.toHaveBeenCalled();
   });
 });

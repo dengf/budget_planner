@@ -20,6 +20,7 @@ function renderSheet(props) {
         onClose={() => {}}
         wasmModule={{}}
         newId={() => 'new-id'}
+        today="2026-01-01"
         categories={CATEGORIES}
         rules={{ items: [] }}
         transactions={transactions}
@@ -33,18 +34,20 @@ function renderSheet(props) {
 }
 
 describe('AddTransactionSheet manual entry', () => {
+  // The chips are the category picker now; a dropdown listing every
+  // category cost three interactions for the app's most common action.
   it('defaults to Expense mode with only expense categories offered', () => {
     renderSheet();
     expect(screen.getByRole('tab', { name: 'Expense' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('option', { name: 'Housing' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Primary Earned Income' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Housing' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Primary Earned Income' })).not.toBeInTheDocument();
   });
 
   it('switches to Income mode and offers only income categories', () => {
     renderSheet();
     fireEvent.click(screen.getByRole('tab', { name: 'Income' }));
-    expect(screen.getByRole('option', { name: 'Primary Earned Income' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Housing' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Primary Earned Income' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Housing' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add income' })).toBeInTheDocument();
   });
 
@@ -53,8 +56,8 @@ describe('AddTransactionSheet manual entry', () => {
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-01-05' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Rent' } });
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '500' } });
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'exp1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Housing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add $500 to Housing' }));
     expect(transactions.save).toHaveBeenCalledWith(
       expect.objectContaining({ amount: -500, category_id: 'exp1' }),
     );
@@ -66,10 +69,42 @@ describe('AddTransactionSheet manual entry', () => {
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-01-05' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Paycheck' } });
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '500' } });
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'inc1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add income' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Primary Earned Income' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add $500 to Primary Earned Income' }));
     expect(transactions.save).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 500, category_id: 'inc1' }),
+    );
+  });
+
+  // The amount is the one thing someone always knows when they open the
+  // sheet. Requiring a date and a note as well put three fields between
+  // them and logging the coffee they just bought.
+  it('needs only an amount: the date falls back to today and the note to the category', () => {
+    const { transactions } = renderSheet();
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '4.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Housing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add $4.5 to Housing' }));
+    expect(transactions.save).toHaveBeenCalledWith(
+      expect.objectContaining({ date: '2026-01-01', description: 'Housing', amount: -4.5 }),
+    );
+  });
+
+  it('will not submit without an amount', () => {
+    renderSheet();
+    expect(screen.getByRole('button', { name: 'Add expense' })).toBeDisabled();
+  });
+
+  // Tapping the selected chip clears it: an uncategorized transaction is
+  // an honest record, and better than a wrong one filed to get out of
+  // the sheet.
+  it('saves without a category when none is chosen', () => {
+    const { transactions } = renderSheet();
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Housing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Housing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add $12' }));
+    expect(transactions.save).toHaveBeenCalledWith(
+      expect.objectContaining({ category_id: null, description: 'Expense' }),
     );
   });
 
