@@ -95,7 +95,11 @@ pub fn transcribe_voice_command(
         .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no output".into()))?;
 
     let filterbank = mel_filterbank(N_MELS);
-    let (features, n_mels, n_frames) = log_mel_features(samples, &filterbank, N_MELS);
+    // `QuartzNet15x5`'s compiled graph has only one input (`audio_signal`,
+    // confirmed by inspecting it directly) -- the true, pre-padding frame
+    // count `log_mel_features` also returns is Citrinet's `length` input's
+    // concern (`voice_cmn.rs`), not this model's.
+    let (features, n_mels, n_frames, _true_frames) = log_mel_features(samples, &filterbank, N_MELS);
     let input = Tensor::from_data(&[1, n_mels, n_frames], features);
 
     let [output] = model

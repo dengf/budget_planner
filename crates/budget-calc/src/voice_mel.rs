@@ -112,16 +112,23 @@ fn hann_window() -> Vec<f64> {
     window
 }
 
-/// 16kHz mono samples in; `(features, n_mels, n_frames)` out, row-major
-/// `[n_mels, n_frames]` -- the layout this whole model family's
-/// `audio_signal` input wants. `n_frames` is already padded to a multiple
-/// of `FRAME_PAD_MULTIPLE`.
+/// 16kHz mono samples in; `(features, n_mels, n_frames, true_frames)` out,
+/// `features` row-major `[n_mels, n_frames]` -- the layout this whole
+/// model family's `audio_signal` input wants. `n_frames` is already
+/// padded to a multiple of `FRAME_PAD_MULTIPLE`; `true_frames` is the
+/// count *before* that padding, which Citrinet's `length` input needs so
+/// its masked convolutions know which trailing frames are real audio
+/// versus padding -- see `voice_cmn.rs`'s own doc comment for why passing
+/// only `audio_signal` and omitting `length` is a real, previously-shipped
+/// bug, not a hypothetical one. `QuartzNet15x5` (`voice.rs`) has no
+/// `length` input at all (confirmed by inspecting its compiled `.rten`
+/// graph), so it simply ignores this fourth value.
 #[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) fn log_mel_features(
     samples: &[f32],
     filterbank: &[Vec<f64>],
     n_mels: usize,
-) -> (Vec<f32>, usize, usize) {
+) -> (Vec<f32>, usize, usize, usize) {
     let x: Vec<f64> = samples.iter().map(|&s| s as f64).collect();
 
     // Preemphasis; the first sample is left untouched.
@@ -199,7 +206,7 @@ pub(crate) fn log_mel_features(
             out[m * total_frames + t] = mel[m * n_frames.max(1) + t] as f32;
         }
     }
-    (out, n_mels, total_frames)
+    (out, n_mels, total_frames, n_frames)
 }
 
 /// Greedy CTC decode: argmax per frame, collapse immediate repeats, drop
@@ -257,7 +264,7 @@ mod tests {
             let fb = mel_filterbank(n_mels);
             // ~1 second of silence.
             let samples = vec![0.0f32; 16000];
-            let (data, mels, n_frames) = log_mel_features(&samples, &fb, n_mels);
+            let (data, mels, n_frames, _true_frames) = log_mel_features(&samples, &fb, n_mels);
             assert_eq!(mels, n_mels);
             assert_eq!(n_frames % FRAME_PAD_MULTIPLE, 0);
             assert_eq!(data.len(), mels * n_frames);
@@ -273,7 +280,7 @@ mod tests {
         // downstream conv layer silently.
         let fb = mel_filterbank(80);
         let samples = vec![0.0f32; 16000];
-        let (data, _, _) = log_mel_features(&samples, &fb, 80);
+        let (data, _, _, _) = log_mel_features(&samples, &fb, 80);
         assert!(data.iter().all(|v| v.is_finite()));
     }
 

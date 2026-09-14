@@ -197,14 +197,16 @@ fn frame_features(
 }
 
 /// `[-1.0, 1.0]` 16kHz mono samples in; `(features, n_mels, n_frames)`
-/// out, row-major `[n_mels, n_frames]` -- same output shape convention
-/// as `voice_mel::log_mel_features`, so `voice_yue.rs` can build its
-/// model input tensor the same way `voice_cmn.rs` does. No frame-count
-/// padding here (unlike `voice_mel.rs`'s `FRAME_PAD_MULTIPLE`): the `WeNet`
-/// Conformer export this feeds has no matching conv-stride constraint
-/// that was found in the spike, and padding un-asked-for silence into a
-/// short recording would change the model's own (already-correct)
-/// output length assumptions.
+/// out, row-major `[n_frames, n_mels]` -- **not** `voice_mel::log_mel_features`'s
+/// `[n_mels, n_frames]` convention. Confirmed by inspecting the compiled
+/// `yue-conformer-fp32.rten` graph directly: its `x` input is shaped
+/// `[N, T, 80]` (batch, time, mel-bins), the opposite axis order from the
+/// `NeMo` family's `audio_signal` input. No frame-count padding here
+/// (unlike `voice_mel.rs`'s `FRAME_PAD_MULTIPLE`): the `WeNet` Conformer
+/// export this feeds has no matching conv-stride constraint that was
+/// found in the spike, and padding un-asked-for silence into a short
+/// recording would change the model's own (already-correct) output
+/// length assumptions.
 pub(crate) fn fbank_features(
     samples: &[f32],
     filterbank: &[Vec<f32>],
@@ -220,13 +222,11 @@ pub(crate) fn fbank_features(
     let mut planner = rustfft::FftPlanner::<f64>::new();
     let fft = planner.plan_fft_forward(PADDED_SIZE);
 
-    let mut out = vec![0.0f32; num_bins * n_frames.max(1)];
+    let mut out = vec![0.0f32; n_frames * num_bins];
     for t in 0..n_frames {
         let raw = extract_frame(&scaled, t);
         let feats = frame_features(&raw, &window, filterbank, &fft);
-        for (m, &v) in feats.iter().enumerate() {
-            out[m * n_frames.max(1) + t] = v;
-        }
+        out[t * num_bins..(t + 1) * num_bins].copy_from_slice(&feats);
     }
     (out, num_bins, n_frames)
 }
@@ -274,12 +274,13 @@ mod tests {
         let fb = yue_mel_filterbank(80);
         let (data, num_bins, n_frames) = fbank_features(&synthetic_samples(), &fb, 80);
         assert_eq!(num_bins, 80);
+        assert_eq!(n_frames, 5);
 
         let frame0_expected: [f32; 5] = [13.179_926, 13.874_611, 14.143_15, 14.449_106, 14.897_824];
         let frame1_expected: [f32; 5] = [5.880_062, 6.490_823, 5.677_254, 4.960_998, 6.863_027];
         for i in 0..5 {
-            let got0 = data[i * n_frames];
-            let got1 = data[i * n_frames + 1];
+            let got0 = data[i];
+            let got1 = data[num_bins + i];
             assert!(
                 (got0 - frame0_expected[i]).abs() < 5e-2,
                 "frame0[{i}]: got {got0}, expected {}",

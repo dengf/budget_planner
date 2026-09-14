@@ -16,6 +16,14 @@
 //! is guarded by an explicit test below since getting it wrong produces
 //! confident nonsense, not an error.
 //!
+//! **This model's compiled graph takes two inputs, `x` and `x_lens`, and
+//! `x` is `[N, T, 80]` (batch, time, mel-bins) -- the opposite axis order
+//! from the `NeMo` family's `[1, n_mels, n_frames]`.** Both confirmed by
+//! inspecting the compiled `.rten` graph directly, the same way
+//! `voice_cmn.rs`'s missing `length` input was found: omitting the length
+//! input or transposing the feature tensor doesn't produce a wrong
+//! transcript, it fails the whole forward pass.
+//!
 //! **Decode rule is identical to `voice_cmn.rs`'s**, not a bespoke
 //! CJK/ASCII-run heuristic as originally speculated: this vocab mixes CJK
 //! characters with whole English BPE pieces, and the English pieces
@@ -104,21 +112,34 @@ pub fn transcribe_voice_command_yue(
 
     let model =
         Model::load(model_bytes).map_err(|e| BudgetError::VoiceModelLoadFailed(e.to_string()))?;
-    let input_id = *model
-        .input_ids()
-        .first()
-        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no input".into()))?;
-    let output_id = *model
-        .output_ids()
-        .first()
-        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no output".into()))?;
+    // Looked up by name, not `input_ids().first()` -- this model has two
+    // inputs (`x`, `x_lens`) and two outputs (`log_probs`,
+    // `log_probs_lens`), and nothing guarantees graph export order.
+    let audio_input_id = model
+        .find_node("x")
+        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no x input".into()))?;
+    let lens_input_id = model
+        .find_node("x_lens")
+        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no x_lens input".into()))?;
+    let output_id = model
+        .find_node("log_probs")
+        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no log_probs output".into()))?;
 
     let filterbank = yue_mel_filterbank(N_MELS);
     let (features, n_mels, n_frames) = fbank_features(samples, &filterbank, N_MELS);
-    let input = Tensor::from_data(&[1, n_mels, n_frames], features);
+    // `[1, n_frames, n_mels]` -- this model's `x` input is time-major
+    // (batch, time, mel-bins), the opposite axis order from the NeMo
+    // family's `audio_signal`. `fbank_features` already returns data laid
+    // out this way; see its own doc comment.
+    let input = Tensor::from_data(&[1, n_frames, n_mels], features);
+    let lens = Tensor::from_data(&[1], vec![n_frames as i32]);
 
     let [output] = model
-        .run_n(vec![(input_id, input.into())], [output_id], None)
+        .run_n(
+            vec![(audio_input_id, input.into()), (lens_input_id, lens.into())],
+            [output_id],
+            None,
+        )
         .map_err(|e| BudgetError::VoiceTranscribeFailed(e.to_string()))?;
     let logits: Tensor<f32> = output
         .try_into()

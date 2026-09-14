@@ -15,6 +15,18 @@
 //! `▁` word-boundary marker, confirmed against the model's own shipped
 //! tokens file rather than assumed) -- not in the DSP itself, which is
 //! bit-for-bit the same recipe.
+//!
+//! **Unlike `QuartzNet15x5`, this model's compiled graph has a second
+//! required input, `length`** (`int32`, the real frame count before
+//! `voice_mel.rs`'s multiple-of-16 padding) -- confirmed by inspecting the
+//! model's own input nodes directly, not assumed from `voice.rs`'s
+//! single-input shape. Citrinet's masked convolutions use it to know
+//! which trailing frames are padding rather than real audio; omitting it
+//! doesn't produce a wrong transcript, it fails the whole forward pass
+//! with an `rten` graph-planning error (`Missing input "length" for op
+//! .../mconv.3/Shape_1`) -- a real bug that shipped to production in this
+//! module's first version because no test here ever ran the real model
+//! end-to-end, only the decode logic against synthetic tensors.
 
 use rten_embed::Model;
 use rten_tensor::Tensor;
@@ -99,21 +111,34 @@ pub fn transcribe_voice_command_cmn(
 
     let model =
         Model::load(model_bytes).map_err(|e| BudgetError::VoiceModelLoadFailed(e.to_string()))?;
-    let input_id = *model
-        .input_ids()
-        .first()
-        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no input".into()))?;
+    // Looked up by name, not `input_ids().first()` -- this model has two
+    // inputs (`audio_signal`, `length`) and nothing guarantees graph
+    // export order, unlike `voice.rs`'s single-input `QuartzNet15x5`.
+    let audio_input_id = model.find_node("audio_signal").ok_or_else(|| {
+        BudgetError::VoiceModelLoadFailed("model has no audio_signal input".into())
+    })?;
+    let length_input_id = model
+        .find_node("length")
+        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no length input".into()))?;
     let output_id = *model
         .output_ids()
         .first()
         .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no output".into()))?;
 
     let filterbank = mel_filterbank(N_MELS);
-    let (features, n_mels, n_frames) = log_mel_features(samples, &filterbank, N_MELS);
+    let (features, n_mels, n_frames, true_frames) = log_mel_features(samples, &filterbank, N_MELS);
     let input = Tensor::from_data(&[1, n_mels, n_frames], features);
+    let length = Tensor::from_data(&[1], vec![true_frames as i32]);
 
     let [output] = model
-        .run_n(vec![(input_id, input.into())], [output_id], None)
+        .run_n(
+            vec![
+                (audio_input_id, input.into()),
+                (length_input_id, length.into()),
+            ],
+            [output_id],
+            None,
+        )
         .map_err(|e| BudgetError::VoiceTranscribeFailed(e.to_string()))?;
     let logits: Tensor<f32> = output
         .try_into()
