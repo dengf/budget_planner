@@ -6,10 +6,15 @@
 //! negative `remaining`, which the UI reframes as "borrowed from next
 //! month" rather than a failure (see budget-wasm's Message layer).
 
+use std::cmp::Reverse;
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use budget_core::{round_currency, BudgetError, BudgetResult};
+
+use crate::date_util::parse_date;
+use crate::transaction::Transaction;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Category {
@@ -244,6 +249,132 @@ pub fn summarize_month(lines: &[CategoryLine], income_category_ids: &[String]) -
     }
 }
 
+/// Which side of the ledger the person is entering, which is the first
+/// and cheapest thing that narrows a category list: entering income can
+/// never mean Groceries, and entering a expense can never mean Salary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Direction {
+    Expense,
+    Income,
+}
+
+impl Direction {
+    /// A transaction's own sign convention (positive = income), so the
+    /// same rule decides what a stored transaction counted as and what a
+    /// half-typed amount is about to count as.
+    fn matches_amount(self, amount: Decimal) -> bool {
+        match self {
+            Direction::Income => amount.is_sign_positive(),
+            Direction::Expense => amount.is_sign_negative(),
+        }
+    }
+}
+
+/// How often a category has been used lately, on a 0-1 scale where 1 is
+/// the most-used category on this side of the ledger. `uses` is the raw
+/// count behind it, so a caller can tell "never used" (0) apart from
+/// "used, but least of all" -- the first has no history to justify
+/// pre-selecting it, the second does.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RankedCategory {
+    pub category_id: String,
+    pub score: Decimal,
+    pub uses: u32,
+}
+
+/// A recent use counts for more than an old one, halving every 30 days.
+/// Chosen, not measured: a month is the unit this whole app thinks in,
+/// so "this month's habits outweigh last month's, and last year's barely
+/// register" is the behaviour to aim at. Three months back is worth an
+/// eighth of today.
+const RECENCY_HALF_LIFE_DAYS: f64 = 30.0;
+
+/// Order the categories by how likely this person is to want each one
+/// next, so the Add sheet can put a handful of chips in front of them
+/// instead of a scrolling list of everything.
+///
+/// Two inputs, in order of how much they narrow things:
+///
+/// 1. **Direction.** Entering money received can only mean an income
+///    category, and spending can only mean an expense one. For most
+///    people this alone takes income down to a single choice.
+/// 2. **Recency-weighted frequency.** Among what's left, what they
+///    actually use, with recent use weighted above old use (see
+///    `RECENCY_HALF_LIFE_DAYS`).
+///
+/// Deliberately *not* a model. `rules.rs` already carries this app's
+/// position on automatic categorization: a keyword rule is inspectable
+/// and can be corrected, "the model decided" is not. Counting a person's
+/// own past choices is the same kind of honest -- the answer to "why is
+/// Groceries first?" is "because you picked it eleven times this month".
+///
+/// Every matching category is returned, never a truncated list: how many
+/// chips fit is a layout question, and the caller is the only one that
+/// knows it. Categories with no history keep the order they were given
+/// in (the sort is stable), which is preset order for the starter set --
+/// so a brand-new budget with no transactions still gets a sensible
+/// list rather than an arbitrary one.
+///
+/// `as_of` is passed in, never read from a clock -- this crate has no
+/// I/O (see lib.rs). An unparseable `as_of`, or an unparseable
+/// transaction date, contributes no weight rather than erroring: a bad
+/// date in one old record shouldn't take the whole list down.
+pub fn category_rank(
+    categories: &[Category],
+    transactions: &[Transaction],
+    as_of: &str,
+    direction: Direction,
+) -> Vec<RankedCategory> {
+    let today = parse_date(as_of);
+
+    let mut ranked: Vec<RankedCategory> = categories
+        .iter()
+        .filter(|c| c.is_income == (direction == Direction::Income))
+        .map(|c| {
+            let mut weight = 0.0_f64;
+            let mut uses = 0_u32;
+            for t in transactions {
+                if t.category_id.as_deref() != Some(c.id.as_str()) {
+                    continue;
+                }
+                if !direction.matches_amount(t.amount) {
+                    continue;
+                }
+                uses += 1;
+                let Some((today, date)) = today.zip(parse_date(&t.date)) else {
+                    continue;
+                };
+                let days_ago = (today - date).num_days().max(0) as f64;
+                weight += 0.5_f64.powf(days_ago / RECENCY_HALF_LIFE_DAYS);
+            }
+            (c.id.clone(), weight, uses)
+        })
+        .map(|(category_id, weight, uses)| RankedCategory {
+            category_id,
+            score: Decimal::try_from(weight).unwrap_or_default(),
+            uses,
+        })
+        .collect();
+
+    let top = ranked
+        .iter()
+        .map(|r| r.score)
+        .max()
+        .unwrap_or(Decimal::ZERO);
+    if top > Decimal::ZERO {
+        for r in &mut ranked {
+            r.score = (r.score / top).round_dp(4);
+        }
+    }
+
+    // Highest score first, and `sort_by_key` is stable -- so equal
+    // scores, which every category has before any history exists, keep
+    // the caller's order.
+    ranked.sort_by_key(|r| Reverse(r.score));
+    ranked
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,5 +558,160 @@ mod tests {
     fn a_negative_savings_target_is_rejected_same_as_any_other_category() {
         let err = build_savings_line(dec!(-1), dec!(2000), dec!(1000)).unwrap_err();
         assert_eq!(err, BudgetError::NegativePlannedAmount("-1".to_string()));
+    }
+
+    fn cat(id: &str, is_income: bool) -> Category {
+        Category::new(id, id, "General", is_income, "").unwrap()
+    }
+
+    fn tx(id: &str, date: &str, amount: Decimal, category_id: &str) -> Transaction {
+        let mut t = Transaction::new(id, date, "x", amount);
+        t.category_id = Some(category_id.to_string());
+        t
+    }
+
+    fn ranked_ids(ranked: &[RankedCategory]) -> Vec<&str> {
+        ranked.iter().map(|r| r.category_id.as_str()).collect()
+    }
+
+    #[test]
+    fn entering_income_never_offers_an_expense_category() {
+        let categories = vec![cat("salary", true), cat("food", false), cat("rent", false)];
+        let ranked = category_rank(&categories, &[], "2026-09-14", Direction::Income);
+        assert_eq!(ranked_ids(&ranked), ["salary"]);
+    }
+
+    #[test]
+    fn entering_an_expense_never_offers_an_income_category() {
+        let categories = vec![cat("salary", true), cat("food", false), cat("rent", false)];
+        let ranked = category_rank(&categories, &[], "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["food", "rent"]);
+    }
+
+    #[test]
+    fn with_no_history_the_given_order_is_kept() {
+        // A fresh budget has the five seeded starter categories and no
+        // transactions. Preset order is the only signal there is, and an
+        // unstable sort would scramble it into something arbitrary.
+        let categories = vec![cat("food", false), cat("rent", false), cat("fun", false)];
+        let ranked = category_rank(&categories, &[], "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["food", "rent", "fun"]);
+        assert!(ranked.iter().all(|r| r.uses == 0));
+    }
+
+    #[test]
+    fn the_most_used_category_comes_first() {
+        let categories = vec![cat("rent", false), cat("food", false)];
+        let transactions = vec![
+            tx("1", "2026-09-10", dec!(-20), "food"),
+            tx("2", "2026-09-11", dec!(-30), "food"),
+            tx("3", "2026-09-01", dec!(-1500), "rent"),
+        ];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["food", "rent"]);
+        assert_eq!(ranked[0].uses, 2);
+    }
+
+    #[test]
+    fn amount_never_outweighs_frequency() {
+        // One 1500 rent payment against two small grocery runs: this
+        // ranks how often a category is *picked*, not how much money
+        // went through it. Ranking by amount would put rent and
+        // mortgage permanently above the categories actually typed in
+        // every day.
+        let categories = vec![cat("rent", false), cat("food", false)];
+        let transactions = vec![
+            tx("1", "2026-09-10", dec!(-4), "food"),
+            tx("2", "2026-09-11", dec!(-6), "food"),
+            tx("3", "2026-09-11", dec!(-1500), "rent"),
+        ];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["food", "rent"]);
+    }
+
+    #[test]
+    fn a_recent_habit_outranks_an_abandoned_one() {
+        // Four uses six months ago against two uses this week. The old
+        // one wins on raw count and still has to lose: the point is what
+        // this person reaches for *now*.
+        let categories = vec![cat("old", false), cat("new", false)];
+        let transactions = vec![
+            tx("1", "2026-03-01", dec!(-10), "old"),
+            tx("2", "2026-03-02", dec!(-10), "old"),
+            tx("3", "2026-03-03", dec!(-10), "old"),
+            tx("4", "2026-03-04", dec!(-10), "old"),
+            tx("5", "2026-09-12", dec!(-10), "new"),
+            tx("6", "2026-09-13", dec!(-10), "new"),
+        ];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["new", "old"]);
+        assert_eq!(ranked[1].uses, 4);
+    }
+
+    #[test]
+    fn the_top_category_scores_one_and_an_unused_one_scores_zero() {
+        let categories = vec![cat("food", false), cat("fun", false)];
+        let transactions = vec![tx("1", "2026-09-14", dec!(-10), "food")];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked[0].score, dec!(1));
+        assert_eq!(ranked[1].score, dec!(0));
+        assert_eq!(ranked[1].uses, 0);
+    }
+
+    #[test]
+    fn a_transaction_on_the_wrong_side_of_the_ledger_does_not_count() {
+        // A refund posts as a positive amount against an expense
+        // category. It is not evidence that this category is where the
+        // next *expense* goes, so it earns no weight -- and mustn't
+        // quietly reorder the list on the strength of it.
+        let categories = vec![cat("food", false), cat("fun", false)];
+        let transactions = vec![tx("1", "2026-09-14", dec!(40), "food")];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["food", "fun"]);
+        assert!(ranked.iter().all(|r| r.uses == 0));
+    }
+
+    #[test]
+    fn an_uncategorized_transaction_contributes_nothing() {
+        let categories = vec![cat("food", false)];
+        let transactions = vec![Transaction::new("1", "2026-09-14", "x", dec!(-10))];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked[0].uses, 0);
+    }
+
+    #[test]
+    fn an_unparseable_date_is_counted_but_earns_no_recency_weight() {
+        // Half of a rescued CSV import can carry a date this app can't
+        // read. The right answer is to ignore what can't be read, not to
+        // return an empty list and leave the sheet with no chips at all.
+        let categories = vec![cat("food", false), cat("fun", false)];
+        let transactions = vec![
+            tx("1", "not-a-date", dec!(-10), "food"),
+            tx("2", "2026-09-14", dec!(-10), "fun"),
+        ];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked_ids(&ranked), ["fun", "food"]);
+        assert_eq!(ranked[1].uses, 1);
+        assert_eq!(ranked[1].score, dec!(0));
+    }
+
+    #[test]
+    fn a_future_dated_transaction_counts_as_today_rather_than_more_than_today() {
+        // Scheduling next week's rent shouldn't out-weight something
+        // logged this morning; clamping at zero days keeps the most a
+        // single use can be worth at 1.
+        let categories = vec![cat("rent", false), cat("food", false)];
+        let transactions = vec![
+            tx("1", "2026-12-01", dec!(-1500), "rent"),
+            tx("2", "2026-09-14", dec!(-10), "food"),
+        ];
+        let ranked = category_rank(&categories, &transactions, "2026-09-14", Direction::Expense);
+        assert_eq!(ranked[0].score, ranked[1].score);
+        assert_eq!(ranked_ids(&ranked), ["rent", "food"]);
+    }
+
+    #[test]
+    fn no_categories_at_all_gives_an_empty_list_not_a_panic() {
+        assert!(category_rank(&[], &[], "2026-09-14", Direction::Expense).is_empty());
     }
 }

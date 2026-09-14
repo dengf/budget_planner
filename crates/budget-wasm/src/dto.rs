@@ -164,6 +164,33 @@ pub struct SpendByCategoryParams {
     pub transactions: Vec<TransactionDto>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct CategoryRankParams {
+    pub categories: Vec<CategoryDto>,
+    pub transactions: Vec<TransactionDto>,
+    /// Today, as the caller's own `YYYY-MM-DD` -- `budget-calc` has no
+    /// clock (see its lib.rs), and the browser is the only thing here
+    /// that knows what day it is in the viewer's timezone.
+    pub as_of: String,
+    /// `"income"` or `"expense"`. Anything else is a bad request rather
+    /// than a silent default: guessing the direction would hand back the
+    /// wrong half of the category list with no sign that it had.
+    pub direction: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CategoryRankResult {
+    pub ranked: Vec<RankedCategoryDto>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RankedCategoryDto {
+    pub category_id: String,
+    pub score: f64,
+    pub uses: u32,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SpendByCategoryResult {
     pub totals: Vec<AmountResultDto>,

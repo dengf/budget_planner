@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import CalcError from './CalcError';
+import CategoryPicker from './CategoryPicker';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
 import VoiceCapture from './VoiceCapture';
 import { SpreadsheetIcon } from './icons';
 import { categoryDisplayName } from '../presetCategories';
+import { useCategoryRank } from '../useCategoryRank';
 
 const DEFAULT_MAPPING = {
   date_col: 0,
@@ -15,7 +17,22 @@ const DEFAULT_MAPPING = {
   has_header: true,
 };
 
-const EMPTY_DRAFT = { date: '', description: '', amount: '', category_id: '', isIncome: false };
+/**
+ * `categoryTouched` is not part of the record -- it's the difference
+ * between "this category is a suggestion" and "this category is the
+ * person's answer". Until they touch the picker, the selected category
+ * is derived on every render from the rule match and the ranking, so it
+ * keeps up with what they type in the note; the moment they tap a chip,
+ * their choice stops moving under them.
+ */
+const EMPTY_DRAFT = {
+  date: '',
+  description: '',
+  amount: '',
+  category_id: '',
+  isIncome: false,
+  categoryTouched: false,
+};
 
 const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
@@ -45,6 +62,7 @@ export default function AddTransactionSheet({
   onClose,
   wasmModule,
   newId,
+  today,
   categories,
   rules,
   transactions,
@@ -69,27 +87,113 @@ export default function AddTransactionSheet({
   const [columnsDetected, setColumnsDetected] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [recurringDraft, setRecurringDraft] = useState(EMPTY_RECURRING_DRAFT);
+  const [ruleMatch, setRuleMatch] = useState(null);
+
+  const { ordered, suggestionId } = useCategoryRank({
+    wasmModule,
+    categories: categories.items,
+    transactions: transactions.items,
+    today,
+    isIncome: draft.isIncome,
+  });
+
+  /**
+   * The same `budget_calc::apply_rules` that files imported CSV rows,
+   * run against what's being typed right now -- so a rule someone wrote
+   * once ("uber -> Transport") does its work at the moment of entry
+   * instead of only on a later bulk re-run. The draft is handed over as
+   * a throwaway one-transaction list; nothing is saved here.
+   *
+   * Every setState is inside the async closure: a synchronous one in an
+   * effect body is the cascading-render pattern React warns about, and
+   * "no rule matched" is just as much a result as a match is.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const note = draft.description.trim();
+      const canMatch = note && rules.items.length > 0 && wasmModule?.apply_rules;
+      const result = canMatch
+        ? await wasmModule.apply_rules({
+            transactions: [
+              {
+                id: 'draft',
+                date: draft.date || today,
+                description: note,
+                amount: draft.isIncome ? 1 : -1,
+                category_id: null,
+              },
+            ],
+            rules: rules.items,
+          })
+        : null;
+      const matched = result?.error ? null : (result?.transactions?.[0]?.category_id ?? null);
+      if (!cancelled) setRuleMatch(matched);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [wasmModule, rules.items, draft.description, draft.date, draft.isIncome, today]);
+
+  // Derived, not stored: a suggestion that lived in state would need an
+  // effect to keep it in step with the note, and the moment two effects
+  // can both write `category_id` one of them starts winning races.
+  const suggested = ruleMatch ?? suggestionId ?? '';
+  const categoryId = draft.categoryTouched ? draft.category_id : suggested;
+  const suggestedByRule = Boolean(ruleMatch) && !draft.categoryTouched;
 
   if (!open) return null;
 
+  const categoryName = (id) =>
+    categoryDisplayName(
+      categories.items.find((c) => c.id === id),
+      t,
+    );
+
+  /**
+   * The amount is the only thing required. A date left alone is today --
+   * which is when nearly every manually-logged transaction happened --
+   * and a blank note takes the category's name, or just "Expense" /
+   * "Income" when there isn't one. Both used to be mandatory, which made
+   * three fields stand between someone and logging the coffee they just
+   * bought.
+   */
   const addTransaction = async (e) => {
     e.preventDefault();
-    if (!draft.date || !draft.description || draft.amount === '') return;
+    if (draft.amount === '') return;
     // The Expense/Income toggle below is the one place the sign gets
     // decided -- the amount field only ever collects a plain positive
     // magnitude now, so there is nothing left to get backwards by typing
     // (or forgetting) a minus sign. See DirectionWarning.jsx for why that
     // used to be a real, easy-to-make mistake.
     const magnitude = Math.abs(Number(draft.amount));
+    const fallback = categoryId
+      ? categoryName(categoryId)
+      : t(draft.isIncome ? 'transactions.income' : 'transactions.expense');
     await transactions.save({
       id: newId(),
-      date: draft.date,
-      description: draft.description,
+      date: draft.date || today,
+      description: draft.description.trim() || fallback,
       amount: draft.isIncome ? magnitude : -magnitude,
-      category_id: draft.category_id || null,
+      category_id: categoryId || null,
     });
     setDraft({ ...EMPTY_DRAFT, isIncome: draft.isIncome });
     onClose();
+  };
+
+  /** Names what is about to happen, with the figures already in the
+   *  draft -- "Add $42.60 to Food" is a sentence someone can check
+   *  before tapping, where "Add expense" is a button they have to trust.
+   *  Falls back as the draft empties out, never naming a category or an
+   *  amount that isn't there. */
+  const submitLabel = () => {
+    if (draft.amount === '') {
+      return t(draft.isIncome ? 'transactions.addIncome' : 'transactions.addExpense');
+    }
+    const amount = formatMoney(Math.abs(Number(draft.amount)));
+    return categoryId
+      ? t('transactions.addAmountTo', { amount, category: categoryName(categoryId) })
+      : t('transactions.addAmount', { amount });
   };
 
   const addRecurring = async (e) => {
@@ -158,6 +262,9 @@ export default function AddTransactionSheet({
       amount: patch.amount,
       category_id: patch.category_id,
       isIncome: patch.isIncome,
+      // A category heard in the utterance is the person's own answer,
+      // not a guess to be overwritten by the ranking a moment later.
+      categoryTouched: Boolean(patch.category_id),
     });
     setMethod('manual');
   };
@@ -258,7 +365,9 @@ export default function AddTransactionSheet({
                   role="tab"
                   aria-selected={!draft.isIncome}
                   className={`txn-type-btn${!draft.isIncome ? ' active' : ''}`}
-                  onClick={() => setDraft({ ...draft, isIncome: false, category_id: '' })}
+                  onClick={() =>
+                    setDraft({ ...draft, isIncome: false, category_id: '', categoryTouched: false })
+                  }
                 >
                   {t('transactions.expense')}
                 </button>
@@ -267,31 +376,20 @@ export default function AddTransactionSheet({
                   role="tab"
                   aria-selected={draft.isIncome}
                   className={`txn-type-btn${draft.isIncome ? ' active' : ''}`}
-                  onClick={() => setDraft({ ...draft, isIncome: true, category_id: '' })}
+                  onClick={() =>
+                    setDraft({ ...draft, isIncome: true, category_id: '', categoryTouched: false })
+                  }
                 >
                   {t('transactions.income')}
                 </button>
               </div>
+              {/* Amount first. It is the one thing someone always knows
+                  when they open this sheet, the only required field, and
+                  the thing every other control below reacts to -- the
+                  submit button quotes it back. Date and note used to
+                  come first purely because that is a bank statement's
+                  column order. */}
               <form className="form-grid" onSubmit={addTransaction}>
-                <label className="field">
-                  <span className="field-label">{t('transactions.date')}</span>
-                  <div className="field-input">
-                    <input
-                      type="date"
-                      value={draft.date}
-                      onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                    />
-                  </div>
-                </label>
-                <label className="field">
-                  <span className="field-label">{t('transactions.description')}</span>
-                  <div className="field-input">
-                    <input
-                      value={draft.description}
-                      onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                    />
-                  </div>
-                </label>
                 <NumberField
                   label={t('transactions.amount')}
                   value={draft.amount}
@@ -299,24 +397,44 @@ export default function AddTransactionSheet({
                   grouped
                 />
                 <label className="field">
-                  <span className="field-label">{t('transactions.category')}</span>
-                  <select
-                    className="field-select"
-                    value={draft.category_id}
-                    onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}
-                  >
-                    <option value="">{t('transactions.uncategorized')}</option>
-                    {categories.items
-                      .filter((c) => c.is_income === draft.isIncome)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {categoryDisplayName(c, t)}
-                        </option>
-                      ))}
-                  </select>
+                  <span className="field-label">{t('transactions.description')}</span>
+                  <div className="field-input">
+                    <input
+                      value={draft.description}
+                      placeholder={t('transactions.descriptionPlaceholder')}
+                      onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                    />
+                  </div>
                 </label>
-                <button className="btn" type="submit">
-                  {t(draft.isIncome ? 'transactions.addIncome' : 'transactions.addExpense')}
+
+                <CategoryPicker
+                  ordered={ordered}
+                  value={categoryId}
+                  onChange={(id) => setDraft({ ...draft, category_id: id, categoryTouched: true })}
+                />
+                {/* Says why a category is already selected, so an
+                    unexpected one is something to correct rather than
+                    something to wonder about. Only rules get a line:
+                    "because you use it most" is not worth a sentence on
+                    a sheet this size. */}
+                {suggestedByRule && (
+                  <p className="field-label">
+                    {t('transactions.ruleMatched', { category: categoryName(ruleMatch) })}
+                  </p>
+                )}
+
+                <label className="field">
+                  <span className="field-label">{t('transactions.date')}</span>
+                  <div className="field-input">
+                    <input
+                      type="date"
+                      value={draft.date || today}
+                      onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                    />
+                  </div>
+                </label>
+                <button className="btn" type="submit" disabled={draft.amount === ''}>
+                  {submitLabel()}
                 </button>
               </form>
               <p className="field-label">

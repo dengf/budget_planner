@@ -3302,3 +3302,77 @@ table.data tr:last-child td {
 .more-panel {
   gap: 12px;
 }
+
+/* ---- Category picker (Add sheet) ----------------------------------- */
+
+/* Chips, not a <select>. A dropdown costs open-scroll-pick and, on a
+   phone, hands the whole screen to a native list of every category in an
+   order unrelated to what this person actually uses. The first six are
+   already ranked by useCategoryRank; the rest live behind "All". */
+.category-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Spans both columns of `.form-grid` -- a chip row squeezed into one
+     half-width column would wrap to one chip per line. */
+  grid-column: 1 / -1;
+}
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* Two of these fit a 375px row with the gap and the sheet's padding;
+     three fit on anything wider. `max-width` keeps a long category name
+     from pushing a chip past the sheet's own edge -- the name ellipsizes
+     instead (see `.category-chip-name`). */
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 14px 6px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.category-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.category-chip:hover,
+.category-chip:focus-visible {
+  border-color: var(--accent);
+}
+/* Filled with the accent, same as `.txn-type-btn.active` right above it
+   in the sheet -- two selected states a few pixels apart have to look
+   like the same idea. The category badge inside keeps its own colour
+   against that fill, which is why the chip's text goes to --accent-ink
+   rather than the badge being asked to carry the selection. */
+.category-chip.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.category-chip-more {
+  padding-left: 14px;
+}
+.category-picker-all {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* The full list can run long; it scrolls inside itself rather than
+     pushing the submit button off the bottom of the sheet. */
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-alt);
+}

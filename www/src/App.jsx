@@ -9,7 +9,7 @@ import { makeFormatMoney } from './currency';
 import { loadTheme, saveTheme, applyTheme } from './theme';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
-import { currentMonth } from './month';
+import { currentMonth, todayIso } from './month';
 import { availablePresets, buildCategoryFromPreset } from './presetCategories';
 import { TABS, TAB_ORDER } from './tabs';
 
@@ -101,6 +101,11 @@ export function AppShell({ wasmModule }) {
   // across Dashboard/Budget/Transactions so picking a month in one tab
   // is still picked when another tab opens.
   const [today] = useState(() => currentMonth());
+  // The same anchor at day resolution, for the things that need a date
+  // rather than a month: the Add sheet's default date, and the "as of"
+  // that its category ranking measures recency against. Frozen at mount
+  // like `today` above, for the same reason.
+  const [todayDate] = useState(() => todayIso());
   const [viewMonth, setViewMonth] = useState(today);
   const { t } = useI18n();
   const [confirm, confirmDialog] = useConfirm();
@@ -125,8 +130,18 @@ export function AppShell({ wasmModule }) {
    */
   const [addOpen, setAddOpen] = useState(false);
   const [addMethod, setAddMethod] = useState('manual');
+  /**
+   * The sheet is not rendered at all until it is opened for the first
+   * time, and then stays mounted (so a half-typed draft survives a close
+   * and reopen). Rendering a closed one from the start would resolve its
+   * `React.lazy` import during first paint, pulling ReceiptCapture,
+   * VoiceCapture and their worker entry points onto the critical path --
+   * exactly the download this sheet is lazy to avoid.
+   */
+  const [addMounted, setAddMounted] = useState(false);
   const openAdd = useCallback((method = 'manual') => {
     setAddMethod(method);
+    setAddMounted(true);
     setAddOpen(true);
   }, []);
   const formatMoney = useMemo(() => makeFormatMoney(currencySymbol), [currencySymbol]);
@@ -527,20 +542,23 @@ export function AppShell({ wasmModule }) {
         </Suspense>
         <Intro />
       </main>
-      <Suspense fallback={null}>
-        <AddTransactionSheet
-          open={addOpen}
-          onClose={() => setAddOpen(false)}
-          initialMethod={addMethod}
-          wasmModule={wasmModule}
-          newId={newId}
-          categories={categories}
-          rules={rules}
-          transactions={transactions}
-          recurring={recurring}
-          formatMoney={formatMoney}
-        />
-      </Suspense>
+      {addMounted && (
+        <Suspense fallback={null}>
+          <AddTransactionSheet
+            open={addOpen}
+            onClose={() => setAddOpen(false)}
+            initialMethod={addMethod}
+            wasmModule={wasmModule}
+            newId={newId}
+            today={todayDate}
+            categories={categories}
+            rules={rules}
+            transactions={transactions}
+            recurring={recurring}
+            formatMoney={formatMoney}
+          />
+        </Suspense>
+      )}
       <CalcErrorPortal result={guardResult} />
       {confirmDialog}
       <UpdateBanner />

@@ -1,11 +1,11 @@
-//! `build_month`, `summarize_month`.
+//! `build_month`, `summarize_month`, `category_rank`.
 
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{f64_to_decimal, to_js};
 use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
-    CategoryLineDto, MonthSummaryDto,
+    CategoryLineDto, CategoryRankParams, CategoryRankResult, MonthSummaryDto, RankedCategoryDto,
 };
 use crate::message::Message;
 
@@ -133,5 +133,87 @@ fn build_savings_line_impl(params: JsValue) -> BuildSavingsLineResult {
                 ..Default::default()
             }
         }
+    }
+}
+
+/// Which categories to put in front of someone half-way through adding a
+/// transaction -- see `budget_calc::category_rank`.
+///
+/// The whole ranked list comes back, not a top-N: how many chips fit on
+/// a 375px row is a layout question, and this crate has no business
+/// having an opinion about it.
+#[wasm_bindgen]
+pub fn category_rank(params: JsValue) -> JsValue {
+    to_js(&category_rank_impl(params))
+}
+
+fn category_rank_impl(params: JsValue) -> CategoryRankResult {
+    let params: CategoryRankParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        return CategoryRankResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let direction = match params.direction.as_str() {
+        "income" => budget_calc::Direction::Income,
+        "expense" => budget_calc::Direction::Expense,
+        _ => {
+            return CategoryRankResult {
+                error: Some(Message::bad_request().text),
+                ..Default::default()
+            }
+        }
+    };
+
+    let categories: Option<Vec<budget_calc::Category>> = params
+        .categories
+        .iter()
+        .map(|c| {
+            budget_calc::Category::new(
+                c.id.clone(),
+                c.name.clone(),
+                c.group.clone(),
+                c.is_income,
+                c.description.clone(),
+            )
+            .ok()
+        })
+        .collect();
+
+    let transactions: Option<Vec<budget_calc::Transaction>> = params
+        .transactions
+        .iter()
+        .map(|t| {
+            let mut parsed = budget_calc::Transaction::new(
+                t.id.clone(),
+                t.date.clone(),
+                t.description.clone(),
+                f64_to_decimal(t.amount)?,
+            );
+            parsed.category_id = t.category_id.clone();
+            Some(parsed)
+        })
+        .collect();
+
+    let (Some(categories), Some(transactions)) = (categories, transactions) else {
+        return CategoryRankResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    CategoryRankResult {
+        ranked: budget_calc::category_rank(&categories, &transactions, &params.as_of, direction)
+            .into_iter()
+            .map(|r| RankedCategoryDto {
+                category_id: r.category_id,
+                score: crate::convert::decimal_to_f64(r.score),
+                uses: r.uses,
+            })
+            .collect(),
+        error: None,
     }
 }
