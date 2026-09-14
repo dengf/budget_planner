@@ -41,7 +41,6 @@ export default {
   'freq.quarterly': '每季度',
   'freq.yearly': '每年',
 
-  'budget.title': '预算',
   'budget.viewingPastMonth': '该月已结束 — 你仍然可以调整它的计划。',
   'budget.viewingFutureMonth': '正在为{month}提前规划。',
   'budget.income': '本月收入',
@@ -146,7 +145,6 @@ export default {
   'cat.otherExpenses': '其他支出',
   'cat.otherExpenses.desc': '不属于以上分类的其他支出。',
 
-  'transactions.title': '账目',
   'transactions.listTitle': '记录',
   'transactions.addManual': '添加一笔账目',
   'transactions.methodManual': '手动',
@@ -277,7 +275,6 @@ export default {
   'debt.interest': '利息',
   'debt.balanceRemaining': '剩余',
 
-  'dashboard.title': '仪表盘',
   'dashboard.setup.planIncomeTitle': '规划您的收入',
   'dashboard.setup.planIncomeDetail': '添加您这个月预计收到的金额，让预算有据可依。',
   'dashboard.setup.planIncomeCta': '规划收入',

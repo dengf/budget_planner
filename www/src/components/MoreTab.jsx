@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { useI18n } from '../i18n';
+import { LOCALES, useI18n } from '../i18n';
 import GoalsTab from './GoalsTab';
 import DebtTab from './DebtTab';
 import RulesSection from './RulesSection';
 import RecurringSection from './RecurringSection';
+import MeifioMark from './MeifioMark';
 import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon } from './icons';
+
+const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
 
 /**
  * Everything that isn't one of the three screens someone opens daily.
@@ -21,11 +24,20 @@ import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon } from './icons';
  * afterwards, which is setup, not daily use.
  *
  * A list that swaps itself for one section, rather than every section
- * stacked on one long scroll: this screen only grows from here (the
- * header's settings menu moves in next), and a stack of five full
- * panels is a screen nobody can find anything on. `section` is plain
- * local state, not a route -- there is no URL to restore and no history
- * to honour, so a router would be machinery for nothing.
+ * stacked on one long scroll: this screen only grows from here, and a
+ * stack of five full panels is a screen nobody can find anything on.
+ * `section` is plain local state, not a route -- there is no URL to
+ * restore and no history to honour, so a router would be machinery for
+ * nothing.
+ *
+ * The app's title, byline and language picker live at the top of the
+ * list screen (not inside any one section) -- moved here from the header
+ * row, which now carries only the shared month control and the settings
+ * gear. A language is chosen once, not re-offered on every tab, so it
+ * belongs on the one screen that isn't opened daily, same reasoning as
+ * Goals/Debt/Rules/Recurring above. The settings gear (YourDataMenu)
+ * itself stays in the header for this round -- only identity and
+ * language moved.
  *
  * Every prop this receives comes straight from AppShell's single spread
  * onto the active panel; the sections are the same components the tab
@@ -64,7 +76,7 @@ const SECTIONS = [
 ];
 
 export default function MoreTab(props) {
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const [sectionId, setSectionId] = useState(null);
 
   const section = SECTIONS.find((s) => s.id === sectionId);
@@ -90,7 +102,31 @@ export default function MoreTab(props) {
 
   return (
     <div className="panel">
-      <h2>{t('more.title')}</h2>
+      <div className="app-brand">
+        <h1 className="app-title">{t('app.title')}</h1>
+        <a className="app-byline" href={MEIFIO_HOME}>
+          {t('app.byline')
+            .split('{logo}')
+            .flatMap((part, i) => (i === 0 ? [part] : [<MeifioMark key="mark" />, part]))}
+        </a>
+      </div>
+      <label className="app-currency">
+        <span className="app-currency-label">{t('app.language')}</span>
+        <select
+          className="app-language-select"
+          aria-label={t('app.language')}
+          value={locale}
+          onChange={(e) => setLocale(e.target.value)}
+        >
+          {LOCALES.map((l) => (
+            <option key={l.id} value={l.id} lang={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <h2 className="section-start">{t('more.title')}</h2>
       <ul className="more-list">
         {SECTIONS.map(({ id, key, hintKey, Icon }) => (
           <li key={id}>

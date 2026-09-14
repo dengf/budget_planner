@@ -1,10 +1,8 @@
 import React from 'react';
-import { LOCALES, useI18n } from '../i18n';
-import MeifioMark from './MeifioMark';
+import { useI18n } from '../i18n';
 import YourDataMenu from './YourDataMenu';
+import MonthYearPicker from './MonthYearPicker';
 import { TABS, ADD_BUTTON_INDEX } from '../tabs';
-
-const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
 
 export default function Header({
   activeTab,
@@ -17,6 +15,7 @@ export default function Header({
   wasmModule,
   today,
   viewMonth,
+  setViewMonth,
   categories,
   transactions,
   rules,
@@ -27,43 +26,30 @@ export default function Header({
   clearAllData,
   importData,
 }) {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <>
+      {/* One bar, not a brand row plus a title plus a picker per tab: a
+          month strip on the left (shared across Dashboard/Budget/
+          Transactions -- see App.jsx's single `viewMonth` state) and the
+          settings gear on the right. The app's own title, byline and
+          language picker moved into More -- a language is chosen once,
+          not re-offered on every screen (see MoreTab.jsx). */}
       <header className="app-header">
-        <div className="app-brand">
-          <h1 className="app-title">{t('app.title')}</h1>
-          <a className="app-byline" href={MEIFIO_HOME}>
-            {t('app.byline')
-              .split('{logo}')
-              .flatMap((part, i) => (i === 0 ? [part] : [<MeifioMark key="mark" />, part]))}
-          </a>
-        </div>
+        <MonthYearPicker
+          value={viewMonth}
+          onChange={setViewMonth}
+          todayMonth={today}
+          locale={locale}
+        />
 
         <div className="app-switches">
-          <select
-            className="app-language-select"
-            aria-label={t('app.language')}
-            value={locale}
-            onChange={(e) => setLocale(e.target.value)}
-          >
-            {LOCALES.map((l) => (
-              <option key={l.id} value={l.id} lang={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-
           {/* "My data" lives in the header row, not the tab bar below --
               it's a menu of rare, whole-app actions (export/import/clear,
-              plus the currency symbol below), not a screen someone
-              navigates to, and doesn't deserve one of the five
-              thumb-reach slots the mobile bottom bar has room for.
-              Folded into one gear icon instead of its own pill plus a
-              separate currency field, so the header is a title and two
-              small controls rather than a row of settings widgets on
-              every single screen. */}
+              plus theme/currency), not a screen someone navigates to, and
+              doesn't deserve one of the five thumb-reach slots the mobile
+              bottom bar has room for. */}
           <YourDataMenu
             wasmModule={wasmModule}
             today={today}

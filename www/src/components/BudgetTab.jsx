@@ -5,7 +5,6 @@ import { daysLeftInMonth, monthLabel, todayIso } from '../month';
 import CalcError from './CalcError';
 import CategoryBadge from './CategoryBadge';
 import SpendChart from './SpendChart';
-import MonthYearPicker from './MonthYearPicker';
 import {
   DEBT_PREFIX,
   GOAL_PREFIX,
@@ -38,7 +37,6 @@ export default function BudgetTab({
   currencySymbol,
   today,
   viewMonth,
-  setViewMonth,
   categories,
   removeCategory,
   addCommonCategories,
@@ -407,15 +405,6 @@ export default function BudgetTab({
 
   return (
     <div className="panel budget">
-      <div className="dash-header">
-        <h2>{t('budget.title')}</h2>
-        <MonthYearPicker
-          value={viewMonth}
-          onChange={setViewMonth}
-          todayMonth={today}
-          locale={locale}
-        />
-      </div>
       <p className="headline">
         {isCurrentMonth
           ? t('budget.daysLeft', { days, month: monthLabel(viewMonth, locale) })

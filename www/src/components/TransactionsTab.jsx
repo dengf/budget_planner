@@ -3,7 +3,6 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
 import CategoryBadge from './CategoryBadge';
-import MonthYearPicker from './MonthYearPicker';
 import { makeCategoryLookup } from '../presetCategories';
 
 /**
@@ -17,9 +16,7 @@ import { makeCategoryLookup } from '../presetCategories';
  */
 export default function TransactionsTab({
   currencySymbol,
-  today,
   viewMonth,
-  setViewMonth,
   confirm,
   categories,
   transactions,
@@ -59,17 +56,17 @@ export default function TransactionsTab({
           of the screen -- the furthest point from a thumb on a tall
           phone, for the action taken most often in the whole app, and
           present on this tab only. It is now the centre button of the
-          nav bar, within reach on every tab. */}
-      <div className="dash-header sticky-title-header sticky-title-header-flush">
-        <h2>{t('transactions.title')}</h2>
-      </div>
+          nav bar, within reach on every tab. The tab's own title row is
+          gone too -- the nav bar already names this tab, and the month
+          being browsed is the one shared, app-level control up in the
+          header (see Header.jsx), not a per-tab picker down here. */}
 
       {/* Logging and importing are what a first visit to this tab is
           actually for, so the empty state leads with both rather than
           leaving someone to find the "+" on their own. */}
       {transactions.items.length === 0 ? (
         <>
-          <h2 className="section-start">{t('transactions.listTitle')}</h2>
+          <h2>{t('transactions.listTitle')}</h2>
           <div className="txn-empty-state">
             <p className="empty-state">{t('transactions.noTransactions')}</p>
             <div className="txn-empty-actions">
@@ -84,20 +81,7 @@ export default function TransactionsTab({
         </>
       ) : (
         <>
-          <div className="dash-header transactions-month-header">
-            <h2 className="section-start">{t('transactions.listTitle')}</h2>
-            {/* Kept interactive (not disabled) while "all months" is
-                checked -- picking a month here still narrows the list back
-                down the moment "all months" is unchecked. */}
-            <div className={showAllMonths ? 'transactions-picker-dimmed' : ''}>
-              <MonthYearPicker
-                value={viewMonth}
-                onChange={setViewMonth}
-                todayMonth={today}
-                locale={locale}
-              />
-            </div>
-          </div>
+          <h2>{t('transactions.listTitle')}</h2>
           <label className="field field-check">
             <input
               type="checkbox"
