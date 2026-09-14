@@ -27,6 +27,7 @@ export default {
   'nav.add': 'Add a transaction',
 
   'more.title': 'More',
+  'more.categoriesHint': 'Add, rename or remove where the money goes.',
   'more.goalsHint': 'Save towards something, one month at a time.',
   'more.debtHint': 'Order your debts and see when they clear.',
   'more.rulesHint': 'Match a keyword once, and every matching transaction files itself.',
@@ -69,7 +70,7 @@ export default {
   'budget.totalPlanned': 'Total planned',
   'budget.totalSpent': 'Total spent',
   'budget.noCategories':
-    'No categories yet — tap the + above to add your first one, starting with income.',
+    'No categories yet — add your first one from More → Categories, starting with income.',
   'budget.save': 'Save',
   'budget.remove': 'Remove',
 
@@ -77,6 +78,7 @@ export default {
   'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
   'budget.commitmentsTitle': 'Goals & debt this month',
   'budget.progressAria': '{name}: {spent} of {planned} spent',
+  'budget.rowSubtext': '{spent} of {planned}',
   'chart.spendTitle': 'Where it went',
   'chart.spendTotal': '{amount} spent this month, across every category',
   'chart.spendRowAria': '{name}: {spent} spent of {planned} planned',

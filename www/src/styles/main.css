@@ -834,8 +834,8 @@ label.btn {
    tables and rows, not primary actions -- they keep their own compact
    sizing rather than inheriting .btn's 44px floor, which would blow out
    the row height of every table in the app. Their own contexts (the
-   mobile .category-row rule below, in particular) size them up where a
-   phone is actually the reasonable case to plan for. */
+   `.category-manage-row .btn.ghost` rule below, in particular) size them
+   up where a phone is actually the reasonable case to plan for. */
 .btn.ghost {
   background: transparent;
   color: var(--muted);
@@ -1026,13 +1026,12 @@ table.data tr:last-child td {
 /* A small ghost button still needs a real tap target -- `.btn.ghost`
    deliberately opts out of `.btn`'s 44px floor for dense desktop rows
    (see its own comment), but a card row like this one is shown at every
-   width, not just desktop, so this sets the floor back explicitly rather
-   than relying on a mobile-only media query the way `.category-row .btn`
-   does. Selector is `.btn.ghost.txn-remove` (three classes), not just
-   `.txn-remove` -- a single-class selector here loses the cascade to
-   `.btn.ghost`'s own `min-height: auto` (two classes beats one
-   regardless of source order), silently shrinking the tap target back
-   down. */
+   width, not just desktop, so this sets the floor back explicitly, the
+   same way `.category-manage-row .btn.ghost` above does. Selector is
+   `.btn.ghost.txn-remove` (three classes), not just `.txn-remove` -- a
+   single-class selector here loses the cascade to `.btn.ghost`'s own
+   `min-height: auto` (two classes beats one regardless of source order),
+   silently shrinking the tap target back down. */
 .btn.ghost.txn-remove {
   min-height: 44px;
   min-width: 44px;
@@ -1056,12 +1055,12 @@ table.data tr:last-child td {
     padding: 7px 8px;
     white-space: nowrap;
   }
-  /* Same underlying issue as `.category-row .btn`'s identical mobile-only
-     fix above: `.btn.ghost` deliberately opts out of `.btn`'s 44px floor
-     for dense desktop rows, but a plain `<table class="data">` (Debt's
-     debt list, Rules/Recurring in TransactionsTab) is still shown on
-     mobile, where every tappable control needs a real touch target
-     regardless of which screen it's in. */
+  /* Same underlying issue as `.category-manage-row .btn.ghost`'s fix
+     above: `.btn.ghost` deliberately opts out of `.btn`'s 44px floor for
+     dense desktop rows, but a plain `<table class="data">` (Debt's debt
+     list, Rules/Recurring in TransactionsTab) is still shown on mobile,
+     where every tappable control needs a real touch target regardless of
+     which screen it's in. */
   table.data .btn.ghost {
     min-height: 44px;
     min-width: 44px;
@@ -1215,37 +1214,39 @@ table.data tr:last-child td {
   }
 }
 
-.category-row {
-  display: grid;
-  grid-template-columns: 1.4fr 0.9fr 0.9fr 1.1fr auto;
-  gap: 10px;
+/* CategoriesScreen's plain management rows (category list, commitments
+   list) and the Savings row -- a simple "info, then a trailing value or
+   action" card, not the old four-column budget grid this replaced (see
+   the plan's own ledger: "Four-column grid + its mobile reflow" is one
+   of this round's Removed items). `flex-wrap` covers the Savings row,
+   the one caller with three trailing children instead of a single
+   action -- they wrap onto their own line on a narrow phone rather than
+   being forced into three cramped columns. */
+.category-manage-row {
+  display: flex;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-.category-row:last-child {
-  border-bottom: none;
-}
-/* The "cute" pass's lightest-touch change: a rounded card look layered
-   purely in CSS on top of the existing grid above -- none of that grid's
-   columns, gap, or the `@media (max-width: 720px)` mobile reflow below
-   change. `:not(.category-head)` excludes both column-header rows (this
-   file and the commitments table share the `.category-row` class), which
-   must stay a plain label row, not a card. */
-.category-row:not(.category-head) {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   background: var(--panel-alt);
   border-radius: 12px;
-  border-bottom: none;
   padding: 12px 14px;
   margin-bottom: 8px;
 }
-.category-row:not(.category-head):last-child {
+.category-manage-row:last-child {
   margin-bottom: 0;
 }
-/* Not a `.category-row` on purpose -- it's a full-width label, not a
-   grid row, and must survive the narrow-screen breakpoint that hides
-   `.category-head` (a real column header has nothing to say once rows
-   stack; this still does). */
+/* Same tap-target floor as `.btn.ghost.txn-remove` above, and for the same
+   reason: this row is shown at every width, not just desktop, so
+   `.btn.ghost`'s dense-desktop `min-height: auto` (see its own comment)
+   needs overriding here rather than left to a mobile-only media query. */
+.category-manage-row .btn.ghost {
+  min-height: 44px;
+  min-width: 44px;
+}
+.category-manage-info {
+  min-width: 0;
+}
 .category-section-header {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -1254,14 +1255,6 @@ table.data tr:last-child td {
   font-weight: 600;
   padding: 14px 0 4px;
   border-bottom: 1px solid var(--line);
-}
-/* Separates Savings from every real category above it -- Savings is
-   always the last row in the table, never sorted in among the others. */
-.category-row-divider {
-  height: 1px;
-  margin: 4px 0 6px;
-  background: var(--line);
-  border: none;
 }
 .category-row-savings {
   font-weight: 600;
@@ -1340,10 +1333,10 @@ table.data tr:last-child td {
 }
 
 /* Shared rounded-card base for this app's "cute" card layouts -- the
-   Transactions list, Dashboard's bubble-detail drill-down and goal/debt
-   preview cards below, and this file's own `.category-row` further down
-   -- one rule instead of a near-duplicate block per caller. Same
-   background/radius `.goal-card` already uses elsewhere in this file. */
+   Transactions list and Dashboard's bubble-detail drill-down and goal/
+   debt preview cards below -- one rule instead of a near-duplicate block
+   per caller. Same background/radius `.goal-card` already uses elsewhere
+   in this file. */
 .money-card {
   background: var(--panel-alt);
   border-radius: 12px;
@@ -1417,41 +1410,22 @@ table.data tr:last-child td {
   font-variant-numeric: tabular-nums;
 }
 
-.assign-progress-ring {
+/* The banner's static blossom -- see AssignBlossom.jsx's own doc comment
+   for why this replaced the old animated ring. `currentColor` on the
+   petal group (not a hardcoded brand pink) so the three state classes
+   below can still carry the banner's meaning, same three states/same
+   colors the ring used to. */
+.assign-blossom {
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
+  color: var(--positive);
 }
-.assign-progress-ring circle {
-  fill: none;
-  stroke-width: 6;
+.assign-blossom-over {
+  color: var(--negative);
 }
-.assign-progress-ring .ring-track {
-  stroke: var(--line);
-}
-.assign-progress-ring .ring-fill {
-  stroke: var(--positive);
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.4s ease;
-}
-.assign-progress-ring-over .ring-fill {
-  stroke: var(--negative);
-}
-.assign-progress-ring-start .ring-fill {
-  stroke: var(--muted);
-}
-/* A new block rather than one of this file's three pre-existing
-   `prefers-reduced-motion` blocks, deliberately: all three sit earlier in
-   this file than the unconditional `.ring-fill` transition rule above,
-   and CSS breaks ties between equal-specificity rules by source order,
-   not by which one is inside a narrower `@media` condition -- so an
-   override placed in any of them would lose the cascade to the
-   unconditional rule below it even while the media query matches. This
-   one only works because it comes after. */
-@media (prefers-reduced-motion: reduce) {
-  .assign-progress-ring .ring-fill {
-    transition: none;
-  }
+.assign-blossom-start {
+  color: var(--muted);
 }
 /* Before a budget exists this is an instruction, not a result. */
 .assign-banner-start {
@@ -1510,46 +1484,13 @@ table.data tr:last-child td {
   margin: 4px 0 16px;
 }
 
-/* Per-category progress: how far through the plan this month is, at a
-   glance, instead of reading three numbers and doing the division. */
-.progress {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--line-soft);
-  margin-top: 4px;
-  overflow: hidden;
-}
-.progress-fill {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.2s ease;
-}
-.progress-fill.over {
-  background: var(--negative);
-}
-
-/* Deliberately dims rather than removes the planned-input cell in
-   tracking mode -- see the plan's "Deviation from the spec" note for
-   why: `.category-row`'s grid must stay the same shape in both modes.
-   `:focus-within` restores it, so it's always fully usable, just quieter
-   once a month's assignment decision is already made. */
-.category-table-tracking .planned-input {
-  opacity: 0.55;
-}
-.category-table-tracking .planned-input:focus-within {
-  opacity: 1;
-}
-
 /* Points at the Income rows before anything is planned, without hiding
    the Expense side (all 16 starter categories are always present -- see
-   BudgetTab.jsx's `dimExpenseUntilIncome` comment). Same de-emphasize-
-   don't-remove treatment as the tracking-mode planned-input dimming
-   above: `:focus-within` restores full opacity, so a row is never
-   actually harder to use, just quieter until it's the one being typed
-   into. Whole rows here rather than one cell, since "not the priority
-   yet" applies to the entire Expense row, not just its planned amount. */
+   BudgetTab.jsx's `dimExpenseUntilIncome` comment). `:focus-within`
+   restores full opacity, so a row is never actually harder to use, just
+   quieter until it's the one being tapped into. Whole rows here rather
+   than one cell, since "not the priority yet" applies to the entire
+   Expense row, not just its planned amount. */
 .category-row-dim,
 .category-section-dim {
   opacity: 0.55;
@@ -1558,63 +1499,99 @@ table.data tr:last-child td {
   opacity: 1;
 }
 
-.commitments-table {
-  margin-bottom: 8px;
-}
-
-/* Upcoming this month: what's scheduled to come due, so it's visible
-   before it posts rather than only after -- see recurring.rs's doc
-   comment for the specific complaint this answers. */
-/* Shared box for the Budget tab's collapsed-by-default sections
-   ("Upcoming this month", the goals/debt commitments table) -- same
-   container, same disclosure-triangle summary treatment as
-   `.csv-columns` below, just applied to a couple more `<details>`. */
-.collapsible-panel {
-  background: var(--panel-alt);
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin-bottom: 16px;
-}
-.collapsible-panel summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 600;
-  list-style: none;
-}
-.collapsible-panel summary::-webkit-details-marker {
-  display: none;
-}
-.collapsible-panel summary::before {
-  content: '▸ ';
-}
-.collapsible-panel[open] summary::before {
-  content: '▾ ';
-}
-/* Same `<details>`-hiding trap as `.csv-columns .form-grid` below: an
-   author rule (these two's own `display: flex`) always overrides the
-   user-agent stylesheet's collapse regardless of specificity, so the
-   open/closed toggle has to be explicit here too. */
-.collapsible-panel > .upcoming-totals,
-.collapsible-panel > .upcoming-list {
-  display: none;
-}
-.collapsible-panel[open] > .upcoming-totals {
-  display: flex;
-}
-.collapsible-panel[open] > .upcoming-list {
-  display: flex;
-}
-.upcoming-totals {
+/* Budget's row list -- read-and-tap, not read-and-type: each row is a
+   real `<button>` (the whole row is the tap target, not just a nested
+   input) that opens EditPlanSheet. Badge + stacked text side by side,
+   same shape `.category-manage-row` uses elsewhere, but as a button
+   rather than a static card. */
+.budget-rows {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 12px 0;
+  gap: 2px;
+  margin-bottom: 8px;
 }
+.budget-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 6px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.budget-row:hover {
+  background: var(--panel-alt);
+}
+.budget-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.budget-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.budget-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+}
+.budget-row-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* Colored by whichever of `.positive`/`.negative`/`.muted-note` (all
+   defined above) `remainingCell()` picked -- same text/meaning the old
+   table's Remaining cell gave, wrapping here instead of truncating since
+   a row has no fixed column width to clip to. */
+.budget-row-pill {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.budget-row-track {
+  position: relative;
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.budget-row-bar {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.budget-row-bar.over {
+  background: var(--negative);
+}
+.budget-row-sub {
+  font-size: 0.78rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one remaining "upcoming this month" surface: a single row inside
+   EditPlanSheet for the one category being edited (see that component's
+   own doc comment), not the standalone list this used to be. The
+   itemized occurrence list and its collapsed-by-default `<details>`
+   wrapper are gone with it -- both were part of this round's "Two
+   <details> sections" removal. */
 .upcoming-total-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .upcoming-total-name {
   flex: 1;
@@ -1628,43 +1605,27 @@ table.data tr:last-child td {
   padding: 6px 12px;
   font-size: 0.82rem;
 }
-.upcoming-list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--line-soft);
+
+/* EditPlanSheet -- sits on `.add-txn-dialog`/`.add-txn-header`/
+   `.add-txn-title` (see those rules' own comments), these three add only
+   what's specific to editing one category's planned amount: the badge
+   inline with the title, and the read-only spent/remaining figures shown
+   above the amount field for context. */
+.edit-plan-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.edit-plan-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 12px;
+}
+.edit-plan-stat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.upcoming-list li {
-  display: flex;
-  gap: 12px;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-.upcoming-list li.past {
-  opacity: 0.55;
-}
-.upcoming-date {
-  font-variant-numeric: tabular-nums;
-  flex: none;
-  width: 88px;
-}
-.upcoming-desc {
-  flex: 1;
-}
-.upcoming-amount {
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 640px) {
-  .upcoming-total-row {
-    flex-wrap: wrap;
-  }
-  .upcoming-list li {
-    flex-wrap: wrap;
-  }
+  gap: 2px;
 }
 
 /* Spending chart: horizontal bars, longest first, with a marker at each
@@ -1746,22 +1707,13 @@ table.data tr:last-child td {
   }
 }
 
-/* Column headers: Planned/Spent/Remaining were three unlabelled figures
-   before these existed. */
-.category-head {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-2);
-  padding-bottom: 6px;
-}
-
 /* The planned field sits inside a row rather than a form-grid, so it
-   needs to be shorter than a standalone .field-input -- the new 44px
+   needs to be shorter than a standalone .field-input -- the 44px
    .field-input floor is for standalone form fields (Add transaction, Add
-   rule, ...), not this dense per-category row repeated a dozen-plus times
-   down the Budget tab, where the actual constraint is scanning many rows
-   at once rather than tapping any single one precisely. */
+   rule, ...), not this dense inline field. CategoriesScreen's Savings row
+   is the only caller left: Budget's per-category planned amounts moved to
+   EditPlanSheet's own NumberField (a real 44px standalone field, tapped
+   into one at a time) when the row list replaced the old table. */
 .planned-input {
   min-height: auto;
 }
@@ -1771,10 +1723,16 @@ table.data tr:last-child td {
   font-variant-numeric: tabular-nums;
 }
 
-/* Redundant while the header row is visible; the only labelling once the
-   row stacks on a narrow screen. */
+/* The only labelling a row like this has -- there's no column header
+   above it any more (the four-column grid it used to label is gone), so
+   this stays visible at every width instead of only appearing once a
+   header row's own labels stop fitting. */
 .cell-label {
-  display: none;
+  display: inline;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-2);
 }
 
 .spent-cell {
@@ -1783,92 +1741,6 @@ table.data tr:last-child td {
   justify-content: flex-end;
   gap: 8px;
 }
-@media (max-width: 720px) {
-  /* A category used to run 8-9 stacked lines on a phone (name, group,
-     progress, a "PLANNED" label row then the input, a "SPENT" label row
-     then value+button, a "REMAINING" label row then value, and Remove on
-     its own full-width row) -- fourteen of those is most of the screen's
-     worth of scrolling before you see anything else. This reflows the
-     same elements onto three compact rows: name+Remove share a line,
-     Planned is one line (label beside the field, not above it), and
-     Spent/Remaining pair up as two short label-plus-value lines instead
-     of four.
-     Column headers only make sense against a table's full-width row,
-     which no longer exists on a phone. */
-  /* Compound selector so this reliably outranks `.category-row`'s own
-     `display: grid` below -- both are single-class selectors of equal
-     specificity, and source order alone made this lose once already. */
-  .category-row.category-head {
-    display: none;
-  }
-  .category-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 3px 10px;
-    padding: 10px 0;
-    align-items: start;
-  }
-  .category-row > :first-child {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  /* Remove moves up beside the name instead of holding its own row, and
-     its label stays small -- a per-row action taken once in a while
-     shouldn't out-weigh the figures people actually look at. The tap
-     target itself still gets real room though: this is a phone-width
-     rule, and a small label with no padding used to measure an actual
-     18px-tall hit box (confirmed via getBoundingClientRect, not just
-     eyeballed), well under the ~44px floor for anything meant to be
-     tapped rather than clicked with a mouse. */
-  .category-row .btn {
-    grid-column: 2;
-    grid-row: 1;
-    justify-self: end;
-    align-self: start;
-    min-height: 44px;
-    padding: 4px 8px;
-    font-size: 0.75rem;
-    color: var(--muted-2);
-    background: transparent;
-  }
-  .planned-input {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    padding: 6px 10px;
-  }
-  .planned-input input {
-    text-align: left;
-  }
-  /* Inline rather than its own line above the value -- "Spent S$120" on
-     one line, not a "SPENT" heading followed by "S$120" underneath it. */
-  .cell-label {
-    display: inline;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted-2);
-  }
-  .category-row .spent-cell {
-    grid-column: 1;
-    grid-row: 3;
-    justify-content: flex-start;
-  }
-  .category-row > .num:not(.spent-cell) {
-    grid-column: 2;
-    grid-row: 3;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px;
-    justify-content: flex-end;
-    /* Right-aligned reads fine for a short figure, but "Borrowed S$7.45
-       from next month" wraps to several lines, and right-aligned wrapped
-       text is ragged-left and harder to read than left-aligned. */
-    text-align: left;
-  }
-}
-
 /* Charts -- hand-rolled SVG, same reasoning as mortgage_calculator's
    Charts.jsx: a charting library would cost more gzipped than the wasm
    module the app is built around. */
@@ -2155,35 +2027,6 @@ table.data tr:last-child td {
   color: var(--ink);
 }
 
-/* Title + trailing control row, shared by whatever still needs it --
-   as of Round 3, just Budget's "Categories" row (title left, add button
-   right). Dashboard, Budget and Transactions each used to render their
-   own copy of this same shape wrapping a title and a `MonthYearPicker`;
-   that picker is now the single, app-level one in Header.jsx, and the
-   three per-tab titles were dropped as redundant with the tab's own nav
-   label, so this rule now has exactly one caller left. `justify-content:
-   flex-end` plus the title's own `margin-right: auto` below produces the
-   same layout as `space-between` when both fit one row, but -- unlike
-   `space-between` -- still pins the trailing control to the right if the
-   title alone doesn't fit and wraps to its own line first. */
-.dash-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-/* A `min-width: 0` here let the title shrink down to whatever sliver of
-   the row the trailing control left it, wrapping word-by-word (even
-   letter-by-letter) on a narrow phone instead of the whole title
-   dropping to its own line above the control -- a real 375px bug, not
-   just a desktop assumption. A real minimum forces the flex-wrap itself
-   to kick in. */
-.dash-header h2 {
-  flex: 1 1 auto;
-  min-width: 200px;
-  margin-right: auto;
-}
 .dash-month-nav {
   display: flex;
   align-items: center;
@@ -2709,16 +2552,12 @@ table.data tr:last-child td {
 
 /* Backdrop for the sheet the nav bar's centre "+" opens -- the single
    entry point for every way a transaction gets added (manual, receipt,
-   voice, CSV, recurring), from any tab. Also reused by Budget's Add
-   Category panel below -- without a dimmed backdrop it floated directly
-   on the page with only a thin border, which read as blending into the
-   main page rather than a popup, since --panel and --bg (:root, top of
-   this file) are close enough in tone that the border alone doesn't
-   read as a separate surface. Nesting a `position: fixed` panel inside
-   this backdrop still lands the panel at its own fixed offset -- fixed
-   positioning is relative to the viewport, not this flex-centering
-   parent, so `.category-add-panel`'s bottom-right anchor is unaffected
-   by reusing this wrapper. */
+   voice, CSV, recurring), from any tab. Also reused by EditPlanSheet
+   (Budget's per-row planned-amount editor) -- without a dimmed backdrop
+   it floated directly on the page with only a thin border, which read as
+   blending into the main page rather than a popup, since --panel and
+   --bg (:root, top of this file) are close enough in tone that the
+   border alone doesn't read as a separate surface. */
 .add-txn-backdrop {
   position: fixed;
   inset: 0;
@@ -2886,10 +2725,6 @@ table.data tr:last-child td {
 }
 
 @media (max-width: 640px) {
-  /* `.category-row` is handled by the 720px block above, which stacks it
-     into two labelled columns. The single-column rule that used to live
-     here put the planned field and both figures on separate lines with
-     nothing naming them -- three anonymous numbers under each category. */
   /* No longer stacked into two rows here -- that was for fitting a
      title, byline and language select alongside the settings gear on
      one 375px-wide line. Round 3 moved all three into More, so this row
@@ -3041,9 +2876,9 @@ table.data tr:last-child td {
   gap: 10px;
   margin: 4px 0 16px;
 }
-/* Same label treatment as `.category-section-header` below the table --
-   deliberately not that class itself, since this sits above a plain
-   flex-wrapped chip row rather than a `.category-row` grid. */
+/* Same label treatment as `.category-section-header` (Budget's row list)
+   -- deliberately not that class itself, since this sits above a plain
+   flex-wrapped chip row rather than a list of category rows. */
 .category-chip-group-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -3072,104 +2907,6 @@ table.data tr:last-child td {
 .category-chip:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-/* The one floating "add" button style, shared by every tab that has
-   one (Budget's quick-add-spend and add-category FABs, Transactions'
-   add-transaction FAB) -- these independently grew a labeled pill and a
-   bare "+" circle in different rounds of work before this fix. A labeled
-   pill throughout: an icon alone doesn't say what it adds, and this
-   repo's own "obvious to use" rule favors that over a smaller circle. */
-/* Shared by every title row that sticks to the top of the viewport on
-   scroll instead of using a fixed FAB -- a floating pill kept landing on
-   top of other buttons further down these form/list-heavy tabs no matter
-   how much clearance padding was added beneath it. Horizontal bleed
-   (negative side margins) lets the background span the panel's full
-   width. Budget's Categories row is the only caller left since Round 3
-   dropped the per-tab title rows (Dashboard/Budget/Transactions) this
-   also used to serve -- it sits mid-panel, so it keeps the ordinary
-   `.section-start` divider (see that rule's own comment) rather than a
-   flush top treatment; the divider goes on this row rather than the
-   nested h2 so it spans the full width, including the add button. */
-.sticky-title-header {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  margin: 0 -20px;
-  padding: 12px 20px;
-  background: var(--panel);
-}
-.sticky-title-header.section-start {
-  padding-top: 20px;
-  border-top: 1px solid var(--line-soft);
-}
-.icon-add-btn {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.fab-picker {
-  position: fixed;
-  right: 20px;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  width: min(280px, calc(100vw - 40px));
-  max-height: 60vh;
-  overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 8px;
-  box-shadow: var(--hero-shadow);
-  z-index: 71;
-}
-/* Widens/repads the .fab-picker shell for form content (the
-   category-name/group fields, income checkbox, Add/Add-common buttons)
-   -- position, z-index and the 720px bottom-clearance override all
-   still come from .fab-picker itself since both classes land on the
-   same element.
-
-   The two classes were once separate things: .fab-picker was the
-   category list a floating "+" button opened on this tab, and this
-   widened the same shell for the add-a-category form. That floating
-   button is gone -- adding a transaction is the nav bar's centre "+"
-   now, from any tab -- so .fab-picker exists only to carry this panel's
-   position, and the two will fold into one rule when the Budget tab
-   itself is rebuilt. */
-.category-add-panel {
-  width: min(340px, calc(100vw - 32px));
-  max-height: 70vh;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Below 720px the bottom tab bar (`.app-tabs`, see its own media query
-   above) switches to `position: fixed; bottom: 0` -- so without this the
-   panel's plain 20px-from-viewport-bottom position sits directly
-   underneath that bar: mostly hidden, and its tap target stolen by the
-   tab bar's own icons. This has to come after the base `.fab-picker`
-   rule above in source order -- an identical `@media (max-width: 720px)`
-   block placed earlier in the file (nearer `.app-tabs`'s own) loses the
-   cascade to this later, equal-specificity unconditional rule, even
-   while its condition matches. Same 64px clearance `.app-main` reserves
-   for that bar, plus the panel's own 20px margin from that now-cleared
-   edge. The offsets used to be 84/148px, stacked to clear a floating
-   "+" button that stood between the panel and the bar; that button is
-   gone, so the panel drops to sit just above the bar itself. */
-@media (max-width: 720px) {
-  .fab-picker {
-    bottom: calc(84px + env(safe-area-inset-bottom));
-  }
 }
 
 /* DebugPanel (`?debug=1`) -- a full-page diagnostic view, not styled to

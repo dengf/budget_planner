@@ -26,6 +26,7 @@ export default {
   'nav.add': '記一筆',
 
   'more.title': '更多',
+  'more.categoriesHint': '新增、重新命名或刪除分類。',
   'more.goalsHint': '一個月一個月地攢，向目標靠近。',
   'more.debtHint': '排好還款順序，看清何時還清。',
   'more.rulesHint': '設定一次關鍵字，之後每筆相符的交易都會自動歸類。',
@@ -66,7 +67,7 @@ export default {
   'budget.reallocate': '重新分配',
   'budget.totalPlanned': '計劃總額',
   'budget.totalSpent': '花費總額',
-  'budget.noCategories': '還沒有分類——點擊上方的 + 新增第一個，建議從收入開始。',
+  'budget.noCategories': '還沒有分類——請到「更多 → 分類」新增第一個，建議從收入開始。',
   'budget.save': '儲存',
   'budget.remove': '刪除',
 
@@ -74,6 +75,7 @@ export default {
   'budget.includeCommitments': '將目標存入與債務最低還款計入本月預算',
   'budget.commitmentsTitle': '本月目標與債務',
   'budget.progressAria': '{name}：已花費 {spent}，計劃 {planned}',
+  'budget.rowSubtext': '已花費 {spent}，計劃 {planned}',
   'chart.spendTitle': '錢花在了哪裡',
   'chart.spendTotal': '本月共花費 {amount}，涵蓋所有分類',
   'chart.spendRowAria': '{name}：已花費 {spent}，計劃 {planned}',

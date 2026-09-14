@@ -26,6 +26,7 @@ export default {
   'nav.add': '记一笔',
 
   'more.title': '更多',
+  'more.categoriesHint': '新增、重命名或删除分类。',
   'more.goalsHint': '一个月一个月地攒，向目标靠近。',
   'more.debtHint': '排好还款顺序，看清何时还清。',
   'more.rulesHint': '设定一次关键词，之后每笔相符的交易都会自动归类。',
@@ -66,7 +67,7 @@ export default {
   'budget.reallocate': '重新分配',
   'budget.totalPlanned': '计划总额',
   'budget.totalSpent': '花费总额',
-  'budget.noCategories': '还没有分类——点击上方的 + 添加第一个，建议从收入开始。',
+  'budget.noCategories': '还没有分类——请到「更多 → 分类」添加第一个，建议从收入开始。',
   'budget.save': '保存',
   'budget.remove': '删除',
 
@@ -74,6 +75,7 @@ export default {
   'budget.includeCommitments': '将目标存入与债务最低还款计入本月预算',
   'budget.commitmentsTitle': '本月目标与债务',
   'budget.progressAria': '{name}：已花费 {spent}，计划 {planned}',
+  'budget.rowSubtext': '已花费 {spent}，计划 {planned}',
   'chart.spendTitle': '钱花在了哪里',
   'chart.spendTotal': '本月共花费 {amount}，涵盖所有分类',
   'chart.spendRowAria': '{name}：已花费 {spent}，计划 {planned}',
