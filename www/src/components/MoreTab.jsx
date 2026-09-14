@@ -4,8 +4,9 @@ import GoalsTab from './GoalsTab';
 import DebtTab from './DebtTab';
 import RulesSection from './RulesSection';
 import RecurringSection from './RecurringSection';
+import CategoriesScreen from './CategoriesScreen';
 import MeifioMark from './MeifioMark';
-import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon } from './icons';
+import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon, CategoriesIcon } from './icons';
 
 const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
 
@@ -22,6 +23,12 @@ const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
  * from the bottom of the Transactions tab, for the same reason: a rule
  * is written once and then applies itself to every transaction added
  * afterwards, which is setup, not daily use.
+ *
+ * Categories joins the list the same way, moved out of Budget's old
+ * four-column grid -- creating, renaming or removing a category, the
+ * goals/debt-commitments toggle, and the Savings target are all setup
+ * decisions made rarely, not the daily "tap a row, type an amount" work
+ * Budget itself is for now. See CategoriesScreen.jsx's own doc comment.
  *
  * A list that swaps itself for one section, rather than every section
  * stacked on one long scroll: this screen only grows from here, and a
@@ -45,6 +52,13 @@ const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
  * how a goal or a debt works changes here.
  */
 const SECTIONS = [
+  {
+    id: 'categories',
+    key: 'budget.categoriesTitle',
+    hintKey: 'more.categoriesHint',
+    Icon: CategoriesIcon,
+    Component: CategoriesScreen,
+  },
   {
     id: 'goals',
     key: 'goals.title',

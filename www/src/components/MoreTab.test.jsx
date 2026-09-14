@@ -30,9 +30,10 @@ function renderMore(props) {
 }
 
 describe('MoreTab', () => {
-  it('lists the four things that used to be tabs or buried disclosures', () => {
+  it('lists Categories alongside the four things that used to be tabs or buried disclosures', () => {
     renderMore();
     for (const name of [
+      'Categories',
       'Savings goals',
       'Debt payoff',
       'Categorization rules',

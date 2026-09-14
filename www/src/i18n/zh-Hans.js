@@ -26,6 +26,7 @@ export default {
   'nav.add': '记一笔',
 
   'more.title': '更多',
+  'more.categoriesHint': '新增、重命名或删除分类。',
   'more.goalsHint': '一个月一个月地攒，向目标靠近。',
   'more.debtHint': '排好还款顺序，看清何时还清。',
   'more.rulesHint': '设定一次关键词，之后每笔相符的交易都会自动归类。',

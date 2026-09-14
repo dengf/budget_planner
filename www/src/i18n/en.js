@@ -27,6 +27,7 @@ export default {
   'nav.add': 'Add a transaction',
 
   'more.title': 'More',
+  'more.categoriesHint': 'Add, rename or remove where the money goes.',
   'more.goalsHint': 'Save towards something, one month at a time.',
   'more.debtHint': 'Order your debts and see when they clear.',
   'more.rulesHint': 'Match a keyword once, and every matching transaction files itself.',

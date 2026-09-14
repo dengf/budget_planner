@@ -161,6 +161,20 @@ export function RecurringIcon() {
   );
 }
 
+/** Categories, in More -- a price tag, the one shape that reads as
+ *  "a single thing, labelled and sorted" without borrowing RulesIcon's
+ *  funnel (the stream of transactions) or a category badge's filled
+ *  register (CategoryIcons.jsx is a deliberately different, "cute" style
+ *  -- see its own doc comment for why this file doesn't reuse it). */
+export function CategoriesIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M11.5 4H6a2 2 0 0 0-2 2v5.5a2 2 0 0 0 .6 1.4l8 8a2 2 0 0 0 2.8 0l5.5-5.5a2 2 0 0 0 0-2.8l-8-8a2 2 0 0 0-1.4-.6Z" />
+      <circle cx="8.2" cy="8.2" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /**
  * The "More" tab -- a plain horizontal ellipsis, deliberately NOT the
  * same shape as `SettingsIcon` above. Both can be on screen at once (the

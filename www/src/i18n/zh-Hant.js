@@ -26,6 +26,7 @@ export default {
   'nav.add': '記一筆',
 
   'more.title': '更多',
+  'more.categoriesHint': '新增、重新命名或刪除分類。',
   'more.goalsHint': '一個月一個月地攢，向目標靠近。',
   'more.debtHint': '排好還款順序，看清何時還清。',
   'more.rulesHint': '設定一次關鍵字，之後每筆相符的交易都會自動歸類。',
