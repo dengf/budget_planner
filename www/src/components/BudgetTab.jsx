@@ -153,18 +153,26 @@ export default function BudgetTab({
   }, [wasmModule, recurring?.items, viewMonth, isPastMonth]);
 
   /**
-   * What the pill says and how it's styled -- three existing expense-side
-   * cases (still exactly the wording/colour BudgetTab's old table used),
-   * plus two income-side ones that read the same negative `remaining` the
-   * opposite way: for an expense category running negative means
-   * overspending (bad, red, "borrowed"); for an income category it means
-   * more came in than was planned for (good, never red).
+   * What the pill says and how it's styled. Expense rows use the plan's
+   * own terse wording ("$42 over" / "$780 left") rather than a longer
+   * sentence -- it's read a dozen-plus times per screen, once per row.
+   * Income rows keep a plain figure ("$3,000.00", no "left") since a
+   * planned-but-not-yet-received income category isn't money "left" to
+   * spend; the two income-only cases below read the same negative
+   * `remaining` the opposite way an expense would (more came in than
+   * planned is good news, never red).
    */
   const remainingCell = (line) => {
+    const incomeRow = isIncome(line.category_id);
     if (line.remaining >= 0) {
-      return { className: 'positive', text: formatMoney(line.remaining) };
+      return {
+        className: 'positive',
+        text: incomeRow
+          ? formatMoney(line.remaining)
+          : t('budget.pillLeft', { amount: formatMoney(line.remaining) }),
+      };
     }
-    if (isIncome(line.category_id)) {
+    if (incomeRow) {
       return line.planned > 0
         ? {
             className: 'positive',
@@ -178,7 +186,7 @@ export default function BudgetTab({
     return line.planned > 0
       ? {
           className: 'negative',
-          text: t('budget.borrowed', { amount: formatMoney(-line.remaining) }),
+          text: t('budget.pillOver', { amount: formatMoney(-line.remaining) }),
         }
       : { className: 'muted-note', text: t('budget.unbudgetedSpend') };
   };

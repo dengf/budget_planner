@@ -3049,8 +3049,18 @@ table.data tr:last-child td {
   grid-column: 1 / -1;
 }
 .category-chips {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* Two columns, not the plan mockup's three -- its `.p-chipgrid` was
+     drawn with single-word labels ("Food", "Transport"); this app's real
+     category names run longer ("Healthcare & Insurance"), and three
+     columns at 375px leaves too little width per chip to read past a
+     couple of letters even with the ellipsis fix below. `minmax(0, 1fr)`,
+     not bare `1fr` -- a grid track's implicit minimum is `auto` (its
+     content's intrinsic width) unless overridden, so a long name would
+     blow the column past the dialog's edge instead of shrinking to it.
+     Same rule as `.category-chip-name`'s `min-width: 0` just above, one
+     level up. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .category-chip {
@@ -3075,20 +3085,25 @@ table.data tr:last-child td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Without this, a flex item's default `min-width: auto` computes to
+     its unwrapped content width (nowrap means there's no smaller
+     min-content size to shrink to), so the ellipsis above never
+     actually engages and a long name like "Healthcare & Insurance"
+     pushes past the pill instead of truncating. */
+  min-width: 0;
 }
 .category-chip:hover,
 .category-chip:focus-visible {
   border-color: var(--accent);
 }
-/* Filled with the accent, same as `.txn-type-btn.active` right above it
-   in the sheet -- two selected states a few pixels apart have to look
-   like the same idea. The category badge inside keeps its own colour
-   against that fill, which is why the chip's text goes to --accent-ink
-   rather than the badge being asked to carry the selection. */
+/* A soft accent tint, not a solid fill -- this chip is as often a
+   ranking-based guess (see `AddTransactionSheet`'s `suggestedByRule`
+   comment) as a real tap, and a full-block fill reads as a committed
+   choice either way. Matches the plan artifact's `.p-chip.on`. */
 .category-chip.active {
   border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--ink);
   font-weight: 600;
 }
 .category-chip-more {

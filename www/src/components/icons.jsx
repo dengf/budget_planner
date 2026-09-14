@@ -102,8 +102,8 @@ export function DashboardIcon() {
 export function BudgetIcon() {
   return (
     <svg {...NAV_ICON_PROPS}>
-      <path d="M12 3v9l7.8 4.5" />
-      <path d="M20.4 13.5A8.4 8.4 0 1 1 12 3.6" />
+      <path d="M5 19V9M12 19V5M19 19v-6" />
+      <path d="M3 21h18" />
     </svg>
   );
 }
