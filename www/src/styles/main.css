@@ -145,11 +145,11 @@ body {
 }
 
 /* One bar: the shared `MonthYearPicker` (Header.jsx) on the left, the
-   settings gear on the right. Used to also carry the app's title,
-   byline and language picker -- those moved into More (MoreTab.jsx),
-   which is why `.app-brand`/`.app-title`/`.app-byline` below still exist
-   as plain, unscoped classes rather than being deleted: they render
-   there verbatim now, unchanged, just no longer inside this header. */
+   language picker and settings gear on the right. Used to also carry the
+   app's title and byline -- those moved into More (MoreTab.jsx), which
+   is why `.app-brand`/`.app-title`/`.app-byline` below still exist as
+   plain, unscoped classes rather than being deleted: they render there
+   verbatim now, unchanged, just no longer inside this header. */
 .app-header {
   display: flex;
   align-items: center;
@@ -197,15 +197,13 @@ body {
   flex-wrap: wrap;
 }
 /* The language picker -- a native <select>. Round 3 moved it out of the
-   header entirely, next to the app's own title/byline at the top of
-   More (MoreTab.jsx) rather than in a row every screen carries: a
-   language is chosen once, not re-offered on every tab. Rendered inside
-   an `.app-currency` pill there, the same label+control treatment
-   YourDataMenu already uses for theme/currency, so this element itself
-   stays transparent/borderless and lets that wrapper supply the fill.
-   `.app-region`/`.app-region.active` below are unrelated
-   (SpendOverTimeChart's Daily/Weekly toggle is their only remaining
-   caller). */
+   header into More next to the app's own title/byline; moved back here
+   on explicit request, as its own small control beside the settings
+   gear in `.app-switches` rather than nested in YourDataMenu's dialog --
+   a language choice someone might reach for on first launch shouldn't
+   need finding More first. `.app-region`/`.app-region.active` below are
+   unrelated (SpendOverTimeChart's Daily/Weekly toggle is their only
+   remaining caller). */
 .app-language-select {
   background: transparent;
   color: var(--muted);
@@ -242,9 +240,7 @@ body {
    app carries no other region-flavoured behavior for a toggle to justify.
    Now lives inside `YourDataMenu`'s dialog rather than the header row, so
    this is a plain labeled field in a vertical list of dialog rows, not a
-   pill competing for space with other controls. MoreTab.jsx's language
-   field (above `.app-language-select`) reuses this same pill for the
-   identical reason, just outside `YourDataMenu`'s own dialog. */
+   pill competing for space with other controls. */
 .app-currency {
   display: flex;
   align-items: center;
@@ -848,8 +844,18 @@ label.btn {
   padding: 6px 10px;
   min-height: auto;
 }
+/* Flat muted colors, not opacity -- opacity fades a button's own
+   background and text toward whatever sits behind it, and in dark mode
+   that backdrop is near-black, which drags a light accent-ink label and
+   a mid-tone accent background toward each other faster than either
+   moves toward the page: the result reads as washed-out, low-contrast
+   pink-on-pink instead of "disabled". `--panel-alt`/`--muted` already
+   clear WCAG AA against each other in both themes (see this file's own
+   contrast notes at the top), so this stays legible regardless of
+   what's behind it. */
 .btn:disabled {
-  opacity: 0.5;
+  background: var(--panel-alt);
+  color: var(--muted);
   cursor: not-allowed;
 }
 
@@ -2604,15 +2610,27 @@ table.data tr:last-child td {
 }
 .add-txn-method-btn {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   border: none;
   background: transparent;
   color: var(--muted);
-  padding: 10px 6px;
+  padding: 8px 4px;
   min-height: 44px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 600;
+}
+/* An icon per method, matching the plan artifact's `.p-method svg` --
+   overridden to one consistent size here regardless of which icon
+   component supplies it (`.field-icon` at 15px, `.nav-icon` at 20px). */
+.add-txn-method-btn svg {
+  width: 18px;
+  height: 18px;
 }
 .add-txn-method-btn.active {
   background: var(--accent);
@@ -3049,8 +3067,18 @@ table.data tr:last-child td {
   grid-column: 1 / -1;
 }
 .category-chips {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* Two columns, not the plan mockup's three -- its `.p-chipgrid` was
+     drawn with single-word labels ("Food", "Transport"); this app's real
+     category names run longer ("Healthcare & Insurance"), and three
+     columns at 375px leaves too little width per chip to read past a
+     couple of letters even with the ellipsis fix below. `minmax(0, 1fr)`,
+     not bare `1fr` -- a grid track's implicit minimum is `auto` (its
+     content's intrinsic width) unless overridden, so a long name would
+     blow the column past the dialog's edge instead of shrinking to it.
+     Same rule as `.category-chip-name`'s `min-width: 0` just above, one
+     level up. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .category-chip {
@@ -3075,20 +3103,25 @@ table.data tr:last-child td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Without this, a flex item's default `min-width: auto` computes to
+     its unwrapped content width (nowrap means there's no smaller
+     min-content size to shrink to), so the ellipsis above never
+     actually engages and a long name like "Healthcare & Insurance"
+     pushes past the pill instead of truncating. */
+  min-width: 0;
 }
 .category-chip:hover,
 .category-chip:focus-visible {
   border-color: var(--accent);
 }
-/* Filled with the accent, same as `.txn-type-btn.active` right above it
-   in the sheet -- two selected states a few pixels apart have to look
-   like the same idea. The category badge inside keeps its own colour
-   against that fill, which is why the chip's text goes to --accent-ink
-   rather than the badge being asked to carry the selection. */
+/* A soft accent tint, not a solid fill -- this chip is as often a
+   ranking-based guess (see `AddTransactionSheet`'s `suggestedByRule`
+   comment) as a real tap, and a full-block fill reads as a committed
+   choice either way. Matches the plan artifact's `.p-chip.on`. */
 .category-chip.active {
   border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--ink);
   font-weight: 600;
 }
 .category-chip-more {

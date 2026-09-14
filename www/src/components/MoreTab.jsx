@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LOCALES, useI18n } from '../i18n';
+import { useI18n } from '../i18n';
 import GoalsTab from './GoalsTab';
 import DebtTab from './DebtTab';
 import RulesSection from './RulesSection';
@@ -37,14 +37,15 @@ const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
  * restore and no history to honour, so a router would be machinery for
  * nothing.
  *
- * The app's title, byline and language picker live at the top of the
- * list screen (not inside any one section) -- moved here from the header
- * row, which now carries only the shared month control and the settings
- * gear. A language is chosen once, not re-offered on every tab, so it
- * belongs on the one screen that isn't opened daily, same reasoning as
- * Goals/Debt/Rules/Recurring above. The settings gear (YourDataMenu)
- * itself stays in the header for this round -- only identity and
- * language moved.
+ * The app's title and byline live at the top of the list screen (not
+ * inside any one section) -- moved here from the header row, which now
+ * carries only the shared month control, the language picker and the
+ * settings gear. Identity (title/byline) is looked-at-once-then-ignored
+ * in the same way Goals/Debt/Rules/Recurring are, so it belongs on the
+ * one screen that isn't opened daily. The language picker itself moved
+ * back to the header on explicit request -- a control someone might
+ * reach for on first launch, before ever finding More, reads better
+ * living where every screen can see it than buried a level deep.
  *
  * Every prop this receives comes straight from AppShell's single spread
  * onto the active panel; the sections are the same components the tab
@@ -90,7 +91,7 @@ const SECTIONS = [
 ];
 
 export default function MoreTab(props) {
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
   const [sectionId, setSectionId] = useState(null);
 
   const section = SECTIONS.find((s) => s.id === sectionId);
@@ -124,22 +125,6 @@ export default function MoreTab(props) {
             .flatMap((part, i) => (i === 0 ? [part] : [<MeifioMark key="mark" />, part]))}
         </a>
       </div>
-      <label className="app-currency">
-        <span className="app-currency-label">{t('app.language')}</span>
-        <select
-          className="app-language-select"
-          aria-label={t('app.language')}
-          value={locale}
-          onChange={(e) => setLocale(e.target.value)}
-        >
-          {LOCALES.map((l) => (
-            <option key={l.id} value={l.id} lang={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
       <h2 className="section-start">{t('more.title')}</h2>
       <ul className="more-list">
         {SECTIONS.map(({ id, key, hintKey, Icon }) => (

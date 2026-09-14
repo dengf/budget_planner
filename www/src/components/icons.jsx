@@ -60,21 +60,20 @@ export function SpreadsheetIcon() {
 }
 
 /**
- * Header trigger for `YourDataMenu` -- three preference sliders, not a
- * gear: a radiating-spokes gear at header-icon size reads as a sun/
- * brightness toggle instead (tried first, looked wrong against a real
- * screenshot), and this app has no light/dark toggle to confuse it with
- * anyway (theme follows `prefers-color-scheme` only). Sized via
- * `nav-icon` rather than the inherited `.field-icon` -- like the bottom
- * nav's icons, this one stands alone in its own 44px tap target instead
- * of sitting beside label text. */
+ * Header trigger for `YourDataMenu` -- the plan artifact's own `#i-gear`
+ * glyph (a spoked circle), used verbatim. An earlier round swapped this
+ * for three preference sliders instead, on the judgment that a spoked
+ * gear at header-icon size read as a sun/brightness toggle this app has
+ * no matching control for; overridden here on explicit request to match
+ * the approved plan's own icon rather than that earlier substitution.
+ * Sized via `nav-icon` rather than the inherited `.field-icon` -- like
+ * the bottom nav's icons, this one stands alone in its own 44px tap
+ * target instead of sitting beside label text. */
 export function SettingsIcon() {
   return (
     <svg {...ICON_PROPS} className="nav-icon" aria-hidden="true">
-      <path d="M4 7h20M4 12h20M4 17h20" />
-      <circle cx="15" cy="7" r="2.4" fill="currentColor" stroke="none" />
-      <circle cx="8" cy="12" r="2.4" fill="currentColor" stroke="none" />
-      <circle cx="17" cy="17" r="2.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3" />
     </svg>
   );
 }
@@ -102,8 +101,20 @@ export function DashboardIcon() {
 export function BudgetIcon() {
   return (
     <svg {...NAV_ICON_PROPS}>
-      <path d="M12 3v9l7.8 4.5" />
-      <path d="M20.4 13.5A8.4 8.4 0 1 1 12 3.6" />
+      <path d="M5 19V9M12 19V5M19 19v-6" />
+      <path d="M3 21h18" />
+    </svg>
+  );
+}
+
+/** Manual entry, in the "Add a transaction" method row -- a pen, the
+ *  plan artifact's own `#i-pen` glyph, matching `CameraIcon`/`MicIcon`/
+ *  `SpreadsheetIcon`/`RecurringIcon` right below it as that row's other
+ *  four method icons. */
+export function PenIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M4 20h4L19.2 8.8a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16Z" />
     </svg>
   );
 }
