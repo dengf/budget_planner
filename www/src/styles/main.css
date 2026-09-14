@@ -2365,23 +2365,41 @@ table.data tr:last-child td {
 }
 
 /* The donut -- a ring built from `category_shares`' own fractions
-   (DonutChart.jsx), with the month's expense total in its center rather
-   than a legend, since a phone-width donut has no room to spare for one
-   and the ranked rows just below it already name every wedge. */
+   (DonutChart.jsx), with the month's expense total in its center. Ringed
+   with up to five percentage bubbles on short leader lines, matching the
+   plan artifact's own `.p-bub`/`.p-leaders` -- the ring itself carries a
+   glanceable indication of which wedge is which category, on top of (not
+   instead of) the ranked rows just below it, which stay the tappable,
+   44px, every-category version (see that comment on `.category-row` /
+   `CategoryBreakdown.jsx`). Sized to `DonutChart.jsx`'s own
+   CONTAINER_W/H/OFFSET_X/OFFSET_Y/CENTER constants -- these two files
+   must move together. */
 .donut-chart {
   position: relative;
   align-self: center;
-  width: 160px;
-  height: 160px;
+  width: 236px;
+  height: 200px;
 }
 .donut-svg {
+  position: absolute;
+  left: 48px;
+  top: 30px;
+  width: 140px;
+  height: 140px;
+  display: block;
+}
+.donut-leaders {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  display: block;
+  pointer-events: none;
 }
 .donut-center {
   position: absolute;
-  inset: 0;
+  left: 118px;
+  top: 100px;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2398,6 +2416,27 @@ table.data tr:last-child td {
 .donut-cap {
   font-size: 0.72rem;
   color: var(--muted);
+}
+.donut-bub {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Percentage sits on the ring-ward side of its badge (right bubble: text
+   after the badge; left bubble: text before it) -- same left/right split
+   the plan artifact's `.p-bub.l`/`.p-bub.r` draws, so labels on the far
+   side of the ring don't run text outward past the card's edge. */
+.donut-bub-left {
+  flex-direction: row-reverse;
+}
+.donut-bub-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
@@ -2844,11 +2883,6 @@ table.data tr:last-child td {
   .dash-stat-tile-value {
     font-size: 0.88rem;
   }
-  .donut-chart {
-    width: 130px;
-    height: 130px;
-  }
-
   .chart {
     padding: 12px 14px;
     gap: 4px;

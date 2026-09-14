@@ -315,6 +315,7 @@ export default function DashboardTab({
     id: s.category_id,
     share: s.share,
     color: categoryColor(categoryFor(s.category_id)),
+    category: categoryFor(s.category_id),
   }));
 
   const monthTx = transactions.items
