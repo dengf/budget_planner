@@ -134,3 +134,21 @@ export function DebtIcon() {
     </svg>
   );
 }
+
+/**
+ * The "More" tab -- a plain horizontal ellipsis, deliberately NOT the
+ * same shape as `SettingsIcon` above. Both can be on screen at once (the
+ * header keeps its settings trigger while More holds Goals/Debt), and
+ * two near-identical dot-and-line glyphs a few hundred pixels apart read
+ * as the same control rendered twice. Sliders for settings, three dots
+ * for "the rest of the app" -- the distinction has to survive at 19px.
+ */
+export function MoreIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <circle cx="5.5" cy="12" r="1.9" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.9" fill="currentColor" stroke="none" />
+      <circle cx="18.5" cy="12" r="1.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

@@ -327,6 +327,33 @@ body {
   color: var(--accent-ink);
 }
 
+/* The one control this whole app is most often opened to use, given the
+   middle of the nav row and the app's accent fill so it reads as the
+   primary action rather than a fifth destination. Spliced into the row
+   by Header.jsx at `ADD_BUTTON_INDEX`, never a tab -- see tabs.js.
+
+   `flex: 0 0 auto` against the tab buttons' `flex: 1 1 0` (mobile) keeps
+   it a fixed circle while the four labels share whatever is left. */
+.app-tab-add {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--hero-shadow);
+}
+
 /* Five tabs wrapped left-aligned at phone width -- a lopsided 2/3 split
    hugging the left edge, reading as crowded and unbalanced. Every tab
    stays reachable with no scrolling; centering each wrapped row (flex
@@ -376,6 +403,22 @@ body {
   }
   .app-tab-label {
     white-space: nowrap;
+  }
+  /* Raised out of the bar on phone, the way a primary action in a bottom
+     bar is expected to sit. `transform`, not a negative margin, so the
+     bar keeps its own height (and its safe-area padding) unchanged and
+     only the button moves; transforms carry the hit box with them, so
+     the tap target moves too rather than being left behind in the bar.
+
+     The ring is `--bg`, the page's own background, not the bar's: the
+     top of the circle overhangs scrolling content above the bar, and a
+     ring in the bar's colour would draw a grey halo over that content. */
+  .app-tab-add {
+    width: 56px;
+    height: 56px;
+    font-size: 1.9rem;
+    border: 4px solid var(--bg);
+    transform: translateY(-12px);
   }
   .app-main {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
@@ -3244,4 +3287,100 @@ table.data tr:last-child td {
 }
 .debug-panel-empty {
   color: var(--muted);
+}
+
+/* ---- More tab ------------------------------------------------------ */
+
+/* A list of destinations, not a stack of panels: this screen holds the
+   parts of the app nobody opens daily (Goals and Debt today; the rules
+   and recurring tables, and the settings menu, move in next), and a
+   single long scroll through five full panels is a screen nothing can be
+   found on. Tapping a row swaps the list for that section plus a back
+   link -- MoreTab.jsx's own `section` state, no router. */
+.more-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  /* Comfortably past the 44px floor: these are full-width rows with room
+     to spare, not chips competing for horizontal space. */
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.more-item:hover,
+.more-item:focus-visible {
+  border-color: var(--accent);
+}
+.more-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--panel-alt);
+  color: var(--accent);
+}
+.more-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.more-item-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.more-item-hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.more-item-chevron {
+  color: var(--muted-2);
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.more-back-row {
+  display: flex;
+}
+.more-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px 8px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.more-back span {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+/* The section below renders its own `.panel` with its own heading, so
+   this wrapper contributes only the back row's spacing -- without this
+   the nested panel's padding would stack on top of the outer one's. */
+.more-panel {
+  gap: 12px;
 }

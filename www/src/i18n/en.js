@@ -23,6 +23,12 @@ export default {
   'nav.transactions': 'Transactions',
   'nav.goals': 'Goals',
   'nav.debt': 'Debt payoff',
+  'nav.more': 'More',
+  'nav.add': 'Add a transaction',
+
+  'more.title': 'More',
+  'more.goalsHint': 'Save towards something, one month at a time.',
+  'more.debtHint': 'Order your debts and see when they clear.',
 
   'intro.lede':
     'A monthly budget, savings goals and a debt payoff plan — worked out where you can see the working.',

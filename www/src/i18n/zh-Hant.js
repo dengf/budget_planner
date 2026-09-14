@@ -22,6 +22,12 @@ export default {
   'nav.transactions': '帳目',
   'nav.goals': '儲蓄目標',
   'nav.debt': '還債計劃',
+  'nav.more': '更多',
+  'nav.add': '記一筆',
+
+  'more.title': '更多',
+  'more.goalsHint': '一個月一個月地攢，向目標靠近。',
+  'more.debtHint': '排好還款順序，看清何時還清。',
 
   'intro.lede': '每月預算、儲蓄目標與還債計劃——每一步都看得見推算過程。',
   'intro.privacyShort': '僅保存在此瀏覽器中——不會上傳任何內容。',

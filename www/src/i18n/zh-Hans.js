@@ -22,6 +22,12 @@ export default {
   'nav.transactions': '账目',
   'nav.goals': '储蓄目标',
   'nav.debt': '还债计划',
+  'nav.more': '更多',
+  'nav.add': '记一笔',
+
+  'more.title': '更多',
+  'more.goalsHint': '一个月一个月地攒，向目标靠近。',
+  'more.debtHint': '排好还款顺序，看清何时还清。',
 
   'intro.lede': '每月预算、储蓄目标与还债计划——每一步都看得见推算过程。',
   'intro.privacyShort': '仅保存在此浏览器中——不会上传任何内容。',
