@@ -35,8 +35,9 @@ pub mod voice_parse;
 pub mod voice_yue;
 
 pub use category::{
-    build_month, build_savings_line, category_rank, summarize_month, Category, CategoryLine,
-    Direction, MonthSummary, RankedCategory, SAVINGS_CATEGORY_ID,
+    build_month, build_savings_line, category_rank, category_shares, month_setup_state,
+    summarize_month, Category, CategoryLine, CategoryShare, Direction, MonthSetupState,
+    MonthSummary, RankedCategory, SAVINGS_CATEGORY_ID,
 };
 pub use csv_import::{
     detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,
