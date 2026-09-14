@@ -1,28 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
-import { daysLeftInMonth, monthLabel, todayIso } from '../month';
+import { daysLeftInMonth, monthLabel } from '../month';
 import CalcError from './CalcError';
 import CategoryBadge from './CategoryBadge';
 import SpendChart from './SpendChart';
+import AssignBlossom from './AssignBlossom';
+import EditPlanSheet from './EditPlanSheet';
+import { isCommitmentId, loadIncludeCommitments } from '../commitments';
+import { ASSIGN, budgetMode } from '../budgetMode';
 import {
-  DEBT_PREFIX,
-  GOAL_PREFIX,
-  isCommitmentId,
-  loadIncludeCommitments,
-  saveIncludeCommitments,
-} from '../commitments';
-import { monthsBetween } from '../month';
-import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
-import { ASSIGN, TRACKING, budgetMode } from '../budgetMode';
-import {
-  availablePresets,
   categoryDisplayDescription,
   categoryDisplayGroup,
   categoryDisplayName,
 } from '../presetCategories';
-import AssignProgressRing from './AssignProgressRing';
-import CategoryChipPicker from './CategoryChipPicker';
+import { categoryColor } from '../categoryVisuals';
+import { useMonthBudget } from '../useMonthBudget';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -31,6 +24,15 @@ import CategoryChipPicker from './CategoryChipPicker';
  * carry them forward month-over-month is real, sizeable state (finding
  * and summing the actual previous month) left for a follow-up round
  * rather than this one.
+ *
+ * The row list here is read-and-tap, not read-and-type: a row shows a
+ * badge, its name, a "spent of planned" bar and a remaining pill, and
+ * tapping it opens `EditPlanSheet` -- the same bottom-sheet idiom the
+ * `+` introduced -- rather than an inline input in a four-column grid.
+ * Category management (add/rename/remove), the goals/debt commitments
+ * toggle and the Savings target all moved to More's "Categories" screen
+ * (`CategoriesScreen.jsx`); this tab now holds only the assign banner
+ * and the list itself, per the plan's own ledger for this round.
  */
 export default function BudgetTab({
   wasmModule,
@@ -38,9 +40,6 @@ export default function BudgetTab({
   today,
   viewMonth,
   categories,
-  removeCategory,
-  addCommonCategories,
-  addPresetCategory,
   transactions,
   budgetPlan,
   goals,
@@ -49,161 +48,28 @@ export default function BudgetTab({
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const [result, setResult] = useState(null);
-  const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
-  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
-  const [plannedDraft, setPlannedDraft] = useState({});
-  // Which category's "log spending" row is open, and what's typed in it.
-  const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
+  const [editingId, setEditingId] = useState(null);
   const [upcoming, setUpcoming] = useState(null);
-  const [savingsResult, setSavingsResult] = useState(null);
-  const [presetCategories, setPresetCategories] = useState([]);
-
-  const monthTransactions = useMemo(
-    () => transactions.items.filter((tx) => tx.date?.startsWith(viewMonth)),
-    [transactions.items, viewMonth],
-  );
+  // Read-only here: the checkbox that sets this now lives in
+  // CategoriesScreen (More). This tab remounts (App.jsx's `key={activeTab}`
+  // on the tab panel) every time someone switches to it, so it always
+  // picks up whatever that screen last saved -- no live-sync needed
+  // between two components that are never mounted at once.
+  const [includeCommitments] = useState(() => loadIncludeCommitments());
 
   const isCurrentMonth = viewMonth === today;
   const isPastMonth = viewMonth < today;
 
-  const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
-
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (
-        !wasmModule?.spend_by_category ||
-        !wasmModule?.income_by_category ||
-        !wasmModule?.build_month
-      )
-        return;
-      // Two separate totals, one per side of the ledger -- an income
-      // category's "actual" is what it received (the positive side of its
-      // transactions), an expense category's is what it cost (the negative
-      // side). Each result set is filtered to the categories that actually
-      // belong on that side before merging, so a stray transaction
-      // categorized against the wrong kind of category can't leak its
-      // total into a line it doesn't belong on.
-      const [spendResult, incomeResult] = await Promise.all([
-        wasmModule.spend_by_category({ transactions: monthTransactions }),
-        wasmModule.income_by_category({ transactions: monthTransactions }),
-      ]);
-      const spent = [
-        ...(spendResult?.totals ?? []).filter((row) => !isIncome(row.category_id)),
-        ...(incomeResult?.totals ?? []).filter((row) => isIncome(row.category_id)),
-      ].map((t) => ({ category_id: t.category_id, amount: t.amount }));
-      // Every known category gets a planned line, defaulting to 0 -- not
-      // only the ones with a saved plan entry. Otherwise a category
-      // freshly added this session has nothing to type an amount into: it
-      // exists, but build_month never hears about it until something else
-      // creates a plan row for it first.
-      const planned = categories.items.map((c) => ({
-        category_id: c.id,
-        amount: budgetPlan.items.find((p) => p.category_id === c.id)?.planned ?? 0,
-      }));
-      // Income isn't typed in separately any more -- `build_month`
-      // derives it in Rust from whichever of these `planned` entries
-      // belong to an income category, so the only thing this side needs
-      // to hand over is which ids those are.
-      const incomeCategoryIds = categories.items.filter((c) => c.is_income).map((c) => c.id);
-
-      // Goals and debts, when the toggle is on, join the budget as
-      // ordinary planned entries under synthetic ids. Deliberately not
-      // summed here first: handing each one to `build_month` separately
-      // means the totals and `unassigned` are still Rust's arithmetic, and
-      // each commitment gets its own line to show, rather than the front
-      // end doing money maths CLAUDE.md puts in the core.
-      if (includeCommitments) {
-        for (const goal of goals?.items ?? []) {
-          const months = monthsBetween(todayIso(), goal.target_date);
-          const contribution = await wasmModule.required_contribution?.({
-            target_amount: goal.target_amount,
-            current_amount: goal.current_amount,
-            months_remaining: months,
-            cadence: 'monthly',
-          });
-          if (contribution?.amount > 0) {
-            planned.push({ category_id: `${GOAL_PREFIX}${goal.id}`, amount: contribution.amount });
-          }
-        }
-        for (const debt of debts?.items ?? []) {
-          if (debt.min_payment > 0) {
-            planned.push({ category_id: `${DEBT_PREFIX}${debt.id}`, amount: debt.min_payment });
-          }
-        }
-      }
-
-      const built = await wasmModule.build_month({
-        planned,
-        previous_remaining: [],
-        spent,
-        income_category_ids: incomeCategoryIds,
-      });
-      if (!cancelled) setResult(built);
-    }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  const { result, isIncome } = useMonthBudget({
     wasmModule,
-    budgetPlan.items,
-    categories.items,
-    monthTransactions,
+    categories,
+    budgetPlan,
+    transactions,
+    viewMonth,
     includeCommitments,
-    goals?.items,
-    debts?.items,
-  ]);
-
-  /**
-   * The Savings row's line: income minus every real expense category's
-   * actual this month. Computed as its own `build_savings_line` call
-   * rather than folded into `build_month` above, since it isn't a
-   * category `build_month` knows about -- there's no `Category` record
-   * and nothing is ever categorized against it (see savings.js).
-   */
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (!wasmModule?.build_savings_line || !result?.summary) {
-        setSavingsResult(null);
-        return;
-      }
-      const planned =
-        budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID)?.planned ?? 0;
-      const expense = totalExpenseActual(result.lines ?? [], isIncome, isCommitmentId);
-      const built = await wasmModule.build_savings_line({
-        planned,
-        income: result.summary.income,
-        total_expense_actual: expense,
-      });
-      if (!cancelled) setSavingsResult(built);
-    }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [wasmModule, result, budgetPlan.items, categories.items]);
-
-  const savingsLine = savingsResult?.line;
-
-  /** Savings reads the opposite way `line.remaining` (planned minus
-   *  actual) does for every other category, so this shows actual minus
-   *  planned instead: meeting or beating the target is good news (green,
-   *  "received more" -- saved more than planned), falling short is a
-   *  plain negative amount still to go (red), the same polarity every
-   *  other category's remaining already uses. */
-  const savingsRemainingCell = (line) => {
-    const gap = line.spent - line.planned;
-    if (gap >= 0) {
-      return {
-        className: 'positive',
-        text: t('budget.receivedMore', { amount: formatMoney(gap) }),
-      };
-    }
-    return { className: 'negative', text: formatMoney(gap) };
-  };
+    goals,
+    debts,
+  });
 
   const categoryFor = (id) => categories.items.find((c) => c.id === id);
   const categoryName = (id) => {
@@ -244,35 +110,8 @@ export default function BudgetTab({
           ? byGroup
           : collator.compare(categoryName(a.category_id), categoryName(b.category_id));
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `isIncome`/`categoryGroup`/`categoryName` are derived fresh each render from `categories.items`, already a dep below.
   }, [result, categories.items, locale]);
-
-  /** The goal/debt lines `build_month` returned, paired back with the
-   *  record each one came from so it can be shown by name. */
-  const commitmentLines = useMemo(
-    () =>
-      (result?.lines ?? [])
-        .filter((l) => isCommitmentId(l.category_id))
-        .map((line) => {
-          const isGoal = line.category_id.startsWith(GOAL_PREFIX);
-          const id = line.category_id.slice((isGoal ? GOAL_PREFIX : DEBT_PREFIX).length);
-          const source = (isGoal ? goals?.items : debts?.items)?.find((r) => r.id === id);
-          return { line, isGoal, name: source?.name ?? id };
-        }),
-    [result, goals?.items, debts?.items],
-  );
-
-  const addCategory = async (e) => {
-    e.preventDefault();
-    if (!newCategory.name.trim()) return;
-    const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
-    await categories.save({
-      id,
-      name: newCategory.name,
-      group: newCategory.group || (newCategory.isIncome ? t('cat.group.income') : 'General'),
-      is_income: newCategory.isIncome,
-    });
-    setNewCategory({ name: '', group: '', isIncome: false });
-  };
 
   const savePlanned = async (categoryId, amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === categoryId);
@@ -289,14 +128,15 @@ export default function BudgetTab({
    * Every date this month a recurring expense is due -- rent, a
    * subscription, anything on a schedule -- computed in Rust so a weekly
    * bill genuinely counts 4 or 5 occurrences depending on the real
-   * calendar rather than a flat estimate (see budget-calc::recurring's
-   * doc comment for the actual user complaint this answers: wanting to
-   * see scheduled expenses *before* they post, not after).
+   * calendar rather than a flat estimate. Only the per-category totals
+   * are kept: the itemized list this used to render in a standalone
+   * "Upcoming" section now surfaces contextually, inside the sheet for
+   * the one category being edited (see EditPlanSheet's `upcoming` prop).
    */
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!wasmModule?.recurring_occurrences || !(recurring?.items?.length > 0)) {
+      if (isPastMonth || !wasmModule?.recurring_occurrences || !(recurring?.items?.length > 0)) {
         setUpcoming(null);
         return;
       }
@@ -310,39 +150,13 @@ export default function BudgetTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, recurring?.items, viewMonth]);
-
-  /** The full starter-preset list, for the chip picker -- loaded once
-   *  `wasmModule` is ready. Unlike `addCommonCategories`'s own call to
-   *  the same binding, this one is kept in state so the picker can
-   *  re-filter it against `categories.items` on every render without
-   *  re-fetching from wasm each time. */
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (!wasmModule?.preset_categories) return;
-      const presets = (await wasmModule.preset_categories()) ?? [];
-      if (!cancelled) setPresetCategories(presets);
-    }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [wasmModule]);
-
-  /** Adds a recurring category's expected total on top of whatever is
-   *  already planned for it -- the one-click "help solve it" action, not
-   *  just a number to notice and go type in by hand. */
-  const addUpcomingToPlanned = async (categoryId, amount) => {
-    const currentPlanned = budgetPlan.items.find((p) => p.category_id === categoryId)?.planned ?? 0;
-    await savePlanned(categoryId, currentPlanned + amount);
-  };
+  }, [wasmModule, recurring?.items, viewMonth, isPastMonth]);
 
   /**
-   * What the Remaining cell says and how it's styled -- three existing
-   * expense-side cases (still exactly the wording/colour they were),
-   * plus two income-side ones that read the same negative `remaining`
-   * the opposite way: for an expense category running negative means
+   * What the pill says and how it's styled -- three existing expense-side
+   * cases (still exactly the wording/colour BudgetTab's old table used),
+   * plus two income-side ones that read the same negative `remaining` the
+   * opposite way: for an expense category running negative means
    * overspending (bad, red, "borrowed"); for an income category it means
    * more came in than was planned for (good, never red).
    */
@@ -388,20 +202,21 @@ export default function BudgetTab({
   const hasIncomeCategory = categories.items.some((c) => c.is_income);
   const mode = budgetMode({ isPastMonth, hasIncome, unassigned });
   // Every fresh or cleared budget lands on the compact five-category
-  // starter set at once (App.jsx re-seeds the moment the list is empty,
-  // deliberately -- see its own comment), not the empty-table-plus-chip-
-  // picker state the tap-to-add-one-at-a-time picker was designed around.
-  // The assign banner already says "start with income," but with the
-  // Income and Expense sections sitting at equal visual weight, that's a
-  // sentence to apply to one specific row out of five (and more once
-  // someone adds from the full catalogue), not something the eye finds
-  // on its own. Dimming the Expense side (rows and its section
-  // header) until an income category has something planned turns that
-  // instruction into a visual one instead. `:focus-within` (main.css)
+  // starter set at once, not an empty list -- so the assign banner's
+  // "start with income" message applies to one specific row out of five
+  // (and more once someone adds from the full catalogue), not something
+  // the eye finds on its own. Dimming the Expense side (rows and its
+  // section header) until an income category has something planned turns
+  // that instruction into a visual one instead. `:focus-within` (main.css)
   // restores full opacity, so nothing here is actually harder to reach,
   // and this never applies to a past month -- reviewing history isn't
   // "start here" guidance.
   const dimExpenseUntilIncome = mode === ASSIGN && !hasIncome;
+
+  const editingLine = orderedLines.find((l) => l.category_id === editingId);
+  const editingUpcoming = upcoming?.totals_by_category?.find(
+    (tot) => tot.category_id === editingId,
+  );
 
   return (
     <div className="panel budget">
@@ -412,47 +227,19 @@ export default function BudgetTab({
             ? t('budget.viewingPastMonth')
             : t('budget.viewingFutureMonth', { month: monthLabel(viewMonth, locale) })}
       </p>
-      {/* Grouped into one tighter block rather than two panel-gapped
-          children -- neither line is the next action on this screen (the
-          assign banner below is), so they don't need a full flex gap of
-          their own before it. */}
-      <div className="budget-method-block">
-        {/* The method, stated once. Zero-based budgeting is the entire
-            premise of this tab and the UI never said what it was. */}
-        <p className="panel-subtitle">{t('budget.method')}</p>
-
-        {/* Off by default: a goal or debt only claims part of this month's
-            income once someone says so, not because the feature exists. */}
-        <label className="field-check commitments-toggle">
-          <input
-            type="checkbox"
-            checked={includeCommitments}
-            onChange={(e) => {
-              setIncludeCommitments(e.target.checked);
-              saveIncludeCommitments(e.target.checked);
-            }}
-          />
-          <span>{t('budget.includeCommitments')}</span>
-        </label>
-      </div>
 
       {result?.error && <CalcError result={result} />}
-      {savingsResult?.error && <CalcError result={savingsResult} />}
 
       {summary && (
         <>
           {/* Unassigned is the whole activity of zero-based budgeting --
               you are done when it reaches zero -- so it leads, at the size
               that says so, and the three derived figures you can't act on
-              sit underneath it. It used to be the fourth of four
-              identical tiles, after three you don't act on at all. */}
+              sit underneath it. */}
           <div
             className={`assign-banner${hasBudget ? '' : ' assign-banner-start'}${unassigned < 0 ? ' assign-banner-over' : ''}`}
           >
-            <AssignProgressRing
-              fraction={summary.income > 0 ? summary.total_planned / summary.income : 0}
-              state={!hasIncome ? 'start' : unassigned < 0 ? 'over' : 'onTrack'}
-            />
+            <AssignBlossom state={!hasIncome ? 'start' : unassigned < 0 ? 'over' : 'onTrack'} />
             <div className="assign-banner-text">
               <span className="assign-label">
                 {!hasIncomeCategory
@@ -492,86 +279,14 @@ export default function BudgetTab({
         </>
       )}
 
-      {/* Framed entirely around "upcoming" -- only meaningful looking at
-          the current or a future month, not one that's already over.
-          Collapsed by default (a <details>, same disclosure pattern as
-          the CSV column mapping below) rather than a permanently-open
-          panel -- one more always-visible section was exactly the "too
-          much stacked at once" complaint this round of changes answers. */}
-      {!isPastMonth && upcoming && upcoming.occurrences.length > 0 && (
-        <details className="collapsible-panel">
-          <summary>{t('recurring.upcomingTitle')}</summary>
-          <p className="panel-subtitle">{t('recurring.upcomingHint')}</p>
-          <div className="upcoming-totals">
-            {upcoming.totals_by_category.map((total) => (
-              <div className="upcoming-total-row" key={total.category_id}>
-                <span className="upcoming-total-name">{categoryName(total.category_id)}</span>
-                <span className="upcoming-total-amount">{formatMoney(total.amount)}</span>
-                <button
-                  type="button"
-                  className="btn secondary upcoming-add"
-                  onClick={() => addUpcomingToPlanned(total.category_id, total.amount)}
-                >
-                  {t('recurring.addToPlanned')}
-                </button>
-              </div>
-            ))}
-          </div>
-          <ul className="upcoming-list">
-            {upcoming.occurrences.map((o, i) => (
-              <li
-                key={`${o.recurring_id}-${o.date}-${i}`}
-                className={o.date < todayIso() ? 'past' : ''}
-              >
-                <span className="upcoming-date">{o.date}</span>
-                <span className="upcoming-desc">{o.description}</span>
-                <span className="upcoming-amount">{formatMoney(o.amount)}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <div className="dash-header sticky-title-header section-start">
-        <h2>{t('budget.categoriesTitle')}</h2>
-        {mode !== TRACKING && (
-          <button
-            type="button"
-            className="icon-add-btn"
-            aria-expanded={categoryPanelOpen}
-            aria-label={t('budget.addCategory')}
-            onClick={() => setCategoryPanelOpen((open) => !open)}
-          >
-            <span aria-hidden="true">+</span>
-          </button>
-        )}
-      </div>
       {categories.items.length === 0 ? (
-        // `savingsLine` is truthy from the moment wasm loads -- a zero-
-        // valued Savings line always computes successfully, even with no
-        // income and no expenses (see build_savings_line's own doc
-        // comment). Checking `!savingsLine` here used to make this
-        // branch effectively unreachable: a fresh budget rendered the
-        // real table with only a "$0 Savings" row instead of this
-        // message, with no visible category and no explanation. Savings
-        // has nothing meaningful to show yet either way when there are
-        // no categories at all, so this only checks the one thing that
-        // actually means "empty."
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
-        <div className={`category-table${mode === TRACKING ? ' category-table-tracking' : ''}`}>
-          {/* Without these, Planned/Spent/Remaining read as three bare
-              figures with nothing saying which is which. */}
-          <div className="category-row category-head">
-            <div>{t('budget.categoryName')}</div>
-            <div className="num">{t('budget.planned')}</div>
-            <div className="num">{t('budget.actual')}</div>
-            <div className="num">{t('budget.remaining')}</div>
-            <div />
-          </div>
+        <div className="budget-rows">
           {orderedLines.map((line, i) => {
             const incomeRow = isIncome(line.category_id);
             const remaining = remainingCell(line);
+            const over = !incomeRow && line.spent > line.planned;
             // A section header once at the top of the income block and
             // once at the top of the expense block -- `orderedLines` is
             // already sorted income-first, so the boundary is just the
@@ -592,257 +307,72 @@ export default function BudgetTab({
                     {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
                   </div>
                 )}
-                <div className={dimmed ? 'category-row category-row-dim' : 'category-row'}>
-                  <div>
-                    <div className="category-name">
-                      <CategoryBadge category={categoryFor(line.category_id)} />
-                      {categoryName(line.category_id)}
-                    </div>
-                    {/* Group and description share one line instead of
-                    two -- a dozen-plus of these stacked down the tab adds
-                    up fast. Mei's (a CPA) description text is present on a
-                    preset category, blank on a hand-typed one, so the
-                    " · " separator only ever appears once there's a second
-                    thing to say. */}
-                    <div className="category-group">
-                      {categoryGroup(line.category_id)}
-                      {categoryDescription(line.category_id) &&
-                        ` · ${categoryDescription(line.category_id)}`}
-                    </div>
-                    {/* How far through the plan this category is, without
-                    reading three numbers and doing the division. Only
-                    once a plan exists -- a full bar on planned 0 would
-                    read as "done" when it means "unbudgeted". Exceeding
-                    plan is only styled as a warning on the expense side --
-                    an income category clearing its plan is good news. */}
+                <button
+                  type="button"
+                  className={`budget-row${dimmed ? ' category-row-dim' : ''}`}
+                  aria-label={t('budget.progressAria', {
+                    name: categoryName(line.category_id),
+                    spent: formatMoney(line.spent),
+                    planned: formatMoney(line.planned),
+                  })}
+                  onClick={() => setEditingId(line.category_id)}
+                >
+                  <CategoryBadge category={categoryFor(line.category_id)} />
+                  <span className="budget-row-body">
+                    <span className="budget-row-top">
+                      <span className="budget-row-name">{categoryName(line.category_id)}</span>
+                      <span className={`budget-row-pill ${remaining.className}`}>
+                        {remaining.text}
+                      </span>
+                    </span>
                     {line.planned > 0 && (
-                      <div
-                        className="progress"
-                        role="img"
-                        aria-label={t('budget.progressAria', {
-                          name: categoryName(line.category_id),
-                          spent: formatMoney(line.spent),
-                          planned: formatMoney(line.planned),
-                        })}
-                      >
+                      <span className="budget-row-track">
                         <span
-                          className={
-                            !incomeRow && line.spent > line.planned
-                              ? 'progress-fill over'
-                              : 'progress-fill'
-                          }
+                          className={`budget-row-bar${over ? ' over' : ''}`}
                           style={{
                             width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%`,
+                            ...(over
+                              ? {}
+                              : { background: categoryColor(categoryFor(line.category_id)) }),
                           }}
                         />
-                      </div>
+                      </span>
                     )}
-                  </div>
-                  <div className="field-input planned-input">
-                    <span className="cell-label">{t('budget.planned')}</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      aria-label={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
-                      placeholder="0"
-                      // Empty rather than a literal 0, so budgeting a category
-                      // is one keystroke instead of select-then-replace --
-                      // fourteen times over on a seeded budget.
-                      value={plannedDraft[line.category_id] ?? (line.planned || '')}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setPlannedDraft((d) => ({ ...d, [line.category_id]: raw }));
-                        savePlanned(line.category_id, raw);
-                      }}
-                    />
-                  </div>
-                  {/* The .cell-label spans are hidden once the header row is
-                  visible; on a narrow screen the row stacks and they are
-                  the only thing naming each figure. */}
-                  <div className="num spent-cell">
-                    <span className="cell-label">
-                      {t(incomeRow ? 'budget.received' : 'budget.spent')}
+                    <span className="budget-row-sub">
+                      {t('budget.rowSubtext', {
+                        spent: formatMoney(line.spent),
+                        planned: formatMoney(line.planned),
+                      })}
                     </span>
-                    <span className="spent-value">{formatMoney(line.spent)}</span>
-                  </div>
-                  <div className={`num ${remaining.className}`}>
-                    <span className="cell-label">{t('budget.remaining')}</span>
-                    {remaining.text}
-                  </div>
-                  <button className="btn ghost" onClick={() => removeCategory(line.category_id)}>
-                    {t('budget.remove')}
-                  </button>
-                </div>
+                  </span>
+                </button>
               </React.Fragment>
             );
           })}
-          {savingsLine && (
-            <React.Fragment>
-              <div className="category-row-divider" role="separator" />
-              <div
-                className={
-                  dimExpenseUntilIncome
-                    ? 'category-row category-row-savings category-row-dim'
-                    : 'category-row category-row-savings'
-                }
-              >
-                <div>
-                  <div className="category-name">{t('budget.savings')}</div>
-                  <div className="category-group">{t('budget.savingsHint')}</div>
-                </div>
-                <div className="field-input planned-input">
-                  <span className="cell-label">{t('budget.planned')}</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="any"
-                    aria-label={`${t('budget.planned')} — ${t('budget.savings')}`}
-                    placeholder="0"
-                    value={plannedDraft[SAVINGS_CATEGORY_ID] ?? (savingsLine.planned || '')}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setPlannedDraft((d) => ({ ...d, [SAVINGS_CATEGORY_ID]: raw }));
-                      savePlanned(SAVINGS_CATEGORY_ID, raw);
-                    }}
-                  />
-                </div>
-                <div className="num spent-cell">
-                  <span className="cell-label">{t('budget.savingsActual')}</span>
-                  <span className="spent-value">{formatMoney(savingsLine.spent)}</span>
-                </div>
-                <div className={`num ${savingsRemainingCell(savingsLine).className}`}>
-                  <span className="cell-label">{t('budget.remaining')}</span>
-                  {savingsRemainingCell(savingsLine).text}
-                </div>
-                <div />
-              </div>
-            </React.Fragment>
-          )}
         </div>
       )}
       {categories.items.length > 0 && <p className="field-label">{t('budget.spentHint')}</p>}
 
-      {/* Right under the table it adds to, not after the commitments
-          table and chart below -- previously the very last thing on the
-          tab, easy to miss on a first visit with an empty budget. */}
-      {(() => {
-        const editCategoriesBlock = (
-          <>
-            {mode === ASSIGN && (
-              <CategoryChipPicker
-                presets={availablePresets(presetCategories, categories.items, t)}
-                onAdd={addPresetCategory}
-              />
-            )}
-            <form className="form-grid" onSubmit={addCategory}>
-              <label className="field">
-                <span className="field-label">{t('budget.categoryName')}</span>
-                <div className="field-input">
-                  <input
-                    value={newCategory.name}
-                    onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                  />
-                </div>
-              </label>
-              <label className="field">
-                <span className="field-label">{t('budget.categoryGroup')}</span>
-                <div className="field-input">
-                  <input
-                    value={newCategory.group}
-                    onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
-                  />
-                </div>
-              </label>
-              <label className="field field-check">
-                <input
-                  type="checkbox"
-                  checked={newCategory.isIncome}
-                  onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
-                />
-                <span>{t('budget.categoryIsIncome')}</span>
-              </label>
-              <button className="btn" type="submit">
-                {t('budget.addCategory')}
-              </button>
-              <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
-                {t('budget.addCommon')}
-              </button>
-            </form>
-            <p className="field-label">{t('budget.commonHint')}</p>
-          </>
-        );
-        if (mode === TRACKING) {
-          return (
-            <details className="collapsible-panel">
-              <summary>{t('budget.editCategoriesTitle')}</summary>
-              {editCategoriesBlock}
-            </details>
-          );
-        }
-        // ASSIGN mode: a floating panel triggered by the icon button in the
-        // Categories title row, rather than this block sitting permanently
-        // inline -- it's exactly what was pushing the category table below
-        // the fold on a fresh budget. TRACKING mode keeps its own collapsed
-        // <details> above, unchanged.
-        return (
-          categoryPanelOpen && (
-            <div
-              className="add-txn-backdrop"
-              role="presentation"
-              onClick={() => setCategoryPanelOpen(false)}
-            >
-              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- this handler only stops a click from reaching the backdrop's dismiss handler above; the panel itself is not something to activate, so there is no keyboard equivalent to add. Focus and Escape are handled by the dialog role. */}
-              <div
-                className="fab-picker category-add-panel"
-                role="dialog"
-                aria-label={t('budget.addCategory')}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="add-txn-header">
-                  <span className="add-txn-title">{t('budget.addCategory')}</span>
-                  <button
-                    type="button"
-                    className="dash-month-btn"
-                    aria-label={t('monthpicker.close')}
-                    onClick={() => setCategoryPanelOpen(false)}
-                  >
-                    ×
-                  </button>
-                </div>
-                {editCategoriesBlock}
-              </div>
-            </div>
-          )
-        );
-      })()}
-
-      {includeCommitments && commitmentLines.length > 0 && (
-        <details className="collapsible-panel">
-          <summary>{t('budget.commitmentsTitle')}</summary>
-          <div className="category-table commitments-table">
-            <div className="category-row category-head">
-              <div />
-              <div className="num">{t('budget.planned')}</div>
-              <div />
-            </div>
-            {commitmentLines.map(({ line, isGoal, name }) => (
-              <div className="category-row" key={line.category_id}>
-                <div>
-                  <div className="category-name">{name}</div>
-                  <div className="category-group">
-                    {isGoal ? t('goals.title') : t('debt.title')}
-                  </div>
-                </div>
-                <div className="num">
-                  <span className="cell-label">{t('budget.planned')}</span>
-                  {formatMoney(line.planned)}
-                </div>
-                <div />
-              </div>
-            ))}
-          </div>
-        </details>
+      {editingLine && (
+        <EditPlanSheet
+          open={Boolean(editingLine)}
+          onClose={() => setEditingId(null)}
+          title={categoryName(editingLine.category_id)}
+          badge={<CategoryBadge category={categoryFor(editingLine.category_id)} />}
+          subtitle={
+            categoryGroup(editingLine.category_id) +
+            (categoryDescription(editingLine.category_id)
+              ? ` · ${categoryDescription(editingLine.category_id)}`
+              : '')
+          }
+          planned={editingLine.planned}
+          spentLabel={t(isIncome(editingLine.category_id) ? 'budget.received' : 'budget.spent')}
+          spent={editingLine.spent}
+          remaining={remainingCell(editingLine)}
+          upcoming={editingUpcoming}
+          formatMoney={formatMoney}
+          onSave={(amount) => savePlanned(editingLine.category_id, amount)}
+        />
       )}
 
       {/* Where the money went, not where it came from -- an income

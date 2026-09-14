@@ -67,7 +67,7 @@ export default {
   'budget.reallocate': '重新分配',
   'budget.totalPlanned': '計劃總額',
   'budget.totalSpent': '花費總額',
-  'budget.noCategories': '還沒有分類——點擊上方的 + 新增第一個，建議從收入開始。',
+  'budget.noCategories': '還沒有分類——請到「更多 → 分類」新增第一個，建議從收入開始。',
   'budget.save': '儲存',
   'budget.remove': '刪除',
 
@@ -75,6 +75,7 @@ export default {
   'budget.includeCommitments': '將目標存入與債務最低還款計入本月預算',
   'budget.commitmentsTitle': '本月目標與債務',
   'budget.progressAria': '{name}：已花費 {spent}，計劃 {planned}',
+  'budget.rowSubtext': '已花費 {spent}，計劃 {planned}',
   'chart.spendTitle': '錢花在了哪裡',
   'chart.spendTotal': '本月共花費 {amount}，涵蓋所有分類',
   'chart.spendRowAria': '{name}：已花費 {spent}，計劃 {planned}',

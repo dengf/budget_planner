@@ -70,7 +70,7 @@ export default {
   'budget.totalPlanned': 'Total planned',
   'budget.totalSpent': 'Total spent',
   'budget.noCategories':
-    'No categories yet — tap the + above to add your first one, starting with income.',
+    'No categories yet — add your first one from More → Categories, starting with income.',
   'budget.save': 'Save',
   'budget.remove': 'Remove',
 
@@ -78,6 +78,7 @@ export default {
   'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
   'budget.commitmentsTitle': 'Goals & debt this month',
   'budget.progressAria': '{name}: {spent} of {planned} spent',
+  'budget.rowSubtext': '{spent} of {planned}',
   'chart.spendTitle': 'Where it went',
   'chart.spendTotal': '{amount} spent this month, across every category',
   'chart.spendRowAria': '{name}: {spent} spent of {planned} planned',
