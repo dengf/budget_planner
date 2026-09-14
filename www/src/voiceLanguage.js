@@ -10,13 +10,10 @@ const STORAGE_KEY = 'bp:voiceLanguage';
 
 export const DEFAULT_VOICE_LANGUAGE = 'en';
 
-// Cantonese ('yue') lands in a follow-up PR once its own ASR model and
-// parsing grammar are wired in -- see budget-calc/src/voice_parse.rs's
-// `VoiceLanguage` enum, which already has a (currently-empty) `Yue` case
-// waiting for it.
 export const VOICE_LANGUAGES = [
   { id: 'en', label: 'English' },
   { id: 'cmn', label: '普通话 (Mandarin)' },
+  { id: 'yue', label: '廣東話 (Cantonese)' },
 ];
 
 export function getVoiceLanguage() {

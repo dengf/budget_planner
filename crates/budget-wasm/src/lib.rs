@@ -114,6 +114,10 @@ mod bridge_coverage {
             "voice_cmn",
             "bridged in the sibling budget-wasm-voice-cmn crate, not here -- see this crate's lib.rs doc comment",
         ),
+        (
+            "voice_yue",
+            "bridged in the sibling budget-wasm-voice-yue crate, not here -- see this crate's lib.rs doc comment",
+        ),
     ];
 
     fn public_modules(source: &str) -> Vec<String> {
