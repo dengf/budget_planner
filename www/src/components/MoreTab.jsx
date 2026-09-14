@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import GoalsTab from './GoalsTab';
 import DebtTab from './DebtTab';
-import { GoalsIcon, DebtIcon } from './icons';
+import RulesSection from './RulesSection';
+import RecurringSection from './RecurringSection';
+import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon } from './icons';
 
 /**
  * Everything that isn't one of the three screens someone opens daily.
@@ -13,10 +15,14 @@ import { GoalsIcon, DebtIcon } from './icons';
  * to Transactions, which is opened several times a day, and cost it type
  * size: five labels across 360px forced the whole bar down to 0.68rem.
  *
+ * The categorization rules and recurring-expense tables join them here
+ * from the bottom of the Transactions tab, for the same reason: a rule
+ * is written once and then applies itself to every transaction added
+ * afterwards, which is setup, not daily use.
+ *
  * A list that swaps itself for one section, rather than every section
  * stacked on one long scroll: this screen only grows from here (the
- * categorization rules and recurring-expense tables move in next, and
- * the header's settings menu after that), and a stack of five full
+ * header's settings menu moves in next), and a stack of five full
  * panels is a screen nobody can find anything on. `section` is plain
  * local state, not a route -- there is no URL to restore and no history
  * to honour, so a router would be machinery for nothing.
@@ -27,8 +33,34 @@ import { GoalsIcon, DebtIcon } from './icons';
  * how a goal or a debt works changes here.
  */
 const SECTIONS = [
-  { id: 'goals', key: 'goals.title', hintKey: 'more.goalsHint', Icon: GoalsIcon, Component: GoalsTab },
-  { id: 'debt', key: 'debt.title', hintKey: 'more.debtHint', Icon: DebtIcon, Component: DebtTab },
+  {
+    id: 'goals',
+    key: 'goals.title',
+    hintKey: 'more.goalsHint',
+    Icon: GoalsIcon,
+    Component: GoalsTab,
+  },
+  {
+    id: 'debt',
+    key: 'debt.title',
+    hintKey: 'more.debtHint',
+    Icon: DebtIcon,
+    Component: DebtTab,
+  },
+  {
+    id: 'rules',
+    key: 'transactions.rulesTitle',
+    hintKey: 'more.rulesHint',
+    Icon: RulesIcon,
+    Component: RulesSection,
+  },
+  {
+    id: 'recurring',
+    key: 'recurring.title',
+    hintKey: 'more.recurringHint',
+    Icon: RecurringIcon,
+    Component: RecurringSection,
+  },
 ];
 
 export default function MoreTab(props) {
@@ -39,8 +71,12 @@ export default function MoreTab(props) {
 
   if (section) {
     const { Component } = section;
+    // The back link sits *outside* the section, not inside a wrapper
+    // panel around it -- every section component renders its own
+    // `.panel` with its own heading, and nesting one panel in another
+    // stacks two lots of padding and two backgrounds.
     return (
-      <div className="panel more-panel">
+      <>
         <div className="more-back-row">
           <button type="button" className="more-back" onClick={() => setSectionId(null)}>
             <span aria-hidden="true">&#8249;</span>
@@ -48,12 +84,12 @@ export default function MoreTab(props) {
           </button>
         </div>
         <Component {...props} />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="panel more-panel">
+    <div className="panel">
       <h2>{t('more.title')}</h2>
       <ul className="more-list">
         {SECTIONS.map(({ id, key, hintKey, Icon }) => (

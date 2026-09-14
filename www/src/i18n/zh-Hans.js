@@ -28,6 +28,8 @@ export default {
   'more.title': '更多',
   'more.goalsHint': '一个月一个月地攒，向目标靠近。',
   'more.debtHint': '排好还款顺序，看清何时还清。',
+  'more.rulesHint': '设定一次关键词，之后每笔相符的交易都会自动归类。',
+  'more.recurringHint': '房租、订阅，任何按周期发生的支出。',
 
   'intro.lede': '每月预算、储蓄目标与还债计划——每一步都看得见推算过程。',
   'intro.privacyShort': '仅保存在此浏览器中——不会上传任何内容。',

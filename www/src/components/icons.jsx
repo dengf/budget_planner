@@ -136,6 +136,32 @@ export function DebtIcon() {
 }
 
 /**
+ * Categorization rules -- a funnel. A rule takes the whole stream of
+ * incoming transactions and sorts each one by a keyword, which is what a
+ * funnel shape says without a label; a tag or a label glyph would say
+ * "this names one thing", which is the result, not the mechanism.
+ */
+export function RulesIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M4 5h16l-6 7v7l-4-2v-5Z" />
+    </svg>
+  );
+}
+
+/** Recurring expenses -- the standard cycle arrow, with the clock hand
+ *  inside it that separates "repeats" from "refresh/undo". */
+export function RecurringIcon() {
+  return (
+    <svg {...NAV_ICON_PROPS}>
+      <path d="M20 12a8 8 0 1 1-2.6-5.9" />
+      <path d="M20 4v4h-4" />
+      <path d="M12 8.5V12l2.5 1.5" />
+    </svg>
+  );
+}
+
+/**
  * The "More" tab -- a plain horizontal ellipsis, deliberately NOT the
  * same shape as `SettingsIcon` above. Both can be on screen at once (the
  * header keeps its settings trigger while More holds Goals/Debt), and

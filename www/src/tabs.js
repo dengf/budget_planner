@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  DashboardIcon,
-  BudgetIcon,
-  TransactionsIcon,
-  MoreIcon,
-} from './components/icons';
+import { DashboardIcon, BudgetIcon, TransactionsIcon, MoreIcon } from './components/icons';
 
 // Single source of truth for tab identity -- id, label key, nav icon, and
 // lazy-loaded panel component all in one ordered list, instead of
