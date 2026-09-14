@@ -32,16 +32,23 @@ describe('TransactionsTab', () => {
     expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument();
   });
 
-  it('opens the add sheet on Manual when "Log a transaction" is tapped', () => {
-    renderTab();
+  // The sheet itself lives in AppShell now, behind the nav bar's centre
+  // "+", so what this tab owns is which method it asks for -- and asking
+  // for the right one is the whole point of having two buttons: an
+  // "Import CSV" button that opened onto the Manual form would read as
+  // broken.
+  it('asks the shell for the Manual method when "Log a transaction" is tapped', () => {
+    const onOpenAdd = vi.fn();
+    renderTab({ onOpenAdd });
     fireEvent.click(screen.getByRole('button', { name: 'Log a transaction' }));
-    expect(screen.getByRole('tab', { name: 'Manual', selected: true })).toBeInTheDocument();
+    expect(onOpenAdd).toHaveBeenCalledWith('manual');
   });
 
-  it('opens the add sheet on Import CSV when "Import CSV" is tapped', () => {
-    renderTab();
+  it('asks the shell for the CSV method when "Import CSV" is tapped', () => {
+    const onOpenAdd = vi.fn();
+    renderTab({ onOpenAdd });
     fireEvent.click(screen.getByRole('button', { name: 'Import CSV' }));
-    expect(screen.getByRole('tab', { name: 'Import CSV', selected: true })).toBeInTheDocument();
+    expect(onOpenAdd).toHaveBeenCalledWith('csv');
   });
 
   it('keeps categorization rules and recurring setup collapsed behind a disclosure', () => {

@@ -24,7 +24,6 @@ import {
 } from '../presetCategories';
 import AssignProgressRing from './AssignProgressRing';
 import CategoryChipPicker from './CategoryChipPicker';
-import QuickAddFab from './QuickAddFab';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -57,8 +56,6 @@ export default function BudgetTab({
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [plannedDraft, setPlannedDraft] = useState({});
   // Which category's "log spending" row is open, and what's typed in it.
-  const [spendFor, setSpendFor] = useState(null);
-  const [spendDraft, setSpendDraft] = useState({ amount: '', description: '' });
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
   const [upcoming, setUpcoming] = useState(null);
   const [savingsResult, setSavingsResult] = useState(null);
@@ -277,55 +274,6 @@ export default function BudgetTab({
       is_income: newCategory.isIncome,
     });
     setNewCategory({ name: '', group: '', isIncome: false });
-  };
-
-  /**
-   * Records spending -- or, against an income category, income -- without
-   * leaving this tab.
-   *
-   * "Spent"/"Received" is derived -- `budget-calc::spend_by_category` and
-   * `income_by_category` sum this month's negative or positive
-   * transactions respectively -- so the only way to move it was the
-   * Transactions tab, which nothing here said. This writes an ordinary
-   * transaction; the Transactions tab lists it and can edit or delete it
-   * exactly as if it had been typed there.
-   *
-   * The field asks for a plain positive amount and this applies the sign,
-   * because asking a person to type a minus sign to record an expense (or
-   * to remember an income category is the one place they shouldn't) is
-   * the kind of trap that produces a confidently wrong budget: type 50 for
-   * lunch without it and it books as income.
-   */
-  const logSpending = async (e, categoryId) => {
-    e.preventDefault();
-    const magnitude = Math.abs(Number(spendDraft.amount));
-    if (!Number.isFinite(magnitude) || magnitude === 0) return;
-    const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
-    await transactions.save({
-      id,
-      date: todayIso(),
-      description: spendDraft.description.trim() || categoryName(categoryId),
-      amount: isIncome(categoryId) ? magnitude : -magnitude,
-      category_id: categoryId,
-    });
-    setSpendDraft({ amount: '', description: '' });
-    setSpendFor(null);
-  };
-
-  const openSpend = (categoryId) => {
-    setSpendDraft({ amount: '', description: '' });
-    setSpendFor((current) => (current === categoryId ? null : categoryId));
-  };
-
-  /** Where the FAB's category picker sends focus after a pick -- the
-   *  row's own quick-add form (opened by `openSpend` below) is what
-   *  actually receives the entry; this only makes sure it's on screen.
-   *  Respects `prefers-reduced-motion`, per this repo's CLAUDE.md. */
-  const scrollToCategoryRow = (categoryId) => {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    document
-      .getElementById(`category-row-${categoryId}`)
-      ?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
   };
 
   const savePlanned = async (categoryId, amount) => {
@@ -655,10 +603,7 @@ export default function BudgetTab({
                     {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
                   </div>
                 )}
-                <div
-                  className={dimmed ? 'category-row category-row-dim' : 'category-row'}
-                  id={`category-row-${line.category_id}`}
-                >
+                <div className={dimmed ? 'category-row category-row-dim' : 'category-row'}>
                   <div>
                     <div className="category-name">
                       <CategoryBadge category={categoryFor(line.category_id)} />
@@ -731,25 +676,6 @@ export default function BudgetTab({
                       {t(incomeRow ? 'budget.received' : 'budget.spent')}
                     </span>
                     <span className="spent-value">{formatMoney(line.spent)}</span>
-                    {/* Logging spending always dates the transaction "today" --
-                    doing that while viewing a different month would create
-                    a transaction that silently never shows up in the
-                    month on screen. Backfilling a past month, or planning
-                    ahead for a future one, goes through the Transactions
-                    tab's manual-add form instead, which takes an explicit
-                    date. */}
-                    {isCurrentMonth && (
-                      <button
-                        type="button"
-                        className="spend-add"
-                        aria-expanded={spendFor === line.category_id}
-                        aria-label={`${t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')} — ${categoryName(line.category_id)}`}
-                        title={t(incomeRow ? 'budget.logIncome' : 'budget.logSpending')}
-                        onClick={() => openSpend(line.category_id)}
-                      >
-                        +
-                      </button>
-                    )}
                   </div>
                   <div className={`num ${remaining.className}`}>
                     <span className="cell-label">{t('budget.remaining')}</span>
@@ -759,53 +685,6 @@ export default function BudgetTab({
                     {t('budget.remove')}
                   </button>
                 </div>
-                {spendFor === line.category_id && (
-                  <form className="spend-form" onSubmit={(e) => logSpending(e, line.category_id)}>
-                    <label className="field">
-                      <span className="field-label">
-                        {t(incomeRow ? 'budget.incomeAmount' : 'budget.spendAmount')}
-                      </span>
-                      <div className="field-input">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          step="any"
-                          min="0"
-                          // Focus moves into the amount field of a panel the user just
-                          // opened in order to type an amount -- not on page load, which
-                          // is what the rule guards against. Typing is the only thing
-                          // there is to do here.
-                          // eslint-disable-next-line jsx-a11y/no-autofocus
-                          autoFocus
-                          value={spendDraft.amount}
-                          onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })}
-                        />
-                      </div>
-                    </label>
-                    <label className="field">
-                      <span className="field-label">{t('transactions.description')}</span>
-                      <div className="field-input">
-                        <input
-                          value={spendDraft.description}
-                          placeholder={categoryName(line.category_id)}
-                          onChange={(e) =>
-                            setSpendDraft({ ...spendDraft, description: e.target.value })
-                          }
-                        />
-                      </div>
-                    </label>
-                    <button className="btn" type="submit">
-                      {t('budget.save')}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
-                      onClick={() => setSpendFor(null)}
-                    >
-                      {t('confirm.cancel')}
-                    </button>
-                  </form>
-                )}
               </React.Fragment>
             );
           })}
@@ -916,8 +795,7 @@ export default function BudgetTab({
         // Categories title row, rather than this block sitting permanently
         // inline -- it's exactly what was pushing the category table below
         // the fold on a fresh budget. TRACKING mode keeps its own collapsed
-        // <details> above, unchanged -- a second trigger there would
-        // collide with QuickAddFab's bottom-right slot.
+        // <details> above, unchanged.
         return (
           categoryPanelOpen && (
             <div
@@ -986,15 +864,6 @@ export default function BudgetTab({
         categoryName={categoryName}
         formatMoney={formatMoney}
       />
-      {mode === TRACKING && isCurrentMonth && (
-        <QuickAddFab
-          categories={categories.items}
-          onPick={(categoryId) => {
-            openSpend(categoryId);
-            scrollToCategoryRow(categoryId);
-          }}
-        />
-      )}
     </div>
   );
 }

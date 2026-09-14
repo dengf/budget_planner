@@ -70,9 +70,6 @@ export default {
   'budget.remove': '删除',
 
   'budget.addCommon': '添加常用分类',
-  'budget.logSpending': '记一笔支出',
-  'budget.logIncome': '记一笔收入',
-  'budget.logTransaction': '记一笔支出或收入',
   'budget.includeCommitments': '将目标存入与债务最低还款计入本月预算',
   'budget.commitmentsTitle': '本月目标与债务',
   'budget.progressAria': '{name}：已花费 {spent}，计划 {planned}',
@@ -104,8 +101,6 @@ export default {
   'data.import': '导入数据',
   'data.importConfirm': '用该文件中的 {count} 条记录替换本应用中的全部内容？现有数据将被清除。',
   'data.imported': '已恢复 {count} 条记录。',
-  'budget.spendAmount': '支出金额',
-  'budget.incomeAmount': '收入金额',
   'budget.spentHint':
     '“已花费”由本月的账目自动汇总——点击某一行的 + 可直接记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
-import AddTransactionSheet from './AddTransactionSheet';
 import CategoryBadge from './CategoryBadge';
 import MonthYearPicker from './MonthYearPicker';
 import { categoryDisplayName } from '../presetCategories';
@@ -18,21 +17,21 @@ export default function TransactionsTab({
   transactions,
   rules,
   recurring,
+  onOpenAdd,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [showAllMonths, setShowAllMonths] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addMethod, setAddMethod] = useState('manual');
 
-  /** Opens the Add sheet on a specific tab -- the empty state's two
-   *  buttons (Log a transaction / Import CSV) both go through this
-   *  rather than always landing on Manual, since a "Import CSV" button
-   *  that opens onto the Manual form would read as broken. */
-  const openAdd = (method = 'manual') => {
-    setAddMethod(method);
-    setAddOpen(true);
-  };
+  /** Opens the shell's Add sheet on a specific tab -- the empty state's
+   *  two buttons (Log a transaction / Import CSV) both go through this
+   *  rather than always landing on Manual, since an "Import CSV" button
+   *  that opens onto the Manual form would read as broken.
+   *
+   *  The sheet itself lives in AppShell, behind the "+" in the nav bar,
+   *  so it opens the same way from every tab instead of this tab owning
+   *  a second copy of it. */
+  const openAdd = (method = 'manual') => onOpenAdd?.(method);
 
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
 
@@ -92,30 +91,14 @@ export default function TransactionsTab({
 
   return (
     <div className="panel txn-panel">
+      {/* No "+" in this header any more. It used to sit here, at the top
+          of the screen -- the furthest point from a thumb on a tall
+          phone, for the action taken most often in the whole app, and
+          present on this tab only. It is now the centre button of the
+          nav bar, within reach on every tab. */}
       <div className="dash-header sticky-title-header sticky-title-header-flush">
         <h2>{t('transactions.title')}</h2>
-        <button
-          type="button"
-          className="icon-add-btn"
-          aria-label={t('budget.logTransaction')}
-          onClick={() => openAdd('manual')}
-        >
-          <span aria-hidden="true">+</span>
-        </button>
       </div>
-
-      <AddTransactionSheet
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        initialMethod={addMethod}
-        wasmModule={wasmModule}
-        newId={newId}
-        categories={categories}
-        rules={rules}
-        transactions={transactions}
-        recurring={recurring}
-        formatMoney={formatMoney}
-      />
 
       {/* Logging and importing are what a first-time (and every later)
           visit to this tab is actually for -- categorization rules and

@@ -70,9 +70,6 @@ export default {
   'budget.remove': '刪除',
 
   'budget.addCommon': '新增常用分類',
-  'budget.logSpending': '記一筆支出',
-  'budget.logIncome': '記一筆收入',
-  'budget.logTransaction': '記一筆支出或收入',
   'budget.includeCommitments': '將目標存入與債務最低還款計入本月預算',
   'budget.commitmentsTitle': '本月目標與債務',
   'budget.progressAria': '{name}：已花費 {spent}，計劃 {planned}',
@@ -104,8 +101,6 @@ export default {
   'data.import': '匯入資料',
   'data.importConfirm': '用該檔案中的 {count} 筆記錄取代本應用中的全部內容？現有資料將被清除。',
   'data.imported': '已復原 {count} 筆記錄。',
-  'budget.spendAmount': '支出金額',
-  'budget.incomeAmount': '收入金額',
   'budget.spentHint':
     '「已花費」由本月的帳目自動彙總——點擊某一列的 + 可直接記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
