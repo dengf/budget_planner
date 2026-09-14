@@ -109,6 +109,9 @@ jobs:
       - name: cargo build -p budget-wasm-voice-cmn --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm-voice-cmn --target wasm32-unknown-unknown
 
+      - name: cargo build -p budget-wasm-voice-yue --target wasm32-unknown-unknown
+        run: cargo build -p budget-wasm-voice-yue --target wasm32-unknown-unknown
+
   coverage:
     name: cargo llvm-cov (coverage gate)
     runs-on: ubuntu-latest

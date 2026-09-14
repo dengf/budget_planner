@@ -26,9 +26,13 @@ pub mod transaction;
 pub mod voice;
 #[cfg(feature = "voice-cmn")]
 pub mod voice_cmn;
-#[cfg(any(feature = "voice", feature = "voice-cmn"))]
+#[cfg(feature = "voice-yue")]
+mod voice_fbank;
+#[cfg(any(feature = "voice", feature = "voice-cmn", feature = "voice-yue"))]
 mod voice_mel;
 pub mod voice_parse;
+#[cfg(feature = "voice-yue")]
+pub mod voice_yue;
 
 pub use category::{
     build_month, build_savings_line, summarize_month, Category, CategoryLine, MonthSummary,
@@ -66,3 +70,5 @@ pub use voice::transcribe_voice_command;
 #[cfg(feature = "voice-cmn")]
 pub use voice_cmn::transcribe_voice_command_cmn;
 pub use voice_parse::{parse_voice_command, VoiceCategoryCandidate, VoiceDraft, VoiceLanguage};
+#[cfg(feature = "voice-yue")]
+pub use voice_yue::transcribe_voice_command_yue;

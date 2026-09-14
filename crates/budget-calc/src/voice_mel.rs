@@ -11,19 +11,34 @@
 //! normalization at all, not this `NeMo` recipe) does *not* belong here --
 //! see `voice_fbank.rs` instead.
 
+// Everything below down to `ctc_greedy_decode_indices` is specific to the
+// NeMo log-mel recipe (`voice.rs`/`voice_cmn.rs`) -- individually gated
+// so a `voice-yue`-only build (Kaldi fbank, `voice_fbank.rs`) doesn't
+// compile in a whole unused DSP pipeline, which `cargo clippy
+// --all-targets` (unlike a plain `cargo build --workspace`, which
+// unifies every feature -- see this repo's CLAUDE.md) actually flags as
+// dead code.
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const SAMPLE_RATE: f64 = 16000.0;
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const N_FFT: usize = 512;
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const WIN_LENGTH: usize = 320; // 20ms
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const HOP_LENGTH: usize = 160; // 10ms
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const PREEMPHASIS: f64 = 0.97;
 /// `2f64.powi(-24)`, `NeMo`'s log guard against a zero-energy mel bin.
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const LOG_GUARD: f64 = 5.960_464_477_539_063e-8;
 /// The conv stack of every model built on this pipeline needs the time
 /// axis padded to a multiple of this, or the model produces a shape
 /// mismatch rather than a wrong answer -- an error, not a silent-garbage
 /// risk, but worth avoiding.
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) const FRAME_PAD_MULTIPLE: usize = 16;
 
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 fn hz_to_mel(f: f64) -> f64 {
     let f_sp = 200.0 / 3.0;
     let min_log_hz = 1000.0;
@@ -36,6 +51,7 @@ fn hz_to_mel(f: f64) -> f64 {
     }
 }
 
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 fn mel_to_hz(m: f64) -> f64 {
     let f_sp = 200.0 / 3.0;
     let min_log_hz = 1000.0;
@@ -52,6 +68,7 @@ fn mel_to_hz(m: f64) -> f64 {
 /// htk=False)` -- `NeMo`'s default mel filterbank, reimplemented rather
 /// than depended on (no pure-Rust equivalent exists that matches
 /// librosa's exact normalization).
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) fn mel_filterbank(n_mels: usize) -> Vec<Vec<f64>> {
     let n_bins = N_FFT / 2 + 1;
     let fftfreqs: Vec<f64> = (0..n_bins)
@@ -84,6 +101,7 @@ pub(crate) fn mel_filterbank(n_mels: usize) -> Vec<Vec<f64>> {
 
 /// Symmetric Hann window (`torch.hann_window(WIN_LENGTH,
 /// periodic=False)`), zero-padded from `WIN_LENGTH` up to `N_FFT`.
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 fn hann_window() -> Vec<f64> {
     let mut window = vec![0.0f64; N_FFT];
     let left_pad = (N_FFT - WIN_LENGTH) / 2;
@@ -98,6 +116,7 @@ fn hann_window() -> Vec<f64> {
 /// `[n_mels, n_frames]` -- the layout this whole model family's
 /// `audio_signal` input wants. `n_frames` is already padded to a multiple
 /// of `FRAME_PAD_MULTIPLE`.
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 pub(crate) fn log_mel_features(
     samples: &[f32],
     filterbank: &[Vec<f64>],
@@ -218,6 +237,7 @@ pub(crate) fn ctc_greedy_decode_indices(
 mod tests {
     use super::*;
 
+    #[cfg(any(feature = "voice", feature = "voice-cmn"))]
     #[test]
     fn the_filterbank_has_one_row_per_mel_bin_and_is_never_negative() {
         for n_mels in [64, 80] {
@@ -230,6 +250,7 @@ mod tests {
         }
     }
 
+    #[cfg(any(feature = "voice", feature = "voice-cmn"))]
     #[test]
     fn features_are_padded_to_a_multiple_of_16_frames() {
         for n_mels in [64, 80] {
@@ -243,6 +264,7 @@ mod tests {
         }
     }
 
+    #[cfg(any(feature = "voice", feature = "voice-cmn"))]
     #[test]
     fn silence_produces_finite_normalized_features_not_nan() {
         // A real silent recording is often bit-exact zero -- the log

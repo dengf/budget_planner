@@ -4,11 +4,12 @@
 // its own multi-model dispatcher following that file's template: one
 // worker file, one `self.onmessage`, a per-language wasm module and model
 // path, each loaded only the first time that language's own message type
-// actually arrives. English (`budget-wasm-voice`, QuartzNet15x5, ~72MB) and
-// Mandarin (`budget-wasm-voice-cmn`, zh-citrinet-512, ~159.7MB) are
+// actually arrives. English (`budget-wasm-voice`, QuartzNet15x5, ~72MB),
+// Mandarin (`budget-wasm-voice-cmn`, zh-citrinet-512, ~159.7MB) and
+// Cantonese (`budget-wasm-voice-yue`, WeNet Conformer, ~360.9MB) are
 // mutually exclusive per user action -- a session that only ever speaks
-// English never downloads Mandarin's model or wasm module, and vice versa
-// -- see budget-wasm-voice-cmn/src/lib.rs's own doc comment for the
+// one language never downloads either other one's model or wasm module --
+// see budget-wasm-voice-cmn/src/lib.rs's own doc comment for the
 // architecture rationale (CTC, not autoregressive; fp32, not int8 -- both
 // measured, not assumed).
 //
@@ -18,6 +19,7 @@
 const VOICE_MODEL_PATHS = {
   en: new URL('voice/quartznet15x5-fp32.rten', self.location.href).href,
   cmn: new URL('voice/zh-citrinet-512-fp32.rten', self.location.href).href,
+  yue: new URL('voice/yue-conformer-fp32.rten', self.location.href).href,
 };
 
 // Voice models are far larger than OCR's (tens to low hundreds of MB,
@@ -46,10 +48,11 @@ const MODEL_CACHE_NAME = 'budget-planner-voice-model-v2';
 // that, for bytes already sitting in the cache and for anything freshly
 // fetched before it's allowed to be cached. Mandarin's floor is well below
 // its real ~159.7MB file, same margin English's 10MB floor keeps below its
-// real ~72MB file.
+// real ~72MB file. Cantonese's floor is well below its real ~360.9MB file.
 const MIN_VALID_MODEL_BYTES = {
   en: 10 * 1024 * 1024,
   cmn: 50 * 1024 * 1024,
+  yue: 100 * 1024 * 1024,
 };
 
 async function fetchModelBytes(url, minValidBytes) {
@@ -113,8 +116,20 @@ function loadCmnWasm() {
   return voiceWasmPromises.cmn;
 }
 
+function loadYueWasm() {
+  if (!voiceWasmPromises.yue) {
+    voiceWasmPromises.yue = import('../pkg-voice-yue').then(async (wasm) => {
+      if (wasm.default) await wasm.default();
+      return wasm;
+    });
+  }
+  return voiceWasmPromises.yue;
+}
+
 function loadVoiceWasm(language) {
-  return language === 'cmn' ? loadCmnWasm() : loadEnWasm();
+  if (language === 'cmn') return loadCmnWasm();
+  if (language === 'yue') return loadYueWasm();
+  return loadEnWasm();
 }
 
 // Same reset-on-rejection as `ocrWorker.js`'s `loadModels` -- a dropped
@@ -137,15 +152,18 @@ self.onmessage = async (event) => {
   const { id, type } = event.data;
   try {
     let result;
-    if (type === 'transcribe-en' || type === 'transcribe-cmn') {
-      const language = type === 'transcribe-cmn' ? 'cmn' : 'en';
+    if (type === 'transcribe-en' || type === 'transcribe-cmn' || type === 'transcribe-yue') {
+      const language = type.slice('transcribe-'.length);
       const wasm = await loadVoiceWasm(language);
       const modelBytes = await loadModel(language);
       const { samples } = event.data;
-      result =
-        language === 'cmn'
-          ? wasm.transcribe_voice_command_cmn(modelBytes, samples)
-          : wasm.transcribe_voice_command(modelBytes, samples);
+      if (language === 'cmn') {
+        result = wasm.transcribe_voice_command_cmn(modelBytes, samples);
+      } else if (language === 'yue') {
+        result = wasm.transcribe_voice_command_yue(modelBytes, samples);
+      } else {
+        result = wasm.transcribe_voice_command(modelBytes, samples);
+      }
     } else {
       throw new Error(`voiceWorker: unknown message type "${type}"`);
     }

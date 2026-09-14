@@ -80,6 +80,13 @@ voice = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
 # per user action (one spoken language at a time), so it gets its own
 # lazy-loaded wasm crate rather than bundling with English's model.
 voice-cmn = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
+# Cantonese voice entry (`voice_yue.rs`): a WeNet Conformer-CTC model, a
+# genuinely different feature pipeline from the NeMo family above (Kaldi
+# fbank, not log-mel -- see `voice_fbank.rs`'s own doc comment), but the
+# same single-forward-pass `rten` runtime, so it reuses the identical
+# trio of deps rather than adding a new one. Its own crate
+# (`budget-wasm-voice-yue`) is the only one that enables this.
+voice-yue = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }
