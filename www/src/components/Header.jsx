@@ -1,5 +1,5 @@
 import React from 'react';
-import { useI18n } from '../i18n';
+import { LOCALES, useI18n } from '../i18n';
 import YourDataMenu from './YourDataMenu';
 import MonthYearPicker from './MonthYearPicker';
 import { TABS, ADD_BUTTON_INDEX } from '../tabs';
@@ -26,16 +26,19 @@ export default function Header({
   clearAllData,
   importData,
 }) {
-  const { t, locale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
 
   return (
     <>
       {/* One bar, not a brand row plus a title plus a picker per tab: a
           month strip on the left (shared across Dashboard/Budget/
-          Transactions -- see App.jsx's single `viewMonth` state) and the
-          settings gear on the right. The app's own title, byline and
-          language picker moved into More -- a language is chosen once,
-          not re-offered on every screen (see MoreTab.jsx). */}
+          Transactions -- see App.jsx's single `viewMonth` state), the
+          language picker and the settings gear on the right. The app's
+          own title/byline stay in More -- looked at once then ignored,
+          same as Goals/Debt/Rules/Recurring (see MoreTab.jsx). The
+          language picker itself lives here rather than there: it's a
+          control someone might reach for on first launch, before they've
+          found More. */}
       <header className="app-header">
         <MonthYearPicker
           value={viewMonth}
@@ -45,6 +48,19 @@ export default function Header({
         />
 
         <div className="app-switches">
+          <select
+            className="app-language-select"
+            aria-label={t('app.language')}
+            value={locale}
+            onChange={(e) => setLocale(e.target.value)}
+          >
+            {LOCALES.map((l) => (
+              <option key={l.id} value={l.id} lang={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+
           {/* "My data" lives in the header row, not the tab bar below --
               it's a menu of rare, whole-app actions (export/import/clear,
               plus theme/currency), not a screen someone navigates to, and

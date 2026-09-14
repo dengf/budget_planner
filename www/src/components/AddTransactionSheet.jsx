@@ -5,7 +5,7 @@ import CategoryPicker from './CategoryPicker';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
 import VoiceCapture from './VoiceCapture';
-import { SpreadsheetIcon } from './icons';
+import { PenIcon, CameraIcon, MicIcon, SpreadsheetIcon, RecurringIcon } from './icons';
 import { categoryDisplayName } from '../presetCategories';
 import { useCategoryRank } from '../useCategoryRank';
 
@@ -305,7 +305,8 @@ export default function AddTransactionSheet({
             className={`add-txn-method-btn${method === 'manual' ? ' active' : ''}`}
             onClick={() => setMethod('manual')}
           >
-            {t('transactions.methodManual')}
+            <PenIcon />
+            <span>{t('transactions.methodManual')}</span>
           </button>
           <button
             type="button"
@@ -314,7 +315,8 @@ export default function AddTransactionSheet({
             className={`add-txn-method-btn${method === 'receipt' ? ' active' : ''}`}
             onClick={() => setMethod('receipt')}
           >
-            {t('transactions.methodReceipt')}
+            <CameraIcon />
+            <span>{t('transactions.methodReceipt')}</span>
           </button>
           <button
             type="button"
@@ -323,7 +325,8 @@ export default function AddTransactionSheet({
             className={`add-txn-method-btn${method === 'voice' ? ' active' : ''}`}
             onClick={() => setMethod('voice')}
           >
-            {t('transactions.methodVoice')}
+            <MicIcon />
+            <span>{t('transactions.methodVoice')}</span>
           </button>
           <button
             type="button"
@@ -332,7 +335,8 @@ export default function AddTransactionSheet({
             className={`add-txn-method-btn${method === 'csv' ? ' active' : ''}`}
             onClick={() => setMethod('csv')}
           >
-            {t('transactions.methodImport')}
+            <SpreadsheetIcon />
+            <span>{t('transactions.methodImport')}</span>
           </button>
           <button
             type="button"
@@ -341,7 +345,8 @@ export default function AddTransactionSheet({
             className={`add-txn-method-btn${method === 'recurring' ? ' active' : ''}`}
             onClick={() => setMethod('recurring')}
           >
-            {t('transactions.methodRecurring')}
+            <RecurringIcon />
+            <span>{t('transactions.methodRecurring')}</span>
           </button>
         </div>
 
