@@ -19,6 +19,11 @@ import { CATEGORY_ICONS } from './CategoryIcons';
  * CategoryBadge's own `categoryColor`/`categoryIconId` with no shape
  * translation.
  *
+ * A single tab (Overview's post-redesign expense-only breakdown, since
+ * income is a plain stat now, not a second breakdown) renders with no
+ * switcher UI at all -- a one-button toggle that's always pressed has
+ * nothing to switch between and is just noise above the total.
+ *
  * `selectedId`/`onSelect` are shared across tabs (Dashboard owns the
  * state) -- switching tabs while a row is open just closes it, since the
  * newly-active tab's own items won't include that id. `detail`, optional,
@@ -43,24 +48,29 @@ export default function CategoryBreakdown({ tabs, formatMoney, selectedId, onSel
             toggle group SpendOverTimeChart.jsx uses for its Daily/Weekly
             switch, just with two longer labels instead of two short ones
             (see `.cat-breakdown-tabs`'s own rule for the width/wrap tweak
-            that difference needs). */}
-        <div
-          className="chart-granularity cat-breakdown-tabs"
-          role="group"
-          aria-label={t('chart.breakdownGroup')}
-        >
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              className={tab.key === activeKey ? 'app-region active' : 'app-region'}
-              aria-pressed={tab.key === activeKey}
-              onClick={() => setActiveKey(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+            that difference needs). A single tab (Overview's expense-only
+            breakdown, since income is a plain stat now) skips the switcher
+            entirely -- a one-button toggle that's always pressed has
+            nothing to switch between. */}
+        {tabs.length > 1 && (
+          <div
+            className="chart-granularity cat-breakdown-tabs"
+            role="group"
+            aria-label={t('chart.breakdownGroup')}
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={tab.key === activeKey ? 'app-region active' : 'app-region'}
+                aria-pressed={tab.key === activeKey}
+                onClick={() => setActiveKey(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
         {active.totalLabel != null && <span className="chart-total">{active.totalLabel}</span>}
       </div>
       {!isEmpty && active.hint && <p className="chart-note cat-hint">{active.hint}</p>}

@@ -3,7 +3,8 @@
 //! Same split as mortgage-wasm: the public `#[wasm_bindgen]` surface is
 //! grouped by responsibility --
 //!
-//! - [`category`] -- `build_month`, `category_rank`
+//! - [`category`] -- `build_month`, `category_rank`, `category_shares`,
+//!   `month_setup_state`
 //! - [`transaction`] -- `spend_by_category`, `income_by_category`
 //! - [`rules`] -- `apply_rules`
 //! - [`csv_import`] -- `import_csv`, `detect_csv_columns`
@@ -57,7 +58,9 @@ pub mod storage;
 pub mod transaction;
 pub mod voice_parse;
 
-pub use category::{build_month, build_savings_line, category_rank};
+pub use category::{
+    build_month, build_savings_line, category_rank, category_shares, month_setup_state,
+};
 pub use csv_import::{detect_csv_columns, import_csv};
 pub use debt::build_payoff_plan;
 pub use goals::{goal_progress, milestone_crossed, required_contribution};

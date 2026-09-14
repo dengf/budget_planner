@@ -249,6 +249,126 @@ pub fn summarize_month(lines: &[CategoryLine], income_category_ids: &[String]) -
     }
 }
 
+/// One category's amount as a fraction of a total -- the donut chart's
+/// wedge sizes and the ranked rows' percent labels both need this, and
+/// both used to compute it themselves in a `.map()`. That's arithmetic on
+/// money (CLAUDE.md's own test for what belongs here): a share is a
+/// division, and a chart and a percent label quietly disagreeing about
+/// which category is "38%" of the month is the same class of bug as any
+/// other duplicated calculation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CategoryShare {
+    pub category_id: String,
+    pub amount: Decimal,
+    /// This category's `amount` as a fraction of the total, in `[0, 1]`
+    /// -- deliberately not a whole-number percent, so a caller that needs
+    /// precise arc geometry (the donut) and a caller that only needs a
+    /// rounded label (the ranked rows) each round this the way they need,
+    /// from the one number, rather than the geometry inheriting a label's
+    /// already-lossy rounding.
+    pub share: Decimal,
+}
+
+/// `entries`: `(category_id, amount)` pairs already filtered to one side
+/// of the ledger by the caller (e.g. this month's expense lines) -- this
+/// function has no opinion on which side, only on how to divide up
+/// whatever it's given.
+///
+/// A non-positive total (no spending yet, or a category list that nets to
+/// zero) gives every share `0` rather than dividing by zero; a negative
+/// `amount` (a refund-heavy category netting below zero) is clamped to a
+/// `0` share rather than a wedge with negative size, which has no
+/// geometric meaning for a donut arc.
+pub fn category_shares(entries: &[(String, Decimal)]) -> Vec<CategoryShare> {
+    let total: Decimal = entries.iter().map(|(_, amount)| *amount).sum();
+    entries
+        .iter()
+        .map(|(category_id, amount)| {
+            let share = if total > Decimal::ZERO {
+                (*amount / total).clamp(Decimal::ZERO, Decimal::ONE)
+            } else {
+                Decimal::ZERO
+            };
+            CategoryShare {
+                category_id: category_id.clone(),
+                amount: round_currency(*amount),
+                share: share.round_dp(4),
+            }
+        })
+        .collect()
+}
+
+/// Which of the Overview hero's seven states a month is in -- see the
+/// design spec's "The rule, and every state it produces": while the
+/// viewed month has no transactions, a three-step setup ladder owns the
+/// hero (but only for the *current* month; a past or future month with no
+/// transactions just says so, never the ladder). The moment any
+/// transaction exists, real figures take the hero regardless of which
+/// month it is.
+///
+/// Moving this out of a frontend ternary is the point, not a style
+/// preference: choosing which headline a month gets is "choosing between
+/// rulesets" by CLAUDE.md's own definition, and the ternary it replaces
+/// (`DashboardTab.jsx`'s old `setupStep`) had a real bug -- it kept
+/// showing the "plan your income" setup card, hiding every real
+/// transaction, for as long as income stayed unplanned, regardless of how
+/// much had already been logged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MonthSetupState {
+    /// Past or future month, nothing recorded in it.
+    OtherMonthEmpty,
+    /// Current month, no transactions, no income planned yet.
+    SetupPlanIncome,
+    /// Current month, no transactions, income planned but not fully
+    /// assigned to categories.
+    SetupAssignRemaining,
+    /// Current month, no transactions, income fully assigned.
+    SetupLogTransaction,
+    /// Transactions exist but no income is planned -- Savings can't be
+    /// stated (it would need an income figure), so the hero shows what
+    /// actually is true: what's been spent.
+    SpentSoFar,
+    /// Transactions exist, income is planned, but not fully assigned yet.
+    SavingsUnassigned,
+    /// Transactions exist, income is fully assigned.
+    SavingsComplete,
+}
+
+/// `income`/`unassigned` are `MonthSummary`'s own fields (`summarize_month`)
+/// -- income's presence is a threshold on it (`> 0`), not a separate flag,
+/// for the same reason a threshold belongs here rather than a frontend
+/// `hasIncome` boolean computed the same way in one more place.
+pub fn month_setup_state(
+    is_current_month: bool,
+    has_transactions: bool,
+    income: Decimal,
+    unassigned: Decimal,
+) -> MonthSetupState {
+    let has_income = income > Decimal::ZERO;
+
+    if !has_transactions {
+        if !is_current_month {
+            return MonthSetupState::OtherMonthEmpty;
+        }
+        if !has_income {
+            return MonthSetupState::SetupPlanIncome;
+        }
+        if !unassigned.is_zero() {
+            return MonthSetupState::SetupAssignRemaining;
+        }
+        return MonthSetupState::SetupLogTransaction;
+    }
+
+    if !has_income {
+        return MonthSetupState::SpentSoFar;
+    }
+    if !unassigned.is_zero() {
+        return MonthSetupState::SavingsUnassigned;
+    }
+    MonthSetupState::SavingsComplete
+}
+
 /// Which side of the ledger the person is entering, which is the first
 /// and cheapest thing that narrows a category list: entering income can
 /// never mean Groceries, and entering a expense can never mean Salary.
@@ -713,5 +833,131 @@ mod tests {
     #[test]
     fn no_categories_at_all_gives_an_empty_list_not_a_panic() {
         assert!(category_rank(&[], &[], "2026-09-14", Direction::Expense).is_empty());
+    }
+
+    fn share_of(shares: &[CategoryShare], id: &str) -> Decimal {
+        shares.iter().find(|s| s.category_id == id).unwrap().share
+    }
+
+    #[test]
+    fn shares_split_a_total_proportionally() {
+        let entries = vec![
+            ("food".to_string(), dec!(60)),
+            ("rent".to_string(), dec!(40)),
+        ];
+        let shares = category_shares(&entries);
+        assert_eq!(share_of(&shares, "food"), dec!(0.6));
+        assert_eq!(share_of(&shares, "rent"), dec!(0.4));
+    }
+
+    #[test]
+    fn a_single_category_gets_the_whole_share() {
+        let entries = vec![("food".to_string(), dec!(200))];
+        let shares = category_shares(&entries);
+        assert_eq!(shares[0].share, dec!(1));
+    }
+
+    #[test]
+    fn a_zero_total_gives_every_share_zero_not_a_division_by_zero_panic() {
+        let entries = vec![("food".to_string(), dec!(0)), ("rent".to_string(), dec!(0))];
+        let shares = category_shares(&entries);
+        assert!(shares.iter().all(|s| s.share == dec!(0)));
+    }
+
+    #[test]
+    fn a_negative_amount_clamps_to_a_zero_share_rather_than_a_negative_wedge() {
+        // A refund-heavy category can net below zero. A donut wedge has
+        // no geometric meaning for a negative share, so it reads as "no
+        // wedge" rather than corrupting the arc math.
+        let entries = vec![
+            ("food".to_string(), dec!(-10)),
+            ("rent".to_string(), dec!(100)),
+        ];
+        let shares = category_shares(&entries);
+        assert_eq!(share_of(&shares, "food"), dec!(0));
+    }
+
+    #[test]
+    fn an_empty_entry_list_gives_an_empty_share_list() {
+        assert!(category_shares(&[]).is_empty());
+    }
+
+    #[test]
+    fn past_or_future_month_with_no_transactions_shows_nothing_recorded_regardless_of_income() {
+        assert_eq!(
+            month_setup_state(false, false, dec!(0), dec!(0)),
+            MonthSetupState::OtherMonthEmpty
+        );
+        // Even a past month that was fully planned still isn't the
+        // current month, so the ladder never shows there -- only "nothing
+        // recorded" does.
+        assert_eq!(
+            month_setup_state(false, false, dec!(2000), dec!(0)),
+            MonthSetupState::OtherMonthEmpty
+        );
+    }
+
+    #[test]
+    fn current_month_no_transactions_no_income_is_setup_step_one() {
+        assert_eq!(
+            month_setup_state(true, false, dec!(0), dec!(0)),
+            MonthSetupState::SetupPlanIncome
+        );
+    }
+
+    #[test]
+    fn current_month_no_transactions_unassigned_income_is_setup_step_two() {
+        assert_eq!(
+            month_setup_state(true, false, dec!(2000), dec!(500)),
+            MonthSetupState::SetupAssignRemaining
+        );
+    }
+
+    #[test]
+    fn current_month_no_transactions_fully_assigned_is_setup_step_three() {
+        assert_eq!(
+            month_setup_state(true, false, dec!(2000), dec!(0)),
+            MonthSetupState::SetupLogTransaction
+        );
+    }
+
+    /// Regression test for the real, shipped bug this design spec names:
+    /// `setupStep` used to be `'planIncome'` for as long as income stayed
+    /// unplanned, no matter how many transactions had been logged -- so
+    /// the setup card kept hiding real data. Logging money without ever
+    /// typing an income figure must show it, not the ladder.
+    #[test]
+    fn transactions_with_no_income_shows_spent_so_far_not_the_setup_ladder() {
+        assert_eq!(
+            month_setup_state(true, true, dec!(0), dec!(0)),
+            MonthSetupState::SpentSoFar
+        );
+    }
+
+    #[test]
+    fn transactions_with_unassigned_income_shows_the_savings_hero() {
+        assert_eq!(
+            month_setup_state(true, true, dec!(2000), dec!(500)),
+            MonthSetupState::SavingsUnassigned
+        );
+    }
+
+    #[test]
+    fn transactions_fully_assigned_shows_the_complete_savings_hero() {
+        assert_eq!(
+            month_setup_state(true, true, dec!(2000), dec!(0)),
+            MonthSetupState::SavingsComplete
+        );
+    }
+
+    #[test]
+    fn a_past_month_with_transactions_shows_real_figures_not_the_ladder() {
+        // The ladder is gated on "current month AND no transactions" --
+        // once a past month has data, it's shown the same way the current
+        // month's data would be.
+        assert_eq!(
+            month_setup_state(false, true, dec!(0), dec!(0)),
+            MonthSetupState::SpentSoFar
+        );
     }
 }

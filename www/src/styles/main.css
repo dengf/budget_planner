@@ -1162,7 +1162,7 @@ table.data tr:last-child td {
    dollar progress underneath it at 0.82rem and muted -- backwards for a
    budgeting app, where the amount saved is the figure worth scanning
    for, same "label small and quiet, value big and prominent" pattern as
-   `.dash-card-label`/`.dash-card-value` and `.stat-label`/`.stat-value`. */
+   `.dash-hero-label`/`.dash-hero-value` and `.stat-label`/`.stat-value`. */
 .goal-name {
   font-weight: 600;
   font-size: 0.85rem;
@@ -2415,79 +2415,54 @@ table.data tr:last-child td {
   }
 }
 
-.dash-summary-cards {
+/* The Overview hero -- one figure for whichever of the seven states the
+   viewed month is in (DashboardTab.jsx's `heroState`), replacing what
+   used to be three equal-weight summary cards competing for the same
+   attention. Plain by default (the "Spent so far"/"Nothing recorded"
+   variants, where there's no brand moment to make yet); `.dash-hero-savings`
+   below adds the tinted surface and blossom watermark once Savings is
+   the thing being shown. */
+.dash-hero {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
 }
-/* The two supporting figures (Income, Expenses) -- deliberately plainer
-   than the hero card below: no fill, just a top rule, smaller value type.
-   Three equal-weight boxes used to make Income/Expenses/Savings compete
-   for the same attention; this pair now reads as backup detail for the
-   one hero number. */
-.dash-summary-secondary {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-.dash-card {
-  background: var(--panel-alt);
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  /* A grid item's default min-width is `auto`, i.e. its content's own
-     min-content size -- for an unbroken string like "$1,234,567.00" with
-     no spaces, that's the whole string's width. Once that exceeds this
-     card's equal `1fr` share, the column pushed itself wider and squeezed
-     its neighbor lopsided instead of wrapping. This lets the column stay
-     at its fair share and hand the overflow to `.dash-card-value`
-     instead. */
-  min-width: 0;
-}
-.dash-summary-secondary .dash-card {
-  background: transparent;
-  border-radius: 0;
-  border-top: 1px solid var(--line);
-  padding: 10px 2px 0;
-}
-.dash-card-label {
-  font-size: 0.78rem;
+.dash-hero-label {
+  font-size: 0.85rem;
   color: var(--muted);
 }
-.dash-card-value {
-  font-size: 1.4rem;
+.dash-hero-value {
+  font-size: 2.1rem;
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-  /* Lets a value too wide for its card (a large balance in the 2-across
-     mobile row, mainly) wrap onto a second line instead of forcing its
-     column wider than its `1fr` share -- see `.dash-card`'s own
-     min-width note just above. */
   overflow-wrap: anywhere;
 }
-.dash-summary-secondary .dash-card-value {
-  font-size: 1.1rem;
-}
-/* `.positive`/`.negative` (defined earlier, above `.dash-card-value`)
-   otherwise lose this cascade -- same specificity, later rule wins, so
-   the base ink color was silently overriding them on every summary card
-   regardless of which class DashboardTab.jsx added. The compound
-   selector's higher specificity restores the intended color-coding. */
-.dash-card-value.positive {
+/* `.positive`/`.negative` (defined earlier in this file) otherwise lose
+   this cascade -- same specificity, later rule wins, so the base ink
+   color would silently override them regardless of which class
+   DashboardTab.jsx added. The compound selector's higher specificity
+   restores the intended color-coding. */
+.dash-hero-value.positive {
   color: var(--positive);
 }
-.dash-card-value.negative {
+.dash-hero-value.negative {
   color: var(--negative);
+}
+.dash-hero-note {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.dash-hero-empty {
+  align-items: flex-start;
+  gap: 12px;
 }
 /* Savings is the number this whole screen exists to produce (the repo's
    own "most prominent thing on screen" rule) -- its own tinted surface,
    elevation and a large watermark of the brand blossom behind the figure
-   is this screen's one deliberately bold move; Income/Expenses next to
-   it stay flat and quiet on purpose. `overflow: hidden` clips the
-   watermark to the card's own rounded corners. */
-.dash-card-hero.dash-card-savings {
+   is this screen's one deliberately bold move. `overflow: hidden` clips
+   the watermark to the card's own rounded corners. */
+.dash-hero-savings {
   background: var(--panel-hero);
   box-shadow: var(--hero-shadow);
   border-radius: 18px;
@@ -2495,11 +2470,11 @@ table.data tr:last-child td {
   overflow: hidden;
   position: relative;
 }
-.dash-card-hero .dash-card-label {
-  font-size: 0.85rem;
-}
-.dash-card-hero .dash-card-value {
-  font-size: 2.3rem;
+.dash-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 .dash-blossom-watermark {
   position: absolute;
@@ -2511,7 +2486,7 @@ table.data tr:last-child td {
   opacity: 0.1;
   pointer-events: none;
 }
-.dash-card-blossom {
+.dash-hero-blossom {
   position: relative;
   flex: none;
 }
@@ -2519,14 +2494,106 @@ table.data tr:last-child td {
    yet filled" outline that's nearly invisible against the dark theme and
    doesn't read as "bad" at all -- used as a mood indicator here, filled=0
    needs to actually look like bad news. */
-.dash-card-blossom.negative .goal-blossom-petal-empty {
+.dash-hero-blossom.negative .goal-blossom-petal-empty {
   stroke: var(--negative);
 }
-.dash-card-hero-top {
+
+/* The one-line nudge between the hero and the donut -- "Add your income"
+   or "$X unassigned" -- replacing what used to be the setup ladder's
+   *entire* hero slot. Once real data exists the ladder never owns the
+   hero again; it shrinks to this single tappable line instead. Full
+   width, 44px+ tall, same touch-target floor as every other control. */
+.dash-nudge {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.dash-nudge-go {
+  color: var(--muted-2);
+  font-size: 1.1rem;
+  flex: none;
+}
+
+/* Left to spend / Income / Busiest day, side by side under the hero --
+   the "three-up stat strip" the design spec calls for once there's a
+   real month to report on. */
+.dash-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.dash-stat-tile {
+  background: var(--panel-alt);
+  border-radius: 12px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.dash-stat-tile-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.dash-stat-tile-value {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.dash-stat-tile-value.positive {
+  color: var(--positive);
+}
+.dash-stat-tile-value.negative {
+  color: var(--negative);
+}
+
+/* The donut -- a ring built from `category_shares`' own fractions
+   (DonutChart.jsx), with the month's expense total in its center rather
+   than a legend, since a phone-width donut has no room to spare for one
+   and the ranked rows just below it already name every wedge. */
+.donut-chart {
+  position: relative;
+  align-self: center;
+  width: 160px;
+  height: 160px;
+}
+.donut-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.donut-total {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.donut-cap {
+  font-size: 0.72rem;
+  color: var(--muted);
 }
 
 /* Toasts -- CalcError renders here instead of inline in document flow, so a
@@ -2846,17 +2913,19 @@ table.data tr:last-child td {
     color: #555;
   }
   /* Same reasoning as .chart above -- .money-card (the bubble-detail
-     drill-down panel, goal/debt preview cards) and the summary cards
-     both use dark-theme panel tokens too. */
+     drill-down panel, goal/debt preview cards) and the stat tiles both
+     use dark-theme panel tokens too. */
   .money-card,
-  .dash-card {
+  .dash-stat-tile {
     background: #fff;
     border: 1px solid #ddd;
   }
-  .dash-card-value {
+  .dash-hero-value,
+  .dash-stat-tile-value {
     color: #111;
   }
-  .dash-card-label {
+  .dash-hero-label,
+  .dash-stat-tile-label {
     color: #555;
   }
 }
@@ -2924,8 +2993,8 @@ table.data tr:last-child td {
      base .stat-grid rule (auto-fit, minmax(170px, 1fr)) only fits one
      170px column on a 375px phone, so these three cards stacked to full
      height before the category list even started. Same fix as
-     .dash-summary-cards just below, scoped to -secondary so Dashboard's
-     own .stat-grid usage is untouched. */
+     .dash-stat-strip's own grid, scoped to -secondary so Dashboard's own
+     .stat-grid usage is untouched. */
   .stat-grid-secondary {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
@@ -2941,49 +3010,15 @@ table.data tr:last-child td {
     font-size: 0.95rem;
   }
 
-  /* Income/Expenses/Savings side by side in one row rather than the
-     default auto-fit minmax(160px, ...) wrap, which would stack them on
-     a 375px phone. */
-  .dash-summary-cards {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .dash-card {
-    padding: 10px 8px;
-    gap: 4px;
-  }
-  /* Reserves 2 lines regardless of whether this card's own label actually
-     wraps ("Income this month"/"Total expenses" usually do) -- without
-     it, a shorter label's value would sit visibly higher than its
-     neighbor's, an uneven row. */
-  .dash-card-label {
-    font-size: 0.72rem;
-    line-height: 1.15;
-    min-height: 2.3em;
-  }
-  .dash-card-value {
-    font-size: 1.05rem;
-  }
-  /* `.dash-card`'s own shorthand `padding` just above would otherwise win
-     (same specificity, later in source) and collapse the badge clearance
-     `.dash-card-savings` sets at desktop width. */
-  .dash-card-savings {
-    padding-right: 30px;
-  }
-  .dash-card-blossom {
-    top: 8px;
-    right: 6px;
-  }
-
-  /* Every extra pixel here pushes the breakdown charts further down the
-     page -- the whole point of this pass is landing on Dashboard and
-     seeing the hero figure *and* both breakdowns at once, not scrolling
-     to find them. Tightened, not cut: same information, less padding. */
-  .dash-card-hero.dash-card-savings {
+  /* Every extra pixel here pushes the donut and ranked rows further down
+     the page -- the whole point of this pass is landing on Dashboard and
+     seeing the hero figure *and* the breakdown at once, not scrolling to
+     find them. Tightened, not cut: same information, less padding. */
+  .dash-hero-savings {
     padding: 14px 16px;
   }
-  .dash-card-hero .dash-card-value {
-    font-size: 1.9rem;
+  .dash-hero-value {
+    font-size: 1.8rem;
   }
   .dash-blossom-watermark {
     width: 90px;
@@ -2991,8 +3026,18 @@ table.data tr:last-child td {
     top: -14px;
     right: -14px;
   }
-  .dash-summary-secondary .dash-card {
-    padding-top: 8px;
+  .dash-stat-tile {
+    padding: 8px 6px;
+  }
+  .dash-stat-tile-label {
+    font-size: 0.68rem;
+  }
+  .dash-stat-tile-value {
+    font-size: 0.88rem;
+  }
+  .donut-chart {
+    width: 130px;
+    height: 130px;
   }
 
   .chart {
