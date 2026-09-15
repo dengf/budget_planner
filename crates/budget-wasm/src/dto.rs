@@ -238,6 +238,55 @@ pub struct MonthSetupStateResult {
     pub error: Option<String>,
 }
 
+/// One entry in either list `resolve_category_name` matches against. Both
+/// an existing category and a preset reduce to the same three fields
+/// here, but they stay separate parameters: `id` addresses a saved record
+/// and `key` addresses a preset, and a single list would make "which of
+/// these two is this?" a question the caller answers by convention.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NamedCategoryDto {
+    pub id: String,
+    /// The name as currently displayed, not the stored one -- see
+    /// `budget_calc::NamedCategory`.
+    pub name: String,
+    #[serde(default)]
+    pub is_income: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NamedPresetDto {
+    pub key: String,
+    /// Already translated by the caller, for the same reason.
+    pub name: String,
+    #[serde(default)]
+    pub is_income: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResolveCategoryNameParams {
+    pub typed: String,
+    /// `"income"` or `"expense"`, same convention (and same refusal to
+    /// guess) as `CategoryRankParams::direction`.
+    pub direction: String,
+    #[serde(default)]
+    pub existing: Vec<NamedCategoryDto>,
+    #[serde(default)]
+    pub presets: Vec<NamedPresetDto>,
+}
+
+/// `budget_calc::NewCategoryOutcome` flattened: `outcome` names the case
+/// and the rest are populated only for the case that carries them, the
+/// same shape `MonthSetupStateResult` uses for its own state enum.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ResolveCategoryNameResult {
+    pub outcome: Option<String>,
+    pub category_id: Option<String>,
+    pub preset_key: Option<String>,
+    pub name: Option<String>,
+    pub group_key: Option<String>,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanEntryDto {
     pub category_id: String,

@@ -1105,6 +1105,165 @@ pub fn category_rank(
     ranked
 }
 
+/// An existing category, reduced to what matching a typed name needs.
+///
+/// `name` is the category as the reader *currently sees it*
+/// (`categoryDisplayName`), which is not always the stored
+/// `Category::name`: a preset-derived category re-translates live from its
+/// `preset_key`, so its stored text can be a language behind the screen
+/// somebody is typing at. Matching what they typed against anything but
+/// what is in front of them would offer to create a duplicate of a
+/// category already on the list.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamedCategory {
+    pub id: String,
+    pub name: String,
+    pub is_income: bool,
+}
+
+/// A starter preset, with its name already resolved into the reader's
+/// language by the caller -- preset names cross the boundary as i18n keys
+/// and never as prose (see `presets.rs`), so the frontend holding the
+/// catalogs is the only thing that can say a preset reads "食物" rather
+/// than "Food". The typed name has to be compared against that.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamedPreset {
+    pub key: String,
+    pub name: String,
+    pub is_income: bool,
+}
+
+/// What typing a category name and asking for it should actually do.
+///
+/// Four different things, which is the whole reason this is a state
+/// rather than a `bool` for "does it already exist": each one saves a
+/// different record, or none at all, and a caller comparing strings
+/// itself would be a second copy of the rule below. Same family as
+/// [`MonthSetupState`] and `goals::SavingsAllocationState`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum NewCategoryOutcome {
+    /// Nothing but whitespace was typed. Distinct from every case below:
+    /// there is no category to create *and* nothing to explain, so the
+    /// caller's job is to stay quiet rather than report a problem.
+    Blank,
+    /// A category with this name is already on this side of the ledger.
+    /// Select it instead of creating a second one -- two categories
+    /// sharing a name split one person's spending across two rows that
+    /// look identical everywhere the app names a category.
+    Existing { category_id: String },
+    /// The name belongs to a category on the *other* side of the ledger:
+    /// typing "Salary" while logging an expense. Creating it would leave
+    /// two categories called "Salary", one per side, which the
+    /// Transactions list and the Budget rows have no way to tell apart.
+    /// The likeliest truth is that the Expense/Income toggle is set
+    /// wrong, so the caller says so rather than silently obliging.
+    OtherDirection { category_id: String },
+    /// The name matches a starter preset nobody has added yet. Adding the
+    /// preset rather than a bare category is what gives it its icon,
+    /// colour, group and the CPA-written description -- and a
+    /// `preset_key`, which is what keeps it re-translating when the UI
+    /// language changes. A hand-typed "Food" would silently forfeit all
+    /// of that.
+    Preset { preset_key: String },
+    /// Genuinely new.
+    Create {
+        /// Trimmed, but otherwise exactly as typed: the surrounding
+        /// whitespace is never meaningful, the capitalisation always is.
+        name: String,
+        /// The i18n key for the group to file it under, never composed
+        /// prose -- same convention as `presets.rs`, and the caller
+        /// translates it the same way it translates a preset's.
+        group_key: String,
+    },
+}
+
+/// Case- and whitespace-insensitive, which is how a person reads two
+/// category names as "the same one". `www/src/presetCategories.js`'s
+/// `availablePresets` applies the identical rule to decide whether a
+/// preset is already taken; it stays in JS because it filters a list
+/// against the live catalogs rather than deciding anything.
+fn fingerprint(name: &str) -> String {
+    name.trim().to_lowercase()
+}
+
+/// Decides what to do with a category name somebody typed where they
+/// needed it -- the picker inside the add sheet, or the Budget tab --
+/// rather than making them leave for the Categories screen and come back.
+///
+/// The order of the checks is the rule, and each step exists because
+/// skipping it produces a record that is wrong rather than merely
+/// unhelpful:
+///
+/// 1. **An existing category on this side wins over everything.** Nobody
+///    typing a name they already have meant to make a second one.
+/// 2. **The same name on the other side is reported, not obliged.** See
+///    [`NewCategoryOutcome::OtherDirection`].
+/// 3. **A not-yet-added preset beats a hand-typed category**, so the
+///    common names arrive furnished. Only on the same side of the ledger:
+///    matching "Salary" to the income preset while somebody logs an
+///    expense would add an income category they cannot even select.
+/// 4. **Otherwise it is new.**
+///
+/// A preset on the *other* side falls through to step 4, which is
+/// deliberate -- an expense genuinely called "Salary" (paying someone
+/// else's) is a real thing to budget for. The cost is that
+/// `availablePresets` will then treat the income preset of that name as
+/// taken, exactly as it already does for anything typed on the Categories
+/// screen.
+pub fn resolve_category_name(
+    typed: &str,
+    direction: Direction,
+    existing: &[NamedCategory],
+    presets: &[NamedPreset],
+) -> NewCategoryOutcome {
+    let needle = fingerprint(typed);
+    if needle.is_empty() {
+        return NewCategoryOutcome::Blank;
+    }
+    let wants_income = direction == Direction::Income;
+    let named = |name: &str| fingerprint(name) == needle;
+
+    // Deliberately two passes rather than one `find` that checks the name
+    // and reads `is_income` off whatever it lands on: a budget that
+    // already carries the same name on both sides (nothing stopped that
+    // before this function existed) would otherwise resolve by list
+    // order, and report "that's an income category" to somebody whose own
+    // expense category of that name is sitting right there.
+    if let Some(c) = existing
+        .iter()
+        .find(|c| c.is_income == wants_income && named(&c.name))
+    {
+        return NewCategoryOutcome::Existing {
+            category_id: c.id.clone(),
+        };
+    }
+    if let Some(c) = existing.iter().find(|c| named(&c.name)) {
+        return NewCategoryOutcome::OtherDirection {
+            category_id: c.id.clone(),
+        };
+    }
+
+    if let Some(p) = presets
+        .iter()
+        .find(|p| p.is_income == wants_income && named(&p.name))
+    {
+        return NewCategoryOutcome::Preset {
+            preset_key: p.key.clone(),
+        };
+    }
+
+    let group = if wants_income {
+        crate::presets::INCOME
+    } else {
+        crate::presets::EXPENSE
+    };
+    NewCategoryOutcome::Create {
+        name: typed.trim().to_string(),
+        group_key: group.0.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2180,5 +2339,159 @@ mod tests {
             assert_eq!(entry.planned, row.planned);
         }
         assert_eq!(plan.entries.len(), plan.rows.len() + 1);
+    }
+
+    fn named(id: &str, name: &str, is_income: bool) -> NamedCategory {
+        NamedCategory {
+            id: id.to_string(),
+            name: name.to_string(),
+            is_income,
+        }
+    }
+
+    fn named_preset(key: &str, name: &str, is_income: bool) -> NamedPreset {
+        NamedPreset {
+            key: key.to_string(),
+            name: name.to_string(),
+            is_income,
+        }
+    }
+
+    fn some_presets() -> Vec<NamedPreset> {
+        vec![
+            named_preset("cat.food", "Food", false),
+            named_preset("cat.salary", "Salary", true),
+        ]
+    }
+
+    #[test]
+    fn nothing_but_whitespace_resolves_to_blank() {
+        assert_eq!(
+            resolve_category_name("   ", Direction::Expense, &[], &[]),
+            NewCategoryOutcome::Blank
+        );
+    }
+
+    #[test]
+    fn a_name_already_on_this_side_selects_it_instead_of_duplicating_it() {
+        let existing = vec![named("c1", "Groceries", false)];
+        assert_eq!(
+            resolve_category_name("Groceries", Direction::Expense, &existing, &[]),
+            NewCategoryOutcome::Existing {
+                category_id: "c1".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn matching_an_existing_name_ignores_case_and_surrounding_space() {
+        let existing = vec![named("c1", "Groceries", false)];
+        assert_eq!(
+            resolve_category_name("  gROCERIES ", Direction::Expense, &existing, &[]),
+            NewCategoryOutcome::Existing {
+                category_id: "c1".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn the_same_name_on_the_other_side_is_reported_rather_than_duplicated() {
+        // Typing "Salary" while logging an expense: creating it would
+        // leave two categories called Salary with nothing on screen to
+        // tell them apart.
+        let existing = vec![named("c1", "Salary", true)];
+        assert_eq!(
+            resolve_category_name("Salary", Direction::Expense, &existing, &[]),
+            NewCategoryOutcome::OtherDirection {
+                category_id: "c1".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_name_held_on_both_sides_resolves_to_this_side() {
+        // Nothing stopped a budget acquiring the same name on both sides
+        // before this function existed. The income one is listed first on
+        // purpose: resolving by list order would tell somebody their own
+        // expense category is "an income category".
+        let existing = vec![
+            named("income", "Rent", true),
+            named("expense", "Rent", false),
+        ];
+        assert_eq!(
+            resolve_category_name("Rent", Direction::Expense, &existing, &[]),
+            NewCategoryOutcome::Existing {
+                category_id: "expense".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_name_matching_an_unadded_preset_adds_the_preset() {
+        // Not a bare category of the same name: the preset carries the
+        // icon, group, description and the `preset_key` that keeps it
+        // re-translating when the language changes.
+        assert_eq!(
+            resolve_category_name("food", Direction::Expense, &[], &some_presets()),
+            NewCategoryOutcome::Preset {
+                preset_key: "cat.food".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn an_already_added_preset_is_selected_rather_than_added_twice() {
+        let existing = vec![named("c1", "Food", false)];
+        assert_eq!(
+            resolve_category_name("Food", Direction::Expense, &existing, &some_presets()),
+            NewCategoryOutcome::Existing {
+                category_id: "c1".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_preset_on_the_other_side_is_not_matched() {
+        // An expense genuinely called "Salary" -- paying someone else's --
+        // is a real thing to budget for, and adding the *income* preset
+        // would hand back a category this direction cannot even select.
+        assert_eq!(
+            resolve_category_name("Salary", Direction::Expense, &[], &some_presets()),
+            NewCategoryOutcome::Create {
+                name: "Salary".to_string(),
+                group_key: "cat.group.expense".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn an_unrecognized_name_is_created_trimmed_and_filed_by_direction() {
+        assert_eq!(
+            resolve_category_name("  Vet bills  ", Direction::Expense, &[], &some_presets()),
+            NewCategoryOutcome::Create {
+                name: "Vet bills".to_string(),
+                group_key: "cat.group.expense".to_string(),
+            }
+        );
+        assert_eq!(
+            resolve_category_name("Dividends", Direction::Income, &[], &some_presets()),
+            NewCategoryOutcome::Create {
+                name: "Dividends".to_string(),
+                group_key: "cat.group.income".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn the_group_key_is_the_one_the_presets_themselves_use() {
+        // Guards the two from drifting: a hand-typed category filing
+        // itself under a group no preset uses would split the Budget
+        // tab's grouping in two.
+        let NewCategoryOutcome::Create { group_key, .. } =
+            resolve_category_name("Vet bills", Direction::Expense, &[], &[])
+        else {
+            panic!("expected a new category");
+        };
+        assert_eq!(group_key, crate::presets::EXPENSE.0);
     }
 }

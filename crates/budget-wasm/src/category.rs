@@ -1,6 +1,6 @@
 //! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
 //! `month_setup_state`, `carry_plan_forward`, `month_review`,
-//! `suggest_plan_from_spending`.
+//! `suggest_plan_from_spending`, `resolve_category_name`.
 
 use wasm_bindgen::prelude::*;
 
@@ -10,8 +10,9 @@ use crate::dto::{
     CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto, CategoryLineDto,
     CategoryRankParams, CategoryRankResult, CategoryShareDto, CategorySharesParams,
     CategorySharesResult, MonthReviewParams, MonthReviewResult, MonthSetupStateParams,
-    MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, RankedCategoryDto, SuggestPlanParams,
-    SuggestPlanResult, SuggestedRowDto, TransactionDto,
+    MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, RankedCategoryDto,
+    ResolveCategoryNameParams, ResolveCategoryNameResult, SuggestPlanParams, SuggestPlanResult,
+    SuggestedRowDto, TransactionDto,
 };
 use crate::message::Message;
 
@@ -572,5 +573,81 @@ fn suggest_plan_from_spending_impl(params: JsValue) -> SuggestPlanResult {
         savings: plan.savings.map(decimal_to_f64),
         shortfall: plan.shortfall.map(decimal_to_f64),
         error: None,
+    }
+}
+
+/// `budget_calc::resolve_category_name`.
+#[wasm_bindgen]
+pub fn resolve_category_name(params: JsValue) -> JsValue {
+    to_js(&resolve_category_name_impl(params))
+}
+
+fn resolve_category_name_impl(params: JsValue) -> ResolveCategoryNameResult {
+    let params: ResolveCategoryNameParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        return ResolveCategoryNameResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let direction = match params.direction.as_str() {
+        "income" => budget_calc::Direction::Income,
+        "expense" => budget_calc::Direction::Expense,
+        _ => {
+            return ResolveCategoryNameResult {
+                error: Some(Message::bad_request().text),
+                ..Default::default()
+            }
+        }
+    };
+
+    let existing: Vec<budget_calc::NamedCategory> = params
+        .existing
+        .into_iter()
+        .map(|c| budget_calc::NamedCategory {
+            id: c.id,
+            name: c.name,
+            is_income: c.is_income,
+        })
+        .collect();
+    let presets: Vec<budget_calc::NamedPreset> = params
+        .presets
+        .into_iter()
+        .map(|p| budget_calc::NamedPreset {
+            key: p.key,
+            name: p.name,
+            is_income: p.is_income,
+        })
+        .collect();
+
+    let outcome = budget_calc::resolve_category_name(&params.typed, direction, &existing, &presets);
+
+    let named = |outcome: &str| ResolveCategoryNameResult {
+        outcome: Some(outcome.to_string()),
+        ..Default::default()
+    };
+    match outcome {
+        budget_calc::NewCategoryOutcome::Blank => named("blank"),
+        budget_calc::NewCategoryOutcome::Existing { category_id } => ResolveCategoryNameResult {
+            category_id: Some(category_id),
+            ..named("existing")
+        },
+        budget_calc::NewCategoryOutcome::OtherDirection { category_id } => {
+            ResolveCategoryNameResult {
+                category_id: Some(category_id),
+                ..named("other_direction")
+            }
+        }
+        budget_calc::NewCategoryOutcome::Preset { preset_key } => ResolveCategoryNameResult {
+            preset_key: Some(preset_key),
+            ..named("preset")
+        },
+        budget_calc::NewCategoryOutcome::Create { name, group_key } => ResolveCategoryNameResult {
+            name: Some(name),
+            group_key: Some(group_key),
+            ..named("create")
+        },
     }
 }
