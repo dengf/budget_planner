@@ -1,6 +1,6 @@
 import React, { useId, useState } from 'react';
 import { useI18n } from '../i18n';
-import { weekLabel, weeksInMonth } from '../month';
+import { dayLabel, weekLabel, weeksInMonth } from '../month';
 
 // Hand-rolled SVG, same reasoning as DebtChart: a charting library would
 // cost more gzipped than the wasm module this app is built around.
@@ -151,8 +151,8 @@ export default function SpendOverTimeChart({
           </>
         ) : (
           <>
-            <span>{t('chart.dayN', { n: 1 })}</span>
-            <span>{t('chart.dayN', { n: dayCount })}</span>
+            <span>{dayLabel(month, 1, locale)}</span>
+            <span>{dayLabel(month, dayCount, locale)}</span>
           </>
         )}
       </div>
