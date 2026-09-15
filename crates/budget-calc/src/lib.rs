@@ -36,9 +36,11 @@ pub mod voice_yue;
 
 pub use category::{
     build_month, build_savings_line, carry_plan_forward, category_rank, category_shares,
-    month_review, month_setup_state, previous_plan_month, summarize_month, CarriedPlan, Category,
-    CategoryDelta, CategoryLine, CategoryShare, Direction, MonthFacts, MonthPosition, MonthReview,
-    MonthSetupState, MonthSummary, PlanEntry, RankedCategory, SAVINGS_CATEGORY_ID,
+    month_review, month_setup_state, previous_plan_month, suggest_plan_from_spending,
+    summarize_month, CarriedPlan, Category, CategoryDelta, CategoryLine, CategoryShare, Direction,
+    MonthFacts, MonthPosition, MonthReview, MonthSetupState, MonthSummary, PlanBasis, PlanEntry,
+    PlanSuggestionState, RankedCategory, SuggestedPlan, SuggestedRow, MIN_TRANSACTIONS_FOR_PLAN,
+    SAVINGS_CATEGORY_ID,
 };
 pub use csv_import::{
     detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,

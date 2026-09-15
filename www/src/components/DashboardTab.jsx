@@ -3,6 +3,8 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { daysInMonth, monthLabel, monthPosition } from '../month';
 import { usePlanCarryForward } from '../usePlanCarryForward';
+import { usePlanFromSpending } from '../usePlanFromSpending';
+import PlanFromSpendingSheet from './PlanFromSpendingSheet';
 import CategoryBadge from './CategoryBadge';
 import CategoryBreakdown from './CategoryBreakdown';
 import DonutChart from './DonutChart';
@@ -99,6 +101,14 @@ export default function DashboardTab({
     wasmModule,
     budgetPlan,
     categories,
+    viewMonth,
+  });
+  const [planSheetOpen, setPlanSheetOpen] = useState(false);
+  const planFromSpending = usePlanFromSpending({
+    wasmModule,
+    transactions,
+    categories,
+    budgetPlan,
     viewMonth,
   });
 
@@ -631,12 +641,29 @@ export default function DashboardTab({
               </span>
             )}
           </div>
-          <button type="button" className="dash-nudge" onClick={() => onNavigateTab?.('budget')}>
-            <span>{t('dashboard.hero.addIncomeNudge')}</span>
-            <span className="dash-nudge-go" aria-hidden="true">
-              &rsaquo;
-            </span>
-          </button>
+          {/* This is the state the usage-flow review called out as
+              tolerated but never finished: someone who logs and never
+              plans got pointed back at the same blank income form every
+              time. Once there's enough history to read, offering to build
+              the plan *from* it is strictly better guidance than asking
+              again -- it fills in income too. The old nudge stays for the
+              case where there isn't enough logged yet to propose
+              anything. */}
+          {planFromSpending.canOffer ? (
+            <button type="button" className="dash-nudge" onClick={() => setPlanSheetOpen(true)}>
+              <span>{t('planFromSpending.offer')}</span>
+              <span className="dash-nudge-go" aria-hidden="true">
+                &rsaquo;
+              </span>
+            </button>
+          ) : (
+            <button type="button" className="dash-nudge" onClick={() => onNavigateTab?.('budget')}>
+              <span>{t('dashboard.hero.addIncomeNudge')}</span>
+              <span className="dash-nudge-go" aria-hidden="true">
+                &rsaquo;
+              </span>
+            </button>
+          )}
           {donutAndRows}
         </>
       );
@@ -685,6 +712,23 @@ export default function DashboardTab({
   return (
     <div className="panel report dashboard">
       {hero()}
+
+      <PlanFromSpendingSheet
+        open={planSheetOpen}
+        onClose={() => setPlanSheetOpen(false)}
+        suggestion={planFromSpending.suggestion}
+        incomeOverride={planFromSpending.incomeOverride}
+        setIncomeOverride={planFromSpending.setIncomeOverride}
+        applying={planFromSpending.applying}
+        onApply={async () => {
+          await planFromSpending.applyPlan();
+          setPlanSheetOpen(false);
+        }}
+        categories={categories}
+        viewMonth={viewMonth}
+        formatMoney={formatMoney}
+        locale={locale}
+      />
 
       {goals.items.length > 0 && (
         <>

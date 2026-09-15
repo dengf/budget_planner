@@ -156,7 +156,38 @@ describe('DashboardTab hero states', () => {
     });
     expect(await screen.findByText('Spent so far')).toBeInTheDocument();
     expect(screen.queryByText('Plan your income')).not.toBeInTheDocument();
+    // No `suggest_plan_from_spending` on this double, so there is nothing
+    // to propose and the plain nudge is the right fallback -- see the
+    // test below for what happens once there is.
     expect(screen.getByText("Add your income to see what you're saving")).toBeInTheDocument();
+  });
+
+  // The state the usage-flow review called out: someone who logs and
+  // never plans got sent back to the same blank income form every time.
+  // Once their own history can answer the question, asking again is the
+  // worse of the two nudges, so it gives way.
+  it('offers to build a budget from the logged spending instead of asking for income again', async () => {
+    const wasmModule = makeWasm();
+    wasmModule.suggest_plan_from_spending = async () => ({
+      state: 'ready',
+      basis: 'partial_month',
+      months_observed: 1,
+      transactions_used: 6,
+      uncategorized: 0,
+      rows: [{ category_id: 'c1', observed: 120, planned: 120, is_income: false }],
+      entries: [{ category_id: 'c1', planned: 120 }],
+      total_income: 0,
+      total_expenses: 120,
+      savings: null,
+      shortfall: null,
+    });
+    renderDashboard({
+      wasmModule,
+      transactions: { items: [{ id: 't1', date: '2026-01-05', amount: -20, category_id: 'c1' }] },
+    });
+
+    expect(await screen.findByText("Build a budget from what you've spent")).toBeInTheDocument();
+    expect(screen.queryByText("Add your income to see what you're saving")).not.toBeInTheDocument();
   });
 
   it('shows a link back to the current month, not the ladder, for an empty past month', async () => {
