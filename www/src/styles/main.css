@@ -399,6 +399,16 @@ body {
        which is exactly what shipped, unnoticed, until real-device testing
        caught this bar sitting under Safari's own bottom toolbar. */
     padding-bottom: max(8px, env(safe-area-inset-bottom));
+    /* `env(safe-area-inset-bottom)` only ever covers the home-indicator
+       strip, not Safari's own (much taller) bottom toolbar -- on a real
+       device with that toolbar visible, the padding above still wasn't
+       enough and the bar's last row rendered behind it. `--chrome-inset-
+       bottom` is set from JS (viewportChromeInset.js) via the Visual
+       Viewport API, which is the only thing that actually knows how much
+       of the viewport is covered right now; it reads 0px whenever nothing
+       is covering the bar, so this is a no-op until that toolbar (or an
+       on-screen keyboard) is actually showing. */
+    bottom: var(--chrome-inset-bottom, 0px);
   }
   .app-tab {
     flex-direction: column;
@@ -427,7 +437,10 @@ body {
     transform: translateY(-12px);
   }
   .app-main {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    /* Matches the bar's own `bottom` offset above, so content never sits
+       underneath it even while `--chrome-inset-bottom` is pushing the bar
+       up off the true viewport edge. */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom) + var(--chrome-inset-bottom, 0px));
   }
 }
 
