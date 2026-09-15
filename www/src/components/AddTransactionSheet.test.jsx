@@ -238,3 +238,115 @@ describe('AddTransactionSheet editing an existing transaction', () => {
     expect(screen.queryByText('Make a rule from this')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Creating a category was only possible on More's Categories screen,
+ * which meant a transaction whose category didn't exist yet had to be
+ * abandoned and retyped. The rule for what a typed name resolves to
+ * lives in `budget_calc::resolve_category_name`; what matters here is
+ * that the sheet keeps the half-entered transaction while it happens.
+ */
+describe('AddTransactionSheet category creation', () => {
+  const CREATING_WASM = {
+    ...WASM,
+    preset_categories: async () => [],
+    resolve_category_name: async ({ typed }) => ({
+      outcome: 'create',
+      name: typed.trim(),
+      group_key: 'cat.group.expense',
+      error: null,
+    }),
+  };
+
+  /**
+   * A category store that actually holds what it is given, unlike a
+   * `vi.fn()` save. The whole point of creating one here is that the
+   * picker then has it to select and the submit button has it to name --
+   * against a store that forgets, every one of those assertions would
+   * pass vacuously or fail for the wrong reason.
+   */
+  function renderCreatingSheet() {
+    const transactions = { items: [], save: vi.fn() };
+    const saved = [];
+    function Harness() {
+      const [items, setItems] = React.useState(CATEGORIES.items);
+      const categories = {
+        items,
+        save: async (record) => {
+          saved.push(record);
+          setItems((prev) => [...prev, record]);
+        },
+      };
+      return (
+        <I18nProvider initialLocale="en">
+          <AddTransactionSheet
+            open
+            onClose={() => {}}
+            wasmModule={CREATING_WASM}
+            newId={() => 'new-id'}
+            today="2026-01-01"
+            categories={categories}
+            rules={{ items: [] }}
+            transactions={transactions}
+            recurring={{ items: [] }}
+            formatMoney={(n) => `$${n}`}
+          />
+        </I18nProvider>
+      );
+    }
+    render(<Harness />);
+    return { saved, transactions };
+  }
+
+  it('creates a category from the picker and files the transaction under it', async () => {
+    const { saved, transactions } = renderCreatingSheet();
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '42.60' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New' }));
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Pets' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Pets”' }));
+
+    await waitFor(() => expect(saved).toContainEqual(expect.objectContaining({ name: 'Pets' })));
+    expect(saved[0].is_income).toBe(false);
+
+    // The amount typed before the detour is still there, and the new
+    // category is selected -- the submit button naming both is the
+    // evidence that nothing had to be re-entered.
+    const submit = await screen.findByRole('button', { name: 'Add $42.6 to Pets' });
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(transactions.save).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: -42.6, category_id: 'new-id' }),
+      ),
+    );
+  });
+
+  it('creates on the income side when the sheet is in Income mode', async () => {
+    const { saved } = renderCreatingSheet();
+    fireEvent.click(screen.getByRole('tab', { name: 'Income' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ New' }));
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Dividends' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Dividends”' }));
+    await waitFor(() =>
+      expect(saved).toContainEqual(expect.objectContaining({ name: 'Dividends', is_income: true })),
+    );
+  });
+
+  it('offers to create the name typed into the filter when nothing matches it', async () => {
+    // The moment somebody has already said what they want and been told
+    // it does not exist is the moment the offer is worth most.
+    const many = Array.from({ length: 7 }, (_, i) => ({
+      id: `exp${i}`,
+      name: `Expense ${i}`,
+      is_income: false,
+    }));
+    renderSheet({ wasmModule: CREATING_WASM, categories: { items: many, save: vi.fn() } });
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    fireEvent.change(screen.getByLabelText('Find a category'), { target: { value: 'Vet' } });
+    expect(await screen.findByText('No category matches that.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Vet”' }));
+    // Opens the name field already holding what was typed, rather than
+    // asking for it a second time.
+    expect(screen.getByLabelText('Category name')).toHaveValue('Vet');
+  });
+});

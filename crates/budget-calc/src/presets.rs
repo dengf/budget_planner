@@ -52,8 +52,14 @@ pub struct PresetCategory {
     pub description: &'static str,
 }
 
-const INCOME: (&str, &str) = ("cat.group.income", "Income");
-const EXPENSE: (&str, &str) = ("cat.group.expense", "Expense");
+/// The group every income preset carries, as the same key-plus-English-
+/// fallback pair the rest of this module uses. Public because a
+/// hand-typed category has to land in the same two groups the presets do
+/// -- see `category::resolve_category_name` -- and a second copy of these
+/// literals is how the two drift into naming the same group differently.
+pub const INCOME: (&str, &str) = ("cat.group.income", "Income");
+/// The expense counterpart of [`INCOME`].
+pub const EXPENSE: (&str, &str) = ("cat.group.expense", "Expense");
 
 #[allow(clippy::too_many_arguments)]
 const fn preset(

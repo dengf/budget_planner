@@ -7,6 +7,7 @@ import CategoryBadge from './CategoryBadge';
 import SpendChart from './SpendChart';
 import AssignBlossom from './AssignBlossom';
 import EditPlanSheet from './EditPlanSheet';
+import NewCategoryField from './NewCategoryField';
 import { isCommitmentId, loadIncludeCommitments } from '../commitments';
 import { ASSIGN, budgetMode } from '../budgetMode';
 import {
@@ -16,9 +17,22 @@ import {
 } from '../presetCategories';
 import { categoryColor } from '../categoryVisuals';
 import { useMonthBudget } from '../useMonthBudget';
+import { useCreateCategory } from '../useCreateCategory';
 import { usePlanCarryForward } from '../usePlanCarryForward';
 import { usePlanFromSpending } from '../usePlanFromSpending';
 import PlanFromSpendingSheet from './PlanFromSpendingSheet';
+
+/**
+ * Income first, as its own block. Rendering the two sides as a list
+ * rather than detecting the boundary inside one `.map()` is what lets a
+ * side with no rows still carry its "add a category" button -- and the
+ * side most often empty is income on a first run, which is exactly when
+ * that button matters most.
+ */
+const SECTIONS = [
+  { id: 'income', incomeRow: true },
+  { id: 'expense', incomeRow: false },
+];
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -45,6 +59,7 @@ import PlanFromSpendingSheet from './PlanFromSpendingSheet';
  */
 export default function BudgetTab({
   wasmModule,
+  newId,
   currencySymbol,
   today,
   viewMonth,
@@ -58,6 +73,10 @@ export default function BudgetTab({
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [editingId, setEditingId] = useState(null);
+  // Which section's "add a category" field is open: 'income', 'expense',
+  // or null. One at a time -- two open name fields on a 375px column is
+  // two things to finish where there was one thing to do.
+  const [addingTo, setAddingTo] = useState(null);
   const [upcoming, setUpcoming] = useState(null);
   // Read-only here: the checkbox that sets this now lives in
   // CategoriesScreen (More). This tab remounts (App.jsx's `key={activeTab}`
@@ -94,6 +113,8 @@ export default function BudgetTab({
     goals,
     debts,
   });
+
+  const createCategory = useCreateCategory({ wasmModule, categories, newId });
 
   const categoryFor = (id) => categories.items.find((c) => c.id === id);
   const categoryName = (id) => {
@@ -213,6 +234,49 @@ export default function BudgetTab({
           text: t('budget.pillOver', { amount: formatMoney(-line.remaining) }),
         }
       : { className: 'muted-note', text: t('budget.unbudgetedSpend') };
+  };
+
+  const renderRow = (line, incomeRow, dimmed) => {
+    const remaining = remainingCell(line);
+    const over = !incomeRow && line.spent > line.planned;
+    return (
+      <button
+        key={line.category_id}
+        type="button"
+        className={`budget-row${dimmed ? ' category-row-dim' : ''}`}
+        aria-label={t('budget.progressAria', {
+          name: categoryName(line.category_id),
+          spent: formatMoney(line.spent),
+          planned: formatMoney(line.planned),
+        })}
+        onClick={() => setEditingId(line.category_id)}
+      >
+        <CategoryBadge category={categoryFor(line.category_id)} />
+        <span className="budget-row-body">
+          <span className="budget-row-top">
+            <span className="budget-row-name">{categoryName(line.category_id)}</span>
+            <span className={`budget-row-pill ${remaining.className}`}>{remaining.text}</span>
+          </span>
+          {line.planned > 0 && (
+            <span className="budget-row-track">
+              <span
+                className={`budget-row-bar${over ? ' over' : ''}`}
+                style={{
+                  width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%`,
+                  ...(over ? {} : { background: categoryColor(categoryFor(line.category_id)) }),
+                }}
+              />
+            </span>
+          )}
+          <span className="budget-row-sub">
+            {t('budget.rowSubtext', {
+              spent: formatMoney(line.spent),
+              planned: formatMoney(line.planned),
+            })}
+          </span>
+        </span>
+      </button>
+    );
   };
 
   const days = daysLeftInMonth();
@@ -355,78 +419,57 @@ export default function BudgetTab({
         </>
       )}
 
-      {categories.items.length === 0 ? (
-        <p className="empty-state">{t('budget.noCategories')}</p>
-      ) : (
-        <div className="budget-rows">
-          {orderedLines.map((line, i) => {
-            const incomeRow = isIncome(line.category_id);
-            const remaining = remainingCell(line);
-            const over = !incomeRow && line.spent > line.planned;
-            // A section header once at the top of the income block and
-            // once at the top of the expense block -- `orderedLines` is
-            // already sorted income-first, so the boundary is just the
-            // one spot the flag flips.
-            const startsNewSection =
-              i === 0 || incomeRow !== isIncome(orderedLines[i - 1].category_id);
-            const dimmed = dimExpenseUntilIncome && !incomeRow;
-            return (
-              <React.Fragment key={line.category_id}>
-                {startsNewSection && (
-                  <div
-                    className={
-                      dimmed
-                        ? 'category-section-header category-section-dim'
-                        : 'category-section-header'
-                    }
-                  >
-                    {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
-                  </div>
-                )}
+      {/* No separate "no categories yet, go to More" empty state any
+          more: with both add buttons always rendered, an empty budget
+          already shows the two things there are to do, and a message
+          pointing at another screen was the dead end. */}
+      <div className="budget-rows">
+        {SECTIONS.map(({ id, incomeRow }) => {
+          const lines = orderedLines.filter((l) => isIncome(l.category_id) === incomeRow);
+          const dimmed = dimExpenseUntilIncome && !incomeRow;
+          return (
+            <React.Fragment key={id}>
+              {/* No header over a side with nothing on it -- the add
+                  button below names which side it is. */}
+              {lines.length > 0 && (
+                <div
+                  className={
+                    dimmed
+                      ? 'category-section-header category-section-dim'
+                      : 'category-section-header'
+                  }
+                >
+                  {t(incomeRow ? 'cat.group.income' : 'cat.group.expense')}
+                </div>
+              )}
+              {lines.map((line) => renderRow(line, incomeRow, dimmed))}
+              {/* Rendered for both sides whether or not either has rows:
+                  the one moment somebody most needs to add an income
+                  category is the first run, when there isn't an income
+                  block to hang the button off yet. */}
+              <div className={`budget-add-category${dimmed ? ' category-row-dim' : ''}`}>
                 <button
                   type="button"
-                  className={`budget-row${dimmed ? ' category-row-dim' : ''}`}
-                  aria-label={t('budget.progressAria', {
-                    name: categoryName(line.category_id),
-                    spent: formatMoney(line.spent),
-                    planned: formatMoney(line.planned),
-                  })}
-                  onClick={() => setEditingId(line.category_id)}
+                  className="btn ghost"
+                  aria-expanded={addingTo === id}
+                  onClick={() => setAddingTo(addingTo === id ? null : id)}
                 >
-                  <CategoryBadge category={categoryFor(line.category_id)} />
-                  <span className="budget-row-body">
-                    <span className="budget-row-top">
-                      <span className="budget-row-name">{categoryName(line.category_id)}</span>
-                      <span className={`budget-row-pill ${remaining.className}`}>
-                        {remaining.text}
-                      </span>
-                    </span>
-                    {line.planned > 0 && (
-                      <span className="budget-row-track">
-                        <span
-                          className={`budget-row-bar${over ? ' over' : ''}`}
-                          style={{
-                            width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%`,
-                            ...(over
-                              ? {}
-                              : { background: categoryColor(categoryFor(line.category_id)) }),
-                          }}
-                        />
-                      </span>
-                    )}
-                    <span className="budget-row-sub">
-                      {t('budget.rowSubtext', {
-                        spent: formatMoney(line.spent),
-                        planned: formatMoney(line.planned),
-                      })}
-                    </span>
-                  </span>
+                  {t(incomeRow ? 'category.addIncome' : 'category.addExpense')}
                 </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
-      )}
+                {addingTo === id && (
+                  <NewCategoryField
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- this field only exists because the button above it was just tapped; the caret belongs in it.
+                    autoFocus
+                    isIncome={incomeRow}
+                    create={createCategory}
+                    onCreated={() => setAddingTo(null)}
+                  />
+                )}
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </div>
       {categories.items.length > 0 && <p className="field-label">{t('budget.spentHint')}</p>}
 
       {editingLine && (

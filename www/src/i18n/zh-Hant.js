@@ -67,7 +67,7 @@ export default {
   'budget.reallocate': '重新分配',
   'budget.totalPlanned': '計劃總額',
   'budget.totalSpent': '花費總額',
-  'budget.noCategories': '還沒有分類——請到「更多 → 分類」新增第一個，建議從收入開始。',
+  'budget.noCategories': '還沒有分類——在下方新增第一個，建議從收入開始。',
   'budget.save': '儲存',
   'budget.remove': '刪除',
 
@@ -93,7 +93,7 @@ export default {
   'chart.granularityDaily': '按天',
   'chart.granularityWeekly': '按週',
   'budget.method': '零基預算：給每一分錢都安排好去處，直到沒有剩餘未分配。',
-  'budget.startWithIncomeCategory': '先到「更多」 → 「分類」新增一個收入分類即可開始。',
+  'budget.startWithIncomeCategory': '在下方新增一個收入分類即可開始。',
   'budget.startWithIncome': '從這裡開始——在下方的收入類別中填寫你預計的金額。',
   'budget.assignPrompt': '現在把這 {amount} 分配到下面的各個分類。',
   'budget.carryPlanOffer': '沿用 {month} 的預算',
@@ -134,6 +134,14 @@ export default {
 
   'cat.group.income': '收入',
   'cat.group.expense': '支出',
+  'category.newChip': '+ 新增',
+  'category.namePlaceholder': '分類名稱',
+  'category.create': '建立',
+  'category.createNamed': '建立「{name}」',
+  'category.clashIsIncome': '「{name}」已經是收入分類了，換個名稱吧。',
+  'category.clashIsExpense': '「{name}」已經是支出分類了，換個名稱吧。',
+  'category.addIncome': '+ 新增收入分類',
+  'category.addExpense': '+ 新增支出分類',
 
   'cat.primaryEarnedIncome': '主要勞動收入',
   'cat.primaryEarnedIncome.desc': '薪資、工資、加班費、小費和獎金。',
