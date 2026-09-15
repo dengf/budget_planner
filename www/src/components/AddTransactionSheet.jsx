@@ -48,8 +48,10 @@ const EMPTY_RECURRING_DRAFT = {
  * The four ways a transaction (or a recurring expense that generates
  * future ones) enters the app -- manual entry, a photographed/PDF
  * receipt, a bank CSV export, a recurring rule -- collapsed behind one
- * floating "Add" button (TransactionsTab.jsx) instead of permanently-
- * expanded sections stacked above the transaction list. Manual is the
+ * "+" in the centre of the nav bar (Header.jsx) instead of
+ * permanently-expanded sections stacked above the transaction list. That
+ * "+" started life as a floating button on Transactions itself and moved
+ * to the bar when the sheet became reachable from every tab. Manual is the
  * default tab: it needs no file and no OCR wait, the quickest path for
  * the single most common case of logging one thing just spent. Closes
  * itself after a manual or recurring add (both genuine one-shot
