@@ -3349,3 +3349,125 @@ table.data tr:last-child td {
   border-radius: 12px;
   background: var(--panel-alt);
 }
+
+/* ---- Round 3: the open loops ------------------------------------------
+   Three standing records -- a goal, a debt balance, a recurring schedule
+   -- now each have an action that connects them to the transaction
+   stream. The shared shape below: a quiet banner stating what is true
+   right now, and an action sized like every other primary action in the
+   app (44px minimum, one thumb, no hover required). */
+
+/* What this month saved and how much of it is still unclaimed. Quiet: it
+   is context for the cards under it, not the figure the screen is for. */
+.goal-savings-banner {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+/* Sits inside .goal-info's column, so it stretches to the card's text
+   width rather than sizing to its label -- deliberate: it is the action
+   the card exists to offer once a month, and a full-width target is the
+   easiest thing on the card to hit. */
+.goal-assign {
+  margin-top: 6px;
+  align-self: flex-start;
+  font-size: 0.85rem;
+}
+
+/* Two actions in one cell (record a payment, remove) -- wrapping rather
+   than forcing the table wider, since .table-scroll would otherwise push
+   the balance column off a 375px screen. */
+.debt-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* The payment form opens as a full-width row directly under the debt it
+   belongs to, not as a sheet: at this size the debt's own name, balance
+   and minimum stay on screen while the amount is typed. */
+.debt-payment-row td {
+  background: var(--panel-alt);
+}
+.debt-payment-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 0 4px;
+}
+.debt-payment-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+/* What the payment did, stated after the fact. `role="status"` on the
+   element itself, so a screen reader hears the outcome without the
+   focus having to move. */
+.debt-payment-outcome {
+  margin: 4px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.recurring-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel-alt);
+}
+/* A settled occurrence stays in the list rather than disappearing --
+   "rent is paid" is worth seeing -- but steps back, so what is still
+   due is what the eye lands on. */
+.recurring-status.paid {
+  opacity: 0.65;
+}
+.recurring-status-date {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.recurring-status-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.recurring-status-desc {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+.recurring-status-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.recurring-status-tag {
+  flex: none;
+  color: var(--positive);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+/* `flex: none` so the action keeps its own width instead of competing
+   with the description beside it -- without it the amount/category line
+   wraps mid-phrase at 375px while the button stretches. */
+.recurring-status > .btn {
+  flex: none;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}

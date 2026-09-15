@@ -265,6 +265,12 @@ export default {
   'recurring.upcomingHint':
     "What's scheduled to come due, so you can plan for it before it happens rather than after.",
   'recurring.addToPlanned': 'Add to planned',
+  'recurring.scheduleTitle': 'The schedule',
+  'recurring.thisMonthTitle': '{month}',
+  'recurring.stillDue': '{count} still due — {amount}',
+  'recurring.allPaid': 'Everything scheduled this month has been paid.',
+  'recurring.paid': 'Paid',
+  'recurring.markPaid': 'Mark as paid',
   'transactions.showAllMonths': 'Show all months',
   'transactions.uncategorizedCount': 'Uncategorized ({count})',
   'transactions.editThis': 'Edit {description}',
@@ -290,6 +296,13 @@ export default {
   'goals.milestone.halfway': 'Halfway to {name}.',
   'goals.milestone.three_quarters': 'Three quarters of the way to {name}.',
   'goals.milestone.goal_reached': '{name} is fully funded.',
+  'goals.addToGoal': 'Add to {name}',
+  'goals.assignSavings': "Add {month}'s {amount}",
+  'goals.savingsAvailable': '{month} saved {amount} that no goal has claimed yet.',
+  'goals.savingsAllAssigned': "All {amount} of {month}'s savings is assigned to a goal.",
+  'goals.savingsNone': '{month} has no savings to assign yet.',
+  'goals.savingsOverAssigned':
+    '{assigned} is assigned to goals from {month}, but the month only saved {saved} — spending logged since put it over.',
 
   'debt.title': 'Debt payoff',
   'debt.add': 'Add a debt',
@@ -309,6 +322,16 @@ export default {
   'debt.payment': 'Payment',
   'debt.interest': 'Interest',
   'debt.balanceRemaining': 'Remaining',
+  'debt.recordPayment': 'Record a payment',
+  'debt.recordPaymentCta': 'Record it',
+  'debt.recordPaymentHint':
+    'This logs the payment as a transaction and lowers the balance, so the payoff date below stays true.',
+  'debt.paymentAmount': 'Payment to {name}',
+  'debt.paymentDescription': 'Payment to {name}',
+  'debt.paymentApplied': '{principal} off {name}, {interest} to interest. Balance now {balance}.',
+  'debt.paymentPaidOff': '{name} is paid off.',
+  'debt.paymentUnderInterest': "That is less than this month's interest, so the balance went up.",
+  'debt.paymentOverpaid': '{amount} more than the debt needed was left over.',
 
   'dashboard.setup.planIncomeTitle': 'Plan your income',
   'dashboard.setup.planIncomeDetail':
@@ -371,6 +394,7 @@ export default {
   'err.invalidGoalTarget': "A goal's target must be a positive amount (got {value}).",
   'err.goalTargetInThePast': "A goal's target date must be in the future.",
   'err.invalidDebtBalance': "A debt's balance must be a positive amount (got {value}).",
+  'err.invalidDebtPayment': "A debt payment can't be negative (got {value}).",
   'err.invalidDebtRate': "A debt's APR can't be negative (got {value}).",
   'err.invalidMinPayment': "A debt's minimum payment must be a positive amount (got {value}).",
   'err.payoffBudgetTooSmall':

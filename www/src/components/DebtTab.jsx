@@ -1,17 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
+import { todayIso } from '../month';
 import NumberField from './NumberField';
 import CalcError from './CalcError';
 import DebtChart from './DebtChart';
 
-export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, debts }) {
+export default function DebtTab({
+  wasmModule,
+  currencySymbol,
+  newId,
+  confirm,
+  debts,
+  transactions,
+}) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [draft, setDraft] = useState({ name: '', balance: '', apr_percent: '', min_payment: '' });
   const [extraPayment, setExtraPayment] = useState(0);
   const [strategy, setStrategy] = useState('snowball');
   const [plan, setPlan] = useState(null);
+  // Which debt's payment form is open, the amount typed into it, and
+  // what the last recorded payment did. One at a time: two open forms on
+  // a 375px screen is two ways to lose track of which row you are on.
+  const [payingId, setPayingId] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [outcome, setOutcome] = useState(null);
+  const [paymentError, setPaymentError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +70,62 @@ export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, de
     if (ok) await debts.remove(debt.id);
   };
 
+  const openPayment = async (debt) => {
+    setOutcome(null);
+    setPaymentError(null);
+    if (payingId === debt.id) {
+      setPayingId(null);
+      return;
+    }
+    setPayingId(debt.id);
+    // Pre-filled with the minimum payment, since that is the number
+    // someone recording a payment is most often recording. Typed over
+    // freely -- it is a starting point, not a constraint.
+    setPaymentAmount(String(debt.min_payment ?? ''));
+  };
+
+  /**
+   * Record a payment: log the transaction, then write the new balance.
+   *
+   * Both halves, or the payoff chart goes on projecting from a balance
+   * that stopped being true -- the original debt-free date, stated with
+   * full confidence, months after it stopped being reachable. Every
+   * figure here comes from `record_debt_payment`, which runs the same
+   * month-step the projection itself runs, so a recorded payment and the
+   * plan's first month can never disagree about what it achieved.
+   */
+  const recordPayment = async (debt, e) => {
+    e.preventDefault();
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (!wasmModule?.record_debt_payment || !wasmModule?.signed_amount) return;
+
+    const applied = await wasmModule.record_debt_payment({ debt, payment: amount });
+    if (applied?.error) {
+      setPaymentError(applied);
+      return;
+    }
+    const signed = await wasmModule.signed_amount({ magnitude: amount, is_income: false });
+    if (signed?.error) {
+      setPaymentError(signed);
+      return;
+    }
+
+    await transactions.save({
+      id: newId(),
+      date: todayIso(),
+      description: t('debt.paymentDescription', { name: debt.name }),
+      amount: signed.amount,
+      category_id: null,
+    });
+    await debts.save({ ...debt, balance: applied.new_balance });
+
+    setPaymentError(null);
+    setPayingId(null);
+    setPaymentAmount('');
+    setOutcome({ ...applied, name: debt.name });
+  };
+
   return (
     <div className="panel">
       <h2>{t('debt.title')}</h2>
@@ -75,21 +146,69 @@ export default function DebtTab({ wasmModule, currencySymbol, newId, confirm, de
             </thead>
             <tbody>
               {debts.items.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.name}</td>
-                  <td className="num">{formatMoney(d.balance)}</td>
-                  <td className="num">{d.apr_percent.toFixed(2)}%</td>
-                  <td className="num">{formatMoney(d.min_payment)}</td>
-                  <td>
-                    <button className="btn ghost" onClick={() => removeDebt(d)}>
-                      {t('budget.remove')}
-                    </button>
-                  </td>
-                </tr>
+                <React.Fragment key={d.id}>
+                  <tr>
+                    <td>{d.name}</td>
+                    <td className="num">{formatMoney(d.balance)}</td>
+                    <td className="num">{d.apr_percent.toFixed(2)}%</td>
+                    <td className="num">{formatMoney(d.min_payment)}</td>
+                    <td className="debt-row-actions">
+                      <button
+                        className="btn secondary"
+                        aria-expanded={payingId === d.id}
+                        onClick={() => openPayment(d)}
+                      >
+                        {t('debt.recordPayment')}
+                      </button>
+                      <button className="btn ghost" onClick={() => removeDebt(d)}>
+                        {t('budget.remove')}
+                      </button>
+                    </td>
+                  </tr>
+                  {payingId === d.id && (
+                    <tr className="debt-payment-row">
+                      <td colSpan={5}>
+                        <form className="debt-payment-form" onSubmit={(e) => recordPayment(d, e)}>
+                          <NumberField
+                            label={t('debt.paymentAmount', { name: d.name })}
+                            value={paymentAmount}
+                            onChange={setPaymentAmount}
+                            grouped
+                          />
+                          <button className="btn" type="submit">
+                            {t('debt.recordPaymentCta')}
+                          </button>
+                        </form>
+                        <p className="debt-payment-hint">{t('debt.recordPaymentHint')}</p>
+                        {paymentError && <CalcError result={paymentError} />}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {outcome && (
+        <p className="debt-payment-outcome" role="status">
+          {outcome.paid_off
+            ? t('debt.paymentPaidOff', { name: outcome.name })
+            : t('debt.paymentApplied', {
+                name: outcome.name,
+                principal: formatMoney(outcome.principal),
+                interest: formatMoney(outcome.interest),
+                balance: formatMoney(outcome.new_balance),
+              })}
+          {/* A payment smaller than the month's interest leaves the
+              balance higher than it started. Saying so is the whole
+              point of recording it -- the chart would otherwise just
+              redraw a little further out with no explanation. */}
+          {!outcome.covers_interest && ' ' + t('debt.paymentUnderInterest')}
+          {outcome.overpaid > 0 &&
+            ' ' + t('debt.paymentOverpaid', { amount: formatMoney(outcome.overpaid) })}
+        </p>
       )}
 
       <form className="form-grid" onSubmit={addDebt}>
