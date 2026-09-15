@@ -2396,15 +2396,25 @@ table.data tr:last-child td {
   pointer-events: none;
 }
 .donut-center {
+  /* `width` is required, not cosmetic: an absolutely-positioned auto-width
+     box with only `left` set shrink-to-fits using just the space to its
+     *right* within the containing block, not symmetric room on both
+     sides -- so `translate(-50%, ...)` centers a box that was already
+     sized off-center, and multi-line text (e.g. wrapped "Spending by
+     Category") visibly drifts left of the ring's true center. Kept a
+     little inside the ring's inner diameter (RADIUS - STROKE/2, doubled)
+     so wrapped text doesn't touch the stroke. */
   position: absolute;
   left: 118px;
   top: 100px;
+  width: 84px;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
+  text-align: center;
   pointer-events: none;
 }
 .donut-total {
