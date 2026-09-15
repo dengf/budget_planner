@@ -105,6 +105,26 @@ describe('BudgetTab row list', () => {
     ).toBeInTheDocument();
   });
 
+  // This tab has no way to create a category -- that moved to More ->
+  // Categories -- so the first-run banner has to name where the action
+  // actually is. It used to say "below", pointing at a form that is no
+  // longer on this screen: a dead end on the one screen a first-time
+  // user lands on with nothing set up.
+  it('sends a user with no income category to where categories are actually made', async () => {
+    renderBudget({ categories: { items: [CATEGORIES[1]] } });
+    expect(
+      await screen.findByText('Add an income category in More → Categories to get started.'),
+    ).toBeInTheDocument();
+  });
+
+  // Budget rows open the plan sheet; they have never had a "+". The
+  // nav bar's centre "+" is the one that logs a transaction.
+  it('points at the nav bar for logging a transaction, not a "+" on a row', async () => {
+    renderBudget();
+    await screen.findByRole('button', { name: /Food/ });
+    expect(screen.getByText(/use the \+ in the bar below to log one/)).toBeInTheDocument();
+  });
+
   it('shows "every dollar has a job" once income is fully assigned', async () => {
     renderBudget({
       budgetPlan: {

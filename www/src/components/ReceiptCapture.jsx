@@ -28,7 +28,7 @@ function statementRowKey(row, i) {
 /**
  * Adds a transaction from a photographed receipt or a PDF, instead of
  * typing it in by hand. Deliberately does not auto-save the way CSV
- * import does (`runImport` in `TransactionsTab.jsx`) -- OCR and a
+ * import does (`runImport` in `AddTransactionSheet.jsx`) -- OCR and a
  * receipt's inconsistent layout are both far less reliable than a bank's
  * own structured export, so every extracted field lands in this
  * pre-filled, fully editable form and nothing saves until "Add" is
@@ -89,9 +89,9 @@ export default function ReceiptCapture({
   };
 
   // One `apply_rules` call across every row instead of one per row --
-  // same batching TransactionsTab's own "Apply rules" button already
-  // does, just seeded from freshly-parsed drafts instead of saved
-  // transactions.
+  // same batching the "Apply rules to uncategorized" button already does
+  // (`RulesSection.jsx`, under More), just seeded from freshly-parsed
+  // drafts instead of saved transactions.
   const startStatementReview = async (rows) => {
     const guesses = await wasmModule.apply_rules({
       transactions: rows.map((r, i) => ({
