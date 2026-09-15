@@ -16,7 +16,17 @@ export function startViewportChromeInsetTracking(root = document.documentElement
   if (!vv) return () => {};
 
   const update = () => {
-    const gap = window.innerHeight - vv.height - vv.offsetTop;
+    // `offsetTop` is clamped at 0 before it is subtracted, and that clamp
+    // is the whole point of this line. A *negative* offsetTop means the
+    // visual viewport is sitting above the layout viewport -- rubber-band
+    // overscroll, or the moment iOS collapses its URL bar mid-scroll --
+    // and subtracting a negative number adds to the gap, inventing chrome
+    // that isn't there and lifting the bar off the bottom of the screen
+    // by however far the page happened to bounce. Nothing re-fires once
+    // the bounce settles, so that invented inset is what stays on screen.
+    // Only a visual viewport pushed *down* inside the layout viewport
+    // means something is covering the bottom edge.
+    const gap = window.innerHeight - vv.height - Math.max(0, vv.offsetTop);
     root.style.setProperty('--chrome-inset-bottom', `${Math.max(0, Math.round(gap))}px`);
   };
 
