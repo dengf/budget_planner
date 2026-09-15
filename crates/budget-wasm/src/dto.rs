@@ -62,7 +62,11 @@ pub struct BuildMonthParams {
     pub income_category_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// `Deserialize` as well as `Serialize`: `month_review` takes back the
+/// same lines `build_month` handed out, rather than recomputing them from
+/// raw transactions, so the review can never disagree with the figures
+/// already on screen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryLineDto {
     pub category_id: String,
     pub planned: f64,
@@ -71,7 +75,8 @@ pub struct CategoryLineDto {
     pub remaining: f64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// Round-trips for the same reason as `CategoryLineDto` above.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MonthSummaryDto {
     pub income: f64,
     pub total_planned: f64,
@@ -211,8 +216,18 @@ pub struct CategorySharesResult {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MonthSetupStateParams {
-    pub is_current_month: bool,
+    /// `"past"`, `"current"` or `"future"`. Replaces the
+    /// `is_current_month` boolean this used to take -- see
+    /// `budget_calc::MonthPosition` for why the distinction now matters.
+    pub position: String,
     pub has_transactions: bool,
+    /// Both default to `false` so a caller that hasn't been taught about
+    /// the carry-forward offer yet still gets the old ladder rather than
+    /// a parse failure.
+    #[serde(default)]
+    pub has_plan: bool,
+    #[serde(default)]
+    pub has_previous_plan: bool,
     pub income: f64,
     pub unassigned: f64,
 }
@@ -220,6 +235,60 @@ pub struct MonthSetupStateParams {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct MonthSetupStateResult {
     pub state: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanEntryDto {
+    pub category_id: String,
+    pub planned: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CarryPlanParams {
+    pub previous: Vec<PlanEntryDto>,
+    pub existing_category_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CarryPlanResult {
+    pub entries: Vec<PlanEntryDto>,
+    pub dropped_missing_category: usize,
+    pub dropped_zero: usize,
+    pub error: Option<String>,
+}
+
+/// Which earlier month's plan can be carried into the month on screen --
+/// `month` is `None` when there is no earlier plan at all.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PreviousPlanMonthResult {
+    pub month: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MonthReviewParams {
+    pub lines: Vec<CategoryLineDto>,
+    pub summary: MonthSummaryDto,
+    pub income_category_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CategoryDeltaDto {
+    pub category_id: String,
+    pub planned: f64,
+    pub spent: f64,
+    pub delta: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct MonthReviewResult {
+    pub income: f64,
+    pub total_planned: f64,
+    pub total_spent: f64,
+    pub saved: f64,
+    pub biggest_overspend: Option<CategoryDeltaDto>,
+    pub biggest_underspend: Option<CategoryDeltaDto>,
     pub error: Option<String>,
 }
 

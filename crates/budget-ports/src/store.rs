@@ -27,6 +27,12 @@ pub trait BudgetStore {
     async fn save_budget_plan(&self, record: BudgetPlanRecord) -> Result<(), StoreError>;
     /// Every planned-amount line for one `YYYY-MM` month.
     async fn list_budget_plan(&self, month: &str) -> Result<Vec<BudgetPlanRecord>, StoreError>;
+    /// Which `YYYY-MM` months have any planned-amount line at all, each
+    /// listed once. Distinct from `list_budget_plan` because the caller
+    /// asking "is there an earlier plan to carry forward?" doesn't know
+    /// which month to ask for yet, and shouldn't have to pull every plan
+    /// row of every month it has ever saved to find out.
+    async fn list_budget_plan_months(&self) -> Result<Vec<String>, StoreError>;
     async fn delete_budget_plan(&self, id: &str) -> Result<(), StoreError>;
 
     async fn save_transaction(&self, record: TransactionRecord) -> Result<(), StoreError>;

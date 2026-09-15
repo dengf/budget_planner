@@ -205,6 +205,18 @@ impl BudgetStore for RedbBudgetStore {
             .filter(|r| r.month == month)
             .collect())
     }
+    async fn list_budget_plan_months(&self) -> Result<Vec<String>, StoreError> {
+        let mut months: Vec<String> = list_budget_plan_all_impl(self)
+            .await?
+            .into_iter()
+            .map(|r| r.month)
+            .collect();
+        // `YYYY-MM` sorts chronologically as text, so plain sort/dedup is
+        // enough to hand back each month once, oldest first.
+        months.sort();
+        months.dedup();
+        Ok(months)
+    }
     async fn delete_budget_plan(&self, id: &str) -> Result<(), StoreError> {
         delete_budget_plan_impl(self, id).await
     }

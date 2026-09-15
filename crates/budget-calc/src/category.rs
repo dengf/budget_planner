@@ -298,7 +298,46 @@ pub fn category_shares(entries: &[(String, Decimal)]) -> Vec<CategoryShare> {
         .collect()
 }
 
-/// Which of the Overview hero's seven states a month is in -- see the
+/// Where the viewed month sits relative to the real current one.
+///
+/// Replaces the `is_current_month` boolean this function used to take.
+/// Three of the states below now differ between a *past* and a *future*
+/// month -- a past month that has ended gets a review, a future one gets
+/// offered the previous month's plan -- and a single boolean can't say
+/// which of those an "other" month is. Two booleans could, but a pair
+/// where only three of four combinations are legal is exactly the shape
+/// that goes wrong later.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MonthPosition {
+    Past,
+    Current,
+    Future,
+}
+
+/// Everything the hero's state depends on, in one struct.
+///
+/// Grew past the point where a positional argument list was readable --
+/// six values, four of them booleans, is how a caller ends up passing
+/// `has_plan` where `has_previous_plan` belongs and getting a plausible
+/// wrong answer instead of a compile error.
+#[derive(Debug, Clone, Copy)]
+pub struct MonthFacts {
+    pub position: MonthPosition,
+    pub has_transactions: bool,
+    /// Whether the viewed month has a budget plan of its own -- any entry
+    /// with a non-zero planned amount. Distinct from `income > 0`: a
+    /// month can have expense categories planned before any income is.
+    pub has_plan: bool,
+    /// Whether some *earlier* month has a plan that could be carried into
+    /// this one. The "which earlier month" search is the caller's job;
+    /// this only needs to know whether the offer can be made.
+    pub has_previous_plan: bool,
+    pub income: Decimal,
+    pub unassigned: Decimal,
+}
+
+/// Which of the Overview hero's states a month is in -- see the
 /// design spec's "The rule, and every state it produces": while the
 /// viewed month has no transactions, a three-step setup ladder owns the
 /// hero (but only for the *current* month; a past or future month with no
@@ -318,6 +357,23 @@ pub fn category_shares(entries: &[(String, Decimal)]) -> Vec<CategoryShare> {
 pub enum MonthSetupState {
     /// Past or future month, nothing recorded in it.
     OtherMonthEmpty,
+    /// Current or future month with no plan of its own, while an earlier
+    /// month does have one -- offer to carry that plan forward instead of
+    /// asking for every figure again.
+    ///
+    /// This is the month-boundary cliff the usage-flow review found: a
+    /// returning user opening the app on the 1st was handed
+    /// `SetupPlanIncome`, byte-for-byte the first-run experience, twelve
+    /// times a year. It outranks both `SetupPlanIncome` (current month)
+    /// and `OtherMonthEmpty` (future month) because re-typing a plan the
+    /// app already has is never the best next action.
+    SetupCarryPlan,
+    /// A month that has ended and has transactions in it: the hero shows
+    /// how it went (see `month_review`) rather than the same live figures
+    /// the current month gets. A month nobody can still spend into is
+    /// finished, and a finished month's useful question is "what
+    /// happened", not "what's left".
+    MonthEndedReview,
     /// Current month, no transactions, no income planned yet.
     SetupPlanIncome,
     /// Current month, no transactions, income planned but not fully
@@ -339,34 +395,236 @@ pub enum MonthSetupState {
 /// -- income's presence is a threshold on it (`> 0`), not a separate flag,
 /// for the same reason a threshold belongs here rather than a frontend
 /// `hasIncome` boolean computed the same way in one more place.
-pub fn month_setup_state(
-    is_current_month: bool,
-    has_transactions: bool,
-    income: Decimal,
-    unassigned: Decimal,
-) -> MonthSetupState {
-    let has_income = income > Decimal::ZERO;
+pub fn month_setup_state(facts: MonthFacts) -> MonthSetupState {
+    let has_income = facts.income > Decimal::ZERO;
 
-    if !has_transactions {
-        if !is_current_month {
-            return MonthSetupState::OtherMonthEmpty;
+    if facts.has_transactions {
+        // A finished month is reviewed, never re-planned: the live
+        // savings hero answers "what's left to spend", which is not a
+        // question a month that has ended still has.
+        if facts.position == MonthPosition::Past {
+            return MonthSetupState::MonthEndedReview;
         }
         if !has_income {
-            return MonthSetupState::SetupPlanIncome;
+            return MonthSetupState::SpentSoFar;
         }
-        if !unassigned.is_zero() {
-            return MonthSetupState::SetupAssignRemaining;
+        if !facts.unassigned.is_zero() {
+            return MonthSetupState::SavingsUnassigned;
         }
-        return MonthSetupState::SetupLogTransaction;
+        return MonthSetupState::SavingsComplete;
+    }
+
+    // Nothing recorded. A past month is history with nothing in it --
+    // never offer to backfill a plan onto a month nobody can spend into.
+    if facts.position == MonthPosition::Past {
+        return MonthSetupState::OtherMonthEmpty;
+    }
+
+    // Before the ladder, not inside it: carrying a plan forward answers
+    // the ladder's first two steps at once, so offering it *after*
+    // "plan your income" would be offering the shortcut only to someone
+    // who had already taken the long way.
+    if !facts.has_plan && facts.has_previous_plan {
+        return MonthSetupState::SetupCarryPlan;
+    }
+
+    // A future month with no plan to carry has nothing to say yet -- the
+    // three-step ladder is about getting *this* month going, and "log
+    // your first transaction" is wrong guidance for a month that hasn't
+    // started.
+    if facts.position == MonthPosition::Future {
+        return MonthSetupState::OtherMonthEmpty;
     }
 
     if !has_income {
-        return MonthSetupState::SpentSoFar;
+        return MonthSetupState::SetupPlanIncome;
     }
-    if !unassigned.is_zero() {
-        return MonthSetupState::SavingsUnassigned;
+    if !facts.unassigned.is_zero() {
+        return MonthSetupState::SetupAssignRemaining;
     }
-    MonthSetupState::SavingsComplete
+    MonthSetupState::SetupLogTransaction
+}
+
+/// One category's planned amount, as carried between months.
+///
+/// Deliberately not the stored budget-plan record: that carries an `id`
+/// and a `month`, both of which belong to the month it was saved in and
+/// neither of which this decision has any business inventing. The caller
+/// attaches a fresh id and the target month to each entry it saves.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlanEntry {
+    pub category_id: String,
+    pub planned: Decimal,
+}
+
+/// What `carry_plan_forward` decided, including what it left behind.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CarriedPlan {
+    pub entries: Vec<PlanEntry>,
+    /// Rows dropped because the category they pointed at is gone.
+    pub dropped_missing_category: usize,
+    /// Rows dropped because they planned nothing.
+    pub dropped_zero: usize,
+}
+
+/// Builds a new month's plan from the previous month's.
+///
+/// The month boundary is where this app lost people: every planned amount
+/// had to be re-typed from memory, twelve times a year, because
+/// `budget_plan` is fetched per month and a fresh month simply has no
+/// rows. This produces the rows to write, and the three rules it applies
+/// are the reason it lives here instead of a frontend `.map()`:
+///
+/// 1. **A row whose category no longer exists is dropped.** Carrying it
+///    would recreate the dangling-reference bug this codebase already
+///    closed once, where a deleted category left its raw id on screen.
+/// 2. **A row planning nothing is dropped.** A zero row is not a plan, and
+///    carrying it forward fills the new month with rows that say nothing
+///    while making it look planned.
+/// 3. **A category is carried at most once.** Two rows for one category in
+///    the same month is a state the rest of the app has no reading for --
+///    `budgetPlan.items.find()` would take one and silently orphan the
+///    other.
+///
+/// `SAVINGS_CATEGORY_ID` is carried like any other entry despite never
+/// appearing in `existing_category_ids`: the savings target is stored as a
+/// plan row against a category that deliberately doesn't exist (see that
+/// constant's own doc comment), so checking it against the real category
+/// list would drop exactly the figure most worth keeping.
+pub fn carry_plan_forward(previous: &[PlanEntry], existing_category_ids: &[String]) -> CarriedPlan {
+    let mut entries: Vec<PlanEntry> = Vec::new();
+    let mut dropped_missing_category = 0;
+    let mut dropped_zero = 0;
+
+    for entry in previous {
+        if entry.planned.is_zero() {
+            dropped_zero += 1;
+            continue;
+        }
+        let exists = entry.category_id == SAVINGS_CATEGORY_ID
+            || existing_category_ids
+                .iter()
+                .any(|id| id == &entry.category_id);
+        if !exists {
+            dropped_missing_category += 1;
+            continue;
+        }
+        if entries
+            .iter()
+            .any(|kept| kept.category_id == entry.category_id)
+        {
+            continue;
+        }
+        entries.push(PlanEntry {
+            category_id: entry.category_id.clone(),
+            planned: round_currency(entry.planned),
+        });
+    }
+
+    CarriedPlan {
+        entries,
+        dropped_missing_category,
+        dropped_zero,
+    }
+}
+
+/// Which earlier month's plan to offer as the starting point for `month`.
+///
+/// The most recent month strictly before `month` that has any plan rows,
+/// or `None` if there is none. "Most recent" rather than "the one directly
+/// before" on purpose: someone who skips October and opens November should
+/// still be offered September's plan, and the alternative -- looking only
+/// one month back -- silently withholds the offer from exactly the user
+/// who has been away longest and would benefit most.
+///
+/// `YYYY-MM` compares chronologically as text, so this is a max over a
+/// filtered list; it lives here rather than in a `.jsx` `.filter().sort()`
+/// because "strictly before, never the month on screen itself" is the kind
+/// of off-by-one that reads as correct in either place and is only ever
+/// caught by a test.
+pub fn previous_plan_month(months: &[String], month: &str) -> Option<String> {
+    months.iter().filter(|m| m.as_str() < month).max().cloned()
+}
+
+/// One category's gap between what was planned and what happened.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CategoryDelta {
+    pub category_id: String,
+    pub planned: Decimal,
+    pub spent: Decimal,
+    /// `spent - planned`. Positive means overspent, negative means under.
+    pub delta: Decimal,
+}
+
+/// How a finished month went.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MonthReview {
+    pub income: Decimal,
+    pub total_planned: Decimal,
+    pub total_spent: Decimal,
+    /// Income minus what was actually spent -- `MonthSummary::unspent`
+    /// passed straight through rather than recomputed, so the review can
+    /// never disagree with the figure the rest of the app shows.
+    pub saved: Decimal,
+    pub biggest_overspend: Option<CategoryDelta>,
+    pub biggest_underspend: Option<CategoryDelta>,
+}
+
+/// The two or three true things worth saying about a month that has ended.
+///
+/// Which facts those are is a ruleset decision, which is why it is here
+/// and tested rather than a `.sort()` in the Dashboard: only *expense*
+/// categories that were actually planned against can be over or under
+/// their plan. A category with no planned amount cannot be "over" one --
+/// the app already words that case as "Not budgeted yet" -- and an income
+/// category's `spent` is money received, so ranking it among overspends
+/// would report earning well as the month's biggest problem.
+///
+/// Ties keep the earlier line, so the same month always reviews the same
+/// way rather than depending on iteration order.
+pub fn month_review(
+    lines: &[CategoryLine],
+    summary: &MonthSummary,
+    income_category_ids: &[String],
+) -> MonthReview {
+    let mut biggest_overspend: Option<CategoryDelta> = None;
+    let mut biggest_underspend: Option<CategoryDelta> = None;
+
+    for line in lines {
+        let is_income = income_category_ids.iter().any(|id| id == &line.category_id);
+        if is_income || line.planned <= Decimal::ZERO {
+            continue;
+        }
+        let delta = round_currency(line.spent - line.planned);
+        let candidate = CategoryDelta {
+            category_id: line.category_id.clone(),
+            planned: round_currency(line.planned),
+            spent: round_currency(line.spent),
+            delta,
+        };
+        if delta > Decimal::ZERO
+            && biggest_overspend
+                .as_ref()
+                .is_none_or(|best| delta > best.delta)
+        {
+            biggest_overspend = Some(candidate);
+        } else if delta < Decimal::ZERO
+            && biggest_underspend
+                .as_ref()
+                .is_none_or(|best| delta < best.delta)
+        {
+            biggest_underspend = Some(candidate);
+        }
+    }
+
+    MonthReview {
+        income: round_currency(summary.income),
+        total_planned: round_currency(summary.total_planned),
+        total_spent: round_currency(summary.total_spent),
+        saved: round_currency(summary.unspent),
+        biggest_overspend,
+        biggest_underspend,
+    }
 }
 
 /// Which side of the ledger the person is entering, which is the first
@@ -882,17 +1140,34 @@ mod tests {
         assert!(category_shares(&[]).is_empty());
     }
 
+    /// A month with nothing carried in and nothing to carry from -- the
+    /// state every test below varies one field of.
+    fn facts(position: MonthPosition, has_transactions: bool) -> MonthFacts {
+        MonthFacts {
+            position,
+            has_transactions,
+            has_plan: false,
+            has_previous_plan: false,
+            income: dec!(0),
+            unassigned: dec!(0),
+        }
+    }
+
     #[test]
     fn past_or_future_month_with_no_transactions_shows_nothing_recorded_regardless_of_income() {
         assert_eq!(
-            month_setup_state(false, false, dec!(0), dec!(0)),
+            month_setup_state(facts(MonthPosition::Future, false)),
             MonthSetupState::OtherMonthEmpty
         );
         // Even a past month that was fully planned still isn't the
         // current month, so the ladder never shows there -- only "nothing
         // recorded" does.
         assert_eq!(
-            month_setup_state(false, false, dec!(2000), dec!(0)),
+            month_setup_state(MonthFacts {
+                income: dec!(2000),
+                has_plan: true,
+                ..facts(MonthPosition::Past, false)
+            }),
             MonthSetupState::OtherMonthEmpty
         );
     }
@@ -900,7 +1175,7 @@ mod tests {
     #[test]
     fn current_month_no_transactions_no_income_is_setup_step_one() {
         assert_eq!(
-            month_setup_state(true, false, dec!(0), dec!(0)),
+            month_setup_state(facts(MonthPosition::Current, false)),
             MonthSetupState::SetupPlanIncome
         );
     }
@@ -908,7 +1183,12 @@ mod tests {
     #[test]
     fn current_month_no_transactions_unassigned_income_is_setup_step_two() {
         assert_eq!(
-            month_setup_state(true, false, dec!(2000), dec!(500)),
+            month_setup_state(MonthFacts {
+                has_plan: true,
+                income: dec!(2000),
+                unassigned: dec!(500),
+                ..facts(MonthPosition::Current, false)
+            }),
             MonthSetupState::SetupAssignRemaining
         );
     }
@@ -916,7 +1196,11 @@ mod tests {
     #[test]
     fn current_month_no_transactions_fully_assigned_is_setup_step_three() {
         assert_eq!(
-            month_setup_state(true, false, dec!(2000), dec!(0)),
+            month_setup_state(MonthFacts {
+                has_plan: true,
+                income: dec!(2000),
+                ..facts(MonthPosition::Current, false)
+            }),
             MonthSetupState::SetupLogTransaction
         );
     }
@@ -929,7 +1213,7 @@ mod tests {
     #[test]
     fn transactions_with_no_income_shows_spent_so_far_not_the_setup_ladder() {
         assert_eq!(
-            month_setup_state(true, true, dec!(0), dec!(0)),
+            month_setup_state(facts(MonthPosition::Current, true)),
             MonthSetupState::SpentSoFar
         );
     }
@@ -937,7 +1221,12 @@ mod tests {
     #[test]
     fn transactions_with_unassigned_income_shows_the_savings_hero() {
         assert_eq!(
-            month_setup_state(true, true, dec!(2000), dec!(500)),
+            month_setup_state(MonthFacts {
+                has_plan: true,
+                income: dec!(2000),
+                unassigned: dec!(500),
+                ..facts(MonthPosition::Current, true)
+            }),
             MonthSetupState::SavingsUnassigned
         );
     }
@@ -945,19 +1234,269 @@ mod tests {
     #[test]
     fn transactions_fully_assigned_shows_the_complete_savings_hero() {
         assert_eq!(
-            month_setup_state(true, true, dec!(2000), dec!(0)),
+            month_setup_state(MonthFacts {
+                has_plan: true,
+                income: dec!(2000),
+                ..facts(MonthPosition::Current, true)
+            }),
             MonthSetupState::SavingsComplete
         );
     }
 
     #[test]
-    fn a_past_month_with_transactions_shows_real_figures_not_the_ladder() {
-        // The ladder is gated on "current month AND no transactions" --
-        // once a past month has data, it's shown the same way the current
-        // month's data would be.
+    fn a_month_that_has_ended_with_transactions_is_reviewed_not_re_planned() {
+        // Was `SpentSoFar` before the month-boundary round: a past month
+        // showed the same live "what's left" hero the current month gets,
+        // which is the wrong question for a month nobody can spend into.
         assert_eq!(
-            month_setup_state(false, true, dec!(0), dec!(0)),
-            MonthSetupState::SpentSoFar
+            month_setup_state(facts(MonthPosition::Past, true)),
+            MonthSetupState::MonthEndedReview
         );
+        assert_eq!(
+            month_setup_state(MonthFacts {
+                has_plan: true,
+                income: dec!(2000),
+                ..facts(MonthPosition::Past, true)
+            }),
+            MonthSetupState::MonthEndedReview
+        );
+    }
+
+    #[test]
+    fn a_new_month_with_a_previous_plan_is_offered_that_plan_not_the_ladder() {
+        // The month-two cliff: this used to be SetupPlanIncome, identical
+        // to a first-ever run, however many months had been planned before.
+        assert_eq!(
+            month_setup_state(MonthFacts {
+                has_previous_plan: true,
+                ..facts(MonthPosition::Current, false)
+            }),
+            MonthSetupState::SetupCarryPlan
+        );
+        // And the same offer when planning ahead, where the only thing on
+        // offer used to be "back to the current month".
+        assert_eq!(
+            month_setup_state(MonthFacts {
+                has_previous_plan: true,
+                ..facts(MonthPosition::Future, false)
+            }),
+            MonthSetupState::SetupCarryPlan
+        );
+    }
+
+    #[test]
+    fn carry_forward_is_not_offered_once_this_month_has_a_plan_of_its_own() {
+        // Offering it here would invite overwriting work already done.
+        assert_eq!(
+            month_setup_state(MonthFacts {
+                has_plan: true,
+                has_previous_plan: true,
+                income: dec!(2000),
+                unassigned: dec!(500),
+                ..facts(MonthPosition::Current, false)
+            }),
+            MonthSetupState::SetupAssignRemaining
+        );
+    }
+
+    #[test]
+    fn carry_forward_is_never_offered_for_a_month_that_has_already_ended() {
+        assert_eq!(
+            month_setup_state(MonthFacts {
+                has_previous_plan: true,
+                ..facts(MonthPosition::Past, false)
+            }),
+            MonthSetupState::OtherMonthEmpty
+        );
+    }
+
+    #[test]
+    fn a_first_ever_run_still_gets_the_ladder_since_there_is_nothing_to_carry() {
+        assert_eq!(
+            month_setup_state(facts(MonthPosition::Current, false)),
+            MonthSetupState::SetupPlanIncome
+        );
+    }
+
+    fn entry(category_id: &str, planned: Decimal) -> PlanEntry {
+        PlanEntry {
+            category_id: category_id.to_string(),
+            planned,
+        }
+    }
+
+    #[test]
+    fn carrying_a_plan_forward_keeps_every_live_category_in_order() {
+        let previous = vec![entry("salary", dec!(5000)), entry("food", dec!(600))];
+        let existing = vec!["food".to_string(), "salary".to_string()];
+
+        let carried = carry_plan_forward(&previous, &existing);
+
+        assert_eq!(carried.entries, previous);
+        assert_eq!(carried.dropped_missing_category, 0);
+        assert_eq!(carried.dropped_zero, 0);
+    }
+
+    #[test]
+    fn carrying_drops_a_row_whose_category_has_since_been_deleted() {
+        let previous = vec![entry("food", dec!(600)), entry("gone", dec!(120))];
+        let existing = vec!["food".to_string()];
+
+        let carried = carry_plan_forward(&previous, &existing);
+
+        assert_eq!(carried.entries, vec![entry("food", dec!(600))]);
+        assert_eq!(carried.dropped_missing_category, 1);
+    }
+
+    #[test]
+    fn carrying_drops_rows_that_planned_nothing() {
+        let previous = vec![entry("food", dec!(600)), entry("pets", dec!(0))];
+        let existing = vec!["food".to_string(), "pets".to_string()];
+
+        let carried = carry_plan_forward(&previous, &existing);
+
+        assert_eq!(carried.entries, vec![entry("food", dec!(600))]);
+        assert_eq!(carried.dropped_zero, 1);
+    }
+
+    #[test]
+    fn carrying_keeps_the_savings_target_even_though_it_is_not_a_real_category() {
+        let previous = vec![entry(SAVINGS_CATEGORY_ID, dec!(400))];
+
+        let carried = carry_plan_forward(&previous, &[]);
+
+        assert_eq!(carried.entries, vec![entry(SAVINGS_CATEGORY_ID, dec!(400))]);
+        assert_eq!(carried.dropped_missing_category, 0);
+    }
+
+    #[test]
+    fn carrying_never_writes_two_rows_for_one_category() {
+        let previous = vec![entry("food", dec!(600)), entry("food", dec!(900))];
+        let existing = vec!["food".to_string()];
+
+        let carried = carry_plan_forward(&previous, &existing);
+
+        assert_eq!(carried.entries, vec![entry("food", dec!(600))]);
+    }
+
+    #[test]
+    fn carrying_an_empty_plan_produces_nothing_to_write() {
+        let carried = carry_plan_forward(&[], &["food".to_string()]);
+        assert!(carried.entries.is_empty());
+    }
+
+    fn months(list: &[&str]) -> Vec<String> {
+        list.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn the_plan_offered_is_the_latest_one_before_the_month_on_screen() {
+        let saved = months(&["2026-07", "2026-08", "2026-09"]);
+        assert_eq!(
+            previous_plan_month(&saved, "2026-10"),
+            Some("2026-09".to_string())
+        );
+    }
+
+    #[test]
+    fn a_skipped_month_still_reaches_back_to_the_last_real_plan() {
+        // October was never opened; November must still be offered
+        // September rather than finding nothing one month back.
+        let saved = months(&["2026-09"]);
+        assert_eq!(
+            previous_plan_month(&saved, "2026-11"),
+            Some("2026-09".to_string())
+        );
+    }
+
+    #[test]
+    fn a_month_is_never_offered_its_own_plan() {
+        let saved = months(&["2026-09"]);
+        assert_eq!(previous_plan_month(&saved, "2026-09"), None);
+    }
+
+    #[test]
+    fn a_later_month_is_never_offered_as_a_starting_point() {
+        // Paging back to August must not offer to copy September over it.
+        let saved = months(&["2026-09", "2026-10"]);
+        assert_eq!(previous_plan_month(&saved, "2026-08"), None);
+    }
+
+    #[test]
+    fn no_saved_plan_anywhere_means_nothing_to_carry() {
+        assert_eq!(previous_plan_month(&[], "2026-10"), None);
+    }
+
+    fn review_summary(income: Decimal, planned: Decimal, spent: Decimal) -> MonthSummary {
+        MonthSummary {
+            income,
+            total_planned: planned,
+            total_spent: spent,
+            unassigned: round_currency(income - planned),
+            unspent: round_currency(income - spent),
+        }
+    }
+
+    #[test]
+    fn a_review_names_the_biggest_overspend_and_the_biggest_underspend() {
+        let lines = vec![
+            build_line("food".into(), dec!(600), dec!(0), dec!(750)),
+            build_line("transport".into(), dec!(300), dec!(0), dec!(180)),
+            build_line("fun".into(), dec!(200), dec!(0), dec!(210)),
+        ];
+        let summary = review_summary(dec!(5000), dec!(1100), dec!(1140));
+
+        let review = month_review(&lines, &summary, &[]);
+
+        assert_eq!(review.biggest_overspend.unwrap().category_id, "food");
+        assert_eq!(review.biggest_underspend.unwrap().category_id, "transport");
+        assert_eq!(review.saved, dec!(3860));
+    }
+
+    #[test]
+    fn a_review_ignores_income_categories_entirely() {
+        // Earning more than planned is not the month's biggest overspend.
+        let lines = vec![
+            build_line("salary".into(), dec!(3000), dec!(0), dec!(5000)),
+            build_line("food".into(), dec!(600), dec!(0), dec!(620)),
+        ];
+        let summary = review_summary(dec!(5000), dec!(600), dec!(620));
+
+        let review = month_review(&lines, &summary, &["salary".to_string()]);
+
+        assert_eq!(review.biggest_overspend.unwrap().category_id, "food");
+    }
+
+    #[test]
+    fn a_review_ignores_a_category_that_was_never_budgeted() {
+        // Spending in an unplanned category is "not budgeted yet", not an
+        // overspend against a plan that was never made.
+        let lines = vec![build_line("impulse".into(), dec!(0), dec!(0), dec!(400))];
+        let summary = review_summary(dec!(5000), dec!(0), dec!(400));
+
+        let review = month_review(&lines, &summary, &[]);
+
+        assert!(review.biggest_overspend.is_none());
+    }
+
+    #[test]
+    fn a_review_of_a_month_that_went_exactly_to_plan_names_neither() {
+        let lines = vec![build_line("food".into(), dec!(600), dec!(0), dec!(600))];
+        let summary = review_summary(dec!(5000), dec!(600), dec!(600));
+
+        let review = month_review(&lines, &summary, &[]);
+
+        assert!(review.biggest_overspend.is_none());
+        assert!(review.biggest_underspend.is_none());
+    }
+
+    #[test]
+    fn a_reviews_saved_figure_is_the_summarys_own_unspent() {
+        // Not recomputed here: two implementations of "income minus what
+        // was spent" is exactly how the review ends up disagreeing with
+        // the figure every other screen shows.
+        let summary = review_summary(dec!(5000), dec!(4000), dec!(4250));
+        let review = month_review(&[], &summary, &[]);
+        assert_eq!(review.saved, summary.unspent);
     }
 }

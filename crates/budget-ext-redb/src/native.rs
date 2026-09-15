@@ -132,4 +132,39 @@ mod tests {
         assert_eq!(august.len(), 1);
         assert_eq!(august[0].id, "p2");
     }
+
+    #[tokio::test]
+    async fn planned_months_come_back_once_each_in_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = RedbBudgetStore::open(dir.path().join("budget.redb")).unwrap();
+
+        // Two rows in August, one in July: the answer is the two months,
+        // not the three rows -- the caller is choosing a month to carry
+        // forward from, and a duplicate would make it look like a choice.
+        for (id, month, category) in [
+            ("p1", "2026-08", "dining"),
+            ("p2", "2026-08", "rent"),
+            ("p3", "2026-07", "dining"),
+        ] {
+            store
+                .save_budget_plan(budget_ports::BudgetPlanRecord {
+                    id: id.to_string(),
+                    month: month.to_string(),
+                    category_id: category.to_string(),
+                    planned: "200".to_string(),
+                })
+                .await
+                .unwrap();
+        }
+
+        let months = store.list_budget_plan_months().await.unwrap();
+        assert_eq!(months, vec!["2026-07".to_string(), "2026-08".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn an_empty_store_has_no_planned_months() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = RedbBudgetStore::open(dir.path().join("budget.redb")).unwrap();
+        assert!(store.list_budget_plan_months().await.unwrap().is_empty());
+    }
 }

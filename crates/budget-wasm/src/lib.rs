@@ -59,7 +59,8 @@ pub mod transaction;
 pub mod voice_parse;
 
 pub use category::{
-    build_month, build_savings_line, category_rank, category_shares, month_setup_state,
+    build_month, build_savings_line, carry_plan_forward, category_rank, category_shares,
+    month_review, month_setup_state,
 };
 pub use csv_import::{detect_csv_columns, import_csv};
 pub use debt::build_payoff_plan;
@@ -73,8 +74,9 @@ pub use rules::apply_rules;
 pub use storage::{
     delete_budget_plan_entry, delete_category, delete_debt, delete_goal, delete_recurring_expense,
     delete_rule, delete_transaction, init_storage, list_budget_plan, list_categories, list_debts,
-    list_goals, list_recurring_expenses, list_rules, list_transactions, save_budget_plan_entry,
-    save_category, save_debt, save_goal, save_recurring_expense, save_rule, save_transaction,
+    list_goals, list_recurring_expenses, list_rules, list_transactions, previous_plan_month,
+    save_budget_plan_entry, save_category, save_debt, save_goal, save_recurring_expense, save_rule,
+    save_transaction,
 };
 pub use transaction::{income_by_category, spend_by_category};
 pub use voice_parse::parse_voice_command;

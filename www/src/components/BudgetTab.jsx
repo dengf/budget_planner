@@ -16,6 +16,7 @@ import {
 } from '../presetCategories';
 import { categoryColor } from '../categoryVisuals';
 import { useMonthBudget } from '../useMonthBudget';
+import { usePlanCarryForward } from '../usePlanCarryForward';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -24,6 +25,12 @@ import { useMonthBudget } from '../useMonthBudget';
  * carry them forward month-over-month is real, sizeable state (finding
  * and summing the actual previous month) left for a follow-up round
  * rather than this one.
+ *
+ * Not to be confused with the carry-forward offer below
+ * (`usePlanCarryForward`), which copies *the plan* -- last month's
+ * planned amounts, as this month's starting point. Rollover copies *the
+ * leftover money*, and changes what every figure on this screen means.
+ * They are deliberately separate features.
  *
  * The row list here is read-and-tap, not read-and-type: a row shows a
  * badge, its name, a "spent of planned" bar and a remaining pill, and
@@ -59,6 +66,13 @@ export default function BudgetTab({
 
   const isCurrentMonth = viewMonth === today;
   const isPastMonth = viewMonth < today;
+
+  const { previousPlanMonth, carryPlanForward, carrying } = usePlanCarryForward({
+    wasmModule,
+    budgetPlan,
+    categories,
+    viewMonth,
+  });
 
   const { result, isIncome } = useMonthBudget({
     wasmModule,
@@ -265,6 +279,31 @@ export default function BudgetTab({
               {hasIncome && <span className="assign-value">{formatMoney(unassigned)}</span>}
             </div>
           </div>
+
+          {/* The month boundary, offered where the re-typing would
+              otherwise happen. Only while this month has no plan of its
+              own -- once a single amount is saved the offer would be
+              overwriting work rather than saving it -- and never on a
+              past month, where re-planning history isn't an action. */}
+          {!hasBudget && !isPastMonth && previousPlanMonth && (
+            <button
+              type="button"
+              className="carry-plan-offer"
+              disabled={carrying}
+              onClick={carryPlanForward}
+            >
+              <span>
+                {carrying
+                  ? t('budget.carryPlanBusy')
+                  : t('budget.carryPlanOffer', {
+                      month: monthLabel(previousPlanMonth, locale),
+                    })}
+              </span>
+              <span className="carry-plan-go" aria-hidden="true">
+                &rsaquo;
+              </span>
+            </button>
+          )}
 
           <div className="stat-grid stat-grid-secondary">
             <div className="stat">

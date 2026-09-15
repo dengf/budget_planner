@@ -20,8 +20,8 @@ use crate::convert::{
     percent_to_rate, rate_to_percent, string_to_decimal, to_js,
 };
 use crate::dto::{
-    BudgetPlanEntryDto, CategoryDto, DebtRecordDto, DeleteResult, GoalDto, RecurringExpenseDto,
-    RuleDto, SaveResult, TransactionDto,
+    BudgetPlanEntryDto, CategoryDto, DebtRecordDto, DeleteResult, GoalDto, PreviousPlanMonthResult,
+    RecurringExpenseDto, RuleDto, SaveResult, TransactionDto,
 };
 
 thread_local! {
@@ -483,6 +483,24 @@ pub async fn list_budget_plan(month: String) -> JsValue {
                 .collect::<Vec<_>>(),
         ),
         Err(_) => to_js(&Vec::<BudgetPlanEntryDto>::new()),
+    }
+}
+
+/// The month whose plan can be carried into `month`, if any. Reads which
+/// months have plan rows at all and hands the choice to
+/// `budget_calc::previous_plan_month` -- "most recent month strictly
+/// before this one" is that function's rule, not this binding's.
+#[wasm_bindgen]
+pub async fn previous_plan_month(month: String) -> JsValue {
+    let Ok(store) = get_store() else {
+        return to_js(&PreviousPlanMonthResult::default());
+    };
+    match store.list_budget_plan_months().await {
+        Ok(months) => to_js(&PreviousPlanMonthResult {
+            month: budget_calc::previous_plan_month(&months, &month),
+            error: None,
+        }),
+        Err(_) => to_js(&PreviousPlanMonthResult::default()),
     }
 }
 
