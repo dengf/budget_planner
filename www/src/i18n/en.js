@@ -105,6 +105,35 @@ export default {
   'budget.carryPlanOffer': "Start from {month}'s plan",
   'budget.carryPlanBusy': 'Copying…',
   'budget.unbudgetedSpend': 'Not budgeted yet',
+
+  // The log-first on-ramp: a budget proposed from transactions someone
+  // has already logged, for the person who never knew their grocery
+  // number to begin with. See `budget_calc::suggest_plan_from_spending`.
+  'planFromSpending.offer': "Build a budget from what you've spent",
+  'planFromSpending.title': 'Budget from your spending',
+  'planFromSpending.basisComplete': 'Averaged across {count} finished months.',
+  'planFromSpending.basisCompleteOne': 'Taken from your last finished month.',
+  'planFromSpending.basisPartial':
+    'From what you have logged in {month} so far — a floor, not a full month.',
+  'planFromSpending.uncategorized':
+    '{count} transactions still need a category, so nothing here counts them.',
+  'planFromSpending.uncategorizedOne':
+    'One transaction still needs a category, so nothing here counts it.',
+  'planFromSpending.observedSpent': 'spent {amount}',
+  'planFromSpending.observedReceived': 'received {amount}',
+  'planFromSpending.expenses': 'Spending',
+  'planFromSpending.totalExpenses': 'Planned spending',
+  'planFromSpending.askIncome':
+    "You haven't logged any income, so there's nothing to budget against yet. What do you earn in a month?",
+  'planFromSpending.monthlyIncome': 'Monthly income',
+  'planFromSpending.incomeCategory': 'Counts as',
+  'planFromSpending.savings':
+    '{amount} left over, set as your savings target — it stays unassigned until you give it another job.',
+  'planFromSpending.shortfall':
+    'This plans {amount} more than comes in. Worth saving anyway — the Budget tab will show you the gap.',
+  'planFromSpending.apply': 'Use this budget',
+  'planFromSpending.applying': 'Saving…',
+  'planFromSpending.editLater': 'Every amount stays editable on the Budget tab.',
   'data.import': 'Import data',
   'data.importConfirm':
     'Replace everything in this app with the {count} records in that file? What is here now will be gone.',

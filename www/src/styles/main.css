@@ -2432,6 +2432,84 @@ table.data tr:last-child td {
   flex: none;
 }
 
+/* PlanFromSpendingSheet -- the review screen for a budget proposed from
+   someone's own transactions. Sits on `.add-txn-dialog` like every other
+   sheet; these rules only add the proposal rows, which carry both the
+   observed figure and the planned one.
+
+   The row is a two-line grid at phone width rather than four columns:
+   "Groceries / spent $187.43 / $190" in one line puts three things in
+   ~340px and the observed amount is what gets squeezed out, which is
+   exactly the figure that makes the proposal checkable. Name and amount
+   share the top line; the working sits under the name. */
+.suggest-rows {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.suggest-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+/* Every cell is placed explicitly: the observed line spans to the end of
+   the row, and auto-flow would otherwise push the planned amount down to
+   a third line of its own at the left margin. */
+.suggest-row > .category-badge {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+.suggest-row-name {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 600;
+}
+.suggest-row-planned {
+  grid-column: 3;
+  grid-row: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.suggest-row-observed {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  color: var(--muted-2);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.suggest-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-bottom: 8px;
+}
+.suggest-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.suggest-outcome {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.suggest-note {
+  margin: 0 0 12px;
+  color: var(--muted-2);
+  font-size: 0.82rem;
+}
+.suggest-income-ask {
+  margin-bottom: 12px;
+}
+
 /* Left to spend / Income / Busiest day, side by side under the hero --
    the "three-up stat strip" the design spec calls for once there's a
    real month to report on. */

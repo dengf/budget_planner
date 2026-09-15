@@ -17,6 +17,8 @@ import {
 import { categoryColor } from '../categoryVisuals';
 import { useMonthBudget } from '../useMonthBudget';
 import { usePlanCarryForward } from '../usePlanCarryForward';
+import { usePlanFromSpending } from '../usePlanFromSpending';
+import PlanFromSpendingSheet from './PlanFromSpendingSheet';
 
 /**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
@@ -71,6 +73,14 @@ export default function BudgetTab({
     wasmModule,
     budgetPlan,
     categories,
+    viewMonth,
+  });
+  const [planSheetOpen, setPlanSheetOpen] = useState(false);
+  const planFromSpending = usePlanFromSpending({
+    wasmModule,
+    transactions,
+    categories,
+    budgetPlan,
     viewMonth,
   });
 
@@ -305,6 +315,25 @@ export default function BudgetTab({
             </button>
           )}
 
+          {/* The other way into a first plan, for the person who has no
+              earlier month to copy but does have weeks of transactions.
+              Gated the same way as the carry-forward offer above -- only
+              while this month has no plan of its own, never on a past
+              month -- and offered second, because a plan someone already
+              decided on beats one inferred from their spending. */}
+          {!isPastMonth && planFromSpending.canOffer && (
+            <button
+              type="button"
+              className="carry-plan-offer"
+              onClick={() => setPlanSheetOpen(true)}
+            >
+              <span>{t('planFromSpending.offer')}</span>
+              <span className="carry-plan-go" aria-hidden="true">
+                &rsaquo;
+              </span>
+            </button>
+          )}
+
           <div className="stat-grid stat-grid-secondary">
             <div className="stat">
               <span className="stat-label">
@@ -421,6 +450,23 @@ export default function BudgetTab({
           onSave={(amount) => savePlanned(editingLine.category_id, amount)}
         />
       )}
+
+      <PlanFromSpendingSheet
+        open={planSheetOpen}
+        onClose={() => setPlanSheetOpen(false)}
+        suggestion={planFromSpending.suggestion}
+        incomeOverride={planFromSpending.incomeOverride}
+        setIncomeOverride={planFromSpending.setIncomeOverride}
+        applying={planFromSpending.applying}
+        onApply={async () => {
+          await planFromSpending.applyPlan();
+          setPlanSheetOpen(false);
+        }}
+        categories={categories}
+        viewMonth={viewMonth}
+        formatMoney={formatMoney}
+        locale={locale}
+      />
 
       {/* Where the money went, not where it came from -- an income
           category with a big "actual" would otherwise show up as the
