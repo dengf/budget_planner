@@ -12,6 +12,7 @@ import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth, todayIso } from './month';
 import { availablePresets, buildCategoryFromPreset } from './presetCategories';
 import { TABS, TAB_ORDER } from './tabs';
+import { startViewportChromeInsetTracking } from './viewportChromeInset';
 
 // How far (px) a horizontal drag must travel past the down point before
 // it commits to being a tab-swipe rather than a tap or a vertical scroll.
@@ -107,6 +108,11 @@ export function AppShell({ wasmModule }) {
   // like `today` above, for the same reason.
   const [todayDate] = useState(() => todayIso());
   const [viewMonth, setViewMonth] = useState(today);
+  // Keeps the fixed bottom tab bar (main.css's `.app-tabs`) above whatever
+  // of the viewport Safari's own chrome is currently covering, not just
+  // above the home-indicator strip -- see viewportChromeInset.js's own
+  // comment for why `env(safe-area-inset-bottom)` alone isn't enough.
+  useEffect(() => startViewportChromeInsetTracking(), []);
   const { t } = useI18n();
   const [confirm, confirmDialog] = useConfirm();
   const [guardResult, setGuardResult] = useState(null);
