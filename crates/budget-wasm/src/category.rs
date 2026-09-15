@@ -1,14 +1,15 @@
 //! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
-//! `month_setup_state`.
+//! `month_setup_state`, `carry_plan_forward`, `month_review`.
 
 use wasm_bindgen::prelude::*;
 
-use crate::convert::{f64_to_decimal, to_js};
+use crate::convert::{decimal_to_f64, f64_to_decimal, to_js};
 use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
-    CategoryLineDto, CategoryRankParams, CategoryRankResult, CategoryShareDto,
-    CategorySharesParams, CategorySharesResult, MonthSetupStateParams, MonthSetupStateResult,
-    MonthSummaryDto, RankedCategoryDto,
+    CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryLineDto, CategoryRankParams,
+    CategoryRankResult, CategoryShareDto, CategorySharesParams, CategorySharesResult,
+    MonthReviewParams, MonthReviewResult, MonthSetupStateParams, MonthSetupStateResult,
+    MonthSummaryDto, PlanEntryDto, RankedCategoryDto,
 };
 use crate::message::Message;
 
@@ -58,18 +59,18 @@ fn build_month_impl(params: JsValue) -> BuildMonthResult {
                     .into_iter()
                     .map(|l| CategoryLineDto {
                         category_id: l.category_id,
-                        planned: crate::convert::decimal_to_f64(l.planned),
-                        rollover: crate::convert::decimal_to_f64(l.rollover),
-                        spent: crate::convert::decimal_to_f64(l.spent),
-                        remaining: crate::convert::decimal_to_f64(l.remaining),
+                        planned: decimal_to_f64(l.planned),
+                        rollover: decimal_to_f64(l.rollover),
+                        spent: decimal_to_f64(l.spent),
+                        remaining: decimal_to_f64(l.remaining),
                     })
                     .collect(),
                 summary: Some(MonthSummaryDto {
-                    income: crate::convert::decimal_to_f64(summary.income),
-                    total_planned: crate::convert::decimal_to_f64(summary.total_planned),
-                    total_spent: crate::convert::decimal_to_f64(summary.total_spent),
-                    unassigned: crate::convert::decimal_to_f64(summary.unassigned),
-                    unspent: crate::convert::decimal_to_f64(summary.unspent),
+                    income: decimal_to_f64(summary.income),
+                    total_planned: decimal_to_f64(summary.total_planned),
+                    total_spent: decimal_to_f64(summary.total_spent),
+                    unassigned: decimal_to_f64(summary.unassigned),
+                    unspent: decimal_to_f64(summary.unspent),
                 }),
                 error: None,
                 error_message: None,
@@ -120,10 +121,10 @@ fn build_savings_line_impl(params: JsValue) -> BuildSavingsLineResult {
         Ok(l) => BuildSavingsLineResult {
             line: Some(CategoryLineDto {
                 category_id: l.category_id,
-                planned: crate::convert::decimal_to_f64(l.planned),
-                rollover: crate::convert::decimal_to_f64(l.rollover),
-                spent: crate::convert::decimal_to_f64(l.spent),
-                remaining: crate::convert::decimal_to_f64(l.remaining),
+                planned: decimal_to_f64(l.planned),
+                rollover: decimal_to_f64(l.rollover),
+                spent: decimal_to_f64(l.spent),
+                remaining: decimal_to_f64(l.remaining),
             }),
             error: None,
             error_message: None,
@@ -213,7 +214,7 @@ fn category_rank_impl(params: JsValue) -> CategoryRankResult {
             .into_iter()
             .map(|r| RankedCategoryDto {
                 category_id: r.category_id,
-                score: crate::convert::decimal_to_f64(r.score),
+                score: decimal_to_f64(r.score),
                 uses: r.uses,
             })
             .collect(),
@@ -256,8 +257,8 @@ fn category_shares_impl(params: JsValue) -> CategorySharesResult {
             .into_iter()
             .map(|s| CategoryShareDto {
                 category_id: s.category_id,
-                amount: crate::convert::decimal_to_f64(s.amount),
-                share: crate::convert::decimal_to_f64(s.share),
+                amount: decimal_to_f64(s.amount),
+                share: decimal_to_f64(s.share),
             })
             .collect(),
         error: None,
@@ -291,14 +292,33 @@ fn month_setup_state_impl(params: JsValue) -> MonthSetupStateResult {
         };
     };
 
-    let state = budget_calc::month_setup_state(
-        params.is_current_month,
-        params.has_transactions,
+    let position = match params.position.as_str() {
+        "past" => budget_calc::MonthPosition::Past,
+        "current" => budget_calc::MonthPosition::Current,
+        "future" => budget_calc::MonthPosition::Future,
+        // An unrecognised position is a caller bug, not a user one --
+        // refuse rather than guessing "current" and confidently showing
+        // the wrong hero for the month on screen.
+        _ => {
+            return MonthSetupStateResult {
+                error: Some(Message::bad_request().text),
+                ..Default::default()
+            }
+        }
+    };
+
+    let state = budget_calc::month_setup_state(budget_calc::MonthFacts {
+        position,
+        has_transactions: params.has_transactions,
+        has_plan: params.has_plan,
+        has_previous_plan: params.has_previous_plan,
         income,
         unassigned,
-    );
+    });
     let state = match state {
         budget_calc::MonthSetupState::OtherMonthEmpty => "other_month_empty",
+        budget_calc::MonthSetupState::SetupCarryPlan => "setup_carry_plan",
+        budget_calc::MonthSetupState::MonthEndedReview => "month_ended_review",
         budget_calc::MonthSetupState::SetupPlanIncome => "setup_plan_income",
         budget_calc::MonthSetupState::SetupAssignRemaining => "setup_assign_remaining",
         budget_calc::MonthSetupState::SetupLogTransaction => "setup_log_transaction",
@@ -309,6 +329,124 @@ fn month_setup_state_impl(params: JsValue) -> MonthSetupStateResult {
 
     MonthSetupStateResult {
         state: Some(state.to_string()),
+        error: None,
+    }
+}
+
+/// The previous month's plan, rewritten for a new month. See
+/// `budget_calc::carry_plan_forward`.
+#[wasm_bindgen]
+pub fn carry_plan_forward(params: JsValue) -> JsValue {
+    to_js(&carry_plan_forward_impl(params))
+}
+
+fn carry_plan_forward_impl(params: JsValue) -> CarryPlanResult {
+    let params: CarryPlanParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        return CarryPlanResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let previous: Option<Vec<budget_calc::PlanEntry>> = params
+        .previous
+        .iter()
+        .map(|e| {
+            Some(budget_calc::PlanEntry {
+                category_id: e.category_id.clone(),
+                planned: f64_to_decimal(e.planned)?,
+            })
+        })
+        .collect();
+
+    let Some(previous) = previous else {
+        return CarryPlanResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let carried = budget_calc::carry_plan_forward(&previous, &params.existing_category_ids);
+
+    CarryPlanResult {
+        entries: carried
+            .entries
+            .into_iter()
+            .map(|e| PlanEntryDto {
+                category_id: e.category_id,
+                planned: decimal_to_f64(e.planned),
+            })
+            .collect(),
+        dropped_missing_category: carried.dropped_missing_category,
+        dropped_zero: carried.dropped_zero,
+        error: None,
+    }
+}
+
+/// How a finished month went. See `budget_calc::month_review`.
+#[wasm_bindgen]
+pub fn month_review(params: JsValue) -> JsValue {
+    to_js(&month_review_impl(params))
+}
+
+fn month_review_impl(params: JsValue) -> MonthReviewResult {
+    let params: MonthReviewParams = if let Ok(p) = serde_wasm_bindgen::from_value(params) {
+        p
+    } else {
+        return MonthReviewResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let lines: Option<Vec<budget_calc::CategoryLine>> = params
+        .lines
+        .iter()
+        .map(|l| {
+            Some(budget_calc::CategoryLine {
+                category_id: l.category_id.clone(),
+                planned: f64_to_decimal(l.planned)?,
+                rollover: f64_to_decimal(l.rollover)?,
+                spent: f64_to_decimal(l.spent)?,
+                remaining: f64_to_decimal(l.remaining)?,
+            })
+        })
+        .collect();
+
+    let summary = (|| {
+        Some(budget_calc::MonthSummary {
+            income: f64_to_decimal(params.summary.income)?,
+            total_planned: f64_to_decimal(params.summary.total_planned)?,
+            total_spent: f64_to_decimal(params.summary.total_spent)?,
+            unassigned: f64_to_decimal(params.summary.unassigned)?,
+            unspent: f64_to_decimal(params.summary.unspent)?,
+        })
+    })();
+
+    let (Some(lines), Some(summary)) = (lines, summary) else {
+        return MonthReviewResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+
+    let review = budget_calc::month_review(&lines, &summary, &params.income_category_ids);
+    let delta = |d: budget_calc::CategoryDelta| CategoryDeltaDto {
+        category_id: d.category_id,
+        planned: decimal_to_f64(d.planned),
+        spent: decimal_to_f64(d.spent),
+        delta: decimal_to_f64(d.delta),
+    };
+
+    MonthReviewResult {
+        income: decimal_to_f64(review.income),
+        total_planned: decimal_to_f64(review.total_planned),
+        total_spent: decimal_to_f64(review.total_spent),
+        saved: decimal_to_f64(review.saved),
+        biggest_overspend: review.biggest_overspend.map(delta),
+        biggest_underspend: review.biggest_underspend.map(delta),
         error: None,
     }
 }
