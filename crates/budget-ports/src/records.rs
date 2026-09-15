@@ -49,6 +49,17 @@ pub struct TransactionRecord {
     pub category_id: Option<String>,
 }
 
+/// One month's savings moved into a goal -- the storage shape of
+/// `budget_calc::Contribution`. `amount` is a string for the same reason
+/// every other amount in this module is: a `Decimal` written out and read
+/// back exactly, never a float that drifts a cent per round trip.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GoalContributionRecord {
+    /// `YYYY-MM` -- the month whose savings this came from.
+    pub month: String,
+    pub amount: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GoalRecord {
     pub id: String,
@@ -57,6 +68,15 @@ pub struct GoalRecord {
     pub current_amount: String,
     pub target_date: String,
     pub cadence: String,
+    /// Which months' savings have already been moved into this goal, so
+    /// the same month's savings cannot be allocated twice. Added after
+    /// this record shape was already in use -- `#[serde(default)]` for
+    /// the same back-compat reasoning as `CategoryRecord::is_income`
+    /// above: a goal saved before this existed loads with an empty
+    /// ledger, which is exactly right, since nothing was ever allocated
+    /// to it through that path.
+    #[serde(default)]
+    pub contributions: Vec<GoalContributionRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

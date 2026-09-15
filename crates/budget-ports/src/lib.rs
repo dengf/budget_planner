@@ -9,7 +9,7 @@ mod store;
 
 pub use error::StoreError;
 pub use records::{
-    BudgetPlanRecord, CategorizationRuleRecord, CategoryRecord, DebtRecord, GoalRecord,
-    RecurringExpenseRecord, TransactionRecord,
+    BudgetPlanRecord, CategorizationRuleRecord, CategoryRecord, DebtRecord, GoalContributionRecord,
+    GoalRecord, RecurringExpenseRecord, TransactionRecord,
 };
 pub use store::BudgetStore;

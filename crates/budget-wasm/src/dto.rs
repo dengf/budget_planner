@@ -537,6 +537,136 @@ pub struct GoalDto {
     pub current_amount: f64,
     pub target_date: String,
     pub cadence: String,
+    /// Which months' savings have already gone into this goal. Carried
+    /// across the boundary in full (rather than summarized to a number)
+    /// because `apply_contribution` returns the whole updated goal for
+    /// the caller to store, ledger included -- see its doc comment for
+    /// why the two halves must never be written apart.
+    #[serde(default)]
+    pub contributions: Vec<GoalContributionDto>,
+}
+
+// ---- Round 3: the open loops ------------------------------------
+//
+// Each of these closes a loop between a standing record (a debt balance,
+// a goal, a recurring schedule) and the transactions that should have
+// been moving it. See each budget-calc function's own doc comment.
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DebtPaymentParams {
+    pub debt: DebtDto,
+    pub payment: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DebtPaymentResult {
+    pub interest: f64,
+    pub principal: f64,
+    pub new_balance: f64,
+    pub paid_off: bool,
+    pub covers_interest: bool,
+    pub overpaid: f64,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PayoffAmountParams {
+    pub debt: DebtDto,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PayoffAmountResult {
+    pub amount: f64,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GoalContributionParams {
+    pub goal: GoalDto,
+    /// `YYYY-MM` -- which month's savings this is.
+    pub month: String,
+    pub amount: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct GoalContributionResult {
+    /// The whole updated goal, ready to hand straight to `save_goal`.
+    pub goal: Option<GoalDto>,
+    pub milestone: Option<String>,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UnallocatedSavingsParams {
+    pub savings_actual: f64,
+    pub goals: Vec<GoalDto>,
+    pub month: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct UnallocatedSavingsResult {
+    pub amount: f64,
+    /// Which of the four true things there is to say about this month --
+    /// see `budget_calc::SavingsAllocationState`. A state, not a pair of
+    /// numbers for the frontend to compare, because two of the four
+    /// leave `amount` at zero and only this tells them apart.
+    pub state: String,
+    /// What has already been moved out of this month's savings, so the
+    /// front end can say "600 of 800 allocated" without subtracting.
+    pub allocated: f64,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RecurringStatusParams {
+    pub recurring: Vec<RecurringExpenseDto>,
+    pub transactions: Vec<TransactionDto>,
+    pub month: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OccurrenceStatusDto {
+    pub occurrence: OccurrenceDto,
+    pub paid: bool,
+    pub transaction_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct RecurringStatusResult {
+    pub statuses: Vec<OccurrenceStatusDto>,
+    /// Comes back with the list rather than being counted from it, so a
+    /// "3 still due" badge can never disagree with the rows it opens.
+    pub unpaid_count: usize,
+    /// What the still-unpaid occurrences add up to.
+    pub unpaid_total: f64,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OccurrencePaymentParams {
+    pub occurrence: OccurrenceDto,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct OccurrencePaymentResult {
+    pub date: String,
+    pub description: String,
+    pub amount: f64,
+    pub category_id: String,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalContributionDto {
+    /// `YYYY-MM`.
+    pub month: String,
+    pub amount: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -572,7 +702,12 @@ pub struct OccurrencesParams {
     pub month: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// `Deserialize` as well as `Serialize` because an occurrence now makes a
+/// round trip: `occurrences` hands one to the front end, and "mark as
+/// paid" hands that same row back to `occurrence_payment` to be turned
+/// into a transaction. The front end never rebuilds the amount or date
+/// itself.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OccurrenceDto {
     pub recurring_id: String,
     pub category_id: String,

@@ -43,11 +43,16 @@ pub use category::{
 pub use csv_import::{
     detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,
 };
-pub use debt::{build_plan, Debt, PayoffMonth, PayoffPlan, Strategy};
+pub use debt::{
+    apply_payment, build_plan, payoff_amount, Debt, PaymentOutcome, PayoffMonth, PayoffPlan,
+    Strategy,
+};
 #[cfg(feature = "embed-classify")]
 pub use embed_classify::classify_statement_descriptions;
 pub use goals::{
-    milestone_crossed, petals_filled, progress_ratio, required_contribution, Goal, Milestone,
+    allocated_in_month, apply_contribution, contributed_in_month, milestone_crossed, petals_filled,
+    progress_ratio, required_contribution, savings_allocation_state, unallocated_savings,
+    Contribution, Goal, GoalContribution, Milestone, SavingsAllocationState,
 };
 #[cfg(feature = "ocr")]
 pub use ocr::run_ocr;
@@ -61,7 +66,8 @@ pub use receipt::{
     EXPENSE_EXAMPLE_PHRASES, INCOME_EXAMPLE_PHRASES,
 };
 pub use recurring::{
-    occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
+    match_occurrences, occurrences_for_month, occurrences_in_month, payment_for_occurrence,
+    totals_by_category, Occurrence, OccurrencePayment, OccurrenceStatus, RecurringExpense,
 };
 pub use rules::{apply_rules, suggest_rule_keyword, CategorizationRule};
 pub use transaction::{

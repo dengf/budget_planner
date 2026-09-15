@@ -90,6 +90,14 @@ voice-yue = ["dep:rten-embed", "dep:rten-tensor", "dep:rustfft"]
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }
+# Tests only. The stored shape of a record is part of this crate's
+# contract with what is already in someone's browser -- `Goal`'s
+# `contributions` is `serde(default)` precisely so goals saved before it
+# existed still load, and that is only actually proven by deserializing
+# one. (The optional `serde_json` above is a *runtime* dependency of the
+# `ocr` feature; this entry is what makes it available to tests without
+# turning that feature on.)
+serde_json = { workspace = true }
 
 [lints]
 workspace = true
