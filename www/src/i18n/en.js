@@ -13,6 +13,7 @@ export default {
   'app.themeLight': 'Light',
   'app.themeDark': 'Dark',
   'app.swipeHint': 'Tip: swipe left or right to switch tabs.',
+  'app.preferences': 'Preferences',
   'meta.title': 'Budget Planner — zero-based budgeting, goals & debt payoff | meifio',
   'meta.description':
     'Zero-based budgeting, savings goals and debt payoff planning, with client-side CSV import. Runs entirely in your browser — your numbers never leave your device.',
@@ -91,7 +92,6 @@ export default {
   'chart.dailySpendAria':
     'Chart of spending across the month, totalling {amount}, peaking on day {day}.',
   'chart.dailySpendTotal': '{amount} spent this month, day by day',
-  'chart.dayN': 'Day {n}',
   'chart.weeklySpendTitle': 'Spending by week',
   'chart.weeklySpendAria':
     'Chart of spending across the month, totalling {amount}, peaking the week of {week}.',
@@ -186,8 +186,6 @@ export default {
   'transactions.ruleMatched': 'Your rule files this under {category}.',
   'transactions.addIncome': 'Add income',
   'transactions.amount': 'Amount',
-  'transactions.amountHintExpense': 'Recorded as money spent.',
-  'transactions.amountHintIncome': 'Recorded as money received.',
   'transactions.logCta': 'Log a transaction',
   'transactions.directionMismatchExpense':
     '{category} is an expense category, but a positive amount counts as income and won’t show up as spending. Did you mean {flipped}?',
@@ -387,7 +385,8 @@ export default {
   'confirm.removeRecurring': 'Stop tracking "{description}"? It will no longer show as upcoming.',
   'confirm.removeDebt': 'Remove "{name}" from the payoff plan?',
 
-  'data.title': 'My data',
+  'data.title': 'Settings',
+  'data.backupSection': 'Backup & restore',
   'data.exportHint': 'Download everything you have entered as a single JSON file.',
   'data.export': 'Export all data',
   'data.clearAll': 'Clear all data',

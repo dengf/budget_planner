@@ -101,3 +101,14 @@ export function weekLabel(startIso, endIso, locale = 'en') {
   };
   return `${fmt(startIso)}–${fmt(endIso)}`;
 }
+
+/** A single day's date for display, e.g. "Sep 1" -- same `weekLabel`
+ *  style, for the daily chart's axis, where a bare "Day 1"/"Day 30"
+ *  doesn't say which month it's counting into. */
+export function dayLabel(monthStr, day, locale = 'en') {
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, day).toLocaleDateString(locale, {
+    month: 'short',
+    day: 'numeric',
+  });
+}

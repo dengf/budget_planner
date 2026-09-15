@@ -12,6 +12,7 @@ export default {
   'app.themeLight': '浅色',
   'app.themeDark': '深色',
   'app.swipeHint': '提示：左右滑动可切换标签页。',
+  'app.preferences': '偏好设置',
   'meta.title': '预算规划 — 零基预算、储蓄目标与还债计划 | meifio',
   'meta.description':
     '零基预算、储蓄目标与还债计划，支持本地导入银行账单。完全在浏览器中运行——您的数据不会离开您的设备。',
@@ -87,7 +88,6 @@ export default {
   'chart.dailySpendTitle': '每日支出',
   'chart.dailySpendAria': '本月支出走势图，共 {amount}，第 {day} 天达到峰值。',
   'chart.dailySpendTotal': '本月共支出 {amount}，按天统计',
-  'chart.dayN': '第 {n} 天',
   'chart.weeklySpendTitle': '每周支出',
   'chart.weeklySpendAria': '本月支出走势图，共 {amount}，在 {week} 这一周达到峰值。',
   'chart.weeklySpendTotal': '本月共支出 {amount}，按周统计',
@@ -171,8 +171,6 @@ export default {
   'transactions.ruleMatched': '按你的规则，这笔归入{category}。',
   'transactions.addIncome': '添加收入',
   'transactions.amount': '金额',
-  'transactions.amountHintExpense': '将记录为支出金额。',
-  'transactions.amountHintIncome': '将记录为收入金额。',
   'transactions.logCta': '记录交易',
   'transactions.directionMismatchExpense':
     '{category}是支出分类，但金额是正数，会被计为收入，不会显示为支出。是不是想输入 {flipped}？',
@@ -360,7 +358,8 @@ export default {
   'confirm.removeRecurring': '停止追踪“{description}”？它将不再显示在即将到期列表中。',
   'confirm.removeDebt': '将“{name}”从还债计划中删除？',
 
-  'data.title': '我的数据',
+  'data.title': '设置',
+  'data.backupSection': '备份与还原',
   'data.exportHint': '将您输入的所有内容下载为单个 JSON 文件。',
   'data.export': '导出所有数据',
   'data.clearAll': '清空所有数据',

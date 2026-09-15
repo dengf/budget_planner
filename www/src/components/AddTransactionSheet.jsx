@@ -393,7 +393,9 @@ export default function AddTransactionSheet({
                   the thing every other control below reacts to -- the
                   submit button quotes it back. Date and note used to
                   come first purely because that is a bank statement's
-                  column order. */}
+                  column order. The Expense/Income toggle right above
+                  already says which this is; a repeated "Recorded as
+                  money spent" line under it was redundant, not a hint. */}
               <form className="form-grid" onSubmit={addTransaction}>
                 <NumberField
                   label={t('transactions.amount')}
@@ -438,17 +440,12 @@ export default function AddTransactionSheet({
                     />
                   </div>
                 </label>
-                <button className="btn" type="submit" disabled={draft.amount === ''}>
-                  {submitLabel()}
-                </button>
+                <div className="add-txn-submit-bar">
+                  <button className="btn" type="submit" disabled={draft.amount === ''}>
+                    {submitLabel()}
+                  </button>
+                </div>
               </form>
-              <p className="field-label">
-                {t(
-                  draft.isIncome
-                    ? 'transactions.amountHintIncome'
-                    : 'transactions.amountHintExpense',
-                )}
-              </p>
             </>
           )}
 
@@ -633,11 +630,13 @@ export default function AddTransactionSheet({
                     />
                   </div>
                 </label>
-                <button className="btn" type="submit">
-                  {t('recurring.add')}
-                </button>
+                <p className="field-label">{t('recurring.anchorHint')}</p>
+                <div className="add-txn-submit-bar">
+                  <button className="btn" type="submit">
+                    {t('recurring.add')}
+                  </button>
+                </div>
               </form>
-              <p className="field-label">{t('recurring.anchorHint')}</p>
             </>
           )}
         </div>

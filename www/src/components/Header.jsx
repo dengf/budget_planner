@@ -61,7 +61,7 @@ export default function Header({
             ))}
           </select>
 
-          {/* "My data" lives in the header row, not the tab bar below --
+          {/* "Settings" lives in the header row, not the tab bar below --
               it's a menu of rare, whole-app actions (export/import/clear,
               plus theme/currency), not a screen someone navigates to, and
               doesn't deserve one of the five thumb-reach slots the mobile

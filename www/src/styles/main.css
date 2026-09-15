@@ -2547,7 +2547,7 @@ table.data tr:last-child td {
   padding: 10px 16px;
 }
 
-/* "My data" nav dropdown -- same backdrop+dialog pattern as
+/* "Settings" nav dropdown -- same backdrop+dialog pattern as
    .monthpicker-backdrop/.confirm-backdrop, own namespaced classes per
    this codebase's convention of not sharing one generic popup class
    across unrelated components. */
@@ -2583,6 +2583,19 @@ table.data tr:last-child td {
 }
 .data-menu-title {
   font-weight: 700;
+}
+/* Preferences (theme/currency) and the backup/restore actions are
+   unrelated concerns that happened to share one dialog -- grouped under
+   their own `.category-section-header` (the same uppercase, underlined
+   label the Categories screen already uses for its own groups) so they
+   read as two sections, not one long list. */
+.data-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.data-menu-section .category-section-header {
+  padding-top: 0;
 }
 /* Stacked, full-width actions -- unlike .confirm-actions' left/right
    pair, these are three independent one-shot actions, not a choice
@@ -2744,6 +2757,38 @@ table.data tr:last-child td {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* The primary submit (manual and recurring forms both end in one) sticks
+   to the sheet's own bottom edge instead of being whatever the last thing
+   in the scroll happens to be -- a category grid or a five-field recurring
+   form can otherwise push "Add $12.00 to Food" well past the fold on a
+   phone, which is exactly the "primary actions reachable one-handed"
+   rule CLAUDE.md states up top. `.add-txn-dialog` is the scrolling
+   ancestor (its own `overflow-y: auto` above); the intermediate
+   `.add-txn-body`/`.form-grid` flex/grid containers carry no overflow of
+   their own, so sticky positions correctly against that dialog, not
+   against the viewport. `grid-column: 1 / -1` spans the full sheet width
+   regardless of how many columns `.form-grid`'s auto-fit currently has.
+   A dedicated wrapper, not a class on `.btn` itself, so the button keeps
+   its ordinary pill shape/colors untouched -- this only owns the sticky
+   bar's own background/bleed/shadow. Only ever the last node in its form
+   (see AddTransactionSheet.jsx's own comments on relocating the amount/
+   anchor-date hints above it) -- anything rendered after a sticky element
+   would be hidden behind it once stuck. */
+.add-txn-submit-bar {
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: -20px;
+  margin: 4px -20px -20px;
+  padding: 10px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel);
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 -8px 12px -8px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+.add-txn-submit-bar .btn {
+  width: 100%;
 }
 
 @media print {

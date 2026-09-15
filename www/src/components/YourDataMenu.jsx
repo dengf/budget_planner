@@ -34,12 +34,12 @@ function formatExportDate(iso, locale) {
 }
 
 /**
- * "My data" as a nav-level dropdown rather than a tab -- it isn't a
+ * "Settings" as a nav-level dropdown rather than a tab -- it isn't a
  * page of its own (nothing here is browsed or edited in place), just
- * three one-shot actions (export/import/clear) that apply to the whole
- * app's data regardless of which tab happens to be open. Living in the
- * nav means it's reachable from anywhere without a tab switch losing
- * whatever the person was looking at.
+ * theme/currency plus three one-shot data actions (export/import/clear)
+ * that apply to the whole app regardless of which tab happens to be
+ * open. Living in the nav means it's reachable from anywhere without a
+ * tab switch losing whatever the person was looking at.
  *
  * Moved here verbatim from DashboardTab, which is where these three
  * actions used to live (at the bottom of the Dashboard panel) -- same
@@ -249,77 +249,86 @@ export default function YourDataMenu({
                 ×
               </button>
             </div>
-            {onThemeChange && (
-              <label className="app-currency">
-                <span className="app-currency-label">{t('app.theme')}</span>
-                <select
-                  className="app-language-select"
-                  aria-label={t('app.theme')}
-                  value={theme}
-                  onChange={(e) => onThemeChange(e.target.value)}
-                >
-                  <option value="system">{t('app.themeSystem')}</option>
-                  <option value="light">{t('app.themeLight')}</option>
-                  <option value="dark">{t('app.themeDark')}</option>
-                </select>
-              </label>
+            {(onThemeChange || onCurrencySymbolChange) && (
+              <div className="data-menu-section">
+                <span className="category-section-header">{t('app.preferences')}</span>
+                {onThemeChange && (
+                  <label className="app-currency">
+                    <span className="app-currency-label">{t('app.theme')}</span>
+                    <select
+                      className="app-language-select"
+                      aria-label={t('app.theme')}
+                      value={theme}
+                      onChange={(e) => onThemeChange(e.target.value)}
+                    >
+                      <option value="system">{t('app.themeSystem')}</option>
+                      <option value="light">{t('app.themeLight')}</option>
+                      <option value="dark">{t('app.themeDark')}</option>
+                    </select>
+                  </label>
+                )}
+                {onCurrencySymbolChange && (
+                  <label className="app-currency">
+                    <span className="app-currency-label">{t('app.currency')}</span>
+                    <input
+                      type="text"
+                      className="app-currency-input"
+                      value={currencySymbol}
+                      maxLength={3}
+                      onChange={(e) => onCurrencySymbolChange(e.target.value)}
+                    />
+                  </label>
+                )}
+              </div>
             )}
-            {onCurrencySymbolChange && (
-              <label className="app-currency">
-                <span className="app-currency-label">{t('app.currency')}</span>
-                <input
-                  type="text"
-                  className="app-currency-input"
-                  value={currencySymbol}
-                  maxLength={3}
-                  onChange={(e) => onCurrencySymbolChange(e.target.value)}
-                />
-              </label>
-            )}
-            <p className="panel-subtitle">{t('data.exportHint')}</p>
-            <p className="panel-subtitle">
-              {lastExported
-                ? t('data.lastExported', {
-                    date: formatExportDate(lastExported, locale),
-                  })
-                : t('data.neverExported')}
-            </p>
-            {hasFilePicker() && <p className="panel-subtitle">{t('data.syncTip')}</p>}
 
-            <div className="data-menu-actions">
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={async () => {
-                  const ok = await exportData();
-                  if (ok) setOpen(false);
-                }}
-              >
-                {t('data.export')}
-              </button>
-              <button type="button" className="btn secondary" onClick={pickImportFile}>
-                {t('data.import')}
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={async () => {
-                  await clearAllData();
-                  setOpen(false);
-                }}
-              >
-                {t('data.clearAll')}
-              </button>
-            </div>
-
-            {importResult?.error && (
-              <p className="import-error" role="alert">
-                {importResult.error}
+            <div className="data-menu-section">
+              <span className="category-section-header">{t('data.backupSection')}</span>
+              <p className="panel-subtitle">{t('data.exportHint')}</p>
+              <p className="panel-subtitle">
+                {lastExported
+                  ? t('data.lastExported', {
+                      date: formatExportDate(lastExported, locale),
+                    })
+                  : t('data.neverExported')}
               </p>
-            )}
-            {importResult?.imported != null && (
-              <p className="headline">{t('data.imported', { count: importResult.imported })}</p>
-            )}
+              {hasFilePicker() && <p className="panel-subtitle">{t('data.syncTip')}</p>}
+
+              <div className="data-menu-actions">
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={async () => {
+                    const ok = await exportData();
+                    if (ok) setOpen(false);
+                  }}
+                >
+                  {t('data.export')}
+                </button>
+                <button type="button" className="btn secondary" onClick={pickImportFile}>
+                  {t('data.import')}
+                </button>
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={async () => {
+                    await clearAllData();
+                    setOpen(false);
+                  }}
+                >
+                  {t('data.clearAll')}
+                </button>
+              </div>
+
+              {importResult?.error && (
+                <p className="import-error" role="alert">
+                  {importResult.error}
+                </p>
+              )}
+              {importResult?.imported != null && (
+                <p className="headline">{t('data.imported', { count: importResult.imported })}</p>
+              )}
+            </div>
           </div>
         </div>
       )}
