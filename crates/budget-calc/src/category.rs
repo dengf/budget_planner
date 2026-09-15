@@ -502,12 +502,17 @@ pub fn carry_plan_forward(previous: &[PlanEntry], existing_category_ids: &[Strin
             continue;
         }
         let exists = entry.category_id == SAVINGS_CATEGORY_ID
-            || existing_category_ids.iter().any(|id| id == &entry.category_id);
+            || existing_category_ids
+                .iter()
+                .any(|id| id == &entry.category_id);
         if !exists {
             dropped_missing_category += 1;
             continue;
         }
-        if entries.iter().any(|kept| kept.category_id == entry.category_id) {
+        if entries
+            .iter()
+            .any(|kept| kept.category_id == entry.category_id)
+        {
             continue;
         }
         entries.push(PlanEntry {
@@ -538,11 +543,7 @@ pub fn carry_plan_forward(previous: &[PlanEntry], existing_category_ids: &[Strin
 /// of off-by-one that reads as correct in either place and is only ever
 /// caught by a test.
 pub fn previous_plan_month(months: &[String], month: &str) -> Option<String> {
-    months
-        .iter()
-        .filter(|m| m.as_str() < month)
-        .max()
-        .cloned()
+    months.iter().filter(|m| m.as_str() < month).max().cloned()
 }
 
 /// One category's gap between what was planned and what happened.
@@ -1385,7 +1386,7 @@ mod tests {
     }
 
     fn months(list: &[&str]) -> Vec<String> {
-        list.iter().map(|m| m.to_string()).collect()
+        list.iter().map(ToString::to_string).collect()
     }
 
     #[test]
