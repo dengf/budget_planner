@@ -258,6 +258,49 @@ pub struct CarryPlanResult {
     pub error: Option<String>,
 }
 
+// ---- a plan proposed from what's already been logged ---------------------
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SuggestPlanParams {
+    /// The whole history, not one month's worth: which months are worth
+    /// reading is `suggest_plan_from_spending`'s decision, and handing it
+    /// a pre-filtered list would make that decision here instead.
+    pub transactions: Vec<TransactionDto>,
+    pub categories: Vec<CategoryDto>,
+    /// The month being planned, as the caller's own `YYYY-MM` --
+    /// `budget-calc` has no clock (see its lib.rs).
+    pub plan_month: String,
+    /// The monthly income figure when none could be observed, against the
+    /// income category it belongs to. `#[serde(default)]` so the common
+    /// call, which omits it entirely, still deserializes.
+    #[serde(default)]
+    pub income_override: Option<PlanEntryDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SuggestedRowDto {
+    pub category_id: String,
+    pub observed: f64,
+    pub planned: f64,
+    pub is_income: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SuggestPlanResult {
+    pub state: String,
+    pub basis: Option<String>,
+    pub months_observed: usize,
+    pub transactions_used: usize,
+    pub uncategorized: usize,
+    pub rows: Vec<SuggestedRowDto>,
+    pub entries: Vec<PlanEntryDto>,
+    pub total_income: f64,
+    pub total_expenses: f64,
+    pub savings: Option<f64>,
+    pub shortfall: Option<f64>,
+    pub error: Option<String>,
+}
+
 /// One transaction's amount as the entry form collects it. See
 /// `budget_calc::split_amount`.
 #[derive(Debug, Clone, Default, Serialize)]

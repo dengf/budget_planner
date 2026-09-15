@@ -627,6 +627,358 @@ pub fn month_review(
     }
 }
 
+/// How many categorized transactions it takes before offering to build a
+/// plan out of them.
+///
+/// Chosen, not measured. Below this most categories have exactly one
+/// transaction behind them, and a "budget" derived from single data points
+/// is a transcription of a few purchases wearing a plan's clothes.
+/// CLAUDE.md's "never state something that isn't true yet" covers a
+/// proposed figure as much as a total: offering late costs a few more
+/// taps, offering early costs the credibility of every number on screen.
+pub const MIN_TRANSACTIONS_FOR_PLAN: usize = 5;
+
+/// Suggested amounts land on a multiple of this.
+///
+/// $187.43 is an observation, not a plan -- nobody *decides* to spend
+/// that, and showing it as a target reads as a computed figure the person
+/// has no say in. Expenses round up to the step and income rounds down, so
+/// every rounding error lands on the side that under-promises: a plan you
+/// breach in week one is worse than one with a few dollars of slack.
+const PLAN_STEP: i64 = 5;
+
+/// Up to the next multiple of `PLAN_STEP`; a figure already on the step
+/// stays put.
+fn round_up_to_step(value: Decimal) -> Decimal {
+    let step = Decimal::from(PLAN_STEP);
+    (value / step).ceil() * step
+}
+
+/// Down to the previous multiple of `PLAN_STEP`, except that a positive
+/// figure never rounds away to nothing: reporting no income for someone
+/// who logged some is a wrong answer, not a conservative one.
+fn round_down_to_step(value: Decimal) -> Decimal {
+    let step = Decimal::from(PLAN_STEP);
+    let rounded = (value / step).floor() * step;
+    if rounded.is_zero() && value > Decimal::ZERO {
+        return round_currency(value);
+    }
+    rounded
+}
+
+/// Which months a suggestion read, and therefore how much weight its
+/// figures carry.
+///
+/// The distinction is the whole reason this isn't one average over
+/// everything logged: a month that has ended shows a full cycle of
+/// someone's habits, while the month on screen shows however far into it
+/// they happen to be. Averaging the two together quietly drags every
+/// figure down toward the partial one, and the result *looks* like a
+/// considered monthly number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanBasis {
+    /// Every figure is a per-month average over months that have ended.
+    CompleteMonths,
+    /// Nothing has been logged outside the month on screen, which isn't
+    /// over. The figures are what has happened *so far* -- a floor, not a
+    /// forecast, and the caller has to say so rather than presenting them
+    /// as a month's worth.
+    PartialMonth,
+}
+
+/// Whether a plan can be proposed from what's been logged, and if not,
+/// which thing is missing.
+///
+/// A state rather than an `Option`, for `month_setup_state`'s reason: each
+/// of these wants different guidance on screen ("log a few more" and "file
+/// the ones you have" are different next actions), and a caller comparing
+/// counts itself would be a second copy of the thresholds below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanSuggestionState {
+    /// Too little logged to derive anything worth showing.
+    NotEnoughLogged,
+    /// Plenty logged, but too little of it is filed against a category to
+    /// build rows from. The next action is categorizing, not planning.
+    NeedsCategorizing,
+    /// Spending is there, but nothing says what comes *in* -- and a budget
+    /// without income is a list of expenses. The caller supplies the
+    /// figure (see `income_override`) rather than this guessing one.
+    NoIncomeObserved,
+    /// Every row below is ready to write.
+    Ready,
+}
+
+/// One proposed budget row, with the observation it came from.
+///
+/// `observed` is carried alongside `planned` so the screen can show its
+/// own working -- "you spent $187.43, plan $190" is a proposal someone can
+/// check, while $190 on its own is a number the app made up.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SuggestedRow {
+    pub category_id: String,
+    /// Per-month actual across the months read, before rounding.
+    pub observed: Decimal,
+    /// What to plan: `observed` moved to the nearest `PLAN_STEP`, away
+    /// from the optimistic side.
+    pub planned: Decimal,
+    pub is_income: bool,
+}
+
+/// A whole budget proposed from what someone has already logged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SuggestedPlan {
+    pub state: PlanSuggestionState,
+    /// `None` unless there are rows -- a basis for a suggestion that
+    /// doesn't exist is a field waiting to be read as if it meant
+    /// something.
+    pub basis: Option<PlanBasis>,
+    /// How many distinct months the figures average over.
+    pub months_observed: usize,
+    /// How many transactions those months contain. Deliberately not the
+    /// size of the whole history: transactions outside the months read
+    /// didn't contribute to a single figure here, and counting them would
+    /// overstate what the proposal rests on.
+    pub transactions_used: usize,
+    /// Still needing a category, and therefore counted in nothing above --
+    /// the caller must say so, or the rows silently omit real money and
+    /// the totals don't match the person's own sense of the month.
+    pub uncategorized: usize,
+    pub rows: Vec<SuggestedRow>,
+    /// The rows to actually write, savings target included. Empty unless
+    /// `state` is `Ready`, so a caller that saves this blindly writes
+    /// nothing rather than half a budget.
+    pub entries: Vec<PlanEntry>,
+    pub total_income: Decimal,
+    pub total_expenses: Decimal,
+    /// What's left over, when there is any: the savings target, and the
+    /// row that gives the surplus a name instead of leaving it as an
+    /// unexplained gap between income and plan.
+    pub savings: Option<Decimal>,
+    /// How far past income the proposed expenses run, when they do. The
+    /// mirror of `savings`, and never `Some` at the same time -- a month
+    /// is one or the other, and saying it plainly beats a savings target
+    /// of minus four hundred dollars.
+    pub shortfall: Option<Decimal>,
+}
+
+/// The `YYYY-MM` a transaction falls in, or `None` if its date is too
+/// short to say. A malformed date is dropped rather than bucketed into
+/// some fallback month, for the reason `spend_by_category` drops
+/// uncategorized rows instead of pooling them.
+fn month_of(transaction: &Transaction) -> Option<&str> {
+    transaction.date.get(..7)
+}
+
+/// Builds a whole month's plan out of what someone has already spent.
+///
+/// The gap this closes: a first-time budgeter does not know their grocery
+/// number, so the app's setup ladder asks them to invent one. Plenty of
+/// people log for weeks instead and never plan at all -- `SpentSoFar` is
+/// the state that tolerates them, and until now it only ever nudged them
+/// back toward the same blank form. Their own history is a better answer
+/// than anything they'd type from memory.
+///
+/// Every decision below is here rather than in the review sheet because
+/// each one changes the numbers a person will then budget against:
+///
+/// 1. **Which months to read.** Finished months if there are any,
+///    otherwise the month on screen alone -- never both averaged together.
+///    See `PlanBasis`.
+/// 2. **How much history is enough.** `MIN_TRANSACTIONS_FOR_PLAN`, counted
+///    over the months actually read.
+/// 3. **Per-month figures, not totals.** Three months of groceries divided
+///    by three; a category that appeared in only one of those three is
+///    averaged over three too, because that *is* its monthly cost.
+/// 4. **Rounding, directionally.** See `PLAN_STEP`.
+/// 5. **What the surplus is.** Income minus planned expenses becomes the
+///    savings target, or -- when it's negative -- a shortfall stated as
+///    one, never a negative savings row.
+///
+/// `income_override` replaces the observed income side entirely. Someone
+/// who logs only spending has no income rows to read, and the one figure
+/// they can supply from memory is what they earn; the caller collects it
+/// and hands it back so that the savings arithmetic above still happens in
+/// exactly one place. Replacing rather than adding is deliberate: two
+/// sources for income is how a month ends up counting a salary twice.
+pub fn suggest_plan_from_spending(
+    transactions: &[Transaction],
+    categories: &[Category],
+    plan_month: &str,
+    income_override: Option<PlanEntry>,
+) -> SuggestedPlan {
+    let existing_ids: Vec<String> = categories.iter().map(|c| c.id.clone()).collect();
+    let income_ids: Vec<String> = categories
+        .iter()
+        .filter(|c| c.is_income)
+        .map(|c| c.id.clone())
+        .collect();
+
+    let uncategorized = crate::transaction::uncategorized_count(transactions, &existing_ids);
+    let categorized: Vec<Transaction> = transactions
+        .iter()
+        .filter(|t| !crate::transaction::is_uncategorized(t, &existing_ids))
+        .cloned()
+        .collect();
+
+    let complete: Vec<Transaction> = categorized
+        .iter()
+        .filter(|t| month_of(t).is_some_and(|m| m < plan_month))
+        .cloned()
+        .collect();
+    let (samples, basis) = if complete.is_empty() {
+        let partial = categorized
+            .iter()
+            .filter(|t| month_of(t) == Some(plan_month))
+            .cloned()
+            .collect::<Vec<_>>();
+        (partial, PlanBasis::PartialMonth)
+    } else {
+        (complete, PlanBasis::CompleteMonths)
+    };
+
+    let mut months: Vec<&str> = samples.iter().filter_map(month_of).collect();
+    months.sort_unstable();
+    months.dedup();
+    let months_observed = months.len();
+
+    let not_ready = |state: PlanSuggestionState| SuggestedPlan {
+        state,
+        basis: None,
+        months_observed,
+        transactions_used: samples.len(),
+        uncategorized,
+        rows: Vec::new(),
+        entries: Vec::new(),
+        total_income: Decimal::ZERO,
+        total_expenses: Decimal::ZERO,
+        savings: None,
+        shortfall: None,
+    };
+
+    if samples.len() < MIN_TRANSACTIONS_FOR_PLAN {
+        // Enough logged, just not filed: the shortfall is categories, not
+        // history, and telling someone to "log more" when they have
+        // plenty is guidance that can't be followed.
+        if uncategorized >= MIN_TRANSACTIONS_FOR_PLAN {
+            return not_ready(PlanSuggestionState::NeedsCategorizing);
+        }
+        return not_ready(PlanSuggestionState::NotEnoughLogged);
+    }
+
+    let divisor = Decimal::from(months_observed.max(1) as i64);
+    let per_month = |total: Decimal| round_currency(total / divisor);
+
+    // Each side of the ledger read from its own total, the same split the
+    // rest of the app uses: an income category's actual is what it
+    // received, an expense category's is what it cost. A stray transaction
+    // filed against the wrong kind of category can then never leak into
+    // the other side's rows.
+    let mut income_rows: Vec<SuggestedRow> = crate::transaction::income_by_category(&samples)
+        .into_iter()
+        .filter(|(id, _)| income_ids.iter().any(|i| i == id))
+        .map(|(category_id, total)| {
+            let observed = per_month(total);
+            SuggestedRow {
+                category_id,
+                observed,
+                planned: round_down_to_step(observed),
+                is_income: true,
+            }
+        })
+        .filter(|r| r.observed > Decimal::ZERO)
+        .collect();
+    let mut expense_rows: Vec<SuggestedRow> = crate::transaction::spend_by_category(&samples)
+        .into_iter()
+        .filter(|(id, _)| !income_ids.iter().any(|i| i == id))
+        .map(|(category_id, total)| {
+            let observed = per_month(total);
+            SuggestedRow {
+                category_id,
+                observed,
+                planned: round_up_to_step(observed),
+                is_income: false,
+            }
+        })
+        .filter(|r| r.observed > Decimal::ZERO)
+        .collect();
+
+    // Biggest first within each side, ties broken by id so the same
+    // history always proposes the same screen. The review sheet reads top
+    // to bottom and the rows worth checking are the large ones.
+    let by_size = |a: &SuggestedRow, b: &SuggestedRow| {
+        b.planned
+            .cmp(&a.planned)
+            .then_with(|| a.category_id.cmp(&b.category_id))
+    };
+    income_rows.sort_by(by_size);
+    expense_rows.sort_by(by_size);
+
+    if let Some(override_entry) = income_override {
+        let planned = round_currency(override_entry.planned);
+        income_rows = if planned > Decimal::ZERO {
+            vec![SuggestedRow {
+                category_id: override_entry.category_id,
+                observed: planned,
+                planned,
+                is_income: true,
+            }]
+        } else {
+            Vec::new()
+        };
+    }
+
+    if income_rows.is_empty() {
+        let mut plan = not_ready(PlanSuggestionState::NoIncomeObserved);
+        // The expense rows still go back: the sheet shows them while it
+        // asks for the one figure they don't answer. `entries` stays
+        // empty, so nothing can be written from this state.
+        plan.basis = Some(basis);
+        plan.total_expenses =
+            round_currency(expense_rows.iter().map(|r| r.planned).sum::<Decimal>());
+        plan.rows = expense_rows;
+        return plan;
+    }
+
+    let total_income = round_currency(income_rows.iter().map(|r| r.planned).sum::<Decimal>());
+    let total_expenses = round_currency(expense_rows.iter().map(|r| r.planned).sum::<Decimal>());
+    let surplus = round_currency(total_income - total_expenses);
+    let savings = (surplus > Decimal::ZERO).then_some(surplus);
+    let shortfall = (surplus < Decimal::ZERO).then(|| -surplus);
+
+    let mut rows = income_rows;
+    rows.append(&mut expense_rows);
+
+    let mut entries: Vec<PlanEntry> = rows
+        .iter()
+        .map(|r| PlanEntry {
+            category_id: r.category_id.clone(),
+            planned: r.planned,
+        })
+        .collect();
+    if let Some(savings) = savings {
+        entries.push(PlanEntry {
+            category_id: SAVINGS_CATEGORY_ID.to_string(),
+            planned: savings,
+        });
+    }
+
+    SuggestedPlan {
+        state: PlanSuggestionState::Ready,
+        basis: Some(basis),
+        months_observed,
+        transactions_used: samples.len(),
+        uncategorized,
+        rows,
+        entries,
+        total_income,
+        total_expenses,
+        savings,
+        shortfall,
+    }
+}
+
 /// Which side of the ledger the person is entering, which is the first
 /// and cheapest thing that narrows a category list: entering income can
 /// never mean Groceries, and entering a expense can never mean Salary.
@@ -1498,5 +1850,335 @@ mod tests {
         let summary = review_summary(dec!(5000), dec!(4000), dec!(4250));
         let review = month_review(&[], &summary, &[]);
         assert_eq!(review.saved, summary.unspent);
+    }
+
+    // ---- suggest_plan_from_spending ------------------------------------
+
+    fn plan_categories() -> Vec<Category> {
+        vec![
+            Category::new("salary", "Salary", "Income", true, "").unwrap(),
+            Category::new("food", "Groceries", "Living", false, "").unwrap(),
+            Category::new("rent", "Rent", "Home", false, "").unwrap(),
+        ]
+    }
+
+    /// Five spending transactions in the month on screen -- the minimum
+    /// that earns a suggestion at all.
+    fn partial_month_spending() -> Vec<Transaction> {
+        vec![
+            tx("1", "2026-09-02", dec!(-41), "food"),
+            tx("2", "2026-09-06", dec!(-38), "food"),
+            tx("3", "2026-09-11", dec!(-44), "food"),
+            tx("4", "2026-09-01", dec!(-900), "rent"),
+            tx("5", "2026-09-05", dec!(2000), "salary"),
+        ]
+    }
+
+    fn row<'a>(plan: &'a SuggestedPlan, category_id: &str) -> &'a SuggestedRow {
+        plan.rows
+            .iter()
+            .find(|r| r.category_id == category_id)
+            .expect("row")
+    }
+
+    #[test]
+    fn too_little_logged_proposes_nothing_at_all() {
+        let transactions = vec![
+            tx("1", "2026-09-02", dec!(-41), "food"),
+            tx("2", "2026-09-06", dec!(-38), "food"),
+        ];
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.state, PlanSuggestionState::NotEnoughLogged);
+        assert!(plan.rows.is_empty());
+        assert!(plan.entries.is_empty());
+        // No basis rather than a defaulted one: there is nothing here for
+        // a caller to describe the provenance of.
+        assert_eq!(plan.basis, None);
+    }
+
+    #[test]
+    fn a_pile_of_uncategorized_transactions_asks_for_categories_not_more_logging() {
+        // "Log a few more" is guidance this person cannot follow -- they
+        // have plenty. The missing thing is which category each belongs
+        // to.
+        let transactions: Vec<Transaction> = (0..8)
+            .map(|i| Transaction::new(i.to_string(), "2026-09-02", "x", dec!(-20)))
+            .collect();
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.state, PlanSuggestionState::NeedsCategorizing);
+        assert_eq!(plan.uncategorized, 8);
+    }
+
+    #[test]
+    fn a_transaction_filed_against_a_deleted_category_counts_as_uncategorized() {
+        // The dangling-reference case a `!tx.category_id` check misses --
+        // same rule `uncategorized_count` already applies for the
+        // Transactions filter, reused rather than re-implemented.
+        let mut transactions = partial_month_spending();
+        transactions.push(tx("6", "2026-09-12", dec!(-25), "deleted-category"));
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.uncategorized, 1);
+        assert_eq!(plan.transactions_used, 5);
+        assert!(plan
+            .rows
+            .iter()
+            .all(|r| r.category_id != "deleted-category"));
+    }
+
+    #[test]
+    fn only_the_current_month_logged_is_reported_as_the_partial_thing_it_is() {
+        let plan = suggest_plan_from_spending(
+            &partial_month_spending(),
+            &plan_categories(),
+            "2026-09",
+            None,
+        );
+        assert_eq!(plan.state, PlanSuggestionState::Ready);
+        assert_eq!(plan.basis, Some(PlanBasis::PartialMonth));
+        assert_eq!(plan.months_observed, 1);
+    }
+
+    #[test]
+    fn finished_months_are_averaged_and_the_month_on_screen_is_left_out_of_it() {
+        // The trap this exists to avoid: September is three days old, so
+        // folding it into the average would drag every figure toward a
+        // number nobody spends in a month.
+        let mut transactions = vec![
+            tx("1", "2026-07-03", dec!(-300), "food"),
+            tx("2", "2026-07-01", dec!(-900), "rent"),
+            tx("3", "2026-07-05", dec!(2000), "salary"),
+            tx("4", "2026-08-03", dec!(-500), "food"),
+            tx("5", "2026-08-01", dec!(-900), "rent"),
+            tx("6", "2026-08-05", dec!(2000), "salary"),
+        ];
+        transactions.push(tx("7", "2026-09-02", dec!(-12), "food"));
+
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+
+        assert_eq!(plan.basis, Some(PlanBasis::CompleteMonths));
+        assert_eq!(plan.months_observed, 2);
+        assert_eq!(plan.transactions_used, 6);
+        // (300 + 500) / 2, not (300 + 500 + 12) / 3 and not / 2 with the
+        // 12 folded in.
+        assert_eq!(row(&plan, "food").observed, dec!(400));
+    }
+
+    #[test]
+    fn a_category_seen_in_only_one_of_several_months_is_still_divided_by_all_of_them() {
+        // Its monthly cost *is* a third of it. Dividing by "months it
+        // appeared in" would plan a full annual bill every month.
+        let transactions = vec![
+            tx("1", "2026-06-03", dec!(-900), "rent"),
+            tx("2", "2026-07-03", dec!(-900), "rent"),
+            tx("3", "2026-08-03", dec!(-900), "rent"),
+            tx("4", "2026-08-04", dec!(-300), "food"),
+            tx("5", "2026-08-05", dec!(3000), "salary"),
+        ];
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.months_observed, 3);
+        assert_eq!(row(&plan, "food").observed, dec!(100));
+    }
+
+    #[test]
+    fn expenses_round_up_and_income_rounds_down() {
+        // Both away from the optimistic side: a plan breached in week one
+        // and an income figure that never arrives are the same mistake
+        // pointed in opposite directions.
+        let transactions = vec![
+            tx("1", "2026-09-02", dec!(-41.10), "food"),
+            tx("2", "2026-09-06", dec!(-38.15), "food"),
+            tx("3", "2026-09-11", dec!(-44.18), "food"),
+            tx("4", "2026-09-01", dec!(-901), "rent"),
+            tx("5", "2026-09-05", dec!(2003.99), "salary"),
+        ];
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(row(&plan, "food").observed, dec!(123.43));
+        assert_eq!(row(&plan, "food").planned, dec!(125));
+        assert_eq!(row(&plan, "rent").planned, dec!(905));
+        assert_eq!(row(&plan, "salary").observed, dec!(2003.99));
+        assert_eq!(row(&plan, "salary").planned, dec!(2000));
+    }
+
+    #[test]
+    fn a_figure_already_on_the_step_is_left_alone() {
+        let transactions = partial_month_spending();
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(row(&plan, "rent").observed, dec!(900));
+        assert_eq!(row(&plan, "rent").planned, dec!(900));
+    }
+
+    #[test]
+    fn income_smaller_than_the_rounding_step_does_not_round_away_to_nothing() {
+        let mut transactions = partial_month_spending();
+        transactions.retain(|t| t.category_id.as_deref() != Some("salary"));
+        transactions.push(tx("5", "2026-09-05", dec!(3), "salary"));
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(row(&plan, "salary").planned, dec!(3));
+    }
+
+    #[test]
+    fn what_is_left_over_becomes_the_savings_target() {
+        let plan = suggest_plan_from_spending(
+            &partial_month_spending(),
+            &plan_categories(),
+            "2026-09",
+            None,
+        );
+        // 2000 income - (900 rent + 125 food) planned.
+        assert_eq!(plan.total_income, dec!(2000));
+        assert_eq!(plan.total_expenses, dec!(1025));
+        assert_eq!(plan.savings, Some(dec!(975)));
+        assert_eq!(plan.shortfall, None);
+        let savings = plan
+            .entries
+            .iter()
+            .find(|e| e.category_id == SAVINGS_CATEGORY_ID)
+            .expect("savings entry");
+        assert_eq!(savings.planned, dec!(975));
+    }
+
+    #[test]
+    fn spending_past_income_is_stated_as_a_shortfall_not_a_negative_savings_row() {
+        let transactions = vec![
+            tx("1", "2026-09-02", dec!(-300), "food"),
+            tx("2", "2026-09-06", dec!(-300), "food"),
+            tx("3", "2026-09-11", dec!(-300), "food"),
+            tx("4", "2026-09-01", dec!(-900), "rent"),
+            tx("5", "2026-09-05", dec!(1000), "salary"),
+        ];
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.shortfall, Some(dec!(800)));
+        assert_eq!(plan.savings, None);
+        assert!(plan
+            .entries
+            .iter()
+            .all(|e| e.category_id != SAVINGS_CATEGORY_ID));
+    }
+
+    #[test]
+    fn a_month_that_balances_exactly_claims_neither_savings_nor_shortfall() {
+        let transactions = vec![
+            tx("1", "2026-09-02", dec!(-100), "food"),
+            tx("2", "2026-09-06", dec!(-100), "food"),
+            tx("3", "2026-09-11", dec!(-100), "food"),
+            tx("4", "2026-09-01", dec!(-900), "rent"),
+            tx("5", "2026-09-05", dec!(1200), "salary"),
+        ];
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.savings, None);
+        assert_eq!(plan.shortfall, None);
+    }
+
+    #[test]
+    fn spending_with_nothing_coming_in_asks_for_income_and_writes_nothing() {
+        let mut transactions = partial_month_spending();
+        transactions.retain(|t| t.category_id.as_deref() != Some("salary"));
+        transactions.push(tx("6", "2026-09-12", dec!(-30), "food"));
+        transactions.push(tx("7", "2026-09-13", dec!(-30), "food"));
+
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+
+        assert_eq!(plan.state, PlanSuggestionState::NoIncomeObserved);
+        // The expense rows still come back -- the sheet shows them while
+        // asking for the one figure they can't answer -- but nothing is
+        // writable from this state.
+        assert!(!plan.rows.is_empty());
+        assert!(plan.entries.is_empty());
+        assert_eq!(plan.savings, None);
+    }
+
+    #[test]
+    fn a_supplied_income_figure_completes_the_same_proposal() {
+        let mut transactions = partial_month_spending();
+        transactions.retain(|t| t.category_id.as_deref() != Some("salary"));
+        transactions.push(tx("6", "2026-09-12", dec!(-30), "food"));
+        transactions.push(tx("7", "2026-09-13", dec!(-30), "food"));
+
+        let plan = suggest_plan_from_spending(
+            &transactions,
+            &plan_categories(),
+            "2026-09",
+            Some(PlanEntry {
+                category_id: "salary".to_string(),
+                planned: dec!(2000),
+            }),
+        );
+
+        assert_eq!(plan.state, PlanSuggestionState::Ready);
+        assert_eq!(plan.total_income, dec!(2000));
+        assert_eq!(row(&plan, "salary").planned, dec!(2000));
+    }
+
+    #[test]
+    fn a_supplied_income_figure_replaces_what_was_observed_rather_than_adding_to_it() {
+        // Two sources for income is how a month counts one salary twice.
+        let plan = suggest_plan_from_spending(
+            &partial_month_spending(),
+            &plan_categories(),
+            "2026-09",
+            Some(PlanEntry {
+                category_id: "salary".to_string(),
+                planned: dec!(3000),
+            }),
+        );
+        assert_eq!(plan.total_income, dec!(3000));
+        assert_eq!(plan.rows.iter().filter(|r| r.is_income).count(), 1);
+    }
+
+    #[test]
+    fn rows_come_back_income_first_then_biggest_expense_down() {
+        let plan = suggest_plan_from_spending(
+            &partial_month_spending(),
+            &plan_categories(),
+            "2026-09",
+            None,
+        );
+        let ids: Vec<&str> = plan.rows.iter().map(|r| r.category_id.as_str()).collect();
+        assert_eq!(ids, vec!["salary", "rent", "food"]);
+    }
+
+    #[test]
+    fn a_future_dated_transaction_is_not_mistaken_for_a_finished_month() {
+        // `> current_month` is not `< current_month`; a single misplaced
+        // comparison here would read next month's stray entry as a whole
+        // finished month of history.
+        let mut transactions = partial_month_spending();
+        transactions.push(tx("6", "2026-12-02", dec!(-500), "food"));
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.basis, Some(PlanBasis::PartialMonth));
+        assert_eq!(plan.months_observed, 1);
+        assert_eq!(plan.transactions_used, 5);
+    }
+
+    #[test]
+    fn a_transaction_with_an_unusable_date_is_dropped_rather_than_bucketed() {
+        let mut transactions = partial_month_spending();
+        transactions.push(tx("6", "", dec!(-500), "food"));
+        let plan = suggest_plan_from_spending(&transactions, &plan_categories(), "2026-09", None);
+        assert_eq!(plan.transactions_used, 5);
+        // 41 + 38 + 44, with the undated 500 contributing to nothing.
+        assert_eq!(row(&plan, "food").observed, dec!(123));
+    }
+
+    #[test]
+    fn every_proposed_entry_is_writable_as_a_plan_row() {
+        // The entries are what gets saved, so they must line up with the
+        // rows shown: anything else means the screen reviewed one budget
+        // and the month got another.
+        let plan = suggest_plan_from_spending(
+            &partial_month_spending(),
+            &plan_categories(),
+            "2026-09",
+            None,
+        );
+        for row in &plan.rows {
+            let entry = plan
+                .entries
+                .iter()
+                .find(|e| e.category_id == row.category_id)
+                .expect("entry for every row");
+            assert_eq!(entry.planned, row.planned);
+        }
+        assert_eq!(plan.entries.len(), plan.rows.len() + 1);
     }
 }

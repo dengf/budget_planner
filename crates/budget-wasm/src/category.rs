@@ -1,15 +1,17 @@
 //! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
-//! `month_setup_state`, `carry_plan_forward`, `month_review`.
+//! `month_setup_state`, `carry_plan_forward`, `month_review`,
+//! `suggest_plan_from_spending`.
 
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{decimal_to_f64, f64_to_decimal, to_js};
 use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
-    CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryLineDto, CategoryRankParams,
-    CategoryRankResult, CategoryShareDto, CategorySharesParams, CategorySharesResult,
-    MonthReviewParams, MonthReviewResult, MonthSetupStateParams, MonthSetupStateResult,
-    MonthSummaryDto, PlanEntryDto, RankedCategoryDto,
+    CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto, CategoryLineDto,
+    CategoryRankParams, CategoryRankResult, CategoryShareDto, CategorySharesParams,
+    CategorySharesResult, MonthReviewParams, MonthReviewResult, MonthSetupStateParams,
+    MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, RankedCategoryDto, SuggestPlanParams,
+    SuggestPlanResult, SuggestedRowDto, TransactionDto,
 };
 use crate::message::Message;
 
@@ -447,6 +449,128 @@ fn month_review_impl(params: JsValue) -> MonthReviewResult {
         saved: decimal_to_f64(review.saved),
         biggest_overspend: review.biggest_overspend.map(delta),
         biggest_underspend: review.biggest_underspend.map(delta),
+        error: None,
+    }
+}
+
+/// A whole month's plan proposed from what's already been logged. See
+/// `budget_calc::suggest_plan_from_spending`.
+#[wasm_bindgen]
+pub fn suggest_plan_from_spending(params: JsValue) -> JsValue {
+    to_js(&suggest_plan_from_spending_impl(params))
+}
+
+fn transaction_from_dto(dto: &TransactionDto) -> Option<budget_calc::Transaction> {
+    let mut t = budget_calc::Transaction::new(
+        dto.id.clone(),
+        dto.date.clone(),
+        dto.description.clone(),
+        f64_to_decimal(dto.amount)?,
+    );
+    t.category_id = dto.category_id.clone();
+    Some(t)
+}
+
+/// Built field by field rather than through `Category::new`, which rejects
+/// a blank name: a category the app has already stored is not this
+/// binding's to re-validate, and refusing the whole suggestion over one
+/// odd name would hide every other row behind a generic bad-request.
+fn category_from_dto(dto: &CategoryDto) -> budget_calc::Category {
+    budget_calc::Category {
+        id: dto.id.clone(),
+        name: dto.name.clone(),
+        group: dto.group.clone(),
+        is_income: dto.is_income,
+        description: dto.description.clone(),
+    }
+}
+
+fn suggest_plan_from_spending_impl(params: JsValue) -> SuggestPlanResult {
+    fn failed(message: Message) -> SuggestPlanResult {
+        SuggestPlanResult {
+            error: Some(message.text),
+            ..Default::default()
+        }
+    }
+
+    let Ok(params) = serde_wasm_bindgen::from_value::<SuggestPlanParams>(params) else {
+        return failed(Message::bad_request());
+    };
+
+    let Some(transactions) = params
+        .transactions
+        .iter()
+        .map(transaction_from_dto)
+        .collect::<Option<Vec<_>>>()
+    else {
+        return failed(Message::bad_request());
+    };
+
+    let income_override = match params.income_override {
+        Some(entry) => {
+            let Some(planned) = f64_to_decimal(entry.planned) else {
+                return failed(Message::bad_request());
+            };
+            Some(budget_calc::PlanEntry {
+                category_id: entry.category_id,
+                planned,
+            })
+        }
+        None => None,
+    };
+
+    let categories: Vec<budget_calc::Category> =
+        params.categories.iter().map(category_from_dto).collect();
+
+    let plan = budget_calc::suggest_plan_from_spending(
+        &transactions,
+        &categories,
+        &params.plan_month,
+        income_override,
+    );
+
+    let state = match plan.state {
+        budget_calc::PlanSuggestionState::NotEnoughLogged => "not_enough_logged",
+        budget_calc::PlanSuggestionState::NeedsCategorizing => "needs_categorizing",
+        budget_calc::PlanSuggestionState::NoIncomeObserved => "no_income_observed",
+        budget_calc::PlanSuggestionState::Ready => "ready",
+    };
+    let basis = plan.basis.map(|b| {
+        match b {
+            budget_calc::PlanBasis::CompleteMonths => "complete_months",
+            budget_calc::PlanBasis::PartialMonth => "partial_month",
+        }
+        .to_string()
+    });
+
+    SuggestPlanResult {
+        state: state.to_string(),
+        basis,
+        months_observed: plan.months_observed,
+        transactions_used: plan.transactions_used,
+        uncategorized: plan.uncategorized,
+        rows: plan
+            .rows
+            .into_iter()
+            .map(|r| SuggestedRowDto {
+                category_id: r.category_id,
+                observed: decimal_to_f64(r.observed),
+                planned: decimal_to_f64(r.planned),
+                is_income: r.is_income,
+            })
+            .collect(),
+        entries: plan
+            .entries
+            .into_iter()
+            .map(|e| PlanEntryDto {
+                category_id: e.category_id,
+                planned: decimal_to_f64(e.planned),
+            })
+            .collect(),
+        total_income: decimal_to_f64(plan.total_income),
+        total_expenses: decimal_to_f64(plan.total_expenses),
+        savings: plan.savings.map(decimal_to_f64),
+        shortfall: plan.shortfall.map(decimal_to_f64),
         error: None,
     }
 }
