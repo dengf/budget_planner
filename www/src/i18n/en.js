@@ -104,6 +104,8 @@ export default {
   'budget.startWithIncome':
     'Start here — plan how much you expect from each income category below.',
   'budget.assignPrompt': 'Now assign your {amount} across the categories below.',
+  'budget.carryPlanOffer': "Start from {month}'s plan",
+  'budget.carryPlanBusy': 'Copying…',
   'budget.unbudgetedSpend': 'Not budgeted yet',
   'data.import': 'Import data',
   'data.importConfirm':
@@ -311,6 +313,12 @@ export default {
   'dashboard.setup.logTransactionDetail':
     'Your budget is ready — record spending or income to see this page fill in.',
   'dashboard.setup.logTransactionCta': 'Log a transaction',
+  'dashboard.setup.carryPlanTitle': 'Set up {month}',
+  'dashboard.setup.carryPlanDetail':
+    "Start from {month}'s plan instead of typing it again. Everything stays editable.",
+  'dashboard.setup.carryPlanCta': "Use {month}'s plan",
+  'dashboard.setup.carryPlanBusy': 'Copying…',
+  'dashboard.setup.carryPlanManualCta': 'Plan from scratch',
   'dashboard.income': 'Income',
   'dashboard.totalIncome': 'Total income',
   'dashboard.bubbleHint': 'Tap a category to see details',
@@ -326,6 +334,15 @@ export default {
   'dashboard.hero.spentSoFarNote': '{count} transactions since {date}',
   'dashboard.hero.addIncomeNudge': "Add your income to see what you're saving",
   'dashboard.hero.unassignedNudge': '{amount} unassigned',
+  'dashboard.hero.reviewTitle': '{month} is done — you saved',
+  'dashboard.hero.reviewPlannedVsSpent': 'Planned {planned}, spent {spent}',
+  'dashboard.hero.reviewOverspend': '{category} went {amount} over',
+  'dashboard.hero.reviewUnderspend': '{category} came in {amount} under',
+  // True both when every planned category landed exactly on its number
+  // and when nothing was planned at all -- "every category hit target"
+  // would be a congratulation for an empty plan in the second case.
+  'dashboard.hero.reviewNoStandouts': 'No category stood out either way.',
+  'dashboard.hero.reviewCta': 'Go to {month}',
   'dashboard.stat.leftToSpend': 'Left to spend',
   'dashboard.stat.busiestDay': 'Busiest day',
 

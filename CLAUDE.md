@@ -247,7 +247,10 @@ gets skipped, so ask it explicitly.
   prior month's remaining balances, but the frontend doesn't yet carry
   them forward month-over-month. That's real, sizeable state (finding and
   summing the actual previous month) for a follow-up round, not a Rust
-  limitation.
+  limitation. **Distinct from `carry_plan_forward`**, which is shipped:
+  that copies last month's *planned amounts* into a new month as a
+  starting point. Rollover carries the *leftover money*, and changes what
+  every figure in the app means. Keep the two separate.
 - **No shared crate with `mortgage_calculator`.** Both repos independently
   implement the same *pattern* (hexagonal storage port, redb-over-
   IndexedDB, the `Message` convention) rather than sharing code, so the two

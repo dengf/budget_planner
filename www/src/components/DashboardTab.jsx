@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
-import { daysInMonth, monthLabel } from '../month';
+import { daysInMonth, monthLabel, monthPosition } from '../month';
+import { usePlanCarryForward } from '../usePlanCarryForward';
 import CategoryBadge from './CategoryBadge';
 import CategoryBreakdown from './CategoryBreakdown';
 import DonutChart from './DonutChart';
@@ -56,7 +57,7 @@ function shortDate(iso, locale) {
 }
 
 /**
- * The landing tab: one hero figure for whichever of Overview's seven
+ * The landing tab: one hero figure for whichever of Overview's nine
  * states the viewed month is actually in (see
  * `budget_calc::month_setup_state`), a donut and three-up stat strip
  * beneath it once there's something to show, and the category rows below
@@ -92,7 +93,14 @@ export default function DashboardTab({
   const [heroState, setHeroState] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [goalProgress, setGoalProgress] = useState({});
+  const [review, setReview] = useState(null);
   const detailRef = useRef(null);
+  const { previousPlanMonth, carryPlanForward, carrying } = usePlanCarryForward({
+    wasmModule,
+    budgetPlan,
+    categories,
+    viewMonth,
+  });
 
   const isIncome = (id) => categories.items.find((c) => c.id === id)?.is_income ?? false;
 
@@ -169,20 +177,41 @@ export default function DashboardTab({
         setSummary(builtSummary);
       }
 
-      // Which of Overview's seven states this month is in -- see
+      // Which of Overview's nine states this month is in -- see
       // `budget_calc::month_setup_state`'s own doc comment for the full
       // rule. Computed in the same effect pass as `lines`/`summary`
       // (rather than a separate effect keyed off them) so the hero and
       // the figures it's built from always land in the same render.
       const stateResult = wasmModule.month_setup_state
         ? await wasmModule.month_setup_state({
-            is_current_month: viewMonth === today,
+            position: monthPosition(viewMonth, today),
             has_transactions: monthTx.length > 0,
+            has_plan: budgetPlan.items.length > 0,
+            has_previous_plan: previousPlanMonth !== null,
             income: builtSummary?.income ?? 0,
             unassigned: builtSummary?.unassigned ?? 0,
           })
         : null;
       if (!cancelled) setHeroState(stateResult?.state ?? null);
+
+      // How the month actually went, for the retrospective hero. Asked
+      // for unconditionally alongside everything else rather than in its
+      // own state-dependent effect, so the figures and the hero that
+      // frames them still land in one render.
+      const reviewResult = wasmModule.month_review
+        ? await wasmModule.month_review({
+            lines: builtLines,
+            summary: builtSummary ?? {
+              income: 0,
+              total_planned: 0,
+              total_spent: 0,
+              unassigned: 0,
+              unspent: 0,
+            },
+            income_category_ids: incomeCategoryIds,
+          })
+        : null;
+      if (!cancelled) setReview(reviewResult?.error ? null : reviewResult);
 
       // Each expense category's share of this month's spending, for the
       // donut's wedges and the ranked rows' percent labels -- see
@@ -200,7 +229,15 @@ export default function DashboardTab({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, budgetPlan.items, categories.items, transactions.items, viewMonth, today]);
+  }, [
+    wasmModule,
+    budgetPlan.items,
+    categories.items,
+    transactions.items,
+    viewMonth,
+    today,
+    previousPlanMonth,
+  ]);
 
   // Same Savings computation as BudgetTab: income minus every real expense
   // category's actual this month. Kept out of `lines` (and so out of the
@@ -453,6 +490,100 @@ export default function DashboardTab({
             {t('dashboard.hero.otherMonthCta', { month: monthLabel(today, locale) })}
           </button>
         </div>
+      );
+    }
+
+    // The month-two cliff, answered where it is felt. Shaped like the
+    // setup steps below but kept out of `SETUP_STEPS`, whose entries name
+    // a tab or the Add sheet: this one's action writes rows rather than
+    // navigating, and it offers the manual route as the quieter second
+    // choice rather than replacing it.
+    if (heroState === 'setup_carry_plan') {
+      return (
+        <div className="dash-setup-card money-card">
+          <span className="dash-setup-badge" aria-hidden="true">
+            →
+          </span>
+          <div className="dash-setup-body">
+            <span className="dash-setup-title">
+              {t('dashboard.setup.carryPlanTitle', { month: monthLabel(viewMonth, locale) })}
+            </span>
+            <p className="dash-setup-detail">
+              {t('dashboard.setup.carryPlanDetail', {
+                month: monthLabel(previousPlanMonth ?? viewMonth, locale),
+              })}
+            </p>
+          </div>
+          <button type="button" className="btn" disabled={carrying} onClick={carryPlanForward}>
+            {carrying
+              ? t('dashboard.setup.carryPlanBusy')
+              : t('dashboard.setup.carryPlanCta', {
+                  month: monthLabel(previousPlanMonth ?? viewMonth, locale),
+                })}
+          </button>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => onNavigateTab?.('budget')}
+            disabled={carrying}
+          >
+            {t('dashboard.setup.carryPlanManualCta')}
+          </button>
+        </div>
+      );
+    }
+
+    // A month that is over is read, not planned: the figures are final, so
+    // the hero states how it went rather than nudging toward a setup step
+    // nobody can act on any more.
+    if (heroState === 'month_ended_review') {
+      return (
+        <>
+          <div className="dash-hero dash-hero-review money-card">
+            <span className="dash-hero-label">
+              {t('dashboard.hero.reviewTitle', { month: monthLabel(viewMonth, locale) })}
+            </span>
+            <span
+              className={`dash-hero-value ${(review?.saved ?? 0) >= 0 ? 'positive' : 'negative'}`}
+            >
+              {formatMoney(review?.saved ?? 0)}
+            </span>
+            <span className="dash-hero-note">
+              {t('dashboard.hero.reviewPlannedVsSpent', {
+                planned: formatMoney(review?.total_planned ?? 0),
+                spent: formatMoney(review?.total_spent ?? 0),
+              })}
+            </span>
+            <ul className="dash-review-deltas">
+              {review?.biggest_overspend && (
+                <li className="negative">
+                  {t('dashboard.hero.reviewOverspend', {
+                    category: categoryName(review.biggest_overspend.category_id),
+                    amount: formatMoney(review.biggest_overspend.delta),
+                  })}
+                </li>
+              )}
+              {review?.biggest_underspend && (
+                <li className="positive">
+                  {t('dashboard.hero.reviewUnderspend', {
+                    category: categoryName(review.biggest_underspend.category_id),
+                    amount: formatMoney(-review.biggest_underspend.delta),
+                  })}
+                </li>
+              )}
+              {!review?.biggest_overspend && !review?.biggest_underspend && (
+                <li className="muted-note">{t('dashboard.hero.reviewNoStandouts')}</li>
+              )}
+            </ul>
+            <button type="button" className="btn" onClick={() => setViewMonth(today)}>
+              {t('dashboard.hero.reviewCta', { month: monthLabel(today, locale) })}
+            </button>
+          </div>
+          {/* No stat strip here: its lead figure is "Left to spend",
+              which a month that has ended no longer has, and the hero
+              above already carries income, planned, spent and saved. */}
+          {donutAndRows}
+        </>
       );
     }
 

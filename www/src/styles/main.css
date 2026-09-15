@@ -2232,7 +2232,7 @@ table.data tr:last-child td {
   }
 }
 
-/* The Overview hero -- one figure for whichever of the seven states the
+/* The Overview hero -- one figure for whichever of the nine states the
    viewed month is in (DashboardTab.jsx's `heroState`), replacing what
    used to be three equal-weight summary cards competing for the same
    attention. Plain by default (the "Spent so far"/"Nothing recorded"
@@ -2337,6 +2337,62 @@ table.data tr:last-child td {
   cursor: pointer;
 }
 .dash-nudge-go {
+  color: var(--muted-2);
+  font-size: 1.1rem;
+  flex: none;
+}
+
+/* The retrospective hero for a month that has ended: the same figure-led
+   card as every other hero state, with the two comparison lines and the
+   "go to the live month" action stacked underneath. The list carries no
+   bullets -- each line is already prefixed by a category name, and a
+   bullet in front of one reads as a second marker. */
+.dash-review-deltas {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.88rem;
+}
+.dash-hero-review .btn {
+  margin-top: 14px;
+  width: 100%;
+}
+@media (min-width: 480px) {
+  .dash-hero-review .btn {
+    width: auto;
+    align-self: flex-start;
+  }
+}
+
+/* "Start from September's plan", under the Budget tab's assign banner.
+   Same one-line tappable shape as `.dash-nudge` -- it is the same kind of
+   offer, one tap, no screen change -- and the same 44px floor. */
+.carry-plan-offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.carry-plan-offer:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.carry-plan-go {
   color: var(--muted-2);
   font-size: 1.1rem;
   flex: none;

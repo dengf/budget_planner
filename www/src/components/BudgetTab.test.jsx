@@ -62,13 +62,17 @@ const CATEGORIES = [
   { id: 'food', name: 'Food', group: 'Living', is_income: false },
 ];
 
+// `today` is a `YYYY-MM` month, matching what App.jsx passes
+// (`currentMonth()`) -- a full date would make `viewMonth < today` true
+// for the month on screen and have BudgetTab read the current month as
+// history.
 function renderBudget(props) {
   return render(
     <I18nProvider initialLocale="en">
       <BudgetTab
         wasmModule={makeWasm()}
         currencySymbol="$"
-        today="2026-01-15"
+        today="2026-01"
         viewMonth="2026-01"
         categories={{ items: CATEGORIES }}
         transactions={{ items: [] }}
@@ -139,5 +143,68 @@ describe('BudgetTab row list', () => {
         'No categories yet — add your first one from More → Categories, starting with income.',
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('BudgetTab carry-forward offer', () => {
+  function withPreviousPlan(month = '2025-12') {
+    return {
+      ...makeWasm(),
+      previous_plan_month: async () => ({ month }),
+      list_budget_plan: async () => [
+        { id: 'p1', month, category_id: 'food', planned: 600 },
+      ],
+      carry_plan_forward: async () => ({
+        entries: [{ category_id: 'food', planned: 600 }],
+        dropped_missing_category: 0,
+        dropped_zero: 0,
+      }),
+    };
+  }
+
+  it('offers the previous month plan while this month has none of its own', async () => {
+    renderBudget({ wasmModule: withPreviousPlan() });
+    expect(await screen.findByText("Start from December 2025's plan")).toBeInTheDocument();
+  });
+
+  it('writes the carried rows against the month on screen', async () => {
+    const save = vi.fn(async () => ({ id: 'new-id' }));
+    renderBudget({
+      wasmModule: withPreviousPlan(),
+      budgetPlan: { items: [], save, remove: vi.fn() },
+    });
+    fireEvent.click(await screen.findByText("Start from December 2025's plan"));
+    await vi.waitFor(() =>
+      expect(save).toHaveBeenCalledWith({
+        id: 'new-id',
+        month: '2026-01',
+        category_id: 'food',
+        planned: 600,
+      }),
+    );
+  });
+
+  // Taking the offer once this month has a plan would overwrite typed
+  // work rather than save any, so the offer is gone by then.
+  it('withdraws the offer once this month has a plan of its own', async () => {
+    renderBudget({
+      wasmModule: withPreviousPlan(),
+      budgetPlan: {
+        items: [
+          { id: 'p1', month: '2026-01', category_id: 'salary', planned: 1000 },
+          { id: 'p2', month: '2026-01', category_id: 'food', planned: 400 },
+        ],
+        save: vi.fn(),
+        remove: vi.fn(),
+      },
+    });
+    await screen.findByRole('button', { name: /Food/ });
+    expect(screen.queryByText("Start from December 2025's plan")).not.toBeInTheDocument();
+  });
+
+  it('never offers to re-plan a month that has already ended', async () => {
+    renderBudget({ wasmModule: withPreviousPlan('2025-11'), viewMonth: '2025-12' });
+    await screen.findByRole('button', { name: /Food/ });
+    expect(screen.queryByText("Start from November 2025's plan")).not.toBeInTheDocument();
   });
 });

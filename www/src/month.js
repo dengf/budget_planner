@@ -31,6 +31,18 @@ export function daysLeftInMonth(date = new Date()) {
   return end.getDate() - date.getDate();
 }
 
+/**
+ * `'past' | 'current' | 'future'` for the month on screen, in the exact
+ * vocabulary `budget_calc::MonthPosition` expects. Two `YYYY-MM` strings
+ * compare chronologically as text, so this is a string comparison -- it
+ * lives here so every caller spells the three words the same way, not
+ * because the comparison is hard.
+ */
+export function monthPosition(monthStr, currentMonthStr) {
+  if (monthStr === currentMonthStr) return 'current';
+  return monthStr < currentMonthStr ? 'past' : 'future';
+}
+
 export function monthsBetween(fromIso, toIso) {
   const from = new Date(fromIso);
   const to = new Date(toIso);
