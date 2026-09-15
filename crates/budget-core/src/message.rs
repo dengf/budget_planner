@@ -90,6 +90,9 @@ impl From<&BudgetError> for Message {
             BudgetError::InvalidMinPayment(v) => {
                 Message::with_value("err.invalidMinPayment", v.clone(), text)
             }
+            BudgetError::InvalidDebtPayment(v) => {
+                Message::with_value("err.invalidDebtPayment", v.clone(), text)
+            }
             BudgetError::InvalidRecurringAmount(v) => {
                 Message::with_value("err.invalidRecurringAmount", v.clone(), text)
             }
@@ -186,6 +189,7 @@ mod tests {
             BudgetError::InvalidDebtBalance("1".into()),
             BudgetError::InvalidDebtRate("1".into()),
             BudgetError::InvalidMinPayment("1".into()),
+            BudgetError::InvalidDebtPayment("1".into()),
             BudgetError::InvalidRecurringAmount("1".into()),
             BudgetError::PayoffBudgetTooSmall {
                 minimums: "1".into(),

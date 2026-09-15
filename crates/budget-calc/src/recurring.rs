@@ -18,6 +18,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::date_util::{month_bounds, parse_date};
+use crate::transaction::Transaction;
 use budget_core::{round_currency, BudgetError, BudgetResult, Cadence};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -214,6 +215,100 @@ pub fn totals_by_category(occurrences: &[Occurrence]) -> Vec<(String, Decimal)> 
     totals
 }
 
+/// How far from its scheduled date a transaction may sit and still count
+/// as that occurrence. Rent due on the 1st paid on the 3rd is the same
+/// rent; a fortnight either way would start claiming the *next*
+/// occurrence of a weekly expense, which is why this is smaller than the
+/// shortest cadence's gap.
+const MATCH_WINDOW_DAYS: i64 = 3;
+
+/// One scheduled occurrence, and whether it has actually been paid.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OccurrenceStatus {
+    pub occurrence: Occurrence,
+    pub paid: bool,
+    /// The transaction that settled it, when one did -- so the front end
+    /// can link to the real record rather than just asserting "paid".
+    pub transaction_id: Option<String>,
+}
+
+/// Which of `month`'s scheduled occurrences have already been paid.
+///
+/// A transaction settles an occurrence when it is filed under the same
+/// category, its magnitude equals the scheduled amount exactly, and its
+/// date is within `MATCH_WINDOW_DAYS` of the scheduled one. Each
+/// transaction settles at most one occurrence and each occurrence takes
+/// at most one transaction: weekly rent with four occurrences and three
+/// payments logged must read as three paid and one still due, never four.
+/// Occurrences are settled earliest-first, each taking the closest
+/// unclaimed transaction, so two payments a few days apart attach to the
+/// occurrences they are actually nearest to.
+///
+/// The amount must match exactly, and that is a deliberate trade. A rent
+/// that really cost $512 against a schedule that says $500 reads as
+/// unpaid -- which is true of the schedule, and visible, and fixable.
+/// The looser alternative quietly claims whichever same-category
+/// transaction happened to be nearby, and being quietly wrong about
+/// whether a bill is paid is the worse failure.
+pub fn match_occurrences(
+    occurrences: &[Occurrence],
+    transactions: &[Transaction],
+) -> Vec<OccurrenceStatus> {
+    let mut claimed: Vec<&str> = Vec::new();
+
+    occurrences
+        .iter()
+        .map(|occurrence| {
+            let scheduled = parse_date(&occurrence.date);
+            let best = transactions
+                .iter()
+                .filter(|t| !claimed.contains(&t.id.as_str()))
+                .filter(|t| t.category_id.as_deref() == Some(occurrence.category_id.as_str()))
+                .filter(|t| t.amount.abs() == occurrence.amount)
+                .filter_map(|t| {
+                    let days = (parse_date(&t.date)? - scheduled?).num_days().abs();
+                    (days <= MATCH_WINDOW_DAYS).then_some((days, t))
+                })
+                .min_by_key(|(days, _)| *days)
+                .map(|(_, t)| t);
+
+            if let Some(t) = best {
+                claimed.push(&t.id);
+            }
+            OccurrenceStatus {
+                occurrence: occurrence.clone(),
+                paid: best.is_some(),
+                transaction_id: best.map(|t| t.id.clone()),
+            }
+        })
+        .collect()
+}
+
+/// The transaction that settling `occurrence` should create -- every
+/// field but the id, which only the caller can mint.
+///
+/// The sign is decided here, by the same rule as
+/// `transaction::signed_amount`: a recurring expense's `amount` is what
+/// it costs ("rent is 500"), and what gets stored is what it does to the
+/// balance. Letting a caller negate it would be a second place that
+/// decision lives.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OccurrencePayment {
+    pub date: String,
+    pub description: String,
+    pub amount: Decimal,
+    pub category_id: String,
+}
+
+pub fn payment_for_occurrence(occurrence: &Occurrence) -> OccurrencePayment {
+    OccurrencePayment {
+        date: occurrence.date.clone(),
+        description: occurrence.description.clone(),
+        amount: crate::transaction::signed_amount(occurrence.amount, false),
+        category_id: occurrence.category_id.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,6 +324,154 @@ mod tests {
             anchor,
         )
         .unwrap()
+    }
+
+    fn occ(date: &str, amount: Decimal) -> Occurrence {
+        Occurrence {
+            recurring_id: "rent".to_string(),
+            category_id: "housing".to_string(),
+            description: "Rent".to_string(),
+            amount,
+            date: date.to_string(),
+        }
+    }
+
+    fn txn(id: &str, date: &str, amount: Decimal, category: Option<&str>) -> Transaction {
+        let mut t = Transaction::new(id, date, "Rent", amount);
+        t.category_id = category.map(str::to_string);
+        t
+    }
+
+    #[test]
+    fn a_transaction_on_the_scheduled_day_settles_that_occurrence() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-01", dec!(500))],
+            &[txn("t1", "2026-09-01", dec!(-500), Some("housing"))],
+        );
+        assert!(statuses[0].paid);
+        assert_eq!(statuses[0].transaction_id.as_deref(), Some("t1"));
+    }
+
+    #[test]
+    fn a_payment_a_couple_of_days_late_still_settles_it() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-01", dec!(500))],
+            &[txn("t1", "2026-09-03", dec!(-500), Some("housing"))],
+        );
+        assert!(statuses[0].paid);
+    }
+
+    #[test]
+    fn a_payment_well_outside_the_window_does_not_settle_it() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-01", dec!(500))],
+            &[txn("t1", "2026-09-20", dec!(-500), Some("housing"))],
+        );
+        assert!(!statuses[0].paid);
+        assert_eq!(statuses[0].transaction_id, None);
+    }
+
+    #[test]
+    fn a_different_category_does_not_settle_it() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-01", dec!(500))],
+            &[txn("t1", "2026-09-01", dec!(-500), Some("dining"))],
+        );
+        assert!(!statuses[0].paid);
+    }
+
+    #[test]
+    fn an_uncategorized_transaction_does_not_settle_it() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-01", dec!(500))],
+            &[txn("t1", "2026-09-01", dec!(-500), None)],
+        );
+        assert!(!statuses[0].paid);
+    }
+
+    /// The trade documented on `match_occurrences`: a different amount
+    /// means the schedule is out of date, and saying so beats quietly
+    /// claiming a transaction that doesn't match it.
+    #[test]
+    fn a_different_amount_reads_as_unpaid_rather_than_being_claimed() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-01", dec!(500))],
+            &[txn("t1", "2026-09-01", dec!(-512), Some("housing"))],
+        );
+        assert!(!statuses[0].paid);
+    }
+
+    /// The case that makes this worth writing in Rust at all: four
+    /// weekly occurrences and three payments must read as three paid and
+    /// one due, not four paid.
+    #[test]
+    fn one_transaction_cannot_settle_two_occurrences() {
+        let statuses = match_occurrences(
+            &[
+                occ("2026-09-04", dec!(500)),
+                occ("2026-09-11", dec!(500)),
+                occ("2026-09-18", dec!(500)),
+                occ("2026-09-25", dec!(500)),
+            ],
+            &[
+                txn("t1", "2026-09-04", dec!(-500), Some("housing")),
+                txn("t2", "2026-09-11", dec!(-500), Some("housing")),
+                txn("t3", "2026-09-18", dec!(-500), Some("housing")),
+            ],
+        );
+        let paid: Vec<bool> = statuses.iter().map(|s| s.paid).collect();
+        assert_eq!(paid, vec![true, true, true, false]);
+        assert_eq!(statuses[3].transaction_id, None);
+    }
+
+    #[test]
+    fn each_occurrence_takes_the_payment_nearest_to_it() {
+        let statuses = match_occurrences(
+            &[occ("2026-09-04", dec!(500)), occ("2026-09-11", dec!(500))],
+            &[
+                txn("late", "2026-09-12", dec!(-500), Some("housing")),
+                txn("early", "2026-09-04", dec!(-500), Some("housing")),
+            ],
+        );
+        assert_eq!(statuses[0].transaction_id.as_deref(), Some("early"));
+        assert_eq!(statuses[1].transaction_id.as_deref(), Some("late"));
+    }
+
+    #[test]
+    fn nothing_scheduled_settles_to_an_empty_list() {
+        assert!(
+            match_occurrences(&[], &[txn("t1", "2026-09-01", dec!(-500), Some("housing"))])
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_month_with_nothing_logged_reads_as_all_due() {
+        let statuses = match_occurrences(&[occ("2026-09-01", dec!(500))], &[]);
+        assert_eq!(statuses.len(), 1);
+        assert!(!statuses[0].paid);
+    }
+
+    /// Settling an occurrence must produce a transaction that then
+    /// settles it -- otherwise "mark as paid" leaves the row still
+    /// showing as due, which is the loop failing to close.
+    #[test]
+    fn the_payment_it_proposes_actually_settles_the_occurrence_it_came_from() {
+        let occurrence = occ("2026-09-01", dec!(500));
+        let payment = payment_for_occurrence(&occurrence);
+        assert_eq!(
+            payment.amount,
+            dec!(-500),
+            "a cost of 500 is stored as -500"
+        );
+
+        let mut created =
+            Transaction::new("new", &payment.date, &payment.description, payment.amount);
+        created.category_id = Some(payment.category_id.clone());
+
+        let statuses = match_occurrences(&[occurrence], &[created]);
+        assert!(statuses[0].paid);
+        assert_eq!(statuses[0].transaction_id.as_deref(), Some("new"));
     }
 
     #[test]

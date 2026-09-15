@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use budget_ports::{
     BudgetPlanRecord, BudgetStore, CategorizationRuleRecord, CategoryRecord, DebtRecord,
-    GoalRecord, RecurringExpenseRecord, TransactionRecord,
+    GoalContributionRecord, GoalRecord, RecurringExpenseRecord, TransactionRecord,
 };
 use wasm_bindgen::prelude::*;
 
@@ -20,8 +20,8 @@ use crate::convert::{
     percent_to_rate, rate_to_percent, string_to_decimal, to_js,
 };
 use crate::dto::{
-    BudgetPlanEntryDto, CategoryDto, DebtRecordDto, DeleteResult, GoalDto, PreviousPlanMonthResult,
-    RecurringExpenseDto, RuleDto, SaveResult, TransactionDto,
+    BudgetPlanEntryDto, CategoryDto, DebtRecordDto, DeleteResult, GoalContributionDto, GoalDto,
+    PreviousPlanMonthResult, RecurringExpenseDto, RuleDto, SaveResult, TransactionDto,
 };
 
 thread_local! {
@@ -248,6 +248,20 @@ pub async fn save_goal(dto: JsValue) -> JsValue {
             ..Default::default()
         });
     };
+    // A contribution whose amount doesn't survive `f64_to_decimal` is
+    // dropped rather than failing the save: losing one ledger row
+    // degrades the double-allocation guard for one month, where refusing
+    // the save would lose the contribution being made right now too.
+    let contributions = dto
+        .contributions
+        .iter()
+        .filter_map(|c| {
+            Some(GoalContributionRecord {
+                month: c.month.clone(),
+                amount: decimal_to_string(f64_to_decimal(c.amount)?),
+            })
+        })
+        .collect();
     let record = GoalRecord {
         id: dto.id.clone(),
         name: dto.name,
@@ -255,6 +269,7 @@ pub async fn save_goal(dto: JsValue) -> JsValue {
         current_amount: decimal_to_string(current),
         target_date: dto.target_date,
         cadence: dto.cadence,
+        contributions,
     };
     let store = match get_store() {
         Ok(s) => s,
@@ -294,6 +309,16 @@ pub async fn list_goals() -> JsValue {
                         current_amount: decimal_to_f64(string_to_decimal(&r.current_amount)?),
                         target_date: r.target_date,
                         cadence: r.cadence,
+                        contributions: r
+                            .contributions
+                            .iter()
+                            .filter_map(|c| {
+                                Some(GoalContributionDto {
+                                    month: c.month.clone(),
+                                    amount: decimal_to_f64(string_to_decimal(&c.amount)?),
+                                })
+                            })
+                            .collect(),
                     })
                 })
                 .collect::<Vec<_>>(),

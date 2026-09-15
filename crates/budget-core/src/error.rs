@@ -31,6 +31,12 @@ pub enum BudgetError {
     #[error("a debt's minimum payment must be positive, got {0}")]
     InvalidMinPayment(String),
 
+    /// A payment cannot be negative. Raising a balance is an edit to the
+    /// debt, not a payment against it -- and a negative "payment" is a
+    /// silent way to do the former while looking like the latter.
+    #[error("a debt payment cannot be negative, got {0}")]
+    InvalidDebtPayment(String),
+
     #[error(
         "the minimum payments across all debts ({minimums}) exceed the extra payment budget \
          ({available})"

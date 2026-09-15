@@ -63,12 +63,14 @@ pub use category::{
     month_review, month_setup_state,
 };
 pub use csv_import::{detect_csv_columns, import_csv};
-pub use debt::build_payoff_plan;
-pub use goals::{goal_progress, milestone_crossed, required_contribution};
+pub use debt::{build_payoff_plan, debt_payoff_amount, record_debt_payment};
+pub use goals::{
+    goal_contribution, goal_progress, milestone_crossed, required_contribution, unallocated_savings,
+};
 pub use message::Message;
 pub use presets::preset_categories;
 pub use receipt::{parse_receipt_text, parse_statement_text};
-pub use recurring::recurring_occurrences;
+pub use recurring::{occurrence_payment, recurring_occurrences, recurring_status};
 pub use rules::{apply_rules, suggest_rule_keyword};
 #[cfg(target_arch = "wasm32")]
 pub use storage::{

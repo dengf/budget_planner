@@ -82,6 +82,83 @@ pub struct PayoffPlan {
     pub total_interest: Decimal,
 }
 
+/// What one payment against one debt does, in the month it is made.
+///
+/// Every field is derived, never typed: the whole point of this struct is
+/// that recording a payment and projecting one cannot disagree about what
+/// a payment does.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PaymentOutcome {
+    /// This month's interest, accrued before the payment lands.
+    pub interest: Decimal,
+    /// What actually came off the balance -- the payment minus the
+    /// interest it had to cover first. Negative when the payment did not
+    /// cover the interest, which is the honest description of a balance
+    /// that grew.
+    pub principal: Decimal,
+    pub new_balance: Decimal,
+    /// True when this payment closed the debt.
+    pub paid_off: bool,
+    /// False when the payment was smaller than the month's interest, so
+    /// the balance went *up*. Worth saying out loud rather than showing a
+    /// larger number with no explanation.
+    pub covers_interest: bool,
+    /// Paid beyond what it took to close the debt, if any -- so a caller
+    /// can tell someone they overpaid instead of silently keeping it.
+    pub overpaid: Decimal,
+}
+
+/// One month of interest plus one payment, applied to one balance.
+///
+/// This is the single implementation of "what a payment does", shared by
+/// `apply_payment` (recording one that really happened) and `build_plan`
+/// (projecting ones that haven't). Before it existed, `build_plan` was
+/// the only place the rule lived, and the balance it projected from was
+/// a number someone typed months ago and never revised -- so after six
+/// real payments the chart still showed the original debt-free date, with
+/// full confidence. Recording a payment through the same arithmetic the
+/// projection uses is what makes the chart's month 1 and the payment
+/// actually made agree.
+fn step(
+    balance: Decimal,
+    monthly_rate: Decimal,
+    available: Decimal,
+) -> (Decimal, Decimal, Decimal) {
+    let interest = round_currency(balance * monthly_rate);
+    let payment = available.min(balance + interest);
+    let new_balance = round_currency((balance + interest - payment).max(Decimal::ZERO));
+    (interest, round_currency(payment), new_balance)
+}
+
+/// What `payment` does to `debt` this month. See `step` for the shared
+/// arithmetic, and `PaymentOutcome` for what the caller gets back.
+///
+/// A negative payment is rejected: "paying" a negative amount is a way to
+/// inflate a balance by accident, and a balance that needs raising is an
+/// edit to the debt, not a payment against it.
+pub fn apply_payment(debt: &Debt, payment: Decimal) -> BudgetResult<PaymentOutcome> {
+    if payment.is_sign_negative() {
+        return Err(BudgetError::InvalidDebtPayment(payment.to_string()));
+    }
+    let (interest, applied, new_balance) = step(debt.balance, debt.monthly_rate(), payment);
+    Ok(PaymentOutcome {
+        interest,
+        principal: round_currency(payment - interest),
+        new_balance,
+        paid_off: new_balance.is_zero(),
+        covers_interest: payment >= interest,
+        overpaid: round_currency((payment - applied).max(Decimal::ZERO)),
+    })
+}
+
+/// What it would take to close `debt` today: the balance plus the month's
+/// interest. The natural default for a "pay it off" action, and the
+/// number `apply_payment` stops at, so paying this exactly leaves zero.
+pub fn payoff_amount(debt: &Debt) -> Decimal {
+    let interest = round_currency(debt.balance * debt.monthly_rate());
+    round_currency(debt.balance + interest)
+}
+
 fn ordered_ids(debts: &[Debt], strategy: Strategy) -> Vec<String> {
     let mut ordered: Vec<&Debt> = debts.iter().collect();
     match strategy {
@@ -141,23 +218,24 @@ pub fn build_plan(
                 continue;
             }
 
-            let interest = round_currency(balance.1 * debt.monthly_rate());
             // A closed-earlier debt's minimum has already joined `pool`
             // via the running total below; this debt gets its own minimum
             // plus whatever extra is still unclaimed by an earlier debt in
             // `order` this month.
             let available = debt.min_payment + pool;
-            let payment = available.min(balance.1 + interest);
+            // Same `step` a recorded payment goes through, so month 1 of
+            // this projection is exactly what `apply_payment` would do.
+            let (interest, payment, new_balance) = step(balance.1, debt.monthly_rate(), available);
             pool = (available - payment).max(Decimal::ZERO);
 
-            balance.1 = round_currency((balance.1 + interest - payment).max(Decimal::ZERO));
+            balance.1 = new_balance;
             total_interest += interest;
 
             schedule.push(PayoffMonth {
                 month,
                 debt_id: id.clone(),
                 interest,
-                payment: round_currency(payment),
+                payment,
                 remaining_balance: balance.1,
             });
         }
@@ -183,6 +261,128 @@ mod tests {
     #[test]
     fn a_zero_balance_debt_is_rejected() {
         assert!(Debt::new("d", "Card", dec!(0), dec!(0.2), dec!(25)).is_err());
+    }
+
+    #[test]
+    fn a_payment_covers_the_months_interest_first_then_principal() {
+        // 1000 at 12% APR = 1% a month = 10.00 interest. A 200 payment
+        // therefore takes 190 off the balance, not 200.
+        let d = debt("card", dec!(1000), dec!(0.12), dec!(25));
+        let out = apply_payment(&d, dec!(200)).unwrap();
+        assert_eq!(out.interest, dec!(10));
+        assert_eq!(out.principal, dec!(190));
+        assert_eq!(out.new_balance, dec!(810));
+        assert!(out.covers_interest);
+        assert!(!out.paid_off);
+        assert_eq!(out.overpaid, dec!(0));
+    }
+
+    #[test]
+    fn a_payment_smaller_than_the_interest_grows_the_balance_and_says_so() {
+        // The case someone most needs told: paying 5 against 10 of
+        // interest leaves them further behind than they started.
+        let d = debt("card", dec!(1000), dec!(0.12), dec!(25));
+        let out = apply_payment(&d, dec!(5)).unwrap();
+        assert_eq!(out.interest, dec!(10));
+        assert_eq!(out.principal, dec!(-5));
+        assert_eq!(out.new_balance, dec!(1005));
+        assert!(!out.covers_interest);
+    }
+
+    #[test]
+    fn paying_the_payoff_amount_exactly_closes_the_debt() {
+        let d = debt("card", dec!(1000), dec!(0.12), dec!(25));
+        let out = apply_payment(&d, payoff_amount(&d)).unwrap();
+        assert_eq!(out.new_balance, dec!(0));
+        assert!(out.paid_off);
+        assert_eq!(out.overpaid, dec!(0));
+    }
+
+    #[test]
+    fn paying_past_the_payoff_amount_reports_the_excess_rather_than_a_negative_balance() {
+        let d = debt("card", dec!(1000), dec!(0.12), dec!(25));
+        let out = apply_payment(&d, dec!(2000)).unwrap();
+        assert_eq!(out.new_balance, dec!(0));
+        assert!(out.paid_off);
+        assert_eq!(out.overpaid, dec!(990)); // 2000 - (1000 + 10)
+    }
+
+    #[test]
+    fn a_zero_payment_is_allowed_and_simply_accrues_the_interest() {
+        // A skipped month is a real thing that happens, and it is not an
+        // error -- it just costs interest.
+        let d = debt("card", dec!(1000), dec!(0.12), dec!(25));
+        let out = apply_payment(&d, dec!(0)).unwrap();
+        assert_eq!(out.new_balance, dec!(1010));
+        assert!(!out.covers_interest);
+    }
+
+    #[test]
+    fn a_negative_payment_is_rejected_rather_than_quietly_inflating_the_balance() {
+        let d = debt("card", dec!(1000), dec!(0.12), dec!(25));
+        assert_eq!(
+            apply_payment(&d, dec!(-50)),
+            Err(BudgetError::InvalidDebtPayment("-50".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_debt_with_no_interest_puts_the_whole_payment_on_the_principal() {
+        let d = debt("loan", dec!(500), dec!(0), dec!(50));
+        let out = apply_payment(&d, dec!(50)).unwrap();
+        assert_eq!(out.interest, dec!(0));
+        assert_eq!(out.principal, dec!(50));
+        assert_eq!(out.new_balance, dec!(450));
+    }
+
+    /// The whole reason `step` was extracted. The projection's first
+    /// month and a payment actually recorded must be the same arithmetic,
+    /// or the chart tells one story and the balance another.
+    #[test]
+    fn recording_a_payment_matches_month_one_of_the_projection_for_the_same_debt() {
+        let d = debt("card", dec!(2500), dec!(0.199), dec!(75));
+        let plan =
+            build_plan(std::slice::from_ref(&d), dec!(125), Strategy::Snowball, 600).unwrap();
+        let month_one = plan
+            .schedule
+            .iter()
+            .find(|r| r.month == 1 && r.debt_id == "card")
+            .expect("the plan has a first month for this debt");
+
+        // The projection pays min_payment + extra = 75 + 125 = 200.
+        let out = apply_payment(&d, dec!(200)).unwrap();
+        assert_eq!(out.interest, month_one.interest);
+        assert_eq!(out.new_balance, month_one.remaining_balance);
+    }
+
+    /// And the loop closes: after recording the payment, re-projecting
+    /// from the new balance is one month shorter than it was before.
+    #[test]
+    fn re_projecting_after_a_recorded_payment_moves_the_debt_free_date_closer() {
+        let before = debt("card", dec!(2500), dec!(0.199), dec!(75));
+        let plan_before = build_plan(
+            std::slice::from_ref(&before),
+            dec!(125),
+            Strategy::Snowball,
+            600,
+        )
+        .unwrap();
+
+        let out = apply_payment(&before, dec!(200)).unwrap();
+        let after = debt("card", out.new_balance, dec!(0.199), dec!(75));
+        let plan_after = build_plan(
+            std::slice::from_ref(&after),
+            dec!(125),
+            Strategy::Snowball,
+            600,
+        )
+        .unwrap();
+
+        assert_eq!(
+            plan_after.months_to_debt_free,
+            plan_before.months_to_debt_free - 1,
+            "a real payment must shorten the plan, not leave it frozen"
+        );
     }
 
     #[test]
