@@ -194,9 +194,7 @@ describe('DashboardTab month boundary', () => {
   // first-run experience, with every planned amount to be re-typed.
   it('offers the previous month plan instead of the setup ladder on a fresh month', async () => {
     renderDashboard({ wasmModule: makeWasm({ previousPlanMonth: '2025-12' }) });
-    expect(
-      await screen.findByText(`Set up ${monthLabel('2026-01', 'en')}`),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(`Set up ${monthLabel('2026-01', 'en')}`)).toBeInTheDocument();
     expect(screen.queryByText('Plan your income')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: `Use ${monthLabel('2025-12', 'en')}'s plan` }),

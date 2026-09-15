@@ -151,9 +151,7 @@ describe('BudgetTab carry-forward offer', () => {
     return {
       ...makeWasm(),
       previous_plan_month: async () => ({ month }),
-      list_budget_plan: async () => [
-        { id: 'p1', month, category_id: 'food', planned: 600 },
-      ],
+      list_budget_plan: async () => [{ id: 'p1', month, category_id: 'food', planned: 600 }],
       carry_plan_forward: async () => ({
         entries: [{ category_id: 'food', planned: 600 }],
         dropped_missing_category: 0,
