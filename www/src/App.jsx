@@ -145,10 +145,28 @@ export function AppShell({ wasmModule }) {
    * exactly the download this sheet is lazy to avoid.
    */
   const [addMounted, setAddMounted] = useState(false);
+  /**
+   * The transaction being corrected, or null when the sheet is adding a
+   * new one. Editing reuses the add sheet rather than getting a form of
+   * its own: every field is the same, and a second form would be a
+   * second place for the amount's sign to be decided.
+   */
+  const [editing, setEditing] = useState(null);
   const openAdd = useCallback((method = 'manual') => {
+    setEditing(null);
     setAddMethod(method);
     setAddMounted(true);
     setAddOpen(true);
+  }, []);
+  const openEdit = useCallback((transaction) => {
+    setEditing(transaction);
+    setAddMethod('manual');
+    setAddMounted(true);
+    setAddOpen(true);
+  }, []);
+  const closeAdd = useCallback(() => {
+    setAddOpen(false);
+    setEditing(null);
   }, []);
   const formatMoney = useMemo(() => makeFormatMoney(currencySymbol), [currencySymbol]);
 
@@ -544,6 +562,7 @@ export function AppShell({ wasmModule }) {
               budgetPlan={budgetPlan}
               onNavigateTab={setActiveTab}
               onOpenAdd={openAdd}
+              onEditTransaction={openEdit}
             />
           </div>
         </Suspense>
@@ -553,8 +572,9 @@ export function AppShell({ wasmModule }) {
         <Suspense fallback={null}>
           <AddTransactionSheet
             open={addOpen}
-            onClose={() => setAddOpen(false)}
+            onClose={closeAdd}
             initialMethod={addMethod}
+            editing={editing}
             wasmModule={wasmModule}
             newId={newId}
             today={todayDate}

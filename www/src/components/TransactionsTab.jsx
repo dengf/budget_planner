@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
@@ -15,16 +15,19 @@ import { makeCategoryLookup } from '../presetCategories';
  * name promises. See RulesSection.jsx / RecurringSection.jsx.
  */
 export default function TransactionsTab({
+  wasmModule,
   currencySymbol,
   viewMonth,
   confirm,
   categories,
   transactions,
   onOpenAdd,
+  onEditTransaction,
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [showAllMonths, setShowAllMonths] = useState(false);
+  const [onlyUncategorized, setOnlyUncategorized] = useState(false);
 
   /** Opens the shell's Add sheet on a specific tab -- the empty state's
    *  two buttons (Log a transaction / Import CSV) both go through this
@@ -46,9 +49,47 @@ export default function TransactionsTab({
   // Defaults to the viewed month so the list stays short and fast to scan
   // as history accumulates; "show all" is one click away for anyone
   // reconciling further back.
-  const visibleTransactions = showAllMonths
+  const monthTransactions = showAllMonths
     ? transactions.items
     : transactions.items.filter((tx) => tx.date?.startsWith(viewMonth));
+
+  /**
+   * Which of the rows on screen still need a category, from
+   * `budget_calc::is_uncategorized` -- not a local `!tx.category_id`
+   * filter, which would miss a row pointing at a category that has since
+   * been deleted. The count and the id list come back from one call so
+   * the badge can never name a number the filtered list doesn't show.
+   */
+  const [uncategorized, setUncategorized] = useState({ ids: [], count: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = wasmModule?.uncategorized
+        ? await wasmModule.uncategorized({
+            transactions: monthTransactions,
+            existing_category_ids: categories.items.map((c) => c.id),
+          })
+        : null;
+      if (cancelled) return;
+      setUncategorized(
+        result && !result.error ? { ids: result.ids, count: result.count } : { ids: [], count: 0 },
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `monthTransactions` is rebuilt every render, so the effect keys off
+    // the two things it is actually derived from instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wasmModule, transactions.items, categories.items, showAllMonths, viewMonth]);
+
+  // A filter that quietly survives its own reason to exist is a bug: once
+  // the last row has been categorized, "Uncategorized (0)" would show an
+  // empty list with no obvious way back.
+  const filterActive = onlyUncategorized && uncategorized.count > 0;
+  const visibleTransactions = filterActive
+    ? monthTransactions.filter((tx) => uncategorized.ids.includes(tx.id))
+    : monthTransactions;
 
   return (
     <div className="panel txn-panel">
@@ -90,6 +131,21 @@ export default function TransactionsTab({
             />
             <span>{t('transactions.showAllMonths')}</span>
           </label>
+          {/* Only offered when there is something to find. An always-on
+              "Uncategorized (0)" chip would be a permanent nag for work
+              that is already done. */}
+          {uncategorized.count > 0 && (
+            <div className="txn-filters">
+              <button
+                type="button"
+                className={`btn ${filterActive ? '' : 'secondary '}txn-filter-btn`}
+                aria-pressed={filterActive}
+                onClick={() => setOnlyUncategorized((v) => !v)}
+              >
+                {t('transactions.uncategorizedCount', { count: uncategorized.count })}
+              </button>
+            </div>
+          )}
           {visibleTransactions.length === 0 ? (
             <p className="empty-state">
               {showAllMonths
@@ -103,12 +159,24 @@ export default function TransactionsTab({
                 .map((tx) => (
                   <li className="txn-card money-card" key={tx.id}>
                     <CategoryBadge category={categoryFor(tx.category_id)} />
-                    <div className="txn-info">
-                      <div className="txn-description">{tx.description}</div>
-                      <div className="txn-meta">
+                    {/* The row itself opens the entry sheet on this
+                        transaction. It is a real <button> rather than a
+                        click handler on the <li> so it is reachable by
+                        keyboard and announced as an action -- and it
+                        wraps only the description block, because the
+                        Remove button beside it cannot be nested inside
+                        another button. */}
+                    <button
+                      type="button"
+                      className="txn-info txn-open"
+                      onClick={() => onEditTransaction?.(tx)}
+                      aria-label={t('transactions.editThis', { description: tx.description })}
+                    >
+                      <span className="txn-description">{tx.description}</span>
+                      <span className="txn-meta">
                         {tx.date} · {categoryName(tx.category_id)}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                     <div className="txn-trailing">
                       <span className={`num txn-amount ${tx.amount < 0 ? 'negative' : 'positive'}`}>
                         {formatMoney(tx.amount)}

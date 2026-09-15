@@ -988,6 +988,18 @@ table.data tr:last-child td {
    the screen someone scans most often, so it's cards, not a table.data
    row: no `.table-scroll`/nowrap needed since a card wraps instead of
    requiring horizontal scroll to reach the amount on a narrow screen. */
+/* Sits between the "show all months" checkbox and the list. A row, so a
+   second filter can join it later without a layout change. */
+.txn-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.txn-filter-btn {
+  font-size: 0.85rem;
+  padding: 8px 14px;
+}
 .txn-list {
   list-style: none;
   margin: 0;
@@ -1020,6 +1032,28 @@ table.data tr:last-child td {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+/* The description block doubles as the control that opens a transaction
+   for editing, so it has to look like plain text while behaving like a
+   button: no chrome of its own, left-aligned, inheriting type, and the
+   whole block tappable rather than just the line of text inside it.
+   `align-items: start` keeps each line's own width as its hit box's
+   width for the focus ring, but the button still fills the row. */
+.txn-open {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  align-items: flex-start;
+  cursor: pointer;
+  /* A whole row is well past the 44px floor in width; this guarantees
+     the height half of it even for a one-line description. */
+  min-height: 44px;
+  justify-content: center;
 }
 .txn-description {
   font-weight: 600;
@@ -2858,6 +2892,23 @@ table.data tr:last-child td {
 }
 .add-txn-submit-bar .btn {
   width: 100%;
+}
+/* "Make a rule from this", under the edit form. Separated by a rule and
+   its own heading because it is a second, optional action on a different
+   object -- saving a rule here does not save the transaction above, and
+   the layout should not suggest otherwise. The submit bar above is
+   sticky, so this needs top margin clear of it. */
+.add-txn-rule {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.add-txn-rule-title {
+  margin: 0;
+  font-size: 0.95rem;
 }
 
 @media print {

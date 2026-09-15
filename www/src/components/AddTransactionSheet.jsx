@@ -69,6 +69,7 @@ export default function AddTransactionSheet({
   recurring,
   formatMoney,
   initialMethod = 'manual',
+  editing = null,
 }) {
   const { t } = useI18n();
   const [method, setMethod] = useState(initialMethod); // 'manual' | 'receipt' | 'voice' | 'csv' | 'recurring'
@@ -88,6 +89,71 @@ export default function AddTransactionSheet({
   const [importResult, setImportResult] = useState(null);
   const [recurringDraft, setRecurringDraft] = useState(EMPTY_RECURRING_DRAFT);
   const [ruleMatch, setRuleMatch] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [ruleKeyword, setRuleKeyword] = useState('');
+  const [ruleSaved, setRuleSaved] = useState(null);
+
+  /**
+   * Loads the transaction being corrected into the draft.
+   *
+   * The stored amount is signed; the form collects a magnitude and a
+   * direction separately (see the Expense/Income toggle below), so
+   * `budget_calc::split_amount` does the pulling apart and
+   * `signed_amount` puts it back together on save. Doing either half
+   * here in JS is how an edit ends up flipping a transaction's sign:
+   * two implementations of the same rule, only one of them tested.
+   *
+   * The category comes across as already-touched -- it is the person's
+   * own earlier answer, not a suggestion for the ranking to overwrite a
+   * render later.
+   */
+  useEffect(() => {
+    if (!open || !editing) return undefined;
+    let cancelled = false;
+    (async () => {
+      const split = wasmModule?.split_amount ? await wasmModule.split_amount(editing.amount) : null;
+      if (cancelled) return;
+      if (split?.error) {
+        setSaveError(split);
+        return;
+      }
+      setDraft({
+        date: editing.date || '',
+        description: editing.description || '',
+        amount: split ? String(split.magnitude) : '',
+        category_id: editing.category_id || '',
+        isIncome: Boolean(split?.is_income),
+        categoryTouched: Boolean(editing.category_id),
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, editing, wasmModule]);
+
+  /**
+   * Seeds the "make a rule from this" keyword from the description --
+   * `budget_calc::suggest_rule_keyword` trims a bank's branch and
+   * reference noise off the merchant name. It is a suggestion and lands
+   * in an editable field, never straight into a saved rule.
+   */
+  useEffect(() => {
+    if (!open || !editing) return undefined;
+    let cancelled = false;
+    (async () => {
+      const result = wasmModule?.suggest_rule_keyword
+        ? await wasmModule.suggest_rule_keyword({ description: editing.description || '' })
+        : null;
+      if (cancelled) return;
+      setRuleKeyword(result?.error ? '' : (result?.keyword ?? ''));
+      // A confirmation left over from the previous transaction would
+      // claim a rule was saved for this one.
+      setRuleSaved(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, editing, wasmModule]);
 
   const { ordered, suggestionId } = useCategoryRank({
     wasmModule,
@@ -166,19 +232,45 @@ export default function AddTransactionSheet({
     // magnitude now, so there is nothing left to get backwards by typing
     // (or forgetting) a minus sign. See DirectionWarning.jsx for why that
     // used to be a real, easy-to-make mistake.
-    const magnitude = Math.abs(Number(draft.amount));
+    //
+    // Composing the stored amount is `budget_calc::signed_amount`, not a
+    // ternary here, so that adding and editing cannot disagree about
+    // which way round a number goes -- see the pre-fill effect above.
+    if (!wasmModule?.signed_amount) return;
+    const signed = await wasmModule.signed_amount({
+      magnitude: Number(draft.amount),
+      is_income: draft.isIncome,
+    });
+    if (signed?.error) {
+      setSaveError(signed);
+      return;
+    }
     const fallback = categoryId
       ? categoryName(categoryId)
       : t(draft.isIncome ? 'transactions.income' : 'transactions.expense');
     await transactions.save({
-      id: newId(),
+      // Editing keeps the id, so the correction replaces the row rather
+      // than leaving the original behind beside a near-duplicate.
+      id: editing?.id ?? newId(),
       date: draft.date || today,
       description: draft.description.trim() || fallback,
-      amount: draft.isIncome ? magnitude : -magnitude,
+      amount: signed.amount,
       category_id: categoryId || null,
     });
     setDraft({ ...EMPTY_DRAFT, isIncome: draft.isIncome });
     onClose();
+  };
+
+  /** The other half of the correction loop: having just filed this one
+   *  transaction, file every future one that looks like it. The keyword
+   *  is whatever is in the field -- the suggestion is only a starting
+   *  point, and a rule saved from a wrong guess would miscategorize
+   *  every import from here on. */
+  const saveRuleFromTransaction = async () => {
+    const keyword = ruleKeyword.trim();
+    if (!keyword || !categoryId) return;
+    await rules.save({ id: newId(), keyword, category_id: categoryId, priority: 0 });
+    setRuleSaved(keyword);
   };
 
   /** Names what is about to happen, with the figures already in the
@@ -187,6 +279,10 @@ export default function AddTransactionSheet({
    *  Falls back as the draft empties out, never naming a category or an
    *  amount that isn't there. */
   const submitLabel = () => {
+    // Editing names the act, not the figures: "Add $42.60 to Food" is
+    // worth quoting back because the row does not exist yet, but on a
+    // correction the row is right there on the screen behind the sheet.
+    if (editing) return t('transactions.saveChanges');
     if (draft.amount === '') {
       return t(draft.isIncome ? 'transactions.addIncome' : 'transactions.addExpense');
     }
@@ -272,8 +368,12 @@ export default function AddTransactionSheet({
   const closeAndReset = () => {
     setDraft(EMPTY_DRAFT);
     setRecurringDraft(EMPTY_RECURRING_DRAFT);
+    setSaveError(null);
+    setRuleSaved(null);
     onClose();
   };
+
+  const sheetTitle = editing ? t('transactions.editTitle') : t('transactions.addManual');
 
   return (
     <div className="add-txn-backdrop" role="presentation" onClick={closeAndReset}>
@@ -282,11 +382,11 @@ export default function AddTransactionSheet({
         className="add-txn-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label={t('transactions.addManual')}
+        aria-label={sheetTitle}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="add-txn-header">
-          <span className="add-txn-title">{t('transactions.addManual')}</span>
+          <span className="add-txn-title">{sheetTitle}</span>
           <button
             type="button"
             className="dash-month-btn"
@@ -297,58 +397,64 @@ export default function AddTransactionSheet({
           </button>
         </div>
 
-        <div className="add-txn-methods" role="tablist" aria-label={t('transactions.addManual')}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={method === 'manual'}
-            className={`add-txn-method-btn${method === 'manual' ? ' active' : ''}`}
-            onClick={() => setMethod('manual')}
-          >
-            <PenIcon />
-            <span>{t('transactions.methodManual')}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={method === 'receipt'}
-            className={`add-txn-method-btn${method === 'receipt' ? ' active' : ''}`}
-            onClick={() => setMethod('receipt')}
-          >
-            <CameraIcon />
-            <span>{t('transactions.methodReceipt')}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={method === 'voice'}
-            className={`add-txn-method-btn${method === 'voice' ? ' active' : ''}`}
-            onClick={() => setMethod('voice')}
-          >
-            <MicIcon />
-            <span>{t('transactions.methodVoice')}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={method === 'csv'}
-            className={`add-txn-method-btn${method === 'csv' ? ' active' : ''}`}
-            onClick={() => setMethod('csv')}
-          >
-            <SpreadsheetIcon />
-            <span>{t('transactions.methodImport')}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={method === 'recurring'}
-            className={`add-txn-method-btn${method === 'recurring' ? ' active' : ''}`}
-            onClick={() => setMethod('recurring')}
-          >
-            <RecurringIcon />
-            <span>{t('transactions.methodRecurring')}</span>
-          </button>
-        </div>
+        {/* No method row when correcting an existing transaction. A
+            receipt scan, a voice note or a CSV import all create rows;
+            none of them edits the one already on screen, so offering
+            them here would be five tabs where four do nothing. */}
+        {!editing && (
+          <div className="add-txn-methods" role="tablist" aria-label={t('transactions.addManual')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'manual'}
+              className={`add-txn-method-btn${method === 'manual' ? ' active' : ''}`}
+              onClick={() => setMethod('manual')}
+            >
+              <PenIcon />
+              <span>{t('transactions.methodManual')}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'receipt'}
+              className={`add-txn-method-btn${method === 'receipt' ? ' active' : ''}`}
+              onClick={() => setMethod('receipt')}
+            >
+              <CameraIcon />
+              <span>{t('transactions.methodReceipt')}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'voice'}
+              className={`add-txn-method-btn${method === 'voice' ? ' active' : ''}`}
+              onClick={() => setMethod('voice')}
+            >
+              <MicIcon />
+              <span>{t('transactions.methodVoice')}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'csv'}
+              className={`add-txn-method-btn${method === 'csv' ? ' active' : ''}`}
+              onClick={() => setMethod('csv')}
+            >
+              <SpreadsheetIcon />
+              <span>{t('transactions.methodImport')}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'recurring'}
+              className={`add-txn-method-btn${method === 'recurring' ? ' active' : ''}`}
+              onClick={() => setMethod('recurring')}
+            >
+              <RecurringIcon />
+              <span>{t('transactions.methodRecurring')}</span>
+            </button>
+          </div>
+        )}
 
         <div className="add-txn-body">
           {method === 'manual' && (
@@ -446,6 +552,54 @@ export default function AddTransactionSheet({
                   </button>
                 </div>
               </form>
+
+              {/* Closes the correction loop, and only where it makes
+                  sense: right after someone has told the app where this
+                  transaction belongs. `categoryTouched` is what makes
+                  that "told" rather than "guessed" -- the picker always
+                  has something selected, but until it is tapped that is
+                  the ranking's suggestion, and a rule is durable enough
+                  that seeding one from a guess would quietly misfile
+                  every future import. Outside a form of its own: a
+                  submit button nested in the one above would save the
+                  transaction instead of the rule. */}
+              {editing && categoryId && draft.categoryTouched && (
+                <div className="add-txn-rule">
+                  <h3 className="add-txn-rule-title">{t('transactions.makeRuleTitle')}</h3>
+                  <p className="field-label">
+                    {t('transactions.makeRuleHint', { category: categoryName(categoryId) })}
+                  </p>
+                  <label className="field">
+                    <span className="field-label">{t('transactions.ruleKeyword')}</span>
+                    <div className="field-input">
+                      <input
+                        value={ruleKeyword}
+                        placeholder={t('transactions.makeRulePlaceholder')}
+                        onChange={(e) => {
+                          setRuleKeyword(e.target.value);
+                          setRuleSaved(null);
+                        }}
+                      />
+                    </div>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    disabled={!ruleKeyword.trim()}
+                    onClick={saveRuleFromTransaction}
+                  >
+                    {t('transactions.makeRuleCta')}
+                  </button>
+                  {ruleSaved && (
+                    <p className="field-label" role="status">
+                      {t('transactions.makeRuleSaved', {
+                        keyword: ruleSaved,
+                        category: categoryName(categoryId),
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
 
@@ -640,6 +794,7 @@ export default function AddTransactionSheet({
             </>
           )}
         </div>
+        {saveError?.error && <CalcError result={saveError} />}
       </div>
     </div>
   );
