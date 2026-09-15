@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import CategoryBadge from './CategoryBadge';
+import NewCategoryField from './NewCategoryField';
 import { categoryDisplayName } from '../presetCategories';
 
 /**
@@ -21,13 +22,24 @@ import { categoryDisplayName } from '../presetCategories';
  * Tapping the selected chip clears it. A category is genuinely optional
  * -- an uncategorized transaction is a real, honest record, and better
  * than a wrong one filed to get the sheet closed.
+ *
+ * The last chip creates one. Until this existed, a category that didn't
+ * fit anything on the list meant abandoning a half-typed transaction for
+ * More's Categories screen and starting the entry again -- so the real
+ * choice on offer was "file it somewhere wrong" or "lose the entry", and
+ * the honest third option cost the most. The filter box doubles as the
+ * name field for the same reason: somebody who has already typed
+ * "Vet" and found nothing has said what they want.
  */
 const CHIP_COUNT = 6;
 
-export default function CategoryPicker({ ordered, value, onChange }) {
+export default function CategoryPicker({ ordered, value, onChange, isIncome, createCategory }) {
   const { t } = useI18n();
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState('');
+  // Null when closed; otherwise the name to open the field with, which is
+  // '' from the "+ New" chip and the filter text when nothing matched it.
+  const [creatingFrom, setCreatingFrom] = useState(null);
 
   const pick = (id) => onChange(id === value ? '' : id);
 
@@ -43,6 +55,31 @@ export default function CategoryPicker({ ordered, value, onChange }) {
     ? ordered.filter((c) => categoryDisplayName(c, t).toLowerCase().includes(needle))
     : ordered;
 
+  /** A category reached this way is always the person's own answer, never
+   *  a suggestion -- they just named it. Closing everything afterwards
+   *  puts the new chip back in a row they can see it selected in. */
+  const onCreated = (id) => {
+    onChange(id);
+    setCreatingFrom(null);
+    setFilter('');
+    setShowAll(false);
+  };
+
+  const createField = (
+    <NewCategoryField
+      // Remounts when the seed changes, so opening the field from the
+      // filter's "create this" button starts on that text rather than
+      // whatever the field held last time.
+      key={creatingFrom}
+      initialName={creatingFrom ?? ''}
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- this field only exists because the chip above it was just tapped; the caret belongs in it.
+      autoFocus
+      isIncome={isIncome}
+      create={createCategory}
+      onCreated={onCreated}
+    />
+  );
+
   const chip = (c) => (
     <button
       key={c.id}
@@ -56,8 +93,29 @@ export default function CategoryPicker({ ordered, value, onChange }) {
     </button>
   );
 
+  const newChip = (
+    <button
+      type="button"
+      className={`category-chip category-chip-new${creatingFrom !== null ? ' active' : ''}`}
+      aria-expanded={creatingFrom !== null}
+      onClick={() => setCreatingFrom(creatingFrom === null ? '' : null)}
+    >
+      {t('category.newChip')}
+    </button>
+  );
+
+  // Nothing on this side of the ledger yet -- the one state where naming
+  // a category is not just easier than the alternative, it is the only
+  // thing to do here.
   if (ordered.length === 0) {
-    return <p className="field-label">{t('transactions.noCategoriesYet')}</p>;
+    return (
+      <div className="category-picker">
+        <span className="field-label">{t('transactions.category')}</span>
+        <p className="field-label">{t('transactions.noCategoriesYet')}</p>
+        <div className="category-chips">{newChip}</div>
+        {creatingFrom !== null && createField}
+      </div>
+    );
   }
 
   return (
@@ -75,7 +133,10 @@ export default function CategoryPicker({ ordered, value, onChange }) {
             {t('transactions.allCategories')}
           </button>
         )}
+        {newChip}
       </div>
+
+      {creatingFrom !== null && createField}
 
       {showAll && (
         <div className="category-picker-all">
@@ -89,7 +150,21 @@ export default function CategoryPicker({ ordered, value, onChange }) {
             />
           </div>
           {filtered.length === 0 ? (
-            <p className="field-label">{t('transactions.noCategoryMatch')}</p>
+            <>
+              <p className="field-label">{t('transactions.noCategoryMatch')}</p>
+              {/* Hidden while the field is already open, or this would
+                  offer to create the filter text while the field above
+                  showed a different, half-edited name. */}
+              {creatingFrom === null && (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setCreatingFrom(filter.trim())}
+                >
+                  {t('category.createNamed', { name: filter.trim() })}
+                </button>
+              )}
+            </>
           ) : (
             <div className="category-chips">{filtered.map(chip)}</div>
           )}

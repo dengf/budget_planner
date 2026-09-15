@@ -53,6 +53,24 @@ function makeWasm() {
       };
     },
     recurring_occurrences: async () => ({ totals_by_category: [], occurrences: [] }),
+    preset_categories: async () => [],
+    // Stands in for `budget_calc::resolve_category_name`. Which of its
+    // five outcomes a typed name deserves is decided in Rust and tested
+    // there; what BudgetTab owns is saving the right record on the right
+    // side, so this mock only has to distinguish "already yours" from
+    // "new".
+    resolve_category_name: async ({ typed, direction, existing }) => {
+      const wantsIncome = direction === 'income';
+      const match = existing.find(
+        (c) => c.is_income === wantsIncome && c.name.toLowerCase() === typed.trim().toLowerCase(),
+      );
+      if (match) return { outcome: 'existing', category_id: match.id };
+      return {
+        outcome: 'create',
+        name: typed.trim(),
+        group_key: direction === 'income' ? 'cat.group.income' : 'cat.group.expense',
+      };
+    },
     new_id: () => 'new-id',
   };
 }
@@ -71,6 +89,7 @@ function renderBudget(props) {
     <I18nProvider initialLocale="en">
       <BudgetTab
         wasmModule={makeWasm()}
+        newId={() => 'new-id'}
         currencySymbol="$"
         today="2026-01"
         viewMonth="2026-01"
@@ -105,16 +124,17 @@ describe('BudgetTab row list', () => {
     ).toBeInTheDocument();
   });
 
-  // This tab has no way to create a category -- that moved to More ->
-  // Categories -- so the first-run banner has to name where the action
-  // actually is. It used to say "below", pointing at a form that is no
-  // longer on this screen: a dead end on the one screen a first-time
-  // user lands on with nothing set up.
-  it('sends a user with no income category to where categories are actually made', async () => {
+  // The first-run banner points at this screen's own control, so the
+  // control has to be here even though the side it belongs to has no rows
+  // to hang it off -- which is exactly the state a first-time user lands
+  // in. Asserting the banner without the button is how "below" quietly
+  // becomes a dead end again.
+  it('offers the income add control to a user who has no income category', async () => {
     renderBudget({ categories: { items: [CATEGORIES[1]] } });
     expect(
-      await screen.findByText('Add an income category in More → Categories to get started.'),
+      await screen.findByText('Add an income category below to get started.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Add an income category' })).toBeInTheDocument();
   });
 
   // Budget rows open the plan sheet; they have never had a "+". The
@@ -156,13 +176,97 @@ describe('BudgetTab row list', () => {
     );
   });
 
-  it('shows the empty state pointing at More once every category is removed', async () => {
+  // A wholly empty budget used to get a sentence sending it to another
+  // screen. Both add buttons already say what there is to do here, and
+  // two of them beside a message naming a third place is one direction
+  // too many.
+  it('answers an empty budget with both add controls rather than a message about More', async () => {
     renderBudget({ categories: { items: [] } });
     expect(
-      await screen.findByText(
-        'No categories yet — add your first one from More → Categories, starting with income.',
-      ),
+      await screen.findByRole('button', { name: '+ Add an income category' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Add an expense category' })).toBeInTheDocument();
+    expect(screen.queryByText(/More → Categories/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BudgetTab category creation', () => {
+  /**
+   * A real store, not `{ items, save: vi.fn() }`: the row a freshly
+   * created category earns only appears if the save actually lands in
+   * `items`, and a mock that swallows the record would let this pass
+   * while the Budget tab stayed empty after creating something.
+   */
+  function mountWithStore(initial = []) {
+    const saved = [];
+    function Harness() {
+      const [items, setItems] = React.useState(initial);
+      const categories = {
+        items,
+        save: async (record) => {
+          saved.push(record);
+          setItems((prev) => [...prev, record]);
+        },
+      };
+      return (
+        <I18nProvider initialLocale="en">
+          <BudgetTab
+            wasmModule={makeWasm()}
+            newId={() => 'new-id'}
+            currencySymbol="$"
+            today="2026-01"
+            viewMonth="2026-01"
+            categories={categories}
+            transactions={{ items: [] }}
+            budgetPlan={{ items: [], save: vi.fn(), remove: vi.fn() }}
+            goals={{ items: [] }}
+            debts={{ items: [] }}
+            recurring={{ items: [] }}
+          />
+        </I18nProvider>
+      );
+    }
+    render(<Harness />);
+    return saved;
+  }
+
+  it('files a category created under Income on the income side, and gives it a row', async () => {
+    const saved = mountWithStore();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Add an income category' }));
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Freelance' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Freelance”' }));
+
+    await vi.waitFor(() =>
+      expect(saved).toContainEqual(
+        expect.objectContaining({ name: 'Freelance', is_income: true, group: 'Income' }),
+      ),
+    );
+    expect(await screen.findByRole('button', { name: /Freelance/ })).toBeInTheDocument();
+  });
+
+  // Same field, other section: the side comes from which button opened it,
+  // never from anything the user has to say twice.
+  it('files a category created under Expense on the expense side', async () => {
+    const saved = mountWithStore();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Vet bills' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Vet bills”' }));
+
+    await vi.waitFor(() =>
+      expect(saved).toContainEqual(
+        expect.objectContaining({ name: 'Vet bills', is_income: false, group: 'Expense' }),
+      ),
+    );
+  });
+
+  // Two open name fields on a 375px column is two things to finish where
+  // there was one thing to do.
+  it('closes the other section field when the second one opens', async () => {
+    mountWithStore();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Add an income category' }));
+    expect(screen.getAllByLabelText('Category name')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '+ Add an expense category' }));
+    expect(screen.getAllByLabelText('Category name')).toHaveLength(1);
   });
 });
 

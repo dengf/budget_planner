@@ -8,6 +8,7 @@ import VoiceCapture from './VoiceCapture';
 import { PenIcon, CameraIcon, MicIcon, SpreadsheetIcon, RecurringIcon } from './icons';
 import { categoryDisplayName } from '../presetCategories';
 import { useCategoryRank } from '../useCategoryRank';
+import { useCreateCategory } from '../useCreateCategory';
 
 const DEFAULT_MAPPING = {
   date_col: 0,
@@ -164,6 +165,8 @@ export default function AddTransactionSheet({
     today,
     isIncome: draft.isIncome,
   });
+
+  const createCategory = useCreateCategory({ wasmModule, categories, newId });
 
   /**
    * The same `budget_calc::apply_rules` that files imported CSV rows,
@@ -525,6 +528,8 @@ export default function AddTransactionSheet({
                 <CategoryPicker
                   ordered={ordered}
                   value={categoryId}
+                  isIncome={draft.isIncome}
+                  createCategory={createCategory}
                   onChange={(id) => setDraft({ ...draft, category_id: id, categoryTouched: true })}
                 />
                 {/* Says why a category is already selected, so an

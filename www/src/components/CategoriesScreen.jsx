@@ -136,7 +136,13 @@ export default function CategoriesScreen({
     await categories.save({
       id,
       name: newCategory.name,
-      group: newCategory.group || (newCategory.isIncome ? t('cat.group.income') : 'General'),
+      // Same two groups `resolve_category_name` files a hand-typed
+      // category under, so one created here and one created from the
+      // picker or Budget don't land in different sections of the very
+      // list that groups by this. ('General' used to be the expense
+      // default -- untranslated, and a group nothing else ever used.)
+      group:
+        newCategory.group || t(newCategory.isIncome ? 'cat.group.income' : 'cat.group.expense'),
       is_income: newCategory.isIncome,
     });
     setNewCategory({ name: '', group: '', isIncome: false });

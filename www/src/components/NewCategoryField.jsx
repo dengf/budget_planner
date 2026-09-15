@@ -1,0 +1,114 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n';
+
+/**
+ * The name field behind every "add a category" affordance outside the
+ * Categories screen: one in the add sheet's picker, one at the foot of
+ * each of Budget's two sections.
+ *
+ * Shared rather than written twice because the interesting part isn't the
+ * input, it's what comes back from `create` -- four outcomes, one of which
+ * (`other_direction`) is a message rather than a saved category. Two
+ * copies of that handling is how one screen starts quietly creating the
+ * duplicate the other refuses.
+ *
+ * Deliberately no group field and no income/expense checkbox, unlike
+ * CategoriesScreen's fuller form: both callers already know which side of
+ * the ledger they're on -- the sheet from its Expense/Income toggle, Budget
+ * from which section this sits under -- and asking again is a decision
+ * someone has already made. No cancel button either: every caller reveals
+ * this from a control that toggles, so backing out is the affordance that
+ * opened it, and a third button on a 375px row costs width the name field
+ * needs more.
+ */
+export default function NewCategoryField({
+  isIncome,
+  create,
+  onCreated,
+  initialName = '',
+  autoFocus = false,
+}) {
+  const { t } = useI18n();
+  const [name, setName] = useState(initialName);
+  const [clash, setClash] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+
+  // Focusing the input is not the same as showing it. Both callers open
+  // this at the bottom of a scroll with something sticky pinned over that
+  // edge -- the add sheet's submit bar, the nav bar on Budget -- and the
+  // browser's own focus scroll counts "visible" as inside the container's
+  // box, which those overlays sit on top of: at 375px this opened
+  // underneath the submit bar, a caret blinking in a field nobody could
+  // see. `center` rather than `nearest` because the amount to clear is
+  // whatever that particular overlay happens to be tall, and the middle
+  // of the scroll is clear of every one of them. `smooth` degrades to an
+  // instant jump under prefers-reduced-motion, matching this app's
+  // convention elsewhere.
+  useEffect(() => {
+    if (!autoFocus || !ref.current) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    // Optional-called for the same reason `matchMedia` above is: jsdom
+    // implements neither, and a layout nicety must not be what decides
+    // whether this field renders at all under test.
+    ref.current.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+  }, [autoFocus]);
+
+  const typed = name.trim();
+
+  const submit = async () => {
+    if (!typed || busy) return;
+    setBusy(true);
+    const result = await create(name, isIncome);
+    setBusy(false);
+    // The name is somebody's own expense category sitting on the income
+    // side (or the reverse). Saying so beats both alternatives: creating
+    // a second category of the same name, or refusing with nothing to act
+    // on.
+    if (result.outcome === 'other_direction') {
+      setClash(typed);
+      return;
+    }
+    if (!result.categoryId) return;
+    setClash(null);
+    setName('');
+    onCreated(result.categoryId);
+  };
+
+  return (
+    <div className="new-category" ref={ref}>
+      <div className="new-category-row">
+        <div className="field-input">
+          <input
+            value={name}
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- only ever set by a caller whose affordance was just tapped to reveal this field; the caret belongs in it.
+            autoFocus={autoFocus}
+            placeholder={t('category.namePlaceholder')}
+            aria-label={t('category.namePlaceholder')}
+            onChange={(e) => {
+              setName(e.target.value);
+              setClash(null);
+            }}
+            // Enter submits without a <form>: both callers render this
+            // inside one of their own, where a nested form is invalid
+            // HTML and a submit button would save a transaction instead
+            // of a category.
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              submit();
+            }}
+          />
+        </div>
+        <button type="button" className="btn" disabled={!typed || busy} onClick={submit}>
+          {typed ? t('category.createNamed', { name: typed }) : t('category.create')}
+        </button>
+      </div>
+      {clash && (
+        <p className="field-label" role="status">
+          {t(isIncome ? 'category.clashIsExpense' : 'category.clashIsIncome', { name: clash })}
+        </p>
+      )}
+    </div>
+  );
+}

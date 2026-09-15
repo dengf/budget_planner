@@ -1563,6 +1563,19 @@ table.data tr:last-child td {
   gap: 2px;
   margin-bottom: 8px;
 }
+/* Sits at the foot of the Income block and again at the foot of the
+   Expense one, so which button someone taps is what decides the new
+   category's side of the ledger. */
+.budget-add-category {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 6px 14px;
+}
+.budget-add-category > .btn.ghost {
+  align-self: flex-start;
+  min-height: 44px;
+}
 .budget-row {
   display: flex;
   align-items: flex-start;
@@ -3413,6 +3426,35 @@ table.data tr:last-child td {
 }
 .category-chip-more {
   padding-left: 14px;
+}
+/* No badge to leave room for, same as `.category-chip-more`. */
+.category-chip-new {
+  padding-left: 14px;
+}
+
+/* The inline "name a new category" field, shared by the picker and the
+   foot of each of Budget's two sections (NewCategoryField.jsx). */
+.new-category {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.new-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+/* Wraps the button under the field rather than squeezing both onto one
+   375px row -- the Create button quotes the typed name back, so it is as
+   wide as whatever is being created. */
+.new-category-row .field-input {
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+.new-category-row .btn {
+  flex: 1 1 auto;
+  min-height: 44px;
 }
 .category-picker-all {
   display: flex;

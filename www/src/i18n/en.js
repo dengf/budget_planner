@@ -69,8 +69,7 @@ export default {
   'budget.reallocate': 'Reallocate',
   'budget.totalPlanned': 'Total planned',
   'budget.totalSpent': 'Total spent',
-  'budget.noCategories':
-    'No categories yet — add your first one from More → Categories, starting with income.',
+  'budget.noCategories': 'No categories yet — add your first one below, starting with income.',
   'budget.save': 'Save',
   'budget.remove': 'Remove',
 
@@ -98,7 +97,7 @@ export default {
   'chart.granularityDaily': 'Daily',
   'chart.granularityWeekly': 'Weekly',
   'budget.method': 'Zero-based: give every dollar a job until nothing is left unassigned.',
-  'budget.startWithIncomeCategory': 'Add an income category in More → Categories to get started.',
+  'budget.startWithIncomeCategory': 'Add an income category below to get started.',
   'budget.startWithIncome':
     'Start here — plan how much you expect from each income category below.',
   'budget.assignPrompt': 'Now assign your {amount} across the categories below.',
@@ -148,6 +147,14 @@ export default {
 
   'cat.group.income': 'Income',
   'cat.group.expense': 'Expense',
+  'category.newChip': '+ New',
+  'category.namePlaceholder': 'Category name',
+  'category.create': 'Create',
+  'category.createNamed': 'Create “{name}”',
+  'category.clashIsIncome': '“{name}” is already an income category — try a different name.',
+  'category.clashIsExpense': '“{name}” is already an expense category — try a different name.',
+  'category.addIncome': '+ Add an income category',
+  'category.addExpense': '+ Add an expense category',
 
   'cat.primaryEarnedIncome': 'Primary Earned Income',
   'cat.primaryEarnedIncome.desc': 'Salary, wages, overtime pay, tips, and bonuses.',
