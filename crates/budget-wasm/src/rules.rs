@@ -1,9 +1,12 @@
-//! `apply_rules`.
+//! `apply_rules`, `suggest_rule_keyword`.
 
 use wasm_bindgen::prelude::*;
 
 use crate::convert::{f64_to_decimal, to_js};
-use crate::dto::{ApplyRulesParams, ApplyRulesResult, RuleDto, TransactionDto};
+use crate::dto::{
+    ApplyRulesParams, ApplyRulesResult, RuleDto, SuggestRuleKeywordParams,
+    SuggestRuleKeywordResult, TransactionDto,
+};
 use crate::message::Message;
 
 fn from_dto(dto: &TransactionDto) -> Option<budget_calc::Transaction> {
@@ -83,4 +86,24 @@ fn apply_rules_impl(params: JsValue) -> ApplyRulesResult {
         transactions: transactions.iter().map(to_dto).collect(),
         error: None,
     }
+}
+
+/// A keyword to propose when someone makes a rule out of a transaction
+/// they are looking at -- see `budget_calc::suggest_rule_keyword`. It is
+/// a suggestion, not an answer: the caller must show it in an editable
+/// field before anything is saved.
+#[wasm_bindgen]
+pub fn suggest_rule_keyword(params: JsValue) -> JsValue {
+    to_js(
+        &match serde_wasm_bindgen::from_value::<SuggestRuleKeywordParams>(params) {
+            Ok(params) => SuggestRuleKeywordResult {
+                keyword: budget_calc::suggest_rule_keyword(&params.description),
+                error: None,
+            },
+            Err(_) => SuggestRuleKeywordResult {
+                error: Some(Message::bad_request().text),
+                ..Default::default()
+            },
+        },
+    )
 }

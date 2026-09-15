@@ -258,6 +258,57 @@ pub struct CarryPlanResult {
     pub error: Option<String>,
 }
 
+/// One transaction's amount as the entry form collects it. See
+/// `budget_calc::split_amount`.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SplitAmountResult {
+    pub magnitude: f64,
+    pub is_income: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SignedAmountParams {
+    pub magnitude: f64,
+    pub is_income: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SignedAmountResult {
+    pub amount: f64,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UncategorizedParams {
+    pub transactions: Vec<TransactionDto>,
+    pub existing_category_ids: Vec<String>,
+}
+
+/// Which transactions still need a category, and how many. The ids and
+/// the count come from one call so a badge can never disagree with the
+/// list it opens.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct UncategorizedResult {
+    pub ids: Vec<String>,
+    pub count: usize,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SuggestRuleKeywordParams {
+    pub description: String,
+}
+
+/// `keyword` is `None` when a description yields nothing worth matching
+/// on. See `budget_calc::suggest_rule_keyword` -- it is a suggestion, and
+/// the caller must let it be edited before saving.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SuggestRuleKeywordResult {
+    pub keyword: Option<String>,
+    pub error: Option<String>,
+}
+
 /// Which earlier month's plan can be carried into the month on screen --
 /// `month` is `None` when there is no earlier plan at all.
 #[derive(Debug, Clone, Default, Serialize)]

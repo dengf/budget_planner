@@ -63,9 +63,10 @@ pub use receipt::{
 pub use recurring::{
     occurrences_for_month, occurrences_in_month, totals_by_category, Occurrence, RecurringExpense,
 };
-pub use rules::{apply_rules, CategorizationRule};
+pub use rules::{apply_rules, suggest_rule_keyword, CategorizationRule};
 pub use transaction::{
-    daily_spend, income_by_category, spend_by_category, weekly_spend, Transaction,
+    daily_spend, income_by_category, is_uncategorized, signed_amount, spend_by_category,
+    split_amount, uncategorized_count, weekly_spend, Transaction,
 };
 #[cfg(feature = "voice")]
 pub use voice::transcribe_voice_command;
