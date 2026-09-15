@@ -69,7 +69,7 @@ pub use message::Message;
 pub use presets::preset_categories;
 pub use receipt::{parse_receipt_text, parse_statement_text};
 pub use recurring::recurring_occurrences;
-pub use rules::apply_rules;
+pub use rules::{apply_rules, suggest_rule_keyword};
 #[cfg(target_arch = "wasm32")]
 pub use storage::{
     delete_budget_plan_entry, delete_category, delete_debt, delete_goal, delete_recurring_expense,
@@ -78,7 +78,9 @@ pub use storage::{
     save_budget_plan_entry, save_category, save_debt, save_goal, save_recurring_expense, save_rule,
     save_transaction,
 };
-pub use transaction::{income_by_category, spend_by_category};
+pub use transaction::{
+    income_by_category, signed_amount, spend_by_category, split_amount, uncategorized,
+};
 pub use voice_parse::parse_voice_command;
 
 /// A new locally-generated record id, for the frontend to assign before

@@ -45,6 +45,67 @@ impl Transaction {
     }
 }
 
+/// A transaction's amount split into the two things a form actually
+/// collects: a positive magnitude, and which direction the money went.
+///
+/// The pair with `signed_amount` below is the whole point. The entry form
+/// has no minus key (see `NumberField.jsx` for the mobile-keyboard bug
+/// that made a signed amount field a real trap), so it collects a
+/// magnitude plus an Expense/Income choice and composes the sign on save.
+/// Editing has to take that apart again -- and if the two halves ever
+/// disagree, editing a transaction silently flips its sign, turning
+/// spending into income in every total in the app. Keeping both here,
+/// with a round-trip test, is what stops a `.jsx` ternary and its inverse
+/// drifting apart.
+///
+/// Zero is reported as an expense: it has no direction of its own, and
+/// expense is what the form opens on.
+pub fn split_amount(amount: Decimal) -> (Decimal, bool) {
+    let is_income = amount > Decimal::ZERO;
+    (round_currency(amount.abs()), is_income)
+}
+
+/// The inverse of `split_amount`: a magnitude plus a direction, composed
+/// back into the signed figure a `Transaction` stores. A magnitude that
+/// arrives negative is taken as the magnitude it should have been, not
+/// double-negated into the wrong direction.
+pub fn signed_amount(magnitude: Decimal, is_income: bool) -> Decimal {
+    let magnitude = magnitude.abs();
+    round_currency(if is_income { magnitude } else { -magnitude })
+}
+
+/// Whether this transaction still needs a category from a person.
+///
+/// Two ways to be uncategorized, and the second is the one a frontend
+/// `.filter(t => !t.category_id)` misses: no category at all (a CSV row
+/// no rule matched), or a category id that no longer names a real
+/// category. That second case is the dangling reference this codebase has
+/// already had to close once -- a deleted category left its raw id on
+/// screen -- and a transaction pointing at nothing is exactly as
+/// unfinished as one pointing at nobody, however different it looks in
+/// storage.
+pub fn is_uncategorized(transaction: &Transaction, existing_category_ids: &[String]) -> bool {
+    match transaction.category_id.as_deref() {
+        None => true,
+        Some(id) if id.trim().is_empty() => true,
+        Some(id) => !existing_category_ids.iter().any(|known| known == id),
+    }
+}
+
+/// How many of these still need a category -- the count behind the
+/// "Uncategorized (N)" filter. Counting here rather than in a `.filter()`
+/// keeps the badge and the filtered list reading from one rule; a badge
+/// that disagrees with the list it opens is worse than no badge.
+pub fn uncategorized_count(
+    transactions: &[Transaction],
+    existing_category_ids: &[String],
+) -> usize {
+    transactions
+        .iter()
+        .filter(|t| is_uncategorized(t, existing_category_ids))
+        .count()
+}
+
 /// Spend per category, as `category::build_month` wants it: only the
 /// spending side (negative amounts), summed to a positive figure per
 /// category, uncategorized transactions dropped rather than silently
@@ -176,6 +237,92 @@ mod tests {
         let mut tx = Transaction::new("id", "2026-08-01", desc, amount);
         tx.category_id = category.map(str::to_string);
         tx
+    }
+
+    fn ids(list: &[&str]) -> Vec<String> {
+        list.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn an_amount_survives_the_round_trip_through_the_entry_form() {
+        // The regression this pair exists to prevent: editing a
+        // transaction and saving it unchanged must not flip its sign.
+        for original in [dec!(-42.60), dec!(3000), dec!(-0.01), dec!(0)] {
+            let (magnitude, is_income) = split_amount(original);
+            assert!(magnitude >= Decimal::ZERO, "magnitude went negative");
+            assert_eq!(signed_amount(magnitude, is_income), original);
+        }
+    }
+
+    #[test]
+    fn spending_splits_to_an_expense_and_income_to_income() {
+        assert_eq!(split_amount(dec!(-42.60)), (dec!(42.60), false));
+        assert_eq!(split_amount(dec!(3000)), (dec!(3000), true));
+    }
+
+    #[test]
+    fn zero_is_an_expense_since_it_has_no_direction_of_its_own() {
+        assert_eq!(split_amount(dec!(0)), (dec!(0), false));
+    }
+
+    #[test]
+    fn a_magnitude_that_arrives_negative_is_not_double_negated() {
+        assert_eq!(signed_amount(dec!(-20), false), dec!(-20));
+        assert_eq!(signed_amount(dec!(-20), true), dec!(20));
+    }
+
+    #[test]
+    fn a_transaction_with_no_category_needs_one() {
+        assert!(is_uncategorized(
+            &t("csv row", dec!(-10), None),
+            &ids(&["dining"])
+        ));
+    }
+
+    #[test]
+    fn a_blank_category_id_counts_as_no_category() {
+        assert!(is_uncategorized(
+            &t("csv row", dec!(-10), Some("   ")),
+            &ids(&["dining"])
+        ));
+    }
+
+    #[test]
+    fn a_category_that_has_since_been_deleted_leaves_it_uncategorized() {
+        // The case a `.filter(t => !t.category_id)` misses entirely: the
+        // id is set, it just points at nothing any more.
+        assert!(is_uncategorized(
+            &t("coffee", dec!(-5), Some("gone")),
+            &ids(&["dining"])
+        ));
+    }
+
+    #[test]
+    fn a_real_category_is_categorized() {
+        assert!(!is_uncategorized(
+            &t("coffee", dec!(-5), Some("dining")),
+            &ids(&["dining"])
+        ));
+    }
+
+    #[test]
+    fn the_count_agrees_with_the_rule_it_filters_by() {
+        let txs = vec![
+            t("coffee", dec!(-5), Some("dining")),
+            t("csv row", dec!(-10), None),
+            t("orphan", dec!(-7), Some("gone")),
+        ];
+        let known = ids(&["dining"]);
+        assert_eq!(uncategorized_count(&txs, &known), 2);
+        assert_eq!(
+            uncategorized_count(&txs, &known),
+            txs.iter().filter(|x| is_uncategorized(x, &known)).count()
+        );
+    }
+
+    #[test]
+    fn nothing_is_uncategorized_in_an_empty_list() {
+        assert_eq!(uncategorized_count(&[], &ids(&["dining"])), 0);
     }
 
     #[test]
