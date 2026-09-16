@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import BudgetTab from './BudgetTab';
 
@@ -357,6 +357,56 @@ describe('BudgetTab category creation', () => {
         screen.queryByRole('button', { name: 'Subscriptions & Memberships' }),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('BudgetTab desktop planned editing', () => {
+  // Same shape as useIsDesktop.test.js's own helper: jsdom has no
+  // matchMedia, so every other describe block in this file already runs
+  // as the phone shell by default. This block is the one place that
+  // needs the desktop branch, so it mocks the query rather than
+  // reproducing this helper's setup/teardown in every other test here.
+  function mockDesktop() {
+    window.matchMedia = vi.fn(() => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  }
+
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  it('renders the planned amount as an inline field instead of a row button', async () => {
+    mockDesktop();
+    renderBudget();
+    await screen.findByText('Food');
+    expect(screen.queryByRole('button', { name: /Food/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: /Planned — Food/ })).toBeInTheDocument();
+  });
+
+  it('saves the typed planned amount on blur, with no sheet involved', async () => {
+    const save = vi.fn();
+    mockDesktop();
+    renderBudget({ budgetPlan: { items: [], save, remove: vi.fn() } });
+
+    const input = await screen.findByRole('spinbutton', { name: /Planned — Food/ });
+    fireEvent.change(input, { target: { value: '250' } });
+    fireEvent.blur(input);
+
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ category_id: 'food', month: '2026-01', planned: 250 }),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps the inline add-category controls working on desktop too', async () => {
+    mockDesktop();
+    renderBudget();
+    expect(
+      await screen.findByRole('button', { name: '+ Add an income category' }),
+    ).toBeInTheDocument();
   });
 });
 

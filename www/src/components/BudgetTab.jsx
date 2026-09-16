@@ -36,6 +36,58 @@ const SECTIONS = [
 ];
 
 /**
+ * Desktop-only: the planned amount, editable right in the row instead of
+ * behind a tap-to-open sheet. A mouse-and-keyboard session has no reason
+ * to lose the row it's looking at just to type one number -- that's a
+ * phone-sheet idiom, kept for phone (see `renderRow` below) but not
+ * forced onto desktop, per this tool's own "obvious to use" rule.
+ *
+ * Module scope, not defined inside `BudgetTab`: a component declared
+ * inside a render function gets a new identity every render, which React
+ * treats as unmounting the old one and mounting a stranger in its place
+ * -- exactly what would drop focus and the in-progress keystroke on every
+ * re-render this field's own `onChange` causes.
+ *
+ * Saves on blur/Enter, not per keystroke -- `budgetPlan.save` is an
+ * IndexedDB write, and firing one per character would mean most of them
+ * never finish before the next arrives. The draft is local state re-seeded
+ * from `value` on prop change (mirroring `EditPlanSheet`'s own `amount`
+ * state), so a save that lands mid-edit from elsewhere doesn't clobber
+ * what's being typed.
+ */
+function PlannedInlineInput({ value, onSave, ariaLabel }) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    const n = draft === '' || draft == null ? 0 : Number(draft);
+    if (Number.isFinite(n) && n !== value) onSave(n);
+  };
+
+  return (
+    <input
+      type="number"
+      step="any"
+      inputMode="decimal"
+      className="budget-row-planned-input"
+      aria-label={ariaLabel}
+      value={draft}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setDraft(e.target.value === '' ? '' : e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
+/**
  * `previous_remaining` (rollover) is passed as `[]` -- every month is
  * planned independently for now. `budget-calc::build_month` already
  * accepts a prior month's remaining balances; wiring the frontend to
@@ -244,6 +296,53 @@ export default function BudgetTab({
   const renderRow = (line, incomeRow, dimmed) => {
     const remaining = remainingCell(line);
     const over = !incomeRow && line.spent > line.planned;
+    const track = line.planned > 0 && (
+      <span className="budget-row-track">
+        <span
+          className={`budget-row-bar${over ? ' over' : ''}`}
+          style={{
+            width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%`,
+            ...(over ? {} : { background: categoryColor(categoryFor(line.category_id)) }),
+          }}
+        />
+      </span>
+    );
+
+    // Desktop: the planned amount is typed right into the row -- no
+    // tap-to-open sheet. A `<button>` can't host an `<input>` (invalid
+    // nesting), so this is a plain row instead of the phone version's
+    // single tap target.
+    if (isDesktop) {
+      return (
+        <div
+          key={line.category_id}
+          className={`budget-row budget-row-desktop${dimmed ? ' category-row-dim' : ''}`}
+        >
+          <CategoryBadge category={categoryFor(line.category_id)} />
+          <span className="budget-row-body">
+            <span className="budget-row-top">
+              <span className="budget-row-name">{categoryName(line.category_id)}</span>
+              <span className={`budget-row-pill ${remaining.className}`}>{remaining.text}</span>
+            </span>
+            {track}
+            <span className="budget-row-sub budget-row-sub-desktop">
+              <span>
+                {t(incomeRow ? 'budget.received' : 'budget.spent')}: {formatMoney(line.spent)}
+              </span>
+              <label className="budget-row-planned-label">
+                {t('budget.planned')}
+                <PlannedInlineInput
+                  value={line.planned}
+                  onSave={(amount) => savePlanned(line.category_id, amount)}
+                  ariaLabel={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
+                />
+              </label>
+            </span>
+          </span>
+        </div>
+      );
+    }
+
     return (
       <button
         key={line.category_id}
@@ -262,17 +361,7 @@ export default function BudgetTab({
             <span className="budget-row-name">{categoryName(line.category_id)}</span>
             <span className={`budget-row-pill ${remaining.className}`}>{remaining.text}</span>
           </span>
-          {line.planned > 0 && (
-            <span className="budget-row-track">
-              <span
-                className={`budget-row-bar${over ? ' over' : ''}`}
-                style={{
-                  width: `${Math.min(100, (line.spent / line.planned) * 100).toFixed(1)}%`,
-                  ...(over ? {} : { background: categoryColor(categoryFor(line.category_id)) }),
-                }}
-              />
-            </span>
-          )}
+          {track}
           <span className="budget-row-sub">
             {t('budget.rowSubtext', {
               spent: formatMoney(line.spent),

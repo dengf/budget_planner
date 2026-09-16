@@ -1919,6 +1919,48 @@ table.data tr:last-child td {
   font-variant-numeric: tabular-nums;
 }
 
+/* Desktop only (BudgetTab.jsx's `isDesktop` branch): a plain row, not a
+   button -- the planned amount is typed in place instead of opening
+   EditPlanSheet, so nothing here is a single click target any more. */
+.budget-row-desktop {
+  cursor: default;
+}
+.budget-row-desktop:hover {
+  background: none;
+}
+.budget-row-sub-desktop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.budget-row-planned-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+.budget-row-planned-input {
+  width: 6.5em;
+  min-height: 32px;
+  padding: 2px 6px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.budget-row-planned-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* The one remaining "upcoming this month" surface: a single row inside
    EditPlanSheet for the one category being edited (see that component's
    own doc comment), not the standalone list this used to be. The
