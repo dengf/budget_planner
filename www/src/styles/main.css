@@ -360,6 +360,20 @@ body {
   box-shadow: var(--hero-shadow);
 }
 
+/* Wraps the "+" button together with a small brand link back to the blog
+   (see `.app-tab-brand` below). `display: contents` outside the phone
+   bottom-bar breakpoint means this box doesn't exist as far as layout is
+   concerned -- the button below still participates directly in `.app-tabs`'
+   flex row exactly as it did before this wrapper existed, so the sticky
+   top pill on wider screens is unaffected. The phone breakpoint below
+   turns it into the real positioned box the brand link needs. */
+.app-tab-add-wrap {
+  display: contents;
+}
+.app-tab-brand {
+  display: none;
+}
+
 /* Five tabs wrapped left-aligned at phone width -- a lopsided 2/3 split
    hugging the left edge, reading as crowded and unbalanced. Every tab
    stays reachable with no scrolling; centering each wrapped row (flex
@@ -429,12 +443,69 @@ body {
      The ring is `--bg`, the page's own background, not the bar's: the
      top of the circle overhangs scrolling content above the bar, and a
      ring in the bar's colour would draw a grey halo over that content. */
+  /* Both the button and the brand link below are positioned absolutely
+     against this wrap now, rather than one flowing and the other raised
+     by transform -- that made their clearance a fragile function of the
+     raise amount happening to exceed the link's box height, which it
+     didn't (see git history on this rule for the overlap that shipped
+     first). An explicit height most other tabs' own icon+label content
+     already reaches on its own gives both elements real, independent
+     room, and shrinking either one here can only ever widen the gap
+     between them, never reintroduce the overlap. */
   .app-tab-add {
-    width: 56px;
-    height: 56px;
-    font-size: 1.9rem;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
     border: 4px solid var(--bg);
-    transform: translateY(-12px);
+    transform: translate(-50%, -14px);
+    margin: 0;
+  }
+  /* Takes over the "+" button's own base-rule flex sizing (`flex: 0 0
+     auto; align-self: center; margin: 0 4px;`) now that it's a real box
+     rather than `display: contents`. `align-self: center` (kept from the
+     base rule) means this fixed height doesn't force the row's other
+     tabs to stretch to match it -- it's simply centered within whatever
+     height their own icon+label content already gives the row. */
+  .app-tab-add-wrap {
+    display: block;
+    position: relative;
+    flex: 0 0 auto;
+    align-self: center;
+    margin: 0 4px;
+    width: 44px;
+    height: 50px;
+  }
+  /* Sits in the gap the raised "+" leaves below itself -- the same band
+     of the row every other tab fills with its label (see the comment on
+     `.app-tab-add-wrap` in Header.jsx). Centered under the button rather
+     than claiming its own flex slot so the row's five-way spacing among
+     the real tabs is untouched; free to be wider than the wrap itself
+     (the wordmark's aspect ratio makes it so) since nothing here clips. */
+  .app-tab-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+  }
+  /* `.meifio-mark` (main.css, near `.app-byline`) fixes its own colour to
+     `--ink` for the More-tab byline it was designed for, full brightness
+     against a full sentence. Here it's a small quiet credit sitting under
+     a bright "+", so it gets its own muted colour instead -- overridden
+     on the mark itself, not `.app-tab-brand`, since currentColor only
+     reaches the letterforms if the mark's own rule doesn't already pin
+     the colour first. */
+  .app-tab-brand .meifio-mark {
+    color: var(--muted);
+  }
+  .app-tab-brand:active .meifio-mark {
+    color: var(--ink);
   }
   .app-main {
     /* Matches the bar's own `bottom` offset above, so content never sits

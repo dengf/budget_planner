@@ -2,7 +2,9 @@ import React from 'react';
 import { LOCALES, useI18n } from '../i18n';
 import YourDataMenu from './YourDataMenu';
 import MonthYearPicker from './MonthYearPicker';
+import MeifioMark from './MeifioMark';
 import { TABS, ADD_BUTTON_INDEX } from '../tabs';
+import { MEIFIO_HOME } from '../meifioHome';
 
 export default function Header({
   activeTab,
@@ -113,15 +115,26 @@ export default function Header({
           );
           if (i !== ADD_BUTTON_INDEX) return [tab];
           return [
-            <button
-              key="add"
-              type="button"
-              className="app-tab-add"
-              aria-label={t('nav.add')}
-              onClick={() => onOpenAdd?.('manual')}
-            >
-              <span aria-hidden="true">+</span>
-            </button>,
+            // The bottom bar's raised "+" leaves a gap below it on phone
+            // -- the same slot every other tab fills with its label --
+            // that this fills with the real "meifio" wordmark (the same
+            // mark used in More's byline, MoreTab.jsx) instead of leaving
+            // it empty. `.app-tab-add-wrap` is `display: contents` outside
+            // that breakpoint (main.css), so the top nav pill on wider
+            // screens renders exactly as before.
+            <span key="add-wrap" className="app-tab-add-wrap">
+              <button
+                type="button"
+                className="app-tab-add"
+                aria-label={t('nav.add')}
+                onClick={() => onOpenAdd?.('manual')}
+              >
+                <span aria-hidden="true">+</span>
+              </button>
+              <a className="app-tab-brand" href={MEIFIO_HOME} aria-label={t('nav.meifio')}>
+                <MeifioMark height="11px" />
+              </a>
+            </span>,
             tab,
           ];
         })}

@@ -7,8 +7,7 @@ import RecurringSection from './RecurringSection';
 import CategoriesScreen from './CategoriesScreen';
 import MeifioMark from './MeifioMark';
 import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon, CategoriesIcon } from './icons';
-
-const MEIFIO_HOME = 'https://dengf.github.io/meifio-blog/';
+import { MEIFIO_HOME } from '../meifioHome';
 
 /**
  * Everything that isn't one of the three screens someone opens daily.

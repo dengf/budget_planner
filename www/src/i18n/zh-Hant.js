@@ -23,6 +23,7 @@ export default {
   'nav.transactions': '帳目',
   'nav.more': '更多',
   'nav.add': '記一筆',
+  'nav.meifio': 'meifio 部落格',
 
   'more.title': '更多',
   'more.categoriesHint': '新增、重新命名或刪除分類。',
