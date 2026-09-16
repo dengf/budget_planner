@@ -427,6 +427,9 @@ export default function BudgetTab({
         {SECTIONS.map(({ id, incomeRow }) => {
           const lines = orderedLines.filter((l) => isIncome(l.category_id) === incomeRow);
           const dimmed = dimExpenseUntilIncome && !incomeRow;
+          const unusedPresets = incomeRow
+            ? createCategory.availableIncomePresets
+            : createCategory.availableExpensePresets;
           return (
             <React.Fragment key={id}>
               {/* No header over a side with nothing on it -- the add
@@ -458,15 +461,27 @@ export default function BudgetTab({
                 </button>
                 {addingTo === id && (
                   <NewCategoryField
-                    // eslint-disable-next-line jsx-a11y/no-autofocus -- this field only exists because the button above it was just tapped; the caret belongs in it.
-                    autoFocus
+                    // Remounts once the preset fetch settles, so a field
+                    // that had to mount before knowing whether presets
+                    // exist gets a fresh, correct autoFocus decision
+                    // instead of being stuck with whatever it guessed at
+                    // mount.
+                    key={createCategory.presetsReady}
+                    // Autofocus only once we know there's nothing to tap
+                    // instead. Stealing the keyboard the instant this
+                    // button is pressed put the nav bar mid-screen and the
+                    // presets that just appeared half behind it -- exactly
+                    // the case this whole field exists to avoid, caught on
+                    // the phone this was tested on. `presetsReady` guards
+                    // against the fetch's own async gap: it resolves after
+                    // this field can already be open, so trusting an empty
+                    // list before it flips true would autofocus every time
+                    // and never let go once the real presets arrived.
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- conditional per the comment above; the caret belongs in the field exactly when nothing else does.
+                    autoFocus={createCategory.presetsReady && unusedPresets.length === 0}
                     isIncome={incomeRow}
                     create={createCategory.create}
-                    presets={
-                      incomeRow
-                        ? createCategory.availableIncomePresets
-                        : createCategory.availableExpensePresets
-                    }
+                    presets={unusedPresets}
                     onCreated={() => setAddingTo(null)}
                   />
                 )}

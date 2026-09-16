@@ -80,11 +80,27 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
     <NewCategoryField
       // Remounts when the seed changes, so opening the field from the
       // filter's "create this" button starts on that text rather than
-      // whatever the field held last time.
-      key={creatingFrom}
+      // whatever the field held last time -- and also once the preset
+      // fetch settles, so a field that had to mount before knowing
+      // whether presets exist gets a fresh, correct autoFocus decision
+      // instead of being stuck with whatever it guessed at mount.
+      key={`${creatingFrom}-${createCategory.presetsReady}`}
       initialName={creatingFrom ?? ''}
-      // eslint-disable-next-line jsx-a11y/no-autofocus -- this field only exists because the chip above it was just tapped; the caret belongs in it.
-      autoFocus
+      // Stealing the keyboard the moment "+ New" is tapped defeats the
+      // point of showing presets at all -- the chips get shoved behind
+      // the keyboard before anyone's had a chance to read them. Autofocus
+      // only when there's nothing to tap instead (`unusedPresets` is
+      // empty, typing is the only path) or the keyboard is already up
+      // because `creatingFrom` came from the filter box's own "Create X"
+      // button -- there, focus doesn't summon anything new. `presetsReady`
+      // guards the first case: the preset fetch is async even when it
+      // resolves instantly, so trusting an empty list before it flips true
+      // would autofocus on every open and then never let go once the real
+      // presets arrive, since focus isn't revisited after mount.
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- conditional per the comment above; the caret belongs in the field exactly when nothing else does.
+      autoFocus={
+        Boolean(creatingFrom) || (createCategory.presetsReady && unusedPresets.length === 0)
+      }
       isIncome={isIncome}
       create={createCategory.create}
       presets={unusedPresets}
