@@ -24,6 +24,7 @@ export default {
   'nav.more': '更多',
   'nav.add': '记一笔',
   'nav.meifio': 'meifio 博客',
+  'nav.sidebarLabel': '导航',
 
   'more.title': '更多',
   'more.categoriesHint': '新增、重命名或删除分类。',

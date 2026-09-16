@@ -25,6 +25,7 @@ export default {
   'nav.more': 'More',
   'nav.add': 'Add a transaction',
   'nav.meifio': 'meifio blog',
+  'nav.sidebarLabel': 'Navigation',
 
   'more.title': 'More',
   'more.categoriesHint': 'Add, rename or remove where the money goes.',
