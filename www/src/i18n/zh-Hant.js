@@ -136,6 +136,8 @@ export default {
   'data.imported': '已復原 {count} 筆記錄。',
   'budget.spentHint':
     '「已花費」由本月的帳目自動彙總——點擊下方工具列的 + 可記一筆，或到「帳目」頁匯入銀行帳單。',
+  'budget.spentHintWide':
+    '「已花費」由本月的帳目自動彙總——點擊側邊欄的「記一筆」可記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
   'budget.editCategoriesTitle': '新增或編輯分類',
   'budget.savings': '儲蓄',

@@ -136,6 +136,8 @@ export default {
   'data.imported': '已恢复 {count} 条记录。',
   'budget.spentHint':
     '“已花费”由本月的账目自动汇总——点击下方工具栏的 + 可记一笔，或到“账目”页导入银行账单。',
+  'budget.spentHintWide':
+    '“已花费”由本月的账目自动汇总——点击侧边栏的“记一笔”可记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
   'budget.editCategoriesTitle': '添加或编辑分类',
   'budget.savings': '储蓄',

@@ -3789,6 +3789,24 @@ table.data tr:last-child td {
     display: none;
   }
 
+  /* The add-transaction sheet is the most-used control in the app and
+     was still sized like a phone sheet here: 480px wide and capped at
+     640px tall on a 900px-tall screen, so the date field and the "+
+     New" chip sat behind the sticky footer and needed an inner scroll,
+     and every category chip truncated ("Food & ..."). The cap exists so
+     a sheet never outgrows a short phone screen -- at this width there
+     is room, so let it use the height it needs and give the two chip
+     columns ~250px each instead of ~210px. */
+  .add-txn-dialog {
+    max-height: 90vh;
+  }
+  /* Only the transaction sheet itself. `.edit-plan-dialog` and
+     `.suggest-plan-dialog` share the class but hold one field and a
+     button; widening those just spreads two controls thinner. */
+  .add-txn-dialog:not(.edit-plan-dialog):not(.suggest-plan-dialog) {
+    max-width: 560px;
+  }
+
   /* Dashboard: the donut beside its own category rows, with the
      spend-over-time chart spanning both columns beneath -- 31 daily
      points are the one thing here that actually wants the full width.
@@ -3831,11 +3849,24 @@ table.data tr:last-child td {
   }
 
   /* Three fields stretched across ~950px read as a stretched form, not
-     a wide one. Cap each track and left-align the row instead. Reaches
-     every `.form-grid` -- Goals, Debt, Categories, Transactions. */
-  .form-grid {
+     a wide one. Cap each track and left-align the row instead.
+     `.panel` on the front, not a bare `.form-grid`: the same class also
+     builds the forms inside the add-transaction and edit-plan sheets,
+     which are 520px wide at most, and a 260px cap there costs them their
+     second column -- the sheet's fields ended up in one narrow strip
+     down the left of a half-empty dialog. In a sheet the width is
+     already the constraint this rule exists to impose. */
+  .panel .form-grid {
     grid-template-columns: repeat(auto-fit, minmax(160px, 260px));
     justify-content: start;
+  }
+  /* EditPlanSheet and PlanFromSpendingSheet render inside BudgetTab's
+     own `.panel` rather than at the root, so the cap above reaches them
+     too and leaves their one field stranded in a 260px strip. Put the
+     ordinary form layout back for anything inside a sheet. */
+  .panel .add-txn-dialog .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    justify-content: stretch;
   }
 }
 
