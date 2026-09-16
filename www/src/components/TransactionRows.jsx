@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useI18n } from '../i18n';
 import { categoryDisplayName } from '../presetCategories';
 
@@ -36,13 +36,54 @@ export default function TransactionRows({
   today,
 }) {
   const { t } = useI18n();
+  const rowsRef = useRef(null);
+  const focusNewRow = useRef(false);
 
   // The column headers are visual, so every control names its own row
   // for a screen reader instead of leaning on them.
   const rowLabel = (field, index) => t('transactions.rowField', { field, n: index + 1 });
 
+  /**
+   * Shift+Enter means "next row", so a batch can be typed without
+   * leaving the keyboard. Plain Enter still submits the form -- the
+   * browser's own behaviour, and the one people expect from a form --
+   * which is exactly why the shortcut needs a modifier.
+   *
+   * It only *adds* a row when there isn't one below: filling an amount
+   * already grows a fresh row underneath, so appending unconditionally
+   * would leave a blank row stranded above the caret every time.
+   *
+   * The handler sits on the container rather than on every input:
+   * `keydown` bubbles, so one listener covers all six controls in all
+   * the rows, including rows that don't exist yet.
+   */
+  const onKeyDown = (e) => {
+    if (e.key !== 'Enter' || !e.shiftKey) return;
+    const from = e.target.closest('.txn-row');
+    if (!from) return;
+    e.preventDefault();
+    const all = [...(rowsRef.current?.querySelectorAll('.txn-row') ?? [])];
+    const next = all[all.indexOf(from) + 1];
+    if (next) {
+      next.querySelector('input[data-row-amount]')?.focus();
+      return;
+    }
+    focusNewRow.current = true;
+    onAddRow();
+  };
+
+  // Focus after React has committed the new row -- the input does not
+  // exist yet at the moment the shortcut fires.
+  useEffect(() => {
+    if (!focusNewRow.current) return;
+    focusNewRow.current = false;
+    const amounts = rowsRef.current?.querySelectorAll('input[data-row-amount]');
+    amounts?.[amounts.length - 1]?.focus();
+  }, [rows.length]);
+
   return (
-    <div className="txn-rows">
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- the rule guards against a div standing in for a control; nothing is activated here. This only listens for a shortcut bubbling out of the native inputs inside, each of which is already focusable and keyboard-operable on its own.
+    <div className="txn-rows" ref={rowsRef} onKeyDown={onKeyDown}>
       <div className="txn-rows-head" aria-hidden="true">
         <span className="field-label">{t('transactions.entryType')}</span>
         <span className="field-label">{t('transactions.amount')}</span>
@@ -76,6 +117,7 @@ export default function TransactionRows({
             <input
               type="text"
               inputMode="decimal"
+              data-row-amount=""
               aria-label={rowLabel(t('transactions.amount'), i)}
               value={row.amount}
               onChange={(e) => {
@@ -136,9 +178,15 @@ export default function TransactionRows({
         </div>
       ))}
 
-      <button type="button" className="btn secondary txn-rows-add" onClick={onAddRow}>
-        + {t('transactions.addRow')}
-      </button>
+      <div className="txn-rows-foot">
+        <button type="button" className="btn secondary txn-rows-add" onClick={onAddRow}>
+          + {t('transactions.addRow')}
+        </button>
+        {/* The shortcut is the fast path, so it is written down rather
+            than left to be discovered -- and the button stays, because a
+            shortcut nobody is obliged to know is not an affordance. */}
+        <span className="field-label txn-rows-hint">{t('transactions.addRowShortcut')}</span>
+      </div>
     </div>
   );
 }

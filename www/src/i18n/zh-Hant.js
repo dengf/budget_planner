@@ -205,6 +205,7 @@ export default {
   'transactions.income': '收入',
   'transactions.addExpense': '新增支出',
   'transactions.addRow': '加一列',
+  'transactions.addRowShortcut': 'Shift + Enter 加一列',
   'transactions.removeRow': '刪除第 {n} 列',
   'transactions.rowField': '第 {n} 列：{field}',
   'transactions.addCount': '新增 {count} 筆',

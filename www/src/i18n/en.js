@@ -236,6 +236,7 @@ export default {
   // names a control for a screen reader ("Amount, row 2"), since the
   // column headers above the rows are visual only.
   'transactions.addRow': 'Add a row',
+  'transactions.addRowShortcut': 'Shift + Enter adds a row',
   'transactions.removeRow': 'Remove row {n}',
   'transactions.rowField': '{field}, row {n}',
   'transactions.addCount': 'Add {count} transactions',

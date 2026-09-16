@@ -3854,8 +3854,14 @@ table.data tr:last-child td {
   .txn-row-remove:disabled {
     opacity: 0.35;
   }
+  .txn-rows-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
   .txn-rows-add {
-    align-self: start;
+    flex: none;
   }
 
   /* Dashboard: the donut beside its own category rows, with the

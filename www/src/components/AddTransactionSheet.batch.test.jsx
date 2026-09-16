@@ -141,6 +141,34 @@ describe('AddTransactionSheet batch entry', () => {
     expect(transactions.save).toHaveBeenCalledWith(expect.objectContaining({ amount: -20 }));
   });
 
+  // Typing a batch is a keyboard job, so the row break is a keystroke
+  // rather than a trip to the button with the mouse.
+  it('adds a row on Shift+Enter and puts the caret in it', () => {
+    renderBatch();
+    fireEvent.change(descriptionIn(1), { target: { value: 'Rent' } });
+    fireEvent.keyDown(descriptionIn(1), { key: 'Enter', shiftKey: true });
+    expect(amountIn(2)).toHaveValue('');
+    expect(amountIn(2)).toHaveFocus();
+  });
+
+  // Filling an amount already grows a row underneath; the shortcut has
+  // to move into that one rather than strand it above the caret.
+  it('moves to the row below instead of adding a second empty one', () => {
+    renderBatch();
+    fireEvent.change(amountIn(1), { target: { value: '12' } });
+    fireEvent.keyDown(descriptionIn(1), { key: 'Enter', shiftKey: true });
+    expect(amountIn(2)).toHaveFocus();
+    expect(screen.queryByLabelText('Amount, row 3')).not.toBeInTheDocument();
+  });
+
+  // Plain Enter is the form's own submit, which is why the shortcut
+  // needs the modifier: it must not add a row instead.
+  it('leaves plain Enter alone', () => {
+    renderBatch();
+    fireEvent.keyDown(amountIn(1), { key: 'Enter' });
+    expect(screen.queryByLabelText('Amount, row 2')).not.toBeInTheDocument();
+  });
+
   // A new row inherits the date above it: a batch is usually one day's
   // receipts, so the date is set once rather than once per row.
   it('carries the date down to the next row', () => {
