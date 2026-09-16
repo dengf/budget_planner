@@ -385,9 +385,20 @@ export function AppShell({ wasmModule }) {
         await budgetPlan.remove(item.id);
       }
 
+      // A record that fails to save here (the engine rejects something
+      // `readBackup`'s own shape check can't catch, e.g. an amount it
+      // can't parse as a `Decimal`) used to be swallowed silently -- the
+      // loop kept going and this returned the same `{ imported }` shape
+      // it would on a clean run, so a partially-restored budget looked
+      // exactly like a fully-restored one. Stopping and reporting it
+      // doesn't undo the clear that already happened above (there is no
+      // multi-record transaction across these wasm calls to roll back),
+      // but a visible failure is still strictly better than a confident,
+      // wrong "it worked."
       for (const name of COLLECTIONS) {
         for (const record of backup.collections[name]) {
-          await byName[name].save(record);
+          const result = await byName[name].save(record);
+          if (result?.error) return { error: t('err.importIncomplete') };
         }
       }
       // Only restore plan rows belonging to the month now on screen --
@@ -395,7 +406,8 @@ export function AppShell({ wasmModule }) {
       // rows into it would show them under the wrong heading.
       if (backup.budgetPlan.month === viewMonth) {
         for (const entry of backup.budgetPlan.entries) {
-          await budgetPlan.save(entry);
+          const result = await budgetPlan.save(entry);
+          if (result?.error) return { error: t('err.importIncomplete') };
         }
       }
       // No separate income restore: income is derived from the categories

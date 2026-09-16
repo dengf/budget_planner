@@ -446,6 +446,8 @@ export default {
   'err.voiceCaptureUnexpected': "Couldn't record that ({value}).",
   'err.badImportFile': "That file isn't a Budget Planner export — nothing was changed.",
   'err.importFailed': "Couldn't read that file. Try again.",
+  'err.importIncomplete':
+    "That backup couldn't be fully restored. Check your data before continuing.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",
   'err.categoryInUse':
     '"{name}" is used by {count} transactions or recurring expenses — recategorize them before removing it.',

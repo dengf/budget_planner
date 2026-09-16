@@ -409,6 +409,7 @@ export default {
   'err.voiceCaptureUnexpected': '无法录音（{value}）。',
   'err.badImportFile': '该文件不是预算规划导出的备份——未做任何更改。',
   'err.importFailed': '无法读取该文件，请重试。',
+  'err.importIncomplete': '该备份未能完全恢复，请先检查数据再继续使用。',
   'err.invalidRecurringAmount': '该金额无效（收到 {value}）。',
   'err.categoryInUse':
     '“{name}”被 {count} 笔账目或定期支出使用——请先给它们重新分类，再删除该分类。',
