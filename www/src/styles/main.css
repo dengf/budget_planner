@@ -3803,8 +3803,59 @@ table.data tr:last-child td {
   /* Only the transaction sheet itself. `.edit-plan-dialog` and
      `.suggest-plan-dialog` share the class but hold one field and a
      button; widening those just spreads two controls thinner. */
-  .add-txn-dialog:not(.edit-plan-dialog):not(.suggest-plan-dialog) {
+  .add-txn-dialog:not(.edit-plan-dialog):not(.suggest-plan-dialog):not(.batch) {
     max-width: 560px;
+  }
+  /* Wider again while the batch rows are showing -- six columns of
+     controls, and narrower than this starts truncating category names
+     in the row selects. Only the Manual tab carries `.batch`, so the
+     sheet goes back to 560px on Receipt/Voice/CSV/Recurring. */
+  .add-txn-dialog.batch {
+    max-width: 880px;
+  }
+  .txn-batch {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .txn-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  /* Type, amount, description, category, date, remove. Description and
+     category take what's left because they hold the longest strings;
+     everything else is sized to its content. */
+  .txn-rows-head,
+  .txn-row {
+    display: grid;
+    grid-template-columns: 108px 104px minmax(0, 1fr) minmax(0, 1.1fr) 162px 32px;
+    gap: 8px;
+    align-items: center;
+  }
+  .txn-rows-head {
+    padding: 0 2px;
+  }
+  /* The row controls lose the stacked label/field block's own margins:
+     the header above is the label, once, for the whole column. */
+  .txn-row .field-input,
+  .txn-row .field-select {
+    margin: 0;
+    width: 100%;
+  }
+  .txn-row-remove {
+    min-width: 32px;
+    padding: 0;
+    justify-self: center;
+  }
+  /* Disabled only when it's the last row, where removing it would leave
+     nowhere to type -- dimmed rather than gone so the column doesn't
+     reflow the moment a second row appears. */
+  .txn-row-remove:disabled {
+    opacity: 0.35;
+  }
+  .txn-rows-add {
+    align-self: start;
   }
 
   /* Dashboard: the donut beside its own category rows, with the

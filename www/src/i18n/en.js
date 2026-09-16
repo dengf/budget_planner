@@ -232,6 +232,13 @@ export default {
   'transactions.expense': 'Expense',
   'transactions.income': 'Income',
   'transactions.addExpense': 'Add expense',
+  // The desktop batch form: several rows filed in one go. `rowField`
+  // names a control for a screen reader ("Amount, row 2"), since the
+  // column headers above the rows are visual only.
+  'transactions.addRow': 'Add a row',
+  'transactions.removeRow': 'Remove row {n}',
+  'transactions.rowField': '{field}, row {n}',
+  'transactions.addCount': 'Add {count} transactions',
   'transactions.addAmount': 'Add {amount}',
   'transactions.addAmountTo': 'Add {amount} to {category}',
   'transactions.descriptionPlaceholder': 'Optional',

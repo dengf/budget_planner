@@ -629,6 +629,7 @@ export function AppShell({ wasmModule }) {
             transactions={transactions}
             recurring={recurring}
             formatMoney={formatMoney}
+            isDesktop={isDesktop}
           />
         </Suspense>
       )}
