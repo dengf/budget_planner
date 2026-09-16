@@ -250,12 +250,20 @@ describe('AddTransactionSheet category creation', () => {
   const CREATING_WASM = {
     ...WASM,
     preset_categories: async () => [],
-    resolve_category_name: async ({ typed }) => ({
-      outcome: 'create',
-      name: typed.trim(),
-      group_key: 'cat.group.expense',
-      error: null,
-    }),
+    resolve_category_name: async ({ typed, direction, presets }) => {
+      const wantsIncome = direction === 'income';
+      const needle = typed.trim().toLowerCase();
+      const presetMatch = presets.find(
+        (p) => p.is_income === wantsIncome && p.name.toLowerCase() === needle,
+      );
+      if (presetMatch) return { outcome: 'preset', preset_key: presetMatch.key };
+      return {
+        outcome: 'create',
+        name: typed.trim(),
+        group_key: wantsIncome ? 'cat.group.income' : 'cat.group.expense',
+        error: null,
+      };
+    },
   };
 
   /**
@@ -265,7 +273,7 @@ describe('AddTransactionSheet category creation', () => {
    * against a store that forgets, every one of those assertions would
    * pass vacuously or fail for the wrong reason.
    */
-  function renderCreatingSheet() {
+  function renderCreatingSheet(wasmModule = CREATING_WASM) {
     const transactions = { items: [], save: vi.fn() };
     const saved = [];
     function Harness() {
@@ -282,7 +290,7 @@ describe('AddTransactionSheet category creation', () => {
           <AddTransactionSheet
             open
             onClose={() => {}}
-            wasmModule={CREATING_WASM}
+            wasmModule={wasmModule}
             newId={() => 'new-id'}
             today="2026-01-01"
             categories={categories}
@@ -348,5 +356,36 @@ describe('AddTransactionSheet category creation', () => {
     // Opens the name field already holding what was typed, rather than
     // asking for it a second time.
     expect(screen.getByLabelText('Category name')).toHaveValue('Vet');
+  });
+
+  // Sixteen starter presets already exist; a typed-name-only field is
+  // only easier than More -> Categories for a name that isn't one of
+  // them. This is the gap CategoryPicker closed alongside Budget's own.
+  it('offers an unadded preset as a chip, and creates it furnished on a tap', async () => {
+    const PRESET = {
+      key: 'cat.subscriptionsMemberships',
+      group_key: 'cat.group.expense',
+      description_key: 'cat.subscriptionsMemberships.desc',
+      is_income: false,
+    };
+    const wasmModule = { ...CREATING_WASM, preset_categories: async () => [PRESET] };
+    const { saved } = renderCreatingSheet(wasmModule);
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New' }));
+    const chip = await screen.findByRole('button', { name: 'Subscriptions & Memberships' });
+    fireEvent.click(chip);
+
+    await waitFor(() =>
+      expect(saved).toContainEqual(
+        expect.objectContaining({
+          name: 'Subscriptions & Memberships',
+          preset_key: 'cat.subscriptionsMemberships',
+        }),
+      ),
+    );
+    // Selected, exactly as a typed-and-created category would be.
+    expect(await screen.findByRole('button', { name: /Subscriptions & Memberships/ })).toHaveClass(
+      'active',
+    );
   });
 });

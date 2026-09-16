@@ -461,7 +461,12 @@ export default function BudgetTab({
                     // eslint-disable-next-line jsx-a11y/no-autofocus -- this field only exists because the button above it was just tapped; the caret belongs in it.
                     autoFocus
                     isIncome={incomeRow}
-                    create={createCategory}
+                    create={createCategory.create}
+                    presets={
+                      incomeRow
+                        ? createCategory.availableIncomePresets
+                        : createCategory.availableExpensePresets
+                    }
                     onCreated={() => setAddingTo(null)}
                   />
                 )}

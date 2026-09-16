@@ -29,7 +29,11 @@ import { categoryDisplayName } from '../presetCategories';
  * choice on offer was "file it somewhere wrong" or "lose the entry", and
  * the honest third option cost the most. The filter box doubles as the
  * name field for the same reason: somebody who has already typed
- * "Vet" and found nothing has said what they want.
+ * "Vet" and found nothing has said what they want. Opening that field
+ * also surfaces the starter presets nobody's added yet, as one-tap chips
+ * above the typed-name input (see `NewCategoryField`'s own comment) --
+ * typing is the fallback for a name that isn't already one of them, not
+ * the only way in.
  */
 const CHIP_COUNT = 6;
 
@@ -40,6 +44,13 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
   // Null when closed; otherwise the name to open the field with, which is
   // '' from the "+ New" chip and the filter text when nothing matched it.
   const [creatingFrom, setCreatingFrom] = useState(null);
+
+  // `createCategory` is `useCreateCategory`'s whole return value, not
+  // just its `create` function -- this picker is the one place that
+  // knows both which direction it's on and which preset list matches it.
+  const unusedPresets = isIncome
+    ? createCategory.availableIncomePresets
+    : createCategory.availableExpensePresets;
 
   const pick = (id) => onChange(id === value ? '' : id);
 
@@ -75,7 +86,8 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
       // eslint-disable-next-line jsx-a11y/no-autofocus -- this field only exists because the chip above it was just tapped; the caret belongs in it.
       autoFocus
       isIncome={isIncome}
-      create={createCategory}
+      create={createCategory.create}
+      presets={unusedPresets}
       onCreated={onCreated}
     />
   );

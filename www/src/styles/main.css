@@ -3456,6 +3456,15 @@ table.data tr:last-child td {
   flex: 1 1 auto;
   min-height: 44px;
 }
+/* The not-yet-added starter presets, offered above the typed-name row --
+   `.category-chip-row` is the same flex-wrapped chip container
+   `CategoryChipPicker` uses on the Categories screen, so a preset reads
+   identically whether it's tapped there or here. */
+.new-category-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .category-picker-all {
   display: flex;
   flex-direction: column;

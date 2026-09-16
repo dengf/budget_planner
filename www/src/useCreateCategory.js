@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from './i18n';
-import { buildCategoryFromPreset, categoryDisplayName } from './presetCategories';
+import { availablePresets, buildCategoryFromPreset, categoryDisplayName } from './presetCategories';
 
 /**
  * Creating a category from wherever somebody happens to need one -- the
@@ -20,10 +20,22 @@ import { buildCategoryFromPreset, categoryDisplayName } from './presetCategories
  * language behind the screen) and `t(preset.key)` for presets, which
  * cross as i18n keys by convention. Somebody types what they can see.
  *
- * Returns `{ outcome, categoryId }`. `outcome` is the Rust case verbatim;
- * `categoryId` is what to select afterwards, present for every case
- * except `blank` and `error` -- including `other_direction`, where it
- * points at the category that clashed so the caller can name it.
+ * Returns `{ create, availableIncomePresets, availableExpensePresets }`.
+ * `create(typed, isIncome)` resolves to `{ outcome, categoryId }`:
+ * `outcome` is the Rust case verbatim; `categoryId` is what to select
+ * afterwards, present for every case except `blank` and `error` --
+ * including `other_direction`, where it points at the category that
+ * clashed so the caller can name it.
+ *
+ * The two `available*Presets` arrays are the starter categories nobody
+ * has added yet, split by direction, so a create field can offer them as
+ * one-tap chips before anyone has to type a name at all -- the same
+ * "not yet taken" rule the Categories screen's own chip picker and
+ * `addCommonCategories` use (`availablePresets` above), so a preset
+ * tapped here is indistinguishable from one added there. Without this, a
+ * typed-name-only field is only easier than More -> Categories for a
+ * category that doesn't already exist as a preset; for the sixteen that
+ * do, it's a guessing game against text nobody can see.
  */
 export function useCreateCategory({ wasmModule, categories, newId }) {
   const { t } = useI18n();
@@ -41,7 +53,14 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
     };
   }, [wasmModule]);
 
-  return useCallback(
+  const notTaken = useMemo(
+    () => availablePresets(presets, categories.items, t),
+    [presets, categories.items, t],
+  );
+  const availableIncomePresets = useMemo(() => notTaken.filter((p) => p.is_income), [notTaken]);
+  const availableExpensePresets = useMemo(() => notTaken.filter((p) => !p.is_income), [notTaken]);
+
+  const create = useCallback(
     async (typed, isIncome) => {
       if (!wasmModule?.resolve_category_name) return { outcome: 'error' };
 
@@ -93,4 +112,6 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
     },
     [wasmModule, categories, newId, presets, t],
   );
+
+  return { create, availableIncomePresets, availableExpensePresets };
 }

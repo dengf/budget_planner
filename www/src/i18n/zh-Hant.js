@@ -135,6 +135,7 @@ export default {
   'cat.group.income': '收入',
   'cat.group.expense': '支出',
   'category.newChip': '+ 新增',
+  'category.orPickPreset': '或者從中選一個：',
   'category.namePlaceholder': '分類名稱',
   'category.create': '建立',
   'category.createNamed': '建立「{name}」',
