@@ -90,13 +90,25 @@ export default {
   'chart.dailySpendAria':
     'Chart of spending across the month, totalling {amount}, peaking on day {day}.',
   'chart.dailySpendTotal': '{amount} spent this month, day by day',
+  'chart.dailySpendTotalExcludingRecurring':
+    '{amount} spent this month, day by day, not counting recurring bills',
   'chart.weeklySpendTitle': 'Spending by week',
   'chart.weeklySpendAria':
     'Chart of spending across the month, totalling {amount}, peaking the week of {week}.',
   'chart.weeklySpendTotal': '{amount} spent this month, week by week',
+  'chart.weeklySpendTotalExcludingRecurring':
+    '{amount} spent this month, week by week, not counting recurring bills',
+  'chart.cumulativeSpendTitle': 'Cumulative spending',
+  'chart.cumulativeSpendAria':
+    'Chart of cumulative spending across the month, reaching {amount} by day {day}.',
+  'chart.cumulativeSpendTotal': '{amount} spent this month so far',
+  'chart.cumulativeSpendTotalExcludingRecurring':
+    '{amount} spent this month so far, not counting recurring bills',
   'chart.granularityGroup': 'Chart granularity',
   'chart.granularityDaily': 'Daily',
   'chart.granularityWeekly': 'Weekly',
+  'chart.granularityCumulative': 'Cumulative',
+  'chart.includeRecurringToggle': 'Include recurring bills',
   'budget.method': 'Zero-based: give every dollar a job until nothing is left unassigned.',
   'budget.startWithIncomeCategory': 'Add an income category below to get started.',
   'budget.startWithIncome':

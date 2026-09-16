@@ -80,6 +80,7 @@ export default function DashboardTab({
   budgetPlan,
   goals,
   debts,
+  recurring,
   onNavigateTab,
   onOpenAdd,
 }) {
@@ -91,6 +92,9 @@ export default function DashboardTab({
   const [savingsPetals, setSavingsPetals] = useState(0);
   const [dailyTotals, setDailyTotals] = useState([]);
   const [weeklyTotals, setWeeklyTotals] = useState([]);
+  const [dailyTotalsIncludingRecurring, setDailyTotalsIncludingRecurring] = useState([]);
+  const [weeklyTotalsIncludingRecurring, setWeeklyTotalsIncludingRecurring] = useState([]);
+  const [excludesRecurring, setExcludesRecurring] = useState(false);
   const [shares, setShares] = useState([]);
   const [heroState, setHeroState] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -145,15 +149,49 @@ export default function DashboardTab({
       // received, an expense category's is what it cost -- summing the
       // wrong side would report $0 for every income category, same as
       // the bug this fixed there.
-      const [spendResult, incomeResult, dailyResult, weeklyResult] = await Promise.all([
+      const [spendResult, incomeResult, recurringStatusResult] = await Promise.all([
         wasmModule.spend_by_category({ transactions: monthTx }),
         wasmModule.income_by_category({ transactions: monthTx }),
-        wasmModule.daily_spend({ transactions: monthTx }),
-        wasmModule.weekly_spend({ transactions: monthTx, month: viewMonth }),
+        wasmModule?.recurring_status && recurring.items.length > 0
+          ? wasmModule.recurring_status({
+              recurring: recurring.items,
+              transactions: monthTx,
+              month: viewMonth,
+            })
+          : null,
+      ]);
+      // A settled recurring bill (rent, a subscription) is already
+      // accounted for elsewhere in the budget, not "unusual spending" --
+      // but logged on one day it dwarfs every other day's amount and
+      // flattens the rest of the chart. Only this chart's own series
+      // drops these; spend_by_category/income_by_category/build_month
+      // above still see every transaction, so the category breakdown and
+      // month summary keep reporting true total spend.
+      const settledIds = new Set(
+        (recurringStatusResult?.statuses ?? []).filter((s) => s.paid).map((s) => s.transaction_id),
+      );
+      const hasSettled = settledIds.size > 0;
+      const variableTx = monthTx.filter((tx) => !settledIds.has(tx.id));
+      // Fetched only when there is actually a difference to show -- with
+      // nothing settled this month, `variableTx` already equals `monthTx`,
+      // so the "including" series would just be a second, wasted call
+      // for figures identical to the ones just below.
+      const [dailyResult, weeklyResult, dailyResultAll, weeklyResultAll] = await Promise.all([
+        wasmModule.daily_spend({ transactions: variableTx }),
+        wasmModule.weekly_spend({ transactions: variableTx, month: viewMonth }),
+        hasSettled ? wasmModule.daily_spend({ transactions: monthTx }) : null,
+        hasSettled ? wasmModule.weekly_spend({ transactions: monthTx, month: viewMonth }) : null,
       ]);
       if (!cancelled) {
         setDailyTotals(dailyResult?.totals ?? []);
         setWeeklyTotals(weeklyResult?.totals ?? []);
+        setDailyTotalsIncludingRecurring(
+          hasSettled ? (dailyResultAll?.totals ?? []) : (dailyResult?.totals ?? []),
+        );
+        setWeeklyTotalsIncludingRecurring(
+          hasSettled ? (weeklyResultAll?.totals ?? []) : (weeklyResult?.totals ?? []),
+        );
+        setExcludesRecurring(hasSettled);
       }
       const spent = [
         ...(spendResult?.totals ?? []).filter((row) => !isIncome(row.category_id)),
@@ -244,6 +282,7 @@ export default function DashboardTab({
     budgetPlan.items,
     categories.items,
     transactions.items,
+    recurring.items,
     viewMonth,
     today,
     previousPlanMonth,
@@ -456,6 +495,9 @@ export default function DashboardTab({
       <SpendOverTimeChart
         dailyTotals={dailyTotals}
         weeklyTotals={weeklyTotals}
+        dailyTotalsIncludingRecurring={dailyTotalsIncludingRecurring}
+        weeklyTotalsIncludingRecurring={weeklyTotalsIncludingRecurring}
+        excludesRecurring={excludesRecurring}
         month={viewMonth}
         daysInMonth={daysInMonth(viewMonth)}
         formatMoney={formatMoney}

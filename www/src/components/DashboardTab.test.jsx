@@ -87,6 +87,7 @@ function renderDashboard(props) {
         budgetPlan={{ items: [] }}
         goals={{ items: [] }}
         debts={{ items: [] }}
+        recurring={{ items: [] }}
         onNavigateTab={() => {}}
         {...props}
       />
@@ -217,6 +218,73 @@ describe('DashboardTab hero states', () => {
     });
     await screen.findByText('Savings');
     expect(document.querySelector('.dash-hero-blossom')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardTab spend chart excludes settled recurring bills', () => {
+  it('drops a settled recurring transaction from daily/weekly spend but keeps it in the category breakdown', async () => {
+    const wasmModule = makeWasm({ income: 1000, total_planned: 1000, unassigned: 0 });
+    const spendByCategory = vi.fn(async () => ({ totals: [] }));
+    const dailySpend = vi.fn(async () => ({ totals: [] }));
+    const weeklySpend = vi.fn(async () => ({ totals: [] }));
+    wasmModule.spend_by_category = spendByCategory;
+    wasmModule.daily_spend = dailySpend;
+    wasmModule.weekly_spend = weeklySpend;
+    wasmModule.recurring_status = async () => ({
+      statuses: [
+        {
+          occurrence: {
+            recurring_id: 'rent',
+            category_id: 'c1',
+            description: 'Rent',
+            amount: 2000,
+            date: '2026-01-01',
+          },
+          paid: true,
+          transaction_id: 'rent-tx',
+        },
+      ],
+      unpaid_count: 0,
+      unpaid_total: 0,
+    });
+
+    renderDashboard({
+      wasmModule,
+      recurring: {
+        items: [
+          {
+            id: 'rec-1',
+            description: 'Rent',
+            category_id: 'c1',
+            amount: 2000,
+            cadence: 'monthly',
+            anchor_date: '2026-01-01',
+          },
+        ],
+      },
+      transactions: {
+        items: [
+          { id: 'rent-tx', date: '2026-01-01', amount: -2000, category_id: 'c1' },
+          { id: 'coffee-tx', date: '2026-01-05', amount: -5, category_id: 'c1' },
+        ],
+      },
+    });
+
+    await vi.waitFor(() => expect(dailySpend).toHaveBeenCalledTimes(2));
+    const dailyArgIds = dailySpend.mock.calls[0][0].transactions.map((t) => t.id);
+    const weeklyArgIds = weeklySpend.mock.calls[0][0].transactions.map((t) => t.id);
+    const spendArgIds = spendByCategory.mock.calls[0][0].transactions.map((t) => t.id);
+    // Fetched a second time with every transaction, unfiltered -- the
+    // "include recurring bills" toggle on SpendOverTimeChart needs this
+    // series ready with no extra wasm round trip when it's flipped on.
+    const dailyAllArgIds = dailySpend.mock.calls[1][0].transactions.map((t) => t.id);
+    const weeklyAllArgIds = weeklySpend.mock.calls[1][0].transactions.map((t) => t.id);
+
+    expect(dailyArgIds).toEqual(['coffee-tx']);
+    expect(weeklyArgIds).toEqual(['coffee-tx']);
+    expect(dailyAllArgIds.sort()).toEqual(['coffee-tx', 'rent-tx']);
+    expect(weeklyAllArgIds.sort()).toEqual(['coffee-tx', 'rent-tx']);
+    expect(spendArgIds.sort()).toEqual(['coffee-tx', 'rent-tx']);
   });
 });
 
