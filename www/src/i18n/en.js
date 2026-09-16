@@ -153,6 +153,11 @@ export default {
   'data.imported': '{count} records restored.',
   'budget.spentHint':
     'Spent adds up your transactions for the month — use the + in the bar below to log one, or the Transactions tab to import a bank export.',
+  // Same sentence for a screen wide enough to have the sidebar instead
+  // of the bottom bar -- "the + in the bar below" names a control that
+  // isn't on screen there.
+  'budget.spentHintWide':
+    'Spent adds up your transactions for the month — use "Add a transaction" in the sidebar to log one, or the Transactions tab to import a bank export.',
   'budget.commonHint': 'A starting point — rename or remove any of them.',
   'budget.editCategoriesTitle': 'Add or edit categories',
   'budget.savings': 'Savings',
@@ -227,6 +232,14 @@ export default {
   'transactions.expense': 'Expense',
   'transactions.income': 'Income',
   'transactions.addExpense': 'Add expense',
+  // The desktop batch form: several rows filed in one go. `rowField`
+  // names a control for a screen reader ("Amount, row 2"), since the
+  // column headers above the rows are visual only.
+  'transactions.addRow': 'Add a row',
+  'transactions.addRowShortcut': 'Shift + Enter adds a row',
+  'transactions.removeRow': 'Remove row {n}',
+  'transactions.rowField': '{field}, row {n}',
+  'transactions.addCount': 'Add {count} transactions',
   'transactions.addAmount': 'Add {amount}',
   'transactions.addAmountTo': 'Add {amount} to {category}',
   'transactions.descriptionPlaceholder': 'Optional',

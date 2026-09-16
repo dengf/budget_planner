@@ -136,6 +136,8 @@ export default {
   'data.imported': '已復原 {count} 筆記錄。',
   'budget.spentHint':
     '「已花費」由本月的帳目自動彙總——點擊下方工具列的 + 可記一筆，或到「帳目」頁匯入銀行帳單。',
+  'budget.spentHintWide':
+    '「已花費」由本月的帳目自動彙總——點擊側邊欄的「記一筆」可記一筆，或到「帳目」頁匯入銀行帳單。',
   'budget.commonHint': '僅供參考——可以隨意重新命名或刪除。',
   'budget.editCategoriesTitle': '新增或編輯分類',
   'budget.savings': '儲蓄',
@@ -202,6 +204,11 @@ export default {
   'transactions.expense': '支出',
   'transactions.income': '收入',
   'transactions.addExpense': '新增支出',
+  'transactions.addRow': '加一列',
+  'transactions.addRowShortcut': 'Shift + Enter 加一列',
+  'transactions.removeRow': '刪除第 {n} 列',
+  'transactions.rowField': '第 {n} 列：{field}',
+  'transactions.addCount': '新增 {count} 筆',
   'transactions.addAmount': '新增 {amount}',
   'transactions.addAmountTo': '把 {amount} 新增到{category}',
   'transactions.descriptionPlaceholder': '可不填',

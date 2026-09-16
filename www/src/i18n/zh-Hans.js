@@ -136,6 +136,8 @@ export default {
   'data.imported': '已恢复 {count} 条记录。',
   'budget.spentHint':
     '“已花费”由本月的账目自动汇总——点击下方工具栏的 + 可记一笔，或到“账目”页导入银行账单。',
+  'budget.spentHintWide':
+    '“已花费”由本月的账目自动汇总——点击侧边栏的“记一笔”可记一笔，或到“账目”页导入银行账单。',
   'budget.commonHint': '仅供参考——可以随意重命名或删除。',
   'budget.editCategoriesTitle': '添加或编辑分类',
   'budget.savings': '储蓄',
@@ -202,6 +204,11 @@ export default {
   'transactions.expense': '支出',
   'transactions.income': '收入',
   'transactions.addExpense': '添加支出',
+  'transactions.addRow': '加一行',
+  'transactions.addRowShortcut': 'Shift + Enter 加一行',
+  'transactions.removeRow': '删除第 {n} 行',
+  'transactions.rowField': '第 {n} 行：{field}',
+  'transactions.addCount': '添加 {count} 笔',
   'transactions.addAmount': '添加 {amount}',
   'transactions.addAmountTo': '把 {amount} 添加到{category}',
   'transactions.descriptionPlaceholder': '可不填',

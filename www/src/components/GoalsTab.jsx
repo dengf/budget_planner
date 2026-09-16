@@ -240,7 +240,7 @@ export default function GoalsTab({
       {goals.items.length === 0 ? (
         <p className="empty-state">{t('goals.noGoals')}</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="goal-list">
           {goals.items.map((g) => (
             <GoalCard
               key={g.id}

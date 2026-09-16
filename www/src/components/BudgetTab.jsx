@@ -20,6 +20,7 @@ import { useMonthBudget } from '../useMonthBudget';
 import { useCreateCategory } from '../useCreateCategory';
 import { usePlanCarryForward } from '../usePlanCarryForward';
 import { usePlanFromSpending } from '../usePlanFromSpending';
+import useIsDesktop from '../useIsDesktop';
 import PlanFromSpendingSheet from './PlanFromSpendingSheet';
 
 /**
@@ -72,6 +73,10 @@ export default function BudgetTab({
 }) {
   const { t, locale } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
+  // Only to pick which of two wordings of one hint is true here -- the
+  // "+" it points at is in the bottom bar on a phone and in the sidebar
+  // at desktop width. Nothing else on this tab branches on width.
+  const isDesktop = useIsDesktop();
   const [editingId, setEditingId] = useState(null);
   // Which section's "add a category" field is open: 'income', 'expense',
   // or null. One at a time -- two open name fields on a 375px column is
@@ -431,7 +436,12 @@ export default function BudgetTab({
             ? createCategory.availableIncomePresets
             : createCategory.availableExpensePresets;
           return (
-            <React.Fragment key={id}>
+            // A real element, not a fragment: income and expense sit
+            // side by side at desktop width (main.css's `.budget-rows`
+            // grid), which needs each side to be one box. Below that
+            // breakpoint this reproduces the flat 2px-gap column the
+            // rows used to form directly inside `.budget-rows`.
+            <div className="budget-section" key={id}>
               {/* No header over a side with nothing on it -- the add
                   button below names which side it is. */}
               {lines.length > 0 && (
@@ -486,11 +496,13 @@ export default function BudgetTab({
                   />
                 )}
               </div>
-            </React.Fragment>
+            </div>
           );
         })}
       </div>
-      {categories.items.length > 0 && <p className="field-label">{t('budget.spentHint')}</p>}
+      {categories.items.length > 0 && (
+        <p className="field-label">{t(isDesktop ? 'budget.spentHintWide' : 'budget.spentHint')}</p>
+      )}
 
       {editingLine && (
         <EditPlanSheet

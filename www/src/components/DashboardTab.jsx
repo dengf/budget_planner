@@ -467,8 +467,13 @@ export default function DashboardTab({
     );
   };
 
+  // A real element, not a fragment, so `.dash-insights` can become a grid
+  // at desktop width (main.css) -- the donut beside its own category
+  // rows, the spend-over-time chart full width beneath them. Below that
+  // breakpoint it reproduces the flex column these three used to get as
+  // direct children of `.panel`.
   const donutAndRows = (
-    <>
+    <div className="dash-insights">
       <DonutChart
         wedges={wedges}
         centerValue={formatMoney(expenseTotals.spent)}
@@ -503,7 +508,7 @@ export default function DashboardTab({
         formatMoney={formatMoney}
         locale={locale}
       />
-    </>
+    </div>
   );
 
   const statStrip = (
@@ -772,42 +777,50 @@ export default function DashboardTab({
         locale={locale}
       />
 
-      {goals.items.length > 0 && (
-        <>
-          <h2>{t('goals.title')}</h2>
-          <div className="dash-preview-row">
-            {goals.items.map((g) => (
-              <div className="dash-preview-card money-card" key={g.id}>
-                <BlossomProgress filled={goalProgress[g.id] ?? 0} size={36} />
-                <div className="dash-preview-card-info">
-                  <span className="dash-preview-card-name">{g.name}</span>
-                  <span className="dash-preview-card-detail">
-                    {formatMoney(g.current_amount)} / {formatMoney(g.target_amount)}
-                  </span>
-                </div>
+      {/* Wrapped (rather than two bare fragments flattened into the
+          panel) so the two previews can sit side by side at desktop
+          width. Gated on either list having something: an empty wrapper
+          would still collect one of `.panel`'s gaps. */}
+      {(goals.items.length > 0 || debts.items.length > 0) && (
+        <div className="dash-previews">
+          {goals.items.length > 0 && (
+            <section className="dash-preview-section">
+              <h2>{t('goals.title')}</h2>
+              <div className="dash-preview-row">
+                {goals.items.map((g) => (
+                  <div className="dash-preview-card money-card" key={g.id}>
+                    <BlossomProgress filled={goalProgress[g.id] ?? 0} size={36} />
+                    <div className="dash-preview-card-info">
+                      <span className="dash-preview-card-name">{g.name}</span>
+                      <span className="dash-preview-card-detail">
+                        {formatMoney(g.current_amount)} / {formatMoney(g.target_amount)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            </section>
+          )}
 
-      {debts.items.length > 0 && (
-        <>
-          <h2>{t('debt.title')}</h2>
-          <div className="dash-preview-row">
-            {debts.items.map((d) => (
-              <div className="dash-preview-card money-card" key={d.id}>
-                <div className="dash-preview-card-info">
-                  <span className="dash-preview-card-name">{d.name}</span>
-                  <span className="dash-preview-card-detail">
-                    {t('debt.balance')}: {formatMoney(d.balance)} · {t('debt.minPayment')}:{' '}
-                    {formatMoney(d.min_payment)}
-                  </span>
-                </div>
+          {debts.items.length > 0 && (
+            <section className="dash-preview-section">
+              <h2>{t('debt.title')}</h2>
+              <div className="dash-preview-row">
+                {debts.items.map((d) => (
+                  <div className="dash-preview-card money-card" key={d.id}>
+                    <div className="dash-preview-card-info">
+                      <span className="dash-preview-card-name">{d.name}</span>
+                      <span className="dash-preview-card-detail">
+                        {t('debt.balance')}: {formatMoney(d.balance)} · {t('debt.minPayment')}:{' '}
+                        {formatMoney(d.min_payment)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </>
+            </section>
+          )}
+        </div>
       )}
     </div>
   );
