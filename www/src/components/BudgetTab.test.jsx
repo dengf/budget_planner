@@ -274,6 +274,14 @@ describe('BudgetTab category creation', () => {
     expect(screen.getAllByLabelText('Category name')).toHaveLength(1);
   });
 
+  // Nothing left to add by hand -- no presets seeded here -- so typing is
+  // the only path, and jumping straight to the keyboard saves a tap.
+  it('autofocuses the name field when there is nothing to pick from instead', async () => {
+    mountWithStore();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Add an income category' }));
+    expect(await screen.findByLabelText('Category name')).toHaveFocus();
+  });
+
   // The whole point: there are already sixteen starter categories, and a
   // typed-name-only field made every one of them a guessing game against
   // text nobody could see. This is the gap PR #96 shipped with.
@@ -295,6 +303,16 @@ describe('BudgetTab category creation', () => {
       expect(
         await screen.findByRole('button', { name: 'Subscriptions & Memberships' }),
       ).toBeInTheDocument();
+    });
+
+    // The bug this was caught on: opening this field used to steal the
+    // keyboard unconditionally, which on a real phone shoved the nav bar
+    // mid-screen and hid the presets that had just appeared behind it --
+    // exactly backwards, since those chips exist so typing isn't needed.
+    it('does not steal the keyboard while there is still something to tap instead', async () => {
+      mountWithStore([], withPreset());
+      fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
+      expect(await screen.findByLabelText('Category name')).not.toHaveFocus();
     });
 
     // Presets are split by direction -- see `useCreateCategory`'s

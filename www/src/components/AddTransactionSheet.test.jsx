@@ -340,6 +340,18 @@ describe('AddTransactionSheet category creation', () => {
     );
   });
 
+  // Nothing left to add by hand -- no presets seeded here -- so typing is
+  // the only path, and jumping straight to the keyboard saves a tap.
+  it('autofocuses the name field when there is nothing to pick from instead', async () => {
+    renderCreatingSheet();
+    fireEvent.click(screen.getByRole('button', { name: '+ New' }));
+    // The preset fetch is async even though it resolves to an empty list,
+    // and the field remounts once that settles -- see `presetsReady` on
+    // `useCreateCategory` -- so the correct autofocus decision can lag the
+    // click by a tick rather than land immediately.
+    await waitFor(() => expect(screen.getByLabelText('Category name')).toHaveFocus());
+  });
+
   it('offers to create the name typed into the filter when nothing matches it', async () => {
     // The moment somebody has already said what they want and been told
     // it does not exist is the moment the offer is worth most.
@@ -356,6 +368,11 @@ describe('AddTransactionSheet category creation', () => {
     // Opens the name field already holding what was typed, rather than
     // asking for it a second time.
     expect(screen.getByLabelText('Category name')).toHaveValue('Vet');
+    // The keyboard was already up for the filter box this came from, so
+    // moving focus into the field it opens summons nothing new -- unlike
+    // "+ New", this path keeps autofocus regardless of any presets on
+    // offer.
+    expect(screen.getByLabelText('Category name')).toHaveFocus();
   });
 
   // Sixteen starter presets already exist; a typed-name-only field is
@@ -373,6 +390,10 @@ describe('AddTransactionSheet category creation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '+ New' }));
     const chip = await screen.findByRole('button', { name: 'Subscriptions & Memberships' });
+    // The bug this was caught on: opening this field used to steal the
+    // keyboard unconditionally, which on a real phone shoved the nav bar
+    // mid-screen and hid the very chip being asserted on above, behind it.
+    expect(screen.getByLabelText('Category name')).not.toHaveFocus();
     fireEvent.click(chip);
 
     await waitFor(() =>

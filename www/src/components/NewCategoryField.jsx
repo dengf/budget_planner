@@ -48,25 +48,29 @@ export default function NewCategoryField({
   const [busy, setBusy] = useState(false);
   const ref = useRef(null);
 
-  // Focusing the input is not the same as showing it. Both callers open
+  // Revealing the field is not the same as focusing its input -- the two
+  // used to be tied to the same flag, which meant turning autofocus off
+  // (so the keyboard doesn't cover a preset chip someone could tap
+  // instead, see the caller's own comment) silently turned this off too
+  // and brought back the exact bug it was written for: both callers open
   // this at the bottom of a scroll with something sticky pinned over that
-  // edge -- the add sheet's submit bar, the nav bar on Budget -- and the
-  // browser's own focus scroll counts "visible" as inside the container's
-  // box, which those overlays sit on top of: at 375px this opened
-  // underneath the submit bar, a caret blinking in a field nobody could
-  // see. `center` rather than `nearest` because the amount to clear is
-  // whatever that particular overlay happens to be tall, and the middle
-  // of the scroll is clear of every one of them. `smooth` degrades to an
-  // instant jump under prefers-reduced-motion, matching this app's
-  // convention elsewhere.
+  // edge -- the add sheet's submit bar, the nav bar on Budget -- and
+  // without an explicit scroll the panel can render entirely underneath
+  // it, invisible whether or not the keyboard ever opens. `center` rather
+  // than `nearest` because the amount to clear is whatever that
+  // particular overlay happens to be tall, and the middle of the scroll
+  // is clear of every one of them. `smooth` degrades to an instant jump
+  // under prefers-reduced-motion, matching this app's convention
+  // elsewhere. Runs on every mount of this field (including the remount
+  // `presetsReady` triggers), regardless of `autoFocus`.
   useEffect(() => {
-    if (!autoFocus || !ref.current) return;
+    if (!ref.current) return;
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     // Optional-called for the same reason `matchMedia` above is: jsdom
     // implements neither, and a layout nicety must not be what decides
     // whether this field renders at all under test.
     ref.current.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
-  }, [autoFocus]);
+  }, []);
 
   const typed = name.trim();
 

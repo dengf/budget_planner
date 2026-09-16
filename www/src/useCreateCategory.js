@@ -20,7 +20,16 @@ import { availablePresets, buildCategoryFromPreset, categoryDisplayName } from '
  * language behind the screen) and `t(preset.key)` for presets, which
  * cross as i18n keys by convention. Somebody types what they can see.
  *
- * Returns `{ create, availableIncomePresets, availableExpensePresets }`.
+ * `presetsReady` is false until the initial `preset_categories()` call
+ * resolves (or immediately true if there's no such call to make). It
+ * exists so a caller deciding whether to autofocus a create field can
+ * tell "nothing to pick" apart from "don't know yet" -- the fetch is
+ * async even when it resolves instantly, so a field that trusted an
+ * empty `available*Presets` before this flips true would autofocus and
+ * grab the keyboard on every open, then never let go even once the real
+ * preset list arrives, because focus isn't revisited after mount.
+ *
+ * Returns `{ create, availableIncomePresets, availableExpensePresets, presetsReady }`.
  * `create(typed, isIncome)` resolves to `{ outcome, categoryId }`:
  * `outcome` is the Rust case verbatim; `categoryId` is what to select
  * afterwards, present for every case except `blank` and `error` --
@@ -40,13 +49,20 @@ import { availablePresets, buildCategoryFromPreset, categoryDisplayName } from '
 export function useCreateCategory({ wasmModule, categories, newId }) {
   const { t } = useI18n();
   const [presets, setPresets] = useState([]);
+  const [presetsReady, setPresetsReady] = useState(!wasmModule?.preset_categories);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!wasmModule?.preset_categories) return;
+      if (!wasmModule?.preset_categories) {
+        if (!cancelled) setPresetsReady(true);
+        return;
+      }
       const loaded = (await wasmModule.preset_categories()) ?? [];
-      if (!cancelled) setPresets(loaded);
+      if (!cancelled) {
+        setPresets(loaded);
+        setPresetsReady(true);
+      }
     })();
     return () => {
       cancelled = true;
@@ -113,5 +129,5 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
     [wasmModule, categories, newId, presets, t],
   );
 
-  return { create, availableIncomePresets, availableExpensePresets };
+  return { create, availableIncomePresets, availableExpensePresets, presetsReady };
 }
