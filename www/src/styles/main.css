@@ -242,6 +242,55 @@ body {
   .app-tabs {
     display: none;
   }
+
+  /* Dashboard: the donut beside its own category rows, with the
+     spend-over-time chart spanning both columns beneath -- 31 daily
+     points are the one thing here that actually wants the full width.
+     The first column is a fixed 236px because `.donut-chart` is fixed
+     at 236x200 in JS as well as CSS (see its own rule below); this is
+     not the place to make it fluid. */
+  .dash-insights {
+    display: grid;
+    grid-template-columns: 236px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .dash-insights > .chart:not(.cat-chart) {
+    grid-column: 1 / -1;
+  }
+
+  /* `auto-fit`, not `1fr 1fr`: either preview section can be absent, and
+     a lone one should fill the row rather than sit in half of it. */
+  .dash-previews {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px 24px;
+    align-items: start;
+  }
+
+  /* Income beside expense instead of one above the other. `align-items:
+     start` so the shorter side ends where its rows end rather than
+     stretching to match the longer one. */
+  .budget-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .goal-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 10px;
+  }
+
+  /* Three fields stretched across ~950px read as a stretched form, not
+     a wide one. Cap each track and left-align the row instead. Reaches
+     every `.form-grid` -- Goals, Debt, Categories, Transactions. */
+  .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 260px));
+    justify-content: start;
+  }
 }
 
 /* One bar: the shared `MonthYearPicker` (Header.jsx) on the left, the
@@ -701,6 +750,21 @@ body {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Dashboard grouping boxes (DashboardTab.jsx) that exist only so the
+   desktop block near the top of this file has something to lay out as a
+   grid. Their contents used to be flattened straight into `.panel`, so
+   below that breakpoint they reproduce its column and its gap exactly --
+   including the 12px it drops to at phone width (see the `max-width:
+   640px` block near the end of this file). Changing `.panel`'s gap means
+   changing these to match. */
+.dash-insights,
+.dash-previews,
+.dash-preview-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1341,6 +1405,16 @@ table.data tr:last-child td {
   font-size: 0.88rem;
 }
 
+/* Replaces an inline `style` on GoalsTab.jsx's card container -- an
+   inline style beats any stylesheet rule, so the desktop grid near the
+   top of this file could never have reached it. Same 10px column it
+   declared. */
+.goal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* Goal cards -- the blossom is the progress bar. */
 .goal-card {
   background: var(--panel-alt);
@@ -1733,6 +1807,14 @@ table.data tr:last-child td {
   flex-direction: column;
   gap: 2px;
   margin-bottom: 8px;
+}
+/* One per side of the ledger (BudgetTab.jsx). Its rows used to be
+   flattened into `.budget-rows` itself, so it repeats that 2px column
+   here and only becomes a grid column at desktop width. */
+.budget-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 /* Sits at the foot of the Income block and again at the foot of the
    Expense one, so which button someone taps is what decides the new
@@ -3255,6 +3337,15 @@ table.data tr:last-child td {
   }
   .panel {
     padding: 16px;
+    gap: 12px;
+  }
+  /* These three only exist as grid containers for desktop; their
+     contents used to be direct `.panel` children, so they have to track
+     its gap here or everything inside them keeps 16px where it had
+     12px. */
+  .dash-insights,
+  .dash-previews,
+  .dash-preview-section {
     gap: 12px;
   }
   .app-main {

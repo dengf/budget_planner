@@ -431,7 +431,12 @@ export default function BudgetTab({
             ? createCategory.availableIncomePresets
             : createCategory.availableExpensePresets;
           return (
-            <React.Fragment key={id}>
+            // A real element, not a fragment: income and expense sit
+            // side by side at desktop width (main.css's `.budget-rows`
+            // grid), which needs each side to be one box. Below that
+            // breakpoint this reproduces the flat 2px-gap column the
+            // rows used to form directly inside `.budget-rows`.
+            <div className="budget-section" key={id}>
               {/* No header over a side with nothing on it -- the add
                   button below names which side it is. */}
               {lines.length > 0 && (
@@ -486,7 +491,7 @@ export default function BudgetTab({
                   />
                 )}
               </div>
-            </React.Fragment>
+            </div>
           );
         })}
       </div>
