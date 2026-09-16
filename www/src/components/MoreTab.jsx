@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useI18n } from '../i18n';
 import GoalsTab from './GoalsTab';
 import DebtTab from './DebtTab';
@@ -50,8 +50,14 @@ import { MEIFIO_HOME } from '../meifioHome';
  * onto the active panel; the sections are the same components the tab
  * bar used to render directly, with the same props, so nothing about
  * how a goal or a debt works changes here.
+ *
+ * `moreSectionId`/`onMoreSectionChange` are owned by App.jsx, not local
+ * state here -- lifted so DesktopSidebar.jsx can jump straight into a
+ * section (e.g. Goals) instead of always landing on this list first.
+ * `SECTIONS` is exported for the same reason: DesktopSidebar reuses this
+ * exact list/icon/label set rather than keeping its own copy.
  */
-const SECTIONS = [
+export const SECTIONS = [
   {
     id: 'categories',
     key: 'budget.categoriesTitle',
@@ -89,11 +95,10 @@ const SECTIONS = [
   },
 ];
 
-export default function MoreTab(props) {
+export default function MoreTab({ moreSectionId, onMoreSectionChange, ...props }) {
   const { t } = useI18n();
-  const [sectionId, setSectionId] = useState(null);
 
-  const section = SECTIONS.find((s) => s.id === sectionId);
+  const section = SECTIONS.find((s) => s.id === moreSectionId);
 
   if (section) {
     const { Component } = section;
@@ -104,7 +109,7 @@ export default function MoreTab(props) {
     return (
       <>
         <div className="more-back-row">
-          <button type="button" className="more-back" onClick={() => setSectionId(null)}>
+          <button type="button" className="more-back" onClick={() => onMoreSectionChange(null)}>
             <span aria-hidden="true">&#8249;</span>
             {t('more.title')}
           </button>
@@ -128,7 +133,7 @@ export default function MoreTab(props) {
       <ul className="more-list">
         {SECTIONS.map(({ id, key, hintKey, Icon }) => (
           <li key={id}>
-            <button type="button" className="more-item" onClick={() => setSectionId(id)}>
+            <button type="button" className="more-item" onClick={() => onMoreSectionChange(id)}>
               <span className="more-item-icon">
                 <Icon />
               </span>

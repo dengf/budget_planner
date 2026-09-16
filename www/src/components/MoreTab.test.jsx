@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
@@ -6,25 +6,39 @@ import MoreTab from './MoreTab';
 
 const dataset = () => ({ items: [], save: vi.fn(), remove: vi.fn() });
 
+// `moreSectionId`/`onMoreSectionChange` are owned by App.jsx in
+// production (see App.jsx's `navigateTo`) -- this harness holds the
+// same piece of state locally so the list -> section -> back-to-list
+// flow below exercises MoreTab exactly as controlled, without needing
+// to stand up the whole App tree.
+function Harness(props) {
+  const [sectionId, setSectionId] = useState(null);
+  return (
+    <MoreTab
+      wasmModule={{}}
+      currencySymbol="$"
+      today="2026-01-01"
+      viewMonth="2026-01-01"
+      newId={() => 'new-id'}
+      confirm={() => Promise.resolve(true)}
+      categories={dataset()}
+      transactions={dataset()}
+      rules={dataset()}
+      recurring={dataset()}
+      goals={dataset()}
+      debts={dataset()}
+      budgetPlan={dataset()}
+      moreSectionId={sectionId}
+      onMoreSectionChange={setSectionId}
+      {...props}
+    />
+  );
+}
+
 function renderMore(props) {
   return render(
     <I18nProvider initialLocale="en">
-      <MoreTab
-        wasmModule={{}}
-        currencySymbol="$"
-        today="2026-01-01"
-        viewMonth="2026-01-01"
-        newId={() => 'new-id'}
-        confirm={() => Promise.resolve(true)}
-        categories={dataset()}
-        transactions={dataset()}
-        rules={dataset()}
-        recurring={dataset()}
-        goals={dataset()}
-        debts={dataset()}
-        budgetPlan={dataset()}
-        {...props}
-      />
+      <Harness {...props} />
     </I18nProvider>,
   );
 }

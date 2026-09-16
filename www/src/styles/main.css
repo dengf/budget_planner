@@ -144,6 +144,106 @@ body {
   padding: 0 24px;
 }
 
+/* The header/nav/main column -- everything that used to render directly
+   inside `.app`, now wrapped so `.app` can become a row (sidebar beside
+   this column) at desktop width without those elements needing to know
+   about the sidebar at all. A plain block below 960px: identical to
+   `.app` rendering its previous direct children. */
+.app-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Desktop-only persistent left nav -- see DesktopSidebar.jsx. Hidden by
+   default (belt-and-suspenders: the component itself only mounts when
+   `useIsDesktop()` is true, so this rule mostly guards the gap between
+   first paint and that effect running). Visual language mirrors
+   `.app-tab`/`.app-tab.active` below so the two navs read as the same
+   control at different widths. */
+.app-sidebar {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+}
+.app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 8px 12px 20px;
+}
+.app-sidebar-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.app-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+}
+.app-sidebar-item.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.app-sidebar-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: auto;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--hero-shadow);
+}
+
+/* Sidebar takes over from the pill nav exactly where `.app`'s old cap
+   would otherwise start wasting margin -- the row layout and wider cap
+   only kick in together. */
+@media (min-width: 960px) {
+  .app {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 32px;
+    max-width: 1240px;
+    padding: 0 32px;
+  }
+  .app-sidebar {
+    display: flex;
+    width: 220px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 24px;
+  }
+  .app-tabs {
+    display: none;
+  }
+}
+
 /* One bar: the shared `MonthYearPicker` (Header.jsx) on the left, the
    language picker and settings gear on the right. Used to also carry the
    app's title and byline -- those moved into More (MoreTab.jsx), which
@@ -3080,6 +3180,7 @@ table.data tr:last-child td {
 @media print {
   .app-header,
   .app-tabs,
+  .app-sidebar,
   .app-switches,
   .dash-month-btn,
   .chart-granularity,

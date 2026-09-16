@@ -1,8 +1,10 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Header from './components/Header';
+import DesktopSidebar from './components/DesktopSidebar';
 import Intro from './components/Intro';
 import SwipeHint from './components/SwipeHint';
 import { useConfirm } from './components/ConfirmDialog';
+import useIsDesktop from './useIsDesktop';
 import { I18nProvider, detectLocale, useI18n } from './i18n';
 import { loadCurrencySymbol, saveCurrencySymbol } from './currencySymbol';
 import { makeFormatMoney } from './currency';
@@ -90,6 +92,15 @@ function TabFallback() {
 
 export function AppShell({ wasmModule }) {
   const [activeTab, setActiveTab] = useState('dashboard');
+  // Which of MoreTab's sections (Categories/Goals/Debt/Rules/Recurring)
+  // is open, if any. Lifted out of MoreTab.jsx itself so DesktopSidebar
+  // can jump straight into a section instead of always landing on
+  // MoreTab's list first -- see `navigateTo` below for why entering
+  // "more" any other way still resets this to null, matching what
+  // MoreTab's own local state used to do every time its tab panel
+  // unmounted and remounted.
+  const [moreSectionId, setMoreSectionId] = useState(null);
+  const isDesktop = useIsDesktop();
   const [currencySymbol, setCurrencySymbol] = useState(() => loadCurrencySymbol());
   // `index.html`'s inline script already stamps `data-theme` before this
   // ever mounts (see its own comment for why that copy has to run that
@@ -458,6 +469,17 @@ export function AppShell({ wasmModule }) {
 
   const ActivePanel = TABS.find((tab) => tab.id === activeTab)?.Component;
 
+  // The one place a tab change happens -- resets `moreSectionId` to null
+  // by default, matching what used to happen implicitly every time
+  // MoreTab's tab panel unmounted and remounted with fresh local state.
+  // DesktopSidebar is the only caller that ever passes a non-null
+  // `sectionId`, to jump straight into e.g. Goals instead of MoreTab's
+  // list.
+  const navigateTo = (tabId, sectionId = null) => {
+    setActiveTab(tabId);
+    setMoreSectionId(sectionId);
+  };
+
   /**
    * Swipe left/right to change tabs on a touch device, matching the
    * left/right paging gesture every native mobile app uses instead of
@@ -502,7 +524,7 @@ export function AppShell({ wasmModule }) {
   const changeTabBy = (delta) => {
     const idx = TAB_ORDER.indexOf(activeTab);
     const nextId = TAB_ORDER[idx + delta];
-    if (nextId) setActiveTab(nextId);
+    if (nextId) navigateTo(nextId);
   };
 
   const onMainPointerUp = () => {
@@ -515,71 +537,83 @@ export function AppShell({ wasmModule }) {
 
   return (
     <div className="app">
-      <Header
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onOpenAdd={openAdd}
-        currencySymbol={currencySymbol}
-        onCurrencySymbolChange={(next) => {
-          saveCurrencySymbol(next);
-          setCurrencySymbol(next);
-        }}
-        theme={theme}
-        onThemeChange={(next) => {
-          saveTheme(next);
-          applyTheme(next);
-          setTheme(next);
-        }}
-        wasmModule={wasmModule}
-        today={today}
-        viewMonth={viewMonth}
-        setViewMonth={setViewMonth}
-        categories={categories}
-        transactions={transactions}
-        rules={rules}
-        budgetPlan={budgetPlan}
-        goals={goals}
-        debts={debts}
-        recurring={recurring}
-        clearAllData={clearAllData}
-        importData={importData}
-      />
-      <main
-        className="app-main"
-        onPointerDown={onMainPointerDown}
-        onPointerMove={onMainPointerMove}
-        onPointerUp={onMainPointerUp}
-        onPointerCancel={onMainPointerUp}
-      >
-        <SwipeHint />
-        <Suspense fallback={<TabFallback />}>
-          <div className="tab-panel" key={activeTab}>
-            <ActivePanel
-              wasmModule={wasmModule}
-              currencySymbol={currencySymbol}
-              today={today}
-              viewMonth={viewMonth}
-              setViewMonth={setViewMonth}
-              newId={newId}
-              confirm={confirm}
-              categories={categories}
-              removeCategory={removeCategory}
-              addCommonCategories={addCommonCategories}
-              addPresetCategory={addPresetCategory}
-              transactions={transactions}
-              rules={rules}
-              goals={goals}
-              debts={debts}
-              recurring={recurring}
-              budgetPlan={budgetPlan}
-              onNavigateTab={setActiveTab}
-              onOpenAdd={openAdd}
-              onEditTransaction={openEdit}
-            />
-          </div>
-        </Suspense>
-        <Intro />
-      </main>
+      {isDesktop && (
+        <DesktopSidebar
+          activeTab={activeTab}
+          moreSectionId={moreSectionId}
+          onNavigate={navigateTo}
+          onOpenAdd={openAdd}
+        />
+      )}
+      <div className="app-content">
+        <Header
+          activeTab={activeTab}
+          onTabChange={(id) => navigateTo(id)}
+          onOpenAdd={openAdd}
+          currencySymbol={currencySymbol}
+          onCurrencySymbolChange={(next) => {
+            saveCurrencySymbol(next);
+            setCurrencySymbol(next);
+          }}
+          theme={theme}
+          onThemeChange={(next) => {
+            saveTheme(next);
+            applyTheme(next);
+            setTheme(next);
+          }}
+          wasmModule={wasmModule}
+          today={today}
+          viewMonth={viewMonth}
+          setViewMonth={setViewMonth}
+          categories={categories}
+          transactions={transactions}
+          rules={rules}
+          budgetPlan={budgetPlan}
+          goals={goals}
+          debts={debts}
+          recurring={recurring}
+          clearAllData={clearAllData}
+          importData={importData}
+        />
+        <main
+          className="app-main"
+          onPointerDown={onMainPointerDown}
+          onPointerMove={onMainPointerMove}
+          onPointerUp={onMainPointerUp}
+          onPointerCancel={onMainPointerUp}
+        >
+          <SwipeHint />
+          <Suspense fallback={<TabFallback />}>
+            <div className="tab-panel" key={activeTab}>
+              <ActivePanel
+                wasmModule={wasmModule}
+                currencySymbol={currencySymbol}
+                today={today}
+                viewMonth={viewMonth}
+                setViewMonth={setViewMonth}
+                newId={newId}
+                confirm={confirm}
+                categories={categories}
+                removeCategory={removeCategory}
+                addCommonCategories={addCommonCategories}
+                addPresetCategory={addPresetCategory}
+                transactions={transactions}
+                rules={rules}
+                goals={goals}
+                debts={debts}
+                recurring={recurring}
+                budgetPlan={budgetPlan}
+                moreSectionId={moreSectionId}
+                onMoreSectionChange={setMoreSectionId}
+                onNavigateTab={(id) => navigateTo(id)}
+                onOpenAdd={openAdd}
+                onEditTransaction={openEdit}
+              />
+            </div>
+          </Suspense>
+          <Intro />
+        </main>
+      </div>
       {addMounted && (
         <Suspense fallback={null}>
           <AddTransactionSheet
