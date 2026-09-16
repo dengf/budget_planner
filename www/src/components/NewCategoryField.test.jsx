@@ -14,12 +14,17 @@ import NewCategoryField from './NewCategoryField';
  * reimplementation of the matching rule. A mock that re-derives the rule
  * can only ever agree with itself; this asserts the wiring.
  */
-function renderField({ outcome, categoryId, isIncome = false } = {}) {
+function renderField({ outcome, categoryId, isIncome = false, presets = [] } = {}) {
   const create = vi.fn(async () => ({ outcome, categoryId }));
   const onCreated = vi.fn();
   render(
     <I18nProvider initialLocale="en">
-      <NewCategoryField isIncome={isIncome} create={create} onCreated={onCreated} />
+      <NewCategoryField
+        isIncome={isIncome}
+        create={create}
+        onCreated={onCreated}
+        presets={presets}
+      />
     </I18nProvider>,
   );
   return { create, onCreated };
@@ -99,5 +104,47 @@ describe('NewCategoryField', () => {
     type('Vet bills');
     fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter' });
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c9'));
+  });
+});
+
+describe('NewCategoryField preset chips', () => {
+  const PRESET = {
+    key: 'cat.subscriptionsMemberships',
+    group_key: 'cat.group.expense',
+    is_income: false,
+  };
+
+  it('offers nothing when there is nothing left to offer', () => {
+    renderField({ outcome: 'create', categoryId: 'c9', presets: [] });
+    expect(screen.queryByText('Or pick one of these:')).not.toBeInTheDocument();
+  });
+
+  it('shows an unused preset as a tappable chip, translated', () => {
+    renderField({ outcome: 'preset', categoryId: 'c9', presets: [PRESET] });
+    expect(screen.getByRole('button', { name: 'Subscriptions & Memberships' })).toBeInTheDocument();
+  });
+
+  // A tap goes through the exact same `create` call a typed name would --
+  // with the preset's own translated name -- so it can never disagree
+  // with what typing that same name and pressing Create would have done.
+  it('creates the preset on a tap, without anyone typing its name', async () => {
+    const { create, onCreated } = renderField({
+      outcome: 'preset',
+      categoryId: 'c9',
+      presets: [PRESET],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Subscriptions & Memberships' }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c9'));
+    expect(create).toHaveBeenCalledWith('Subscriptions & Memberships', false);
+  });
+
+  it('leaves the typed field empty after a preset tap', async () => {
+    const { onCreated } = renderField({ outcome: 'preset', categoryId: 'c9', presets: [PRESET] });
+    type('Half-typed name');
+    fireEvent.click(screen.getByRole('button', { name: 'Subscriptions & Memberships' }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c9'));
+    // The tap created the preset, not whatever was sitting in the input --
+    // leaving stale text behind would misname the next thing typed there.
+    expect(screen.getByLabelText('Category name')).toHaveValue('');
   });
 });

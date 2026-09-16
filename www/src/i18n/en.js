@@ -148,6 +148,7 @@ export default {
   'cat.group.income': 'Income',
   'cat.group.expense': 'Expense',
   'category.newChip': '+ New',
+  'category.orPickPreset': 'Or pick one of these:',
   'category.namePlaceholder': 'Category name',
   'category.create': 'Create',
   'category.createNamed': 'Create “{name}”',

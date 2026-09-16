@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
+import CategoryBadge from './CategoryBadge';
 
 /**
  * The name field behind every "add a category" affordance outside the
@@ -11,6 +12,18 @@ import { useI18n } from '../i18n';
  * (`other_direction`) is a message rather than a saved category. Two
  * copies of that handling is how one screen starts quietly creating the
  * duplicate the other refuses.
+ *
+ * `presets` -- the starter categories nobody has added yet, already
+ * filtered to this field's own direction by the caller (see
+ * `useCreateCategory`'s `availableIncomePresets`/`availableExpensePresets`)
+ * -- render as one-tap chips above the name input, same idea as the
+ * Categories screen's own `CategoryChipPicker`. Without this, typing is
+ * the *only* way in, which only beats More -> Categories for a name that
+ * isn't already one of the sixteen starter presets; for one that is, it's
+ * a guessing game against text nobody can see. Tapping a chip runs the
+ * exact same `create` call a typed name would (with the preset's own
+ * translated name), so it goes through the identical outcome handling
+ * below rather than a second path that could disagree with it.
  *
  * Deliberately no group field and no income/expense checkbox, unlike
  * CategoriesScreen's fuller form: both callers already know which side of
@@ -25,6 +38,7 @@ export default function NewCategoryField({
   isIncome,
   create,
   onCreated,
+  presets = [],
   initialName = '',
   autoFocus = false,
 }) {
@@ -56,17 +70,20 @@ export default function NewCategoryField({
 
   const typed = name.trim();
 
-  const submit = async () => {
-    if (!typed || busy) return;
+  // Shared by the typed-name submit and a preset chip tap: the outcome
+  // handling doesn't care where the name came from, only what came back.
+  const submitNamed = async (candidate) => {
+    const trimmed = candidate.trim();
+    if (!trimmed || busy) return;
     setBusy(true);
-    const result = await create(name, isIncome);
+    const result = await create(candidate, isIncome);
     setBusy(false);
     // The name is somebody's own expense category sitting on the income
     // side (or the reverse). Saying so beats both alternatives: creating
     // a second category of the same name, or refusing with nothing to act
     // on.
     if (result.outcome === 'other_direction') {
-      setClash(typed);
+      setClash(trimmed);
       return;
     }
     if (!result.categoryId) return;
@@ -75,8 +92,29 @@ export default function NewCategoryField({
     onCreated(result.categoryId);
   };
 
+  const submit = () => submitNamed(name);
+
   return (
     <div className="new-category" ref={ref}>
+      {presets.length > 0 && (
+        <div className="new-category-presets">
+          <span className="field-label">{t('category.orPickPreset')}</span>
+          <div className="category-chip-row">
+            {presets.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                className="category-chip"
+                disabled={busy}
+                onClick={() => submitNamed(t(preset.key))}
+              >
+                <CategoryBadge category={{ preset_key: preset.key, is_income: preset.is_income }} />
+                {t(preset.key)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="new-category-row">
         <div className="field-input">
           <input

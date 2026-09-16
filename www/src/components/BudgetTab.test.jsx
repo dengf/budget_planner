@@ -59,12 +59,17 @@ function makeWasm() {
     // there; what BudgetTab owns is saving the right record on the right
     // side, so this mock only has to distinguish "already yours" from
     // "new".
-    resolve_category_name: async ({ typed, direction, existing }) => {
+    resolve_category_name: async ({ typed, direction, existing, presets }) => {
       const wantsIncome = direction === 'income';
-      const match = existing.find(
-        (c) => c.is_income === wantsIncome && c.name.toLowerCase() === typed.trim().toLowerCase(),
+      const needle = typed.trim().toLowerCase();
+      const existingMatch = existing.find(
+        (c) => c.is_income === wantsIncome && c.name.toLowerCase() === needle,
       );
-      if (match) return { outcome: 'existing', category_id: match.id };
+      if (existingMatch) return { outcome: 'existing', category_id: existingMatch.id };
+      const presetMatch = presets.find(
+        (p) => p.is_income === wantsIncome && p.name.toLowerCase() === needle,
+      );
+      if (presetMatch) return { outcome: 'preset', preset_key: presetMatch.key };
       return {
         outcome: 'create',
         name: typed.trim(),
@@ -197,7 +202,7 @@ describe('BudgetTab category creation', () => {
    * `items`, and a mock that swallows the record would let this pass
    * while the Budget tab stayed empty after creating something.
    */
-  function mountWithStore(initial = []) {
+  function mountWithStore(initial = [], wasmModule = makeWasm()) {
     const saved = [];
     function Harness() {
       const [items, setItems] = React.useState(initial);
@@ -211,7 +216,7 @@ describe('BudgetTab category creation', () => {
       return (
         <I18nProvider initialLocale="en">
           <BudgetTab
-            wasmModule={makeWasm()}
+            wasmModule={wasmModule}
             newId={() => 'new-id'}
             currencySymbol="$"
             today="2026-01"
@@ -267,6 +272,73 @@ describe('BudgetTab category creation', () => {
     expect(screen.getAllByLabelText('Category name')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: '+ Add an expense category' }));
     expect(screen.getAllByLabelText('Category name')).toHaveLength(1);
+  });
+
+  // The whole point: there are already sixteen starter categories, and a
+  // typed-name-only field made every one of them a guessing game against
+  // text nobody could see. This is the gap PR #96 shipped with.
+  describe('offering the starter presets nobody has added yet', () => {
+    const PRESET = {
+      key: 'cat.subscriptionsMemberships',
+      group_key: 'cat.group.expense',
+      description_key: 'cat.subscriptionsMemberships.desc',
+      is_income: false,
+    };
+
+    function withPreset() {
+      return { ...makeWasm(), preset_categories: async () => [PRESET] };
+    }
+
+    it('shows an unadded preset as a chip once the expense field opens', async () => {
+      mountWithStore([], withPreset());
+      fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
+      expect(
+        await screen.findByRole('button', { name: 'Subscriptions & Memberships' }),
+      ).toBeInTheDocument();
+    });
+
+    // Presets are split by direction -- see `useCreateCategory`'s
+    // `availableIncomePresets`/`availableExpensePresets` -- so an expense
+    // preset has no business showing up under Income.
+    it('does not offer an expense preset under the income field', async () => {
+      mountWithStore([], withPreset());
+      fireEvent.click(await screen.findByRole('button', { name: '+ Add an income category' }));
+      await screen.findByLabelText('Category name');
+      expect(
+        screen.queryByRole('button', { name: 'Subscriptions & Memberships' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('adds the furnished preset on a tap, and gives it a row, with nothing typed', async () => {
+      const saved = mountWithStore([], withPreset());
+      fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Subscriptions & Memberships' }));
+
+      await vi.waitFor(() =>
+        expect(saved).toContainEqual(
+          expect.objectContaining({
+            name: 'Subscriptions & Memberships',
+            is_income: false,
+            preset_key: 'cat.subscriptionsMemberships',
+          }),
+        ),
+      );
+      expect(
+        await screen.findByRole('button', { name: /Subscriptions & Memberships/ }),
+      ).toBeInTheDocument();
+    });
+
+    it('stops offering a preset once it has been added', async () => {
+      mountWithStore(
+        [{ id: 'subs', name: 'Subscriptions & Memberships', group: 'Expense', is_income: false }],
+        withPreset(),
+      );
+      fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
+      await screen.findByLabelText('Category name');
+      expect(
+        screen.queryByRole('button', { name: 'Subscriptions & Memberships' }),
+      ).not.toBeInTheDocument();
+    });
   });
 });
 
