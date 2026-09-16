@@ -35,23 +35,40 @@ function pathFrom(values, max, { close = false } = {}) {
  * and skipping straight from day 3 to day 19 would draw a slope that
  * implies gradual spending that never happened. Weekly mode is the same
  * idea one level up, for a reader who wants the shape of the month
- * without every day's own noise.
+ * without every day's own noise. Cumulative mode plots a running total
+ * across the month instead -- the fix for a single large day (rent,
+ * a big one-off) otherwise setting the y-axis and flattening every
+ * other day near zero; a spike there just steepens the slope.
  *
- * `dailyTotals`/`weeklyTotals`: `[{ date, amount }]` from
- * `wasm.daily_spend`/`wasm.weekly_spend`, already the positive spend
- * side. `daysInMonth`: from `month.js`, the host-layer calendar
+ * `dailyTotals`/`weeklyTotals` (settled recurring bills already dropped)
+ * and `dailyTotalsIncludingRecurring`/`weeklyTotalsIncludingRecurring`
+ * (the same transactions, nothing dropped): `[{ date, amount }]` from two
+ * passes of `wasm.daily_spend`/`wasm.weekly_spend`, one over each
+ * transaction list the caller built via `wasm.recurring_status`. Kept as
+ * two ready-made series rather than one plus a client-side re-derivation,
+ * so flipping "Include recurring bills" is instant with no wasm round
+ * trip. `excludesRecurring`: whether there was anything to drop this
+ * month at all -- gates whether the toggle renders; with nothing settled
+ * this round, the two series are identical and the toggle would change
+ * nothing. `daysInMonth`: from `month.js`, the host-layer calendar
  * arithmetic this chart needs to build a full x-axis -- budget-calc has
  * no reason to know how many days are in a month.
  *
- * The "anything to show" gate is always read from `dailyTotals`
- * regardless of which mode is active -- both totals are derived from the
- * same transactions and sum to the same figure, so tying the gate to one
- * source of truth means switching the toggle never itself makes the
- * chart appear or disappear.
+ * The toggle defaults off (recurring excluded) -- a settled bill is
+ * already accounted for elsewhere in the budget, not "unusual spending".
+ * The "anything to show" gate always reads the *including* series
+ * regardless of the toggle's position, so a month whose only transaction
+ * was a settled bill still shows the chart (and the toggle to reveal it)
+ * rather than looking like an empty month. Switching daily/weekly/
+ * cumulative never itself makes the chart appear or disappear, since all
+ * three read from the same two underlying series.
  */
 export default function SpendOverTimeChart({
   dailyTotals,
   weeklyTotals,
+  dailyTotalsIncludingRecurring,
+  weeklyTotalsIncludingRecurring,
+  excludesRecurring,
   month,
   daysInMonth: dayCount,
   formatMoney,
@@ -60,22 +77,84 @@ export default function SpendOverTimeChart({
   const { t } = useI18n();
   const gradientId = useId();
   const [granularity, setGranularity] = useState('daily');
+  // Off by default: a settled recurring bill is already accounted for
+  // elsewhere in the budget, so the quieter default hides it here too.
+  // The toggle only ever renders when `excludesRecurring` says there is
+  // something for it to reveal.
+  const [includeRecurring, setIncludeRecurring] = useState(false);
 
-  const byDay = new Map((dailyTotals ?? []).map((row) => [row.date, row.amount]));
-  const dailyValues = Array.from({ length: dayCount }, (_, i) => {
-    const day = String(i + 1).padStart(2, '0');
-    return byDay.get(`${month}-${day}`) ?? 0;
-  });
-  const total = dailyValues.reduce((sum, v) => sum + v, 0);
-  if (total <= 0) return null;
+  const buildDailyValues = (totals) => {
+    const byDay = new Map((totals ?? []).map((row) => [row.date, row.amount]));
+    return Array.from({ length: dayCount }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0');
+      return byDay.get(`${month}-${day}`) ?? 0;
+    });
+  };
+  const dailyValuesExcluding = buildDailyValues(dailyTotals);
+  const dailyValuesIncluding = buildDailyValues(dailyTotalsIncludingRecurring ?? dailyTotals);
+  // The "anything to show" gate reads the *including* total, not
+  // whichever the toggle currently has selected -- a month whose only
+  // spending was a settled recurring bill would otherwise sum to zero on
+  // the excluding-by-default view and hide the chart (and the toggle to
+  // reveal it) entirely.
+  const totalIncluding = dailyValuesIncluding.reduce((sum, v) => sum + v, 0);
+  if (totalIncluding <= 0) return null;
 
   const weeks = weeksInMonth(month);
-  const byWeek = new Map((weeklyTotals ?? []).map((row) => [row.date, row.amount]));
-  const weeklyValues = weeks.map((w) => byWeek.get(w.start) ?? 0);
+  const buildWeeklyValues = (totals) => {
+    const byWeek = new Map((totals ?? []).map((row) => [row.date, row.amount]));
+    return weeks.map((w) => byWeek.get(w.start) ?? 0);
+  };
+  const weeklyValuesExcluding = buildWeeklyValues(weeklyTotals);
+  const weeklyValuesIncluding = buildWeeklyValues(weeklyTotalsIncludingRecurring ?? weeklyTotals);
 
-  const values = granularity === 'weekly' ? weeklyValues : dailyValues;
+  const dailyValues = includeRecurring ? dailyValuesIncluding : dailyValuesExcluding;
+  const weeklyValues = includeRecurring ? weeklyValuesIncluding : weeklyValuesExcluding;
+  const total = dailyValues.reduce((sum, v) => sum + v, 0);
+
+  // A running total over the same per-day series `dailyValues` already
+  // builds. Monotonically non-decreasing, so `Math.max` below is always
+  // its last entry -- a single large recurring payment (excluded by
+  // default) no longer needs special-casing here the way it would on the
+  // daily/weekly views, since a spike just steepens the slope instead of
+  // dominating the y-axis.
+  const cumulativeValues = dailyValues.reduce((acc, v) => {
+    acc.push((acc.at(-1) ?? 0) + v);
+    return acc;
+  }, []);
+
+  const values =
+    granularity === 'weekly'
+      ? weeklyValues
+      : granularity === 'cumulative'
+        ? cumulativeValues
+        : dailyValues;
   const max = Math.max(...values, 1);
+  // The first index reaching the max: for daily/weekly this is the
+  // biggest single bucket, same as before. For cumulative (monotonic) it
+  // is the day the running total stopped climbing -- the day spending for
+  // the month effectively finished, which is a more informative "day" to
+  // report than the calendar's last day.
   const peakIndex = values.indexOf(Math.max(...values));
+
+  const titleKey = {
+    weekly: 'chart.weeklySpendTitle',
+    cumulative: 'chart.cumulativeSpendTitle',
+    daily: 'chart.dailySpendTitle',
+  }[granularity];
+
+  // Only claim "not counting recurring bills" while that's actually true
+  // of the figures on screen -- once the toggle is switched on, this view
+  // is showing the same total a caller with no recurring configured at
+  // all would see, and the qualifier would be a false disclaimer.
+  const showingExcluded = excludesRecurring && !includeRecurring;
+  const totalKey = {
+    weekly: showingExcluded ? 'chart.weeklySpendTotalExcludingRecurring' : 'chart.weeklySpendTotal',
+    cumulative: showingExcluded
+      ? 'chart.cumulativeSpendTotalExcludingRecurring'
+      : 'chart.cumulativeSpendTotal',
+    daily: showingExcluded ? 'chart.dailySpendTotalExcludingRecurring' : 'chart.dailySpendTotal',
+  }[granularity];
 
   const ariaLabel =
     granularity === 'weekly'
@@ -83,14 +162,14 @@ export default function SpendOverTimeChart({
           amount: formatMoney(total),
           week: weekLabel(weeks[peakIndex].start, weeks[peakIndex].end, locale),
         })
-      : t('chart.dailySpendAria', { amount: formatMoney(total), day: peakIndex + 1 });
+      : granularity === 'cumulative'
+        ? t('chart.cumulativeSpendAria', { amount: formatMoney(total), day: peakIndex + 1 })
+        : t('chart.dailySpendAria', { amount: formatMoney(total), day: peakIndex + 1 });
 
   return (
     <figure className="chart">
       <div className="chart-header">
-        <figcaption className="chart-title">
-          {t(granularity === 'weekly' ? 'chart.weeklySpendTitle' : 'chart.dailySpendTitle')}
-        </figcaption>
+        <figcaption className="chart-title">{t(titleKey)}</figcaption>
         <div className="chart-granularity" role="group" aria-label={t('chart.granularityGroup')}>
           <button
             type="button"
@@ -108,8 +187,26 @@ export default function SpendOverTimeChart({
           >
             {t('chart.granularityWeekly')}
           </button>
+          <button
+            type="button"
+            className={granularity === 'cumulative' ? 'app-region active' : 'app-region'}
+            aria-pressed={granularity === 'cumulative'}
+            onClick={() => setGranularity('cumulative')}
+          >
+            {t('chart.granularityCumulative')}
+          </button>
         </div>
       </div>
+      {excludesRecurring && (
+        <label className="field field-check chart-recurring-toggle">
+          <input
+            type="checkbox"
+            checked={includeRecurring}
+            onChange={(e) => setIncludeRecurring(e.target.checked)}
+          />
+          <span>{t('chart.includeRecurringToggle')}</span>
+        </label>
+      )}
       <svg
         className="chart-svg"
         viewBox={`0 0 ${W} ${H}`}
@@ -156,11 +253,7 @@ export default function SpendOverTimeChart({
           </>
         )}
       </div>
-      <p className="chart-note">
-        {t(granularity === 'weekly' ? 'chart.weeklySpendTotal' : 'chart.dailySpendTotal', {
-          amount: formatMoney(total),
-        })}
-      </p>
+      <p className="chart-note">{t(totalKey, { amount: formatMoney(total) })}</p>
     </figure>
   );
 }

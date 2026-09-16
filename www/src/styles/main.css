@@ -1977,6 +1977,10 @@ table.data tr:last-child td {
   font-size: 0.8rem;
   color: var(--muted);
 }
+.chart-recurring-toggle {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
 
 /* A visible cue for a brand-new interaction pattern -- the per-row
    aria-label (CategoryBreakdown.jsx) covers screen-reader discovery, but
@@ -3079,6 +3083,7 @@ table.data tr:last-child td {
   .app-switches,
   .dash-month-btn,
   .chart-granularity,
+  .chart-recurring-toggle,
   .add-txn-fab {
     display: none !important;
   }
