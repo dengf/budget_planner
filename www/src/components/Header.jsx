@@ -107,6 +107,12 @@ export default function Header({
             <button
               key={id}
               className={id === activeTab ? 'app-tab active' : 'app-tab'}
+              // Matches `DesktopSidebar`'s own nav items -- the two navs
+              // are the same control at different widths, and since the
+              // selected tab stopped being a solid accent fill its state
+              // is carried by a rail and a weight, neither of which a
+              // screen reader can see.
+              aria-current={id === activeTab ? 'page' : undefined}
               onClick={() => onTabChange(id)}
             >
               <Icon />

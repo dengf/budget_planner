@@ -41,6 +41,36 @@
 
   --accent: #d1436a;
   --accent-ink: #fff7f9;
+
+  /* Selection is state, not intent. `--accent` used to fill both the
+     selected nav item *and* the primary button, so on the desktop
+     Dashboard a plum sidebar row sat directly above a plum "+ Add a
+     transaction" block and neither outranked the other -- and the same
+     collision happened three times over inside the add sheet (method
+     tab, Expense/Income toggle, submit button). The accent now means
+     only "this is the action"; a selected control gets this neutral
+     surface plus an accent indicator instead.
+
+     This is the same argument `.app-tab.active` already made when it
+     moved off `--positive`: a color that means two things means neither.
+
+     `--selected` is deliberately a step from BOTH `--panel` and
+     `--panel-alt`, not a reuse of either. It can't be `--panel-alt`,
+     because `.budget-row:hover` already fills that and hovered would
+     become indistinguishable from selected; and it has to clear
+     `--panel-alt` on its own because the segmented troughs
+     (`.app-tabs`, `.add-txn-methods`, `.txn-type-toggle`) are already
+     that color, while `.app-sidebar-item` sits on plain `--panel`.
+
+     The fill alone lands ~1.4:1 against `--panel` and can't do better
+     without becoming a grey slab -- a neutral on a neutral has nowhere
+     to go. `--selected-edge` is what carries WCAG 1.4.11's 3:1 for a
+     non-text indicator (3.9:1 dark, 7.0:1 light against `--panel`), and
+     `aria-current`/`aria-selected` carries it for a screen reader. */
+  --selected: #27354a;
+  --selected-ink: var(--ink);
+  --selected-edge: var(--accent);
+
   --positive: #7ee787;
   --positive-ink: #0f1720;
   --positive-bg: #16311f;
@@ -78,6 +108,14 @@
 
     --accent: #b01243;
     --accent-ink: #ffffff;
+
+    /* See the `:root` block for why selection has its own token. Light
+       has to move *darker* than both panels rather than lighter, since
+       `--panel` is already white and there is nowhere above it to go. */
+    --selected: #dae1ea;
+    --selected-ink: var(--ink);
+    --selected-edge: var(--accent);
+
     --positive: #1f7a3d;
     --positive-ink: #ffffff;
     --positive-bg: #e4f3e8;
@@ -111,6 +149,11 @@
 
   --accent: #b01243;
   --accent-ink: #ffffff;
+
+  --selected: #dae1ea;
+  --selected-ink: var(--ink);
+  --selected-edge: var(--accent);
+
   --positive: #1f7a3d;
   --positive-ink: #ffffff;
   --positive-bg: #e4f3e8;
@@ -185,6 +228,8 @@ body {
   gap: 2px;
 }
 .app-sidebar-item {
+  /* Anchors the selected row's accent rail below. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -200,9 +245,23 @@ body {
   font-weight: 600;
   text-align: left;
 }
+/* A destination gets a rail; an option gets a ring (see
+   `.app-region.active` and the sheet's toggles). The distinction is real
+   -- "you are here" versus "this one of these" -- not decorative. */
 .app-sidebar-item.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 700;
+}
+.app-sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--selected-edge);
 }
 .app-sidebar-add {
   display: flex;
@@ -308,8 +367,13 @@ body {
   font-weight: 600;
 }
 .app-region.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 700;
+  /* Inset rather than a real border: these buttons are borderless, and a
+     border added only when active would shift the label by a pixel every
+     time the toggle flips. */
+  box-shadow: inset 0 0 0 2px var(--selected-edge);
 }
 
 /* Replaces the old US/SG region toggle -- a free-form symbol someone types
@@ -388,6 +452,8 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 .app-tab {
+  /* Anchors the selected tab's accent rail below. */
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -403,11 +469,36 @@ body {
 }
 /* The active tab used to reuse `--positive` (green) -- the same color
    this app uses everywhere else to mean "under budget"/"good news". A
-   selected nav tab isn't financial news, so it gets the app's own accent
-   color instead, leaving green free to mean only one thing. */
+   selected nav tab isn't financial news, so green was freed to mean one
+   thing and this took the accent instead. It has since moved off the
+   accent for the same reason one step further on: the accent was also
+   filling `.app-tab-add`, the + circle four pixels to its right, so the
+   destination you are on and the button you came to press carried
+   identical weight. Selection is neutral now; see `--selected`.
+   Deliberately the same treatment as `.app-sidebar-item.active` above,
+   so the two navs still read as one control at different widths. */
 .app-tab.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 700;
+}
+/* A rail on the tab's top edge rather than the usual underline. The bar
+   is bottom-`fixed` on phone and sticky-top on tablet (see the two
+   `.app-tabs` rules below), so no single edge is "the outer one" at every
+   width -- but the top edge is the content-facing one in the phone case,
+   which is the layout this nav is primarily for, and it is the one edge
+   an underline can't have: `.app-tabs` sets `flex-wrap: wrap` with an
+   8px `row-gap`, so an underline on a wrapped first row would sit in the
+   gap directly above the second row's tabs. */
+.app-tab.active::before {
+  content: '';
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 0;
+  height: 3px;
+  border-radius: 0 0 999px 999px;
+  background: var(--selected-edge);
 }
 
 /* The one control this whole app is most often opened to use, given the
@@ -2384,9 +2475,13 @@ table.data tr:last-child td {
   border-color: var(--accent);
 }
 .monthpicker-cell.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 700;
+  /* The cell already carries a 1px border, so the ring goes there rather
+     than as an inset shadow -- and at 2px it stays distinct from the
+     1px `--line` on the eleven cells around it. */
+  border: 2px solid var(--selected-edge);
 }
 /* A small dot marking "this is the real current month", visible whether
    or not the cell is also the selected one. */
@@ -3074,8 +3169,10 @@ table.data tr:last-child td {
   height: 18px;
 }
 .add-txn-method-btn.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--selected-edge);
 }
 
 /* VoiceCapture.jsx's record/stop button while a recording is in
@@ -3128,8 +3225,10 @@ table.data tr:last-child td {
   font-weight: 600;
 }
 .txn-type-btn.active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--selected-edge);
 }
 
 .add-txn-body {
