@@ -221,78 +221,6 @@ body {
   box-shadow: var(--hero-shadow);
 }
 
-/* Sidebar takes over from the pill nav exactly where `.app`'s old cap
-   would otherwise start wasting margin -- the row layout and wider cap
-   only kick in together. */
-@media (min-width: 960px) {
-  .app {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 32px;
-    max-width: 1240px;
-    padding: 0 32px;
-  }
-  .app-sidebar {
-    display: flex;
-    width: 220px;
-    flex-shrink: 0;
-    position: sticky;
-    top: 24px;
-  }
-  .app-tabs {
-    display: none;
-  }
-
-  /* Dashboard: the donut beside its own category rows, with the
-     spend-over-time chart spanning both columns beneath -- 31 daily
-     points are the one thing here that actually wants the full width.
-     The first column is a fixed 236px because `.donut-chart` is fixed
-     at 236x200 in JS as well as CSS (see its own rule below); this is
-     not the place to make it fluid. */
-  .dash-insights {
-    display: grid;
-    grid-template-columns: 236px 1fr;
-    gap: 16px;
-    align-items: start;
-  }
-  .dash-insights > .chart:not(.cat-chart) {
-    grid-column: 1 / -1;
-  }
-
-  /* `auto-fit`, not `1fr 1fr`: either preview section can be absent, and
-     a lone one should fill the row rather than sit in half of it. */
-  .dash-previews {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px 24px;
-    align-items: start;
-  }
-
-  /* Income beside expense instead of one above the other. `align-items:
-     start` so the shorter side ends where its rows end rather than
-     stretching to match the longer one. */
-  .budget-rows {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    align-items: start;
-  }
-
-  .goal-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-    gap: 10px;
-  }
-
-  /* Three fields stretched across ~950px read as a stretched form, not
-     a wide one. Cap each track and left-align the row instead. Reaches
-     every `.form-grid` -- Goals, Debt, Categories, Transactions. */
-  .form-grid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 260px));
-    justify-content: start;
-  }
-}
-
 /* One bar: the shared `MonthYearPicker` (Header.jsx) on the left, the
    language picker and settings gear on the right. Used to also carry the
    app's title and byline -- those moved into More (MoreTab.jsx), which
@@ -3259,52 +3187,7 @@ table.data tr:last-child td {
   font-size: 0.95rem;
 }
 
-@media print {
-  .app-header,
-  .app-tabs,
-  .app-sidebar,
-  .app-switches,
-  .dash-month-btn,
-  .chart-granularity,
-  .chart-recurring-toggle,
-  .add-txn-fab {
-    display: none !important;
-  }
-  body {
-    background: #fff;
-    color: #111;
-  }
-  .panel {
-    border: none;
-    background: #fff;
-  }
-  /* .chart's background/text are dark-theme tokens that .panel's own
-     print rule doesn't reach -- SpendChart/DebtChart never needed this
-     because neither renders on the Report tab, but BubbleChart does. */
-  .chart {
-    background: #fff;
-    border: 1px solid #ddd;
-  }
-  .chart-empty-hint {
-    color: #555;
-  }
-  /* Same reasoning as .chart above -- .money-card (the bubble-detail
-     drill-down panel, goal/debt preview cards) and the stat tiles both
-     use dark-theme panel tokens too. */
-  .money-card,
-  .dash-stat-tile {
-    background: #fff;
-    border: 1px solid #ddd;
-  }
-  .dash-hero-value,
-  .dash-stat-tile-value {
-    color: #111;
-  }
-  .dash-hero-label,
-  .dash-stat-tile-label {
-    color: #555;
-  }
-}
+
 
 @media (max-width: 640px) {
   /* No longer stacked into two rows here -- that was for fitting a
@@ -3867,4 +3750,138 @@ table.data tr:last-child td {
   flex: none;
   font-size: 0.82rem;
   white-space: nowrap;
+}
+
+/* Everything desktop-width lives here, after every base rule in the
+   file, because these rules override base rules of equal specificity:
+   a media query adds no weight, so only source order decides. This
+   block sat up beside `.app` for one round and the `.app-tabs` rule
+   further down silently won, leaving the phone pill nav rendering
+   beside the sidebar on every desktop screen; moving it to just before
+   `@media print` still left ~600 lines of component rules after it
+   (that is how this file is organised -- each component's rules and its
+   own media queries sit together, so "past the last media query" is
+   nowhere near the end). Keep new desktop rules here, at the bottom,
+   and `@media print` below them so printing still has the last word. */
+@media (min-width: 960px) {
+  .app {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 32px;
+    max-width: 1240px;
+    padding: 0 32px;
+  }
+  .app-sidebar {
+    display: flex;
+    width: 220px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 24px;
+  }
+  .app-tabs {
+    display: none;
+  }
+
+  /* The sidebar lists every "More" section as its own item, so at this
+     width a section was never opened *from* a list -- the "< More" back
+     link points at a screen the sidebar has already replaced. */
+  .more-back-row {
+    display: none;
+  }
+
+  /* Dashboard: the donut beside its own category rows, with the
+     spend-over-time chart spanning both columns beneath -- 31 daily
+     points are the one thing here that actually wants the full width.
+     The first column is a fixed 236px because `.donut-chart` is fixed
+     at 236x200 in JS as well as CSS (see its own rule below); this is
+     not the place to make it fluid. */
+  .dash-insights {
+    display: grid;
+    grid-template-columns: 236px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .dash-insights > .chart:not(.cat-chart) {
+    grid-column: 1 / -1;
+  }
+
+  /* `auto-fit`, not `1fr 1fr`: either preview section can be absent, and
+     a lone one should fill the row rather than sit in half of it. */
+  .dash-previews {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px 24px;
+    align-items: start;
+  }
+
+  /* Income beside expense instead of one above the other. `align-items:
+     start` so the shorter side ends where its rows end rather than
+     stretching to match the longer one. */
+  .budget-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .goal-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 10px;
+  }
+
+  /* Three fields stretched across ~950px read as a stretched form, not
+     a wide one. Cap each track and left-align the row instead. Reaches
+     every `.form-grid` -- Goals, Debt, Categories, Transactions. */
+  .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 260px));
+    justify-content: start;
+  }
+}
+
+@media print {
+  .app-header,
+  .app-tabs,
+  .app-sidebar,
+  .app-switches,
+  .dash-month-btn,
+  .chart-granularity,
+  .chart-recurring-toggle,
+  .add-txn-fab {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #111;
+  }
+  .panel {
+    border: none;
+    background: #fff;
+  }
+  /* .chart's background/text are dark-theme tokens that .panel's own
+     print rule doesn't reach -- SpendChart/DebtChart never needed this
+     because neither renders on the Report tab, but BubbleChart does. */
+  .chart {
+    background: #fff;
+    border: 1px solid #ddd;
+  }
+  .chart-empty-hint {
+    color: #555;
+  }
+  /* Same reasoning as .chart above -- .money-card (the bubble-detail
+     drill-down panel, goal/debt preview cards) and the stat tiles both
+     use dark-theme panel tokens too. */
+  .money-card,
+  .dash-stat-tile {
+    background: #fff;
+    border: 1px solid #ddd;
+  }
+  .dash-hero-value,
+  .dash-stat-tile-value {
+    color: #111;
+  }
+  .dash-hero-label,
+  .dash-stat-tile-label {
+    color: #555;
+  }
 }
