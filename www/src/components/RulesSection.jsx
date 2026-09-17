@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import CategoryBadge from './CategoryBadge';
 import { categoryDisplayName, makeCategoryLookup } from '../presetCategories';
+import useIsDesktop from '../useIsDesktop';
 
 /**
  * Categorization rules -- keyword in, category out.
@@ -27,9 +28,10 @@ export default function RulesSection({
   const { t } = useI18n();
   const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
+  const isDesktop = useIsDesktop();
+  const keywordRef = useRef(null);
 
-  const addRule = async (e) => {
-    e.preventDefault();
+  const submitRule = async () => {
     if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return;
     await rules.save({
       id: newId(),
@@ -38,6 +40,21 @@ export default function RulesSection({
       priority: Number(ruleDraft.priority) || 0,
     });
     setRuleDraft({ keyword: '', category_id: '', priority: 0 });
+  };
+
+  const addRule = (e) => {
+    e.preventDefault();
+    submitRule();
+  };
+
+  // Desktop-only: Shift+Enter saves the row in place and refocuses the
+  // keyword field, so someone entering a batch of rules never has to reach
+  // for the mouse between them. Plain Enter keeps its native behaviour.
+  const handleRuleFieldKeyDown = (e) => {
+    if (!isDesktop || e.key !== 'Enter' || !e.shiftKey) return;
+    e.preventDefault();
+    submitRule();
+    keywordRef.current?.focus();
   };
 
   const applyRules = async () => {
@@ -103,8 +120,10 @@ export default function RulesSection({
           <span className="field-label">{t('transactions.ruleKeyword')}</span>
           <div className="field-input">
             <input
+              ref={keywordRef}
               value={ruleDraft.keyword}
               onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
+              onKeyDown={handleRuleFieldKeyDown}
             />
           </div>
         </label>
@@ -114,6 +133,7 @@ export default function RulesSection({
             className="field-select"
             value={ruleDraft.category_id}
             onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
+            onKeyDown={handleRuleFieldKeyDown}
           >
             <option value="">&#8212;</option>
             {categories.items.map((c) => (
@@ -130,6 +150,7 @@ export default function RulesSection({
               type="number"
               value={ruleDraft.priority}
               onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
+              onKeyDown={handleRuleFieldKeyDown}
             />
           </div>
         </label>
@@ -139,6 +160,9 @@ export default function RulesSection({
         <button className="btn secondary" type="button" onClick={applyRules}>
           {t('transactions.applyRules')}
         </button>
+        {/* Written down rather than left to be discovered, same reasoning
+            as TransactionRows' own hint next to its "+ Add row" button. */}
+        {isDesktop && <span className="field-label">{t('transactions.addRowShortcut')}</span>}
       </form>
     </div>
   );

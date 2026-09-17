@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
+import useIsDesktop from '../useIsDesktop';
 import { makeFormatMoney } from '../currency';
 import CategoryBadge from './CategoryBadge';
 import CategoryChipPicker from './CategoryChipPicker';
@@ -55,6 +56,8 @@ export default function CategoriesScreen({
   const [presetCategories, setPresetCategories] = useState([]);
   const [savingsResult, setSavingsResult] = useState(null);
   const [savingsDraft, setSavingsDraft] = useState(null);
+  const isDesktop = useIsDesktop();
+  const categoryNameRef = useRef(null);
 
   const { result, isIncome } = useMonthBudget({
     wasmModule,
@@ -129,8 +132,7 @@ export default function CategoriesScreen({
       return { line, isGoal, name: source?.name ?? id };
     });
 
-  const addCategory = async (e) => {
-    e.preventDefault();
+  const submitCategory = async () => {
     if (!newCategory.name.trim()) return;
     const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
     await categories.save({
@@ -146,6 +148,21 @@ export default function CategoriesScreen({
       is_income: newCategory.isIncome,
     });
     setNewCategory({ name: '', group: '', isIncome: false });
+  };
+
+  const addCategory = (e) => {
+    e.preventDefault();
+    submitCategory();
+  };
+
+  // Desktop-only, same shortcut as RulesSection's keyword field: Shift+Enter
+  // saves the row in place and refocuses the name field, so a batch of
+  // categories can be typed in one after another without the mouse.
+  const handleCategoryFieldKeyDown = (e) => {
+    if (!isDesktop || e.key !== 'Enter' || !e.shiftKey) return;
+    e.preventDefault();
+    submitCategory();
+    categoryNameRef.current?.focus();
   };
 
   const saveSavingsPlanned = async (amount) => {
@@ -214,8 +231,10 @@ export default function CategoriesScreen({
           <span className="field-label">{t('budget.categoryName')}</span>
           <div className="field-input">
             <input
+              ref={categoryNameRef}
               value={newCategory.name}
               onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+              onKeyDown={handleCategoryFieldKeyDown}
             />
           </div>
         </label>
@@ -225,6 +244,7 @@ export default function CategoriesScreen({
             <input
               value={newCategory.group}
               onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
+              onKeyDown={handleCategoryFieldKeyDown}
             />
           </div>
         </label>
@@ -242,6 +262,9 @@ export default function CategoriesScreen({
         <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
           {t('budget.addCommon')}
         </button>
+        {/* Same shortcut, same reasoning as RulesSection's own hint --
+            written down rather than left to be discovered. */}
+        {isDesktop && <span className="field-label">{t('transactions.addRowShortcut')}</span>}
       </form>
       <p className="field-label">{t('budget.commonHint')}</p>
 
