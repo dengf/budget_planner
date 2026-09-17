@@ -61,12 +61,18 @@ describe('RulesSection keyword field', () => {
     expect(screen.getByLabelText('Keyword')).toHaveFocus();
   });
 
-  it('does nothing on Shift+Enter when no category has been chosen yet', () => {
+  it('focuses the category field on Shift+Enter instead of silently doing nothing when none is chosen', async () => {
     mockDesktop();
     const { rules } = renderRules();
     fireEvent.change(screen.getByLabelText('Keyword'), { target: { value: 'Coffee' } });
     fireEvent.keyDown(screen.getByLabelText('Keyword'), { key: 'Enter', shiftKey: true });
     expect(rules.save).not.toHaveBeenCalled();
+    // The button has always required a category before saving -- a mouse
+    // click that went nowhere was easy to write off as "I didn't finish
+    // the form," but the same silent no-op from a keyboard shortcut reads
+    // as "the shortcut is broken." Moving focus makes it visibly "waiting
+    // on you" instead.
+    await waitFor(() => expect(screen.getByLabelText('Category')).toHaveFocus());
   });
 
   it('ignores Shift+Enter on the phone shell, since this is a desktop-only shortcut', () => {
