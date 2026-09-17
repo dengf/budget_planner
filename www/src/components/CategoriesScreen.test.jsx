@@ -145,4 +145,15 @@ describe('CategoriesScreen category name field', () => {
     fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
     expect(save).not.toHaveBeenCalled();
   });
+
+  it('shows the shortcut hint on desktop', () => {
+    mockDesktop();
+    renderScreen();
+    expect(screen.getByText('Shift + Enter adds a row')).toBeInTheDocument();
+  });
+
+  it('hides the shortcut hint on the phone shell, since the shortcut does nothing there', () => {
+    renderScreen();
+    expect(screen.queryByText('Shift + Enter adds a row')).not.toBeInTheDocument();
+  });
 });

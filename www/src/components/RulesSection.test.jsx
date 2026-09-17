@@ -78,4 +78,15 @@ describe('RulesSection keyword field', () => {
     fireEvent.keyDown(screen.getByLabelText('Keyword'), { key: 'Enter', shiftKey: true });
     expect(rules.save).not.toHaveBeenCalled();
   });
+
+  it('shows the shortcut hint on desktop', () => {
+    mockDesktop();
+    renderRules();
+    expect(screen.getByText('Shift + Enter adds a row')).toBeInTheDocument();
+  });
+
+  it('hides the shortcut hint on the phone shell, since the shortcut does nothing there', () => {
+    renderRules();
+    expect(screen.queryByText('Shift + Enter adds a row')).not.toBeInTheDocument();
+  });
 });

@@ -160,6 +160,11 @@ export default function RulesSection({
         <button className="btn secondary" type="button" onClick={applyRules}>
           {t('transactions.applyRules')}
         </button>
+        {/* Written down rather than left to be discovered, same reasoning
+            as TransactionRows' own hint next to its "+ Add row" button. */}
+        {isDesktop && (
+          <span className="field-label">{t('transactions.addRowShortcut')}</span>
+        )}
       </form>
     </div>
   );
