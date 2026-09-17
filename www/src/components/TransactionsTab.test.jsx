@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import TransactionsTab from './TransactionsTab';
 
@@ -130,5 +130,62 @@ describe('TransactionsTab correction loop', () => {
     });
     expect(await screen.findByText('Rent')).toBeInTheDocument();
     expect(screen.queryByText(/Uncategorized/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The same batch-rows form AddTransactionSheet shows behind the "+" on
+ * every other tab, embedded directly on the page instead of behind a
+ * modal -- this tab already is the list those rows land in. `isDesktop`
+ * is read from `matchMedia` inside the component (see BudgetTab's own
+ * desktop tests for the same pattern), not a prop, so it has to be
+ * mocked here rather than passed.
+ */
+describe('TransactionsTab desktop inline add', () => {
+  function mockDesktop() {
+    window.matchMedia = vi.fn(() => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  }
+
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  it('shows the inline batch form in place of the Log a transaction button', () => {
+    mockDesktop();
+    renderTab({ newId: () => 'new-1', rules: { items: [] } });
+    expect(screen.queryByRole('button', { name: 'Log a transaction' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Amount, row 1')).toBeInTheDocument();
+  });
+
+  it('saves a typed row directly, with no sheet or dialog involved', async () => {
+    const onOpenAdd = vi.fn();
+    const save = vi.fn();
+    mockDesktop();
+    renderTab({
+      onOpenAdd,
+      newId: () => 'new-1',
+      rules: { items: [] },
+      wasmModule: {
+        ...WASM,
+        signed_amount: async ({ magnitude, is_income }) => ({
+          amount: is_income ? Math.abs(magnitude) : -Math.abs(magnitude),
+          error: null,
+        }),
+      },
+      transactions: { items: [], save, remove: vi.fn() },
+    });
+
+    fireEvent.change(screen.getByLabelText('Amount, row 1'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add $12.00' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ amount: -12 }));
+    expect(onOpenAdd).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import CalcError from './CalcError';
 import CategoryPicker from './CategoryPicker';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
-import TransactionRows from './TransactionRows';
+import TransactionBatchForm, { emptyRow } from './TransactionBatchForm';
 import VoiceCapture from './VoiceCapture';
 import { PenIcon, CameraIcon, MicIcon, SpreadsheetIcon, RecurringIcon } from './icons';
 import { categoryDisplayName } from '../presetCategories';
@@ -37,18 +37,6 @@ const EMPTY_DRAFT = {
 };
 
 const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
-
-/**
- * One row of the desktop batch form. `key` is React's identity for the
- * row and the handle every edit, removal and rule match is addressed
- * by -- the array index would shift under a removal and hand a row
- * another row's category.
- *
- * A new row copies the date of the row above it: a batch is usually a
- * day's receipts, so the date is set once, not once per row.
- */
-let rowSeq = 0;
-const emptyRow = (date = '') => ({ ...EMPTY_DRAFT, date, key: `row-${(rowSeq += 1)}` });
 
 const EMPTY_RECURRING_DRAFT = {
   description: '',
@@ -105,7 +93,6 @@ export default function AddTransactionSheet({
   // The desktop batch form's rows. Correcting a row is still one row, so
   // `editing` keeps the single form even at desktop width.
   const [rows, setRows] = useState(() => [emptyRow()]);
-  const [rowRuleMatches, setRowRuleMatches] = useState({});
   const [csvText, setCsvText] = useState('');
   const [mapping, setMapping] = useState(DEFAULT_MAPPING);
   const [columnsDetected, setColumnsDetected] = useState(false);
@@ -186,25 +173,6 @@ export default function AddTransactionSheet({
     isIncome: draft.isIncome,
   });
 
-  // The batch rows below each carry their own direction, so both sides
-  // of the ledger have to be ranked at once rather than following one
-  // toggle. Called unconditionally (hooks always are) and simply unused
-  // on a phone, where `batch` is false.
-  const expenseRank = useCategoryRank({
-    wasmModule,
-    categories: categories.items,
-    transactions: transactions.items,
-    today,
-    isIncome: false,
-  });
-  const incomeRank = useCategoryRank({
-    wasmModule,
-    categories: categories.items,
-    transactions: transactions.items,
-    today,
-    isIncome: true,
-  });
-
   const createCategory = useCreateCategory({ wasmModule, categories, newId });
 
   /**
@@ -244,66 +212,6 @@ export default function AddTransactionSheet({
       cancelled = true;
     };
   }, [wasmModule, rules.items, draft.description, draft.date, draft.isIncome, today]);
-
-  // What the rows actually say, as one string: the effect below has to
-  // re-run when a description, date or direction changes and *not* on
-  // the new array identity every unrelated keystroke in the sheet
-  // produces. Extracted rather than inlined in the dependency array so
-  // the lint rule can still read it.
-  const rowsSignature = rows
-    .map((r) => `${r.key}:${r.description}:${r.date}:${r.isIncome}`)
-    .join('|');
-
-  /**
-   * The same rules, for the batch form -- and in *one* call, not one per
-   * row: `apply_rules` takes a list of transactions and returns them
-   * categorized, which is how CSV import uses it. The row `key` rides
-   * along as the transaction id, so the answers come back addressable
-   * even after a row is removed mid-flight.
-   */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const notes = rows.filter((r) => r.description.trim());
-      const canMatch = notes.length > 0 && rules.items.length > 0 && wasmModule?.apply_rules;
-      const result = canMatch
-        ? await wasmModule.apply_rules({
-            transactions: notes.map((r) => ({
-              id: r.key,
-              date: r.date || today,
-              description: r.description.trim(),
-              amount: r.isIncome ? 1 : -1,
-              category_id: null,
-            })),
-            rules: rules.items,
-          })
-        : null;
-      if (cancelled) return;
-      if (!result || result.error) {
-        setRowRuleMatches({});
-        return;
-      }
-      setRowRuleMatches(
-        Object.fromEntries(
-          (result.transactions ?? [])
-            .filter((tx) => tx.category_id)
-            .map((tx) => [tx.id, tx.category_id]),
-        ),
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rows` is read through `rowsSignature` above, which is the dependency that should trigger this.
-  }, [wasmModule, rules.items, today, rowsSignature]);
-
-  // Same precedence as the single form below: an explicit pick wins, then
-  // a rule match, then the ranking's suggestion for that row's direction.
-  const rowCategoryValue = (row) => {
-    if (row.categoryTouched) return row.category_id;
-    const rank = row.isIncome ? incomeRank : expenseRank;
-    return rowRuleMatches[row.key] ?? rank.suggestionId ?? '';
-  };
 
   // Derived, not stored: a suggestion that lived in state would need an
   // effect to keep it in step with the note, and the moment two effects
@@ -363,89 +271,6 @@ export default function AddTransactionSheet({
     });
     setDraft({ ...EMPTY_DRAFT, isIncome: draft.isIncome });
     onClose();
-  };
-
-  /** A row counts as filled the moment it has an amount. The trailing
-   *  empty row the form keeps ready is therefore free -- it is not a
-   *  transaction, it is somewhere to type the next one. */
-  const filledRows = rows.filter((r) => r.amount !== '' && Number(r.amount) > 0);
-
-  const setRow = (key, patch) => {
-    setRows((current) => {
-      const next = current.map((r) => (r.key === key ? { ...r, ...patch } : r));
-      // Typing an amount into the last row grows the form, so a batch
-      // never needs a trip to "+ Add a row" between entries.
-      const last = next[next.length - 1];
-      return last.amount !== '' ? [...next, emptyRow(last.date)] : next;
-    });
-  };
-
-  const addRow = () =>
-    setRows((current) => [...current, emptyRow(current[current.length - 1].date)]);
-
-  const removeRow = (key) =>
-    setRows((current) => (current.length === 1 ? current : current.filter((r) => r.key !== key)));
-
-  /**
-   * Saves every filled row, and drops each one as it lands.
-   *
-   * Sequential, not `Promise.all`: `transactions.save` writes through
-   * one storage handle, and a failure half way has to leave something
-   * coherent behind. What is left in the sheet afterwards is exactly
-   * what did not save, with the error above it -- a batch that silently
-   * lost a row is the "quietly wrong" failure this app is built to
-   * avoid.
-   *
-   * The sign comes from `budget_calc::signed_amount` per row, the same
-   * call the single form makes. Nothing here decides a sign.
-   */
-  const addBatch = async (e) => {
-    e.preventDefault();
-    if (filledRows.length === 0) return;
-    if (!wasmModule?.signed_amount) return;
-    for (const row of filledRows) {
-      const signed = await wasmModule.signed_amount({
-        magnitude: Number(row.amount),
-        is_income: row.isIncome,
-      });
-      if (signed?.error) {
-        setSaveError(signed);
-        return;
-      }
-      const rowCategory = rowCategoryValue(row);
-      const fallback = rowCategory
-        ? categoryName(rowCategory)
-        : t(row.isIncome ? 'transactions.income' : 'transactions.expense');
-      await transactions.save({
-        id: newId(),
-        date: row.date || today,
-        description: row.description.trim() || fallback,
-        amount: signed.amount,
-        category_id: rowCategory || null,
-      });
-      setRows((current) => {
-        const left = current.filter((r) => r.key !== row.key);
-        return left.length === 0 ? [emptyRow(row.date)] : left;
-      });
-    }
-    setSaveError(null);
-    onClose();
-  };
-
-  /** "Add 3 transactions" once there is more than one row to file; a
-   *  single row keeps the single form's sentence, which quotes the
-   *  figure and the category back. */
-  const batchSubmitLabel = () => {
-    if (filledRows.length > 1) {
-      return t('transactions.addCount', { count: filledRows.length });
-    }
-    const row = filledRows[0];
-    if (!row) return t('transactions.addExpense');
-    const amount = formatMoney(Math.abs(Number(row.amount)));
-    const rowCategory = rowCategoryValue(row);
-    return rowCategory
-      ? t('transactions.addAmountTo', { amount, category: categoryName(rowCategory) })
-      : t('transactions.addAmount', { amount });
   };
 
   /** The other half of the correction loop: having just filed this one
@@ -579,7 +404,6 @@ export default function AddTransactionSheet({
   const closeAndReset = () => {
     setDraft(EMPTY_DRAFT);
     setRows([emptyRow()]);
-    setRowRuleMatches({});
     setRecurringDraft(EMPTY_RECURRING_DRAFT);
     setSaveError(null);
     setRuleSaved(null);
@@ -680,24 +504,18 @@ export default function AddTransactionSheet({
               is still what a correction uses at any width -- editing is
               one row by definition. */}
           {method === 'manual' && batch && (
-            <form className="txn-batch" onSubmit={addBatch}>
-              <TransactionRows
-                rows={rows}
-                onRowChange={setRow}
-                onAddRow={addRow}
-                onRemoveRow={removeRow}
-                expenseCategories={expenseRank.ordered}
-                incomeCategories={incomeRank.ordered}
-                categoryValue={rowCategoryValue}
-                today={today}
-              />
-              {saveError && <CalcError result={saveError} />}
-              <div className="add-txn-submit-bar">
-                <button className="btn" type="submit" disabled={filledRows.length === 0}>
-                  {batchSubmitLabel()}
-                </button>
-              </div>
-            </form>
+            <TransactionBatchForm
+              rows={rows}
+              setRows={setRows}
+              wasmModule={wasmModule}
+              newId={newId}
+              today={today}
+              categories={categories}
+              rules={rules}
+              transactions={transactions}
+              formatMoney={formatMoney}
+              onSaved={onClose}
+            />
           )}
 
           {method === 'manual' && !batch && (
