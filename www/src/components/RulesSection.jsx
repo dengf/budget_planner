@@ -30,9 +30,16 @@ export default function RulesSection({
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
   const isDesktop = useIsDesktop();
   const keywordRef = useRef(null);
+  const categoryRef = useRef(null);
 
+  // Returns whether the rule was actually saved, so the keyboard-shortcut
+  // handler below can tell "saved" from "silently rejected" -- the same
+  // keyword/category check the button has always had, but a mouse click
+  // rejected with no error was easy to miss was actually validation, not
+  // a broken button; a keyboard shortcut with the same silent no-op reads
+  // as "the shortcut does nothing" instead.
   const submitRule = async () => {
-    if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return;
+    if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return false;
     await rules.save({
       id: newId(),
       keyword: ruleDraft.keyword,
@@ -40,6 +47,7 @@ export default function RulesSection({
       priority: Number(ruleDraft.priority) || 0,
     });
     setRuleDraft({ keyword: '', category_id: '', priority: 0 });
+    return true;
   };
 
   const addRule = (e) => {
@@ -50,11 +58,21 @@ export default function RulesSection({
   // Desktop-only: Shift+Enter saves the row in place and refocuses the
   // keyword field, so someone entering a batch of rules never has to reach
   // for the mouse between them. Plain Enter keeps its native behaviour.
-  const handleRuleFieldKeyDown = (e) => {
+  //
+  // When the row can't be saved (no category chosen yet), focus jumps to
+  // whichever field is still empty instead of doing nothing -- otherwise
+  // the shortcut looks broken rather than "waiting on you."
+  const handleRuleFieldKeyDown = async (e) => {
     if (!isDesktop || e.key !== 'Enter' || !e.shiftKey) return;
     e.preventDefault();
-    submitRule();
-    keywordRef.current?.focus();
+    const saved = await submitRule();
+    if (saved) {
+      keywordRef.current?.focus();
+    } else if (!ruleDraft.keyword.trim()) {
+      keywordRef.current?.focus();
+    } else {
+      categoryRef.current?.focus();
+    }
   };
 
   const applyRules = async () => {
@@ -130,6 +148,7 @@ export default function RulesSection({
         <label className="field">
           <span className="field-label">{t('transactions.category')}</span>
           <select
+            ref={categoryRef}
             className="field-select"
             value={ruleDraft.category_id}
             onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
