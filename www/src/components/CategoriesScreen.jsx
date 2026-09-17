@@ -264,9 +264,7 @@ export default function CategoriesScreen({
         </button>
         {/* Same shortcut, same reasoning as RulesSection's own hint --
             written down rather than left to be discovered. */}
-        {isDesktop && (
-          <span className="field-label">{t('transactions.addRowShortcut')}</span>
-        )}
+        {isDesktop && <span className="field-label">{t('transactions.addRowShortcut')}</span>}
       </form>
       <p className="field-label">{t('budget.commonHint')}</p>
 
