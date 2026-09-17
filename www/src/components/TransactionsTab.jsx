@@ -3,7 +3,9 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
 import CategoryBadge from './CategoryBadge';
+import TransactionBatchForm, { emptyRow } from './TransactionBatchForm';
 import { makeCategoryLookup } from '../presetCategories';
+import useIsDesktop from '../useIsDesktop';
 
 /**
  * The transaction list, and nothing else.
@@ -13,21 +15,37 @@ import { makeCategoryLookup } from '../presetCategories';
  * quietly on every transaction added afterwards. They now live in More,
  * next to Goals and Debt, which leaves this tab as the one thing its
  * name promises. See RulesSection.jsx / RecurringSection.jsx.
+ *
+ * At desktop width, logging a transaction is inline here too, the same
+ * batch-rows form AddTransactionSheet shows for every other tab's "+" --
+ * except this tab already *is* the list those rows land in, so there is
+ * no reason to cover it with a modal first. Reaching for "+" opens the
+ * modal, still, for the phone-parity methods (receipt/voice/CSV/
+ * recurring) it doesn't cover. Phone is untouched: no `isDesktop` means
+ * no inline form, so a phone still reaches every method through "+".
  */
 export default function TransactionsTab({
   wasmModule,
   currencySymbol,
+  today,
   viewMonth,
   confirm,
   categories,
+  newId,
+  rules,
   transactions,
   onOpenAdd,
   onEditTransaction,
 }) {
   const { t, locale } = useI18n();
+  const isDesktop = useIsDesktop();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [onlyUncategorized, setOnlyUncategorized] = useState(false);
+  // Its own local pair, distinct from AddTransactionSheet's -- this form
+  // has no voice tab reaching in to fill a row, so nothing else needs to
+  // see or drive this state from outside.
+  const [batchRows, setBatchRows] = useState(() => [emptyRow()]);
 
   /** Opens the shell's Add sheet on a specific tab -- the empty state's
    *  two buttons (Log a transaction / Import CSV) both go through this
@@ -102,27 +120,51 @@ export default function TransactionsTab({
           being browsed is the one shared, app-level control up in the
           header (see Header.jsx), not a per-tab picker down here. */}
 
+      <h2>{t('transactions.listTitle')}</h2>
+
+      {/* Desktop skips the modal for the one method it can show inline --
+          the rows are the same ones AddTransactionSheet's "+" opens onto
+          everywhere else, just rendered on the page instead of over it.
+          Receipt/voice/CSV/recurring still go through "+"; typing rows
+          here has no equivalent for a photo, a recording or a file. */}
+      {isDesktop && (
+        <>
+          <h3 className="txn-batch-title">{t('transactions.addManual')}</h3>
+          <TransactionBatchForm
+            rows={batchRows}
+            setRows={setBatchRows}
+            wasmModule={wasmModule}
+            newId={newId}
+            today={today}
+            categories={categories}
+            rules={rules}
+            transactions={transactions}
+            formatMoney={formatMoney}
+          />
+        </>
+      )}
+
       {/* Logging and importing are what a first visit to this tab is
           actually for, so the empty state leads with both rather than
-          leaving someone to find the "+" on their own. */}
+          leaving someone to find the "+" on their own. On desktop the
+          inline form above already covers "log a transaction", so only
+          the CSV alternative is offered here. */}
       {transactions.items.length === 0 ? (
-        <>
-          <h2>{t('transactions.listTitle')}</h2>
-          <div className="txn-empty-state">
-            <p className="empty-state">{t('transactions.noTransactions')}</p>
-            <div className="txn-empty-actions">
+        <div className="txn-empty-state">
+          <p className="empty-state">{t('transactions.noTransactions')}</p>
+          <div className="txn-empty-actions">
+            {!isDesktop && (
               <button type="button" className="btn" onClick={() => openAdd('manual')}>
                 {t('transactions.logCta')}
               </button>
-              <button type="button" className="btn secondary" onClick={() => openAdd('csv')}>
-                {t('transactions.methodImport')}
-              </button>
-            </div>
+            )}
+            <button type="button" className="btn secondary" onClick={() => openAdd('csv')}>
+              {t('transactions.methodImport')}
+            </button>
           </div>
-        </>
+        </div>
       ) : (
         <>
-          <h2>{t('transactions.listTitle')}</h2>
           <label className="field field-check">
             <input
               type="checkbox"
