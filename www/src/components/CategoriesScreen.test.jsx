@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import CategoriesScreen from './CategoriesScreen';
 
@@ -100,5 +100,49 @@ describe('CategoriesScreen', () => {
     expect(screen.queryByText('Goals & debt this month')).not.toBeInTheDocument();
     fireEvent.click(await screen.findByLabelText(/Count goal contributions/));
     expect(await screen.findByText('Goals & debt this month')).toBeInTheDocument();
+  });
+});
+
+function mockDesktop() {
+  window.matchMedia = vi.fn(() => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+describe('CategoriesScreen category name field', () => {
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  it('adds the category on Shift+Enter on desktop, without a click', async () => {
+    mockDesktop();
+    const save = vi.fn();
+    renderScreen({ categories: { items: CATEGORIES, save } });
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Rent' } });
+    fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rent' })),
+    );
+  });
+
+  it('clears the draft and refocuses the name field after Shift+Enter', async () => {
+    mockDesktop();
+    renderScreen({ categories: { items: CATEGORIES, save: vi.fn() } });
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Rent' } });
+    fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
+    await waitFor(() => expect(screen.getByLabelText('Category name')).toHaveValue(''));
+    expect(screen.getByLabelText('Category name')).toHaveFocus();
+  });
+
+  it('ignores Shift+Enter on the phone shell, since this is a desktop-only shortcut', () => {
+    // window.matchMedia is left unmocked, matching this codebase's default
+    // "phone shell" behaviour (see useIsDesktop.js).
+    const save = vi.fn();
+    renderScreen({ categories: { items: CATEGORIES, save } });
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Rent' } });
+    fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
+    expect(save).not.toHaveBeenCalled();
   });
 });
