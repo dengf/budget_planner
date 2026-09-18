@@ -4012,6 +4012,67 @@ table.data tr:last-child td {
     flex: none;
   }
 
+  /* The rules batch form, deliberately built out of the same pieces as
+     the transaction rows above: same gaps, same head-row-as-label,
+     same remove button. Three columns instead of six, so the keyword
+     and category take what's left and priority is sized to a number. */
+  .rule-batch {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .rule-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .rule-rows-head,
+  .rule-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 96px 32px;
+    gap: 8px;
+    align-items: center;
+  }
+  .rule-rows-head {
+    padding: 0 2px;
+  }
+  /* The row controls lose the stacked label/field block's own margins:
+     the header above is the label, once, for the whole column. */
+  .rule-row .field-input,
+  .rule-row .field-select {
+    margin: 0;
+    width: 100%;
+  }
+  .rule-row-remove {
+    min-width: 32px;
+    padding: 0;
+    justify-self: center;
+  }
+  /* Disabled only when it's the last row, where removing it would leave
+     nowhere to type -- dimmed rather than gone so the column doesn't
+     reflow the moment a second row appears. */
+  .rule-row-remove:disabled {
+    opacity: 0.35;
+  }
+  .rule-rows-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .rule-rows-add {
+    flex: none;
+  }
+  .rule-batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .rule-batch-actions .btn {
+    flex: none;
+  }
+
   /* Dashboard: the donut beside its own category rows, with the
      spend-over-time chart spanning both columns beneath -- 31 daily
      points are the one thing here that actually wants the full width.

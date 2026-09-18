@@ -74,6 +74,7 @@ export default {
   'budget.remove': '刪除',
 
   'budget.addCommon': '新增常用分類',
+  'budget.addCategoryShortcut': 'Shift + Enter 新增分類',
   'budget.includeCommitments': '將目標存入與債務最低還款計入本月預算',
   'budget.commitmentsTitle': '本月目標與債務',
   'budget.progressAria': '{name}：已花費 {spent}，計劃 {planned}',
@@ -251,6 +252,7 @@ export default {
   'transactions.ruleKeyword': '關鍵字',
   'transactions.rulePriority': '優先順序',
   'transactions.addRule': '新增規則',
+  'transactions.addRuleCount': '新增 {count} 條規則',
   'transactions.applyRules': '將規則套用到未分類帳目',
   'transactions.noRules': '還沒有規則。',
   'transactions.receiptTitle': '從收據新增',

@@ -262,9 +262,12 @@ export default function CategoriesScreen({
         <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
           {t('budget.addCommon')}
         </button>
-        {/* Same shortcut, same reasoning as RulesSection's own hint --
-            written down rather than left to be discovered. */}
-        {isDesktop && <span className="field-label">{t('transactions.addRowShortcut')}</span>}
+        {/* Same reasoning as the rows forms' own hints -- written down
+            rather than left to be discovered. Its own string, though:
+            this shortcut saves the draft in place, it does not add a
+            row, and `transactions.addRowShortcut` now belongs only to
+            the forms where a row really appears. */}
+        {isDesktop && <span className="field-label">{t('budget.addCategoryShortcut')}</span>}
       </form>
       <p className="field-label">{t('budget.commonHint')}</p>
 

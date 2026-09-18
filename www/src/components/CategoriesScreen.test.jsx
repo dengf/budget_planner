@@ -146,14 +146,17 @@ describe('CategoriesScreen category name field', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  // The hint names what this shortcut actually does -- it saves the draft
+  // in place. "adds a row" belongs to the rows forms (TransactionRows,
+  // RuleRows), where a row really does appear.
   it('shows the shortcut hint on desktop', () => {
     mockDesktop();
     renderScreen();
-    expect(screen.getByText('Shift + Enter adds a row')).toBeInTheDocument();
+    expect(screen.getByText('Shift + Enter adds the category')).toBeInTheDocument();
   });
 
   it('hides the shortcut hint on the phone shell, since the shortcut does nothing there', () => {
     renderScreen();
-    expect(screen.queryByText('Shift + Enter adds a row')).not.toBeInTheDocument();
+    expect(screen.queryByText('Shift + Enter adds the category')).not.toBeInTheDocument();
   });
 });

@@ -74,6 +74,7 @@ export default {
   'budget.remove': '删除',
 
   'budget.addCommon': '添加常用分类',
+  'budget.addCategoryShortcut': 'Shift + Enter 添加分类',
   'budget.includeCommitments': '将目标存入与债务最低还款计入本月预算',
   'budget.commitmentsTitle': '本月目标与债务',
   'budget.progressAria': '{name}：已花费 {spent}，计划 {planned}',
@@ -251,6 +252,7 @@ export default {
   'transactions.ruleKeyword': '关键词',
   'transactions.rulePriority': '优先级',
   'transactions.addRule': '添加规则',
+  'transactions.addRuleCount': '添加 {count} 条规则',
   'transactions.applyRules': '将规则应用到未分类账目',
   'transactions.noRules': '还没有规则。',
   'transactions.receiptTitle': '从收据添加',

@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import CategoryBadge from './CategoryBadge';
+import RuleRows from './RuleRows';
 import { categoryDisplayName, makeCategoryLookup } from '../presetCategories';
 import useIsDesktop from '../useIsDesktop';
 
@@ -16,7 +17,25 @@ import useIsDesktop from '../useIsDesktop';
  * The matching itself is `budget_calc::apply_rules`, called through the
  * wasm bridge -- this screen only collects the keyword, the category and
  * the priority, and asks for a re-run over existing history.
+ *
+ * Two shapes, one per width. Desktop gets `RuleRows`: rules are written
+ * in batches off a bank export, and one draft row meant a dozen separate
+ * save-and-retype cycles. The phone keeps the single draft form -- three
+ * columns of controls do not fit 375px, and the batch case is a desk
+ * case anyway. Both save through the same `saveRule` below.
  */
+
+let rowSeq = 0;
+export const emptyRuleRow = () => ({
+  keyword: '',
+  category_id: '',
+  priority: '0',
+  key: `rule-row-${(rowSeq += 1)}`,
+});
+
+const isComplete = (row) => !!row.keyword.trim() && !!row.category_id;
+const isBlank = (row) => !row.keyword.trim() && !row.category_id;
+
 export default function RulesSection({
   wasmModule,
   newId,
@@ -28,51 +47,61 @@ export default function RulesSection({
   const { t } = useI18n();
   const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
+  const [rows, setRows] = useState(() => [emptyRuleRow()]);
   const isDesktop = useIsDesktop();
-  const keywordRef = useRef(null);
-  const categoryRef = useRef(null);
 
-  // Returns whether the rule was actually saved, so the keyboard-shortcut
-  // handler below can tell "saved" from "silently rejected" -- the same
-  // keyword/category check the button has always had, but a mouse click
-  // rejected with no error was easy to miss was actually validation, not
-  // a broken button; a keyboard shortcut with the same silent no-op reads
-  // as "the shortcut does nothing" instead.
-  const submitRule = async () => {
-    if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return false;
-    await rules.save({
+  const saveRule = ({ keyword, category_id, priority }) =>
+    rules.save({
       id: newId(),
-      keyword: ruleDraft.keyword,
-      category_id: ruleDraft.category_id,
-      priority: Number(ruleDraft.priority) || 0,
+      keyword,
+      category_id,
+      priority: Number(priority) || 0,
     });
+
+  const addRule = async (e) => {
+    e.preventDefault();
+    if (!ruleDraft.keyword.trim() || !ruleDraft.category_id) return;
+    await saveRule(ruleDraft);
     setRuleDraft({ keyword: '', category_id: '', priority: 0 });
-    return true;
   };
 
-  const addRule = (e) => {
-    e.preventDefault();
-    submitRule();
+  // A keyword in the last row grows a fresh row beneath it, the same way
+  // TransactionRows grows on an amount: the next row is already there by
+  // the time someone reaches for it, so "+ Add a row" is the fallback
+  // rather than the step everyone takes.
+  const setRow = (key, patch) => {
+    setRows((current) => {
+      const next = current.map((r) => (r.key === key ? { ...r, ...patch } : r));
+      const last = next[next.length - 1];
+      return last.keyword.trim() ? [...next, emptyRuleRow()] : next;
+    });
   };
 
-  // Desktop-only: Shift+Enter saves the row in place and refocuses the
-  // keyword field, so someone entering a batch of rules never has to reach
-  // for the mouse between them. Plain Enter keeps its native behaviour.
-  //
-  // When the row can't be saved (no category chosen yet), focus jumps to
-  // whichever field is still empty instead of doing nothing -- otherwise
-  // the shortcut looks broken rather than "waiting on you."
-  const handleRuleFieldKeyDown = async (e) => {
-    if (!isDesktop || e.key !== 'Enter' || !e.shiftKey) return;
+  const addRow = () => setRows((current) => [...current, emptyRuleRow()]);
+
+  const removeRow = (key) =>
+    setRows((current) => (current.length === 1 ? current : current.filter((r) => r.key !== key)));
+
+  const completeRows = rows.filter(isComplete);
+
+  /**
+   * Saves every finished row in one pass.
+   *
+   * Half-finished rows -- a keyword with no category yet -- are kept
+   * rather than saved or silently dropped: they are the rows still
+   * needing a decision, and leaving them on screen is the only honest
+   * report of what did and didn't go in. Fully blank rows go, and a
+   * fresh trailing row always comes back so the next keyword has
+   * somewhere to land.
+   */
+  const addRules = async (e) => {
     e.preventDefault();
-    const saved = await submitRule();
-    if (saved) {
-      keywordRef.current?.focus();
-    } else if (!ruleDraft.keyword.trim()) {
-      keywordRef.current?.focus();
-    } else {
-      categoryRef.current?.focus();
-    }
+    if (completeRows.length === 0) return;
+    for (const row of completeRows) await saveRule(row);
+    setRows((current) => {
+      const left = current.filter((r) => !isComplete(r) && !isBlank(r));
+      return [...left, emptyRuleRow()];
+    });
   };
 
   const applyRules = async () => {
@@ -93,6 +122,13 @@ export default function RulesSection({
     const ok = await confirm(t('confirm.removeRule', { keyword: rule.keyword }));
     if (ok) await rules.remove(rule.id);
   };
+
+  // Counts what will actually be saved, so the button never promises more
+  // than the rows hold -- the same call `TransactionBatchForm` makes.
+  const batchSubmitLabel = () =>
+    completeRows.length > 1
+      ? t('transactions.addRuleCount', { count: completeRows.length })
+      : t('transactions.addRule');
 
   return (
     <div className="panel">
@@ -133,56 +169,68 @@ export default function RulesSection({
           </table>
         </div>
       )}
-      <form className="form-grid" onSubmit={addRule}>
-        <label className="field">
-          <span className="field-label">{t('transactions.ruleKeyword')}</span>
-          <div className="field-input">
-            <input
-              ref={keywordRef}
-              value={ruleDraft.keyword}
-              onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
-              onKeyDown={handleRuleFieldKeyDown}
-            />
+      {isDesktop ? (
+        <form className="rule-batch" onSubmit={addRules}>
+          <RuleRows
+            rows={rows}
+            categories={categories.items}
+            onRowChange={setRow}
+            onAddRow={addRow}
+            onRemoveRow={removeRow}
+          />
+          <div className="rule-batch-actions">
+            <button className="btn" type="submit" disabled={completeRows.length === 0}>
+              {batchSubmitLabel()}
+            </button>
+            <button className="btn secondary" type="button" onClick={applyRules}>
+              {t('transactions.applyRules')}
+            </button>
           </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.category')}</span>
-          <select
-            ref={categoryRef}
-            className="field-select"
-            value={ruleDraft.category_id}
-            onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
-            onKeyDown={handleRuleFieldKeyDown}
-          >
-            <option value="">&#8212;</option>
-            {categories.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {categoryDisplayName(c, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('transactions.rulePriority')}</span>
-          <div className="field-input">
-            <input
-              type="number"
-              value={ruleDraft.priority}
-              onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
-              onKeyDown={handleRuleFieldKeyDown}
-            />
-          </div>
-        </label>
-        <button className="btn" type="submit">
-          {t('transactions.addRule')}
-        </button>
-        <button className="btn secondary" type="button" onClick={applyRules}>
-          {t('transactions.applyRules')}
-        </button>
-        {/* Written down rather than left to be discovered, same reasoning
-            as TransactionRows' own hint next to its "+ Add row" button. */}
-        {isDesktop && <span className="field-label">{t('transactions.addRowShortcut')}</span>}
-      </form>
+        </form>
+      ) : (
+        <form className="form-grid" onSubmit={addRule}>
+          <label className="field">
+            <span className="field-label">{t('transactions.ruleKeyword')}</span>
+            <div className="field-input">
+              <input
+                value={ruleDraft.keyword}
+                onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
+              />
+            </div>
+          </label>
+          <label className="field">
+            <span className="field-label">{t('transactions.category')}</span>
+            <select
+              className="field-select"
+              value={ruleDraft.category_id}
+              onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
+            >
+              <option value="">&#8212;</option>
+              {categories.items.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {categoryDisplayName(c, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">{t('transactions.rulePriority')}</span>
+            <div className="field-input">
+              <input
+                type="number"
+                value={ruleDraft.priority}
+                onChange={(e) => setRuleDraft({ ...ruleDraft, priority: e.target.value })}
+              />
+            </div>
+          </label>
+          <button className="btn" type="submit">
+            {t('transactions.addRule')}
+          </button>
+          <button className="btn secondary" type="button" onClick={applyRules}>
+            {t('transactions.applyRules')}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
