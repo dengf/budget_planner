@@ -4073,6 +4073,66 @@ table.data tr:last-child td {
     flex: none;
   }
 
+  /* The categories batch form, third instance of the same rows pattern.
+     Name and group take what's left; direction is sized to its two
+     options. */
+  .category-batch {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .category-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .category-rows-head,
+  .category-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) 120px minmax(0, 1fr) 32px;
+    gap: 8px;
+    align-items: center;
+  }
+  .category-rows-head {
+    padding: 0 2px;
+  }
+  /* The row controls lose the stacked label/field block's own margins:
+     the header above is the label, once, for the whole column. */
+  .category-row .field-input,
+  .category-row .field-select {
+    margin: 0;
+    width: 100%;
+  }
+  .category-row-remove {
+    min-width: 32px;
+    padding: 0;
+    justify-self: center;
+  }
+  /* Disabled only when it's the last row, where removing it would leave
+     nowhere to type -- dimmed rather than gone so the column doesn't
+     reflow the moment a second row appears. */
+  .category-row-remove:disabled {
+    opacity: 0.35;
+  }
+  .category-rows-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .category-rows-add {
+    flex: none;
+  }
+  .category-batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .category-batch-actions .btn {
+    flex: none;
+  }
+
   /* Dashboard: the donut beside its own category rows, with the
      spend-over-time chart spanning both columns beneath -- 31 daily
      points are the one thing here that actually wants the full width.

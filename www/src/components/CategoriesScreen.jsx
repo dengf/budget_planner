@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import useIsDesktop from '../useIsDesktop';
 import { makeFormatMoney } from '../currency';
 import CategoryBadge from './CategoryBadge';
 import CategoryChipPicker from './CategoryChipPicker';
+import CategoryRows from './CategoryRows';
 import {
   DEBT_PREFIX,
   GOAL_PREFIX,
@@ -35,9 +36,26 @@ import { useMonthBudget } from '../useMonthBudget';
  * Savings row's actual/remaining. See that hook's own doc comment for why
  * this is a shared hook rather than a second copy of its planned-list
  * trap.
+ *
+ * Two shapes for creating one, split on width, the same way
+ * `RulesSection` is: desktop gets `CategoryRows`, because setting a
+ * budget up means naming eight or ten categories in a sitting; the phone
+ * keeps the single draft form, which is what fits 375px. Both save
+ * through the same `saveCategory` below, so the group fallback and the
+ * income flag cannot drift between them.
  */
+
+let rowSeq = 0;
+export const emptyCategoryRow = () => ({
+  name: '',
+  group: '',
+  isIncome: false,
+  key: `category-row-${(rowSeq += 1)}`,
+});
+
 export default function CategoriesScreen({
   wasmModule,
+  newId,
   currencySymbol,
   viewMonth,
   categories,
@@ -52,12 +70,12 @@ export default function CategoriesScreen({
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
+  const [rows, setRows] = useState(() => [emptyCategoryRow()]);
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
   const [presetCategories, setPresetCategories] = useState([]);
   const [savingsResult, setSavingsResult] = useState(null);
   const [savingsDraft, setSavingsDraft] = useState(null);
   const isDesktop = useIsDesktop();
-  const categoryNameRef = useRef(null);
 
   const { result, isIncome } = useMonthBudget({
     wasmModule,
@@ -132,38 +150,65 @@ export default function CategoriesScreen({
       return { line, isGoal, name: source?.name ?? id };
     });
 
-  const submitCategory = async () => {
-    if (!newCategory.name.trim()) return;
-    const id = wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`;
+  // `newId` rather than a second copy of App's `wasmModule.new_id ?
+  // ... : local-${Date.now()}` fallback -- App already passes exactly
+  // that down here, and RulesSection has always used it.
+  const saveCategory = async ({ name, group, isIncome }) => {
     await categories.save({
-      id,
-      name: newCategory.name,
+      id: newId(),
+      name,
       // Same two groups `resolve_category_name` files a hand-typed
       // category under, so one created here and one created from the
       // picker or Budget don't land in different sections of the very
       // list that groups by this. ('General' used to be the expense
       // default -- untranslated, and a group nothing else ever used.)
-      group:
-        newCategory.group || t(newCategory.isIncome ? 'cat.group.income' : 'cat.group.expense'),
-      is_income: newCategory.isIncome,
+      group: group || t(isIncome ? 'cat.group.income' : 'cat.group.expense'),
+      is_income: isIncome,
     });
+  };
+
+  const addCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategory.name.trim()) return;
+    await saveCategory(newCategory);
     setNewCategory({ name: '', group: '', isIncome: false });
   };
 
-  const addCategory = (e) => {
-    e.preventDefault();
-    submitCategory();
+  // A name in the last row grows a fresh row beneath it, the same way
+  // RuleRows grows on a keyword: the next row is already there by the
+  // time someone reaches for it, so "+ Add a row" is the fallback rather
+  // than the step everyone takes.
+  const setRow = (key, patch) => {
+    setRows((current) => {
+      const next = current.map((r) => (r.key === key ? { ...r, ...patch } : r));
+      const last = next[next.length - 1];
+      return last.name.trim() ? [...next, emptyCategoryRow()] : next;
+    });
   };
 
-  // Desktop-only, same shortcut as RulesSection's keyword field: Shift+Enter
-  // saves the row in place and refocuses the name field, so a batch of
-  // categories can be typed in one after another without the mouse.
-  const handleCategoryFieldKeyDown = (e) => {
-    if (!isDesktop || e.key !== 'Enter' || !e.shiftKey) return;
+  const addRow = () => setRows((current) => [...current, emptyCategoryRow()]);
+
+  const removeRow = (key) =>
+    setRows((current) => (current.length === 1 ? current : current.filter((r) => r.key !== key)));
+
+  // A name is the whole of a category: the group has a documented
+  // fallback and the direction defaults to expense, so a named row is
+  // always complete.
+  const namedRows = rows.filter((r) => r.name.trim());
+
+  const addCategories = async (e) => {
     e.preventDefault();
-    submitCategory();
-    categoryNameRef.current?.focus();
+    if (namedRows.length === 0) return;
+    for (const row of namedRows) await saveCategory(row);
+    setRows([emptyCategoryRow()]);
   };
+
+  // Counts what will actually be saved, so the button never promises
+  // more than the rows hold.
+  const batchSubmitLabel = () =>
+    namedRows.length > 1
+      ? t('budget.addCategoryCount', { count: namedRows.length })
+      : t('budget.addCategory');
 
   const saveSavingsPlanned = async (amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === SAVINGS_CATEGORY_ID);
@@ -226,49 +271,59 @@ export default function CategoriesScreen({
         presets={availablePresets(presetCategories, categories.items, t)}
         onAdd={addPresetCategory}
       />
-      <form className="form-grid" onSubmit={addCategory}>
-        <label className="field">
-          <span className="field-label">{t('budget.categoryName')}</span>
-          <div className="field-input">
-            <input
-              ref={categoryNameRef}
-              value={newCategory.name}
-              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-              onKeyDown={handleCategoryFieldKeyDown}
-            />
-          </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('budget.categoryGroup')}</span>
-          <div className="field-input">
-            <input
-              value={newCategory.group}
-              onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
-              onKeyDown={handleCategoryFieldKeyDown}
-            />
-          </div>
-        </label>
-        <label className="field field-check">
-          <input
-            type="checkbox"
-            checked={newCategory.isIncome}
-            onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
+      {isDesktop ? (
+        <form className="category-batch" onSubmit={addCategories}>
+          <CategoryRows
+            rows={rows}
+            onRowChange={setRow}
+            onAddRow={addRow}
+            onRemoveRow={removeRow}
           />
-          <span>{t('budget.categoryIsIncome')}</span>
-        </label>
-        <button className="btn" type="submit">
-          {t('budget.addCategory')}
-        </button>
-        <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
-          {t('budget.addCommon')}
-        </button>
-        {/* Same reasoning as the rows forms' own hints -- written down
-            rather than left to be discovered. Its own string, though:
-            this shortcut saves the draft in place, it does not add a
-            row, and `transactions.addRowShortcut` now belongs only to
-            the forms where a row really appears. */}
-        {isDesktop && <span className="field-label">{t('budget.addCategoryShortcut')}</span>}
-      </form>
+          <div className="category-batch-actions">
+            <button className="btn" type="submit" disabled={namedRows.length === 0}>
+              {batchSubmitLabel()}
+            </button>
+            <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
+              {t('budget.addCommon')}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <form className="form-grid" onSubmit={addCategory}>
+          <label className="field">
+            <span className="field-label">{t('budget.categoryName')}</span>
+            <div className="field-input">
+              <input
+                value={newCategory.name}
+                onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+              />
+            </div>
+          </label>
+          <label className="field">
+            <span className="field-label">{t('budget.categoryGroup')}</span>
+            <div className="field-input">
+              <input
+                value={newCategory.group}
+                onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
+              />
+            </div>
+          </label>
+          <label className="field field-check">
+            <input
+              type="checkbox"
+              checked={newCategory.isIncome}
+              onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
+            />
+            <span>{t('budget.categoryIsIncome')}</span>
+          </label>
+          <button className="btn" type="submit">
+            {t('budget.addCategory')}
+          </button>
+          <button className="btn secondary" type="button" onClick={() => addCommonCategories()}>
+            {t('budget.addCommon')}
+          </button>
+        </form>
+      )}
       <p className="field-label">{t('budget.commonHint')}</p>
 
       {savingsLine && (

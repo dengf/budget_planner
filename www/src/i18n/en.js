@@ -76,11 +76,10 @@ export default {
   'budget.remove': 'Remove',
 
   'budget.addCommon': 'Add common categories',
-  // CategoriesScreen's Shift+Enter saves the draft in place; it does not
-  // add a row, so it says so rather than borrowing the rows forms'
-  // `transactions.addRowShortcut`, which now only appears where a row
-  // really does appear (TransactionRows, RuleRows).
-  'budget.addCategoryShortcut': 'Shift + Enter adds the category',
+  // The desktop categories form saves a batch of rows at once, so the
+  // button counts what is actually named; one named row says
+  // "Add Category".
+  'budget.addCategoryCount': 'Add {count} categories',
   'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
   'budget.commitmentsTitle': 'Goals & debt this month',
   'budget.progressAria': '{name}: {spent} of {planned} spent',

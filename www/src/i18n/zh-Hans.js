@@ -74,7 +74,7 @@ export default {
   'budget.remove': '删除',
 
   'budget.addCommon': '添加常用分类',
-  'budget.addCategoryShortcut': 'Shift + Enter 添加分类',
+  'budget.addCategoryCount': '添加 {count} 个分类',
   'budget.includeCommitments': '将目标存入与债务最低还款计入本月预算',
   'budget.commitmentsTitle': '本月目标与债务',
   'budget.progressAria': '{name}：已花费 {spent}，计划 {planned}',
