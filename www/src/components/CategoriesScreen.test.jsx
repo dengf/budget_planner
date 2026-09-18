@@ -40,6 +40,10 @@ function renderScreen(props) {
     <I18nProvider initialLocale="en">
       <CategoriesScreen
         wasmModule={makeWasm()}
+        newId={(() => {
+          let seq = 0;
+          return () => `new-id-${(seq += 1)}`;
+        })()}
         currencySymbol="$"
         viewMonth="2026-01"
         categories={{ items: CATEGORIES, save: vi.fn() }}
@@ -111,52 +115,178 @@ function mockDesktop() {
   }));
 }
 
-describe('CategoriesScreen category name field', () => {
+const name = (n) => screen.getByLabelText(`Category name, row ${n}`);
+const entryType = (n) => screen.getByLabelText(`Entry type, row ${n}`);
+const group = (n) => screen.getByLabelText(`Group, row ${n}`);
+
+describe('CategoriesScreen desktop rows', () => {
   afterEach(() => {
     delete window.matchMedia;
   });
 
-  it('adds the category on Shift+Enter on desktop, without a click', async () => {
+  it('saves every named row in one submit', async () => {
     mockDesktop();
     const save = vi.fn();
     renderScreen({ categories: { items: CATEGORIES, save } });
-    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Rent' } });
-    fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
-    await waitFor(() =>
-      expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rent' })),
-    );
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    fireEvent.change(name(2), { target: { value: 'Salary' } });
+    fireEvent.change(entryType(2), { target: { value: 'income' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 categories' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rent', is_income: false }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Salary', is_income: true }));
   });
 
-  it('clears the draft and refocuses the name field after Shift+Enter', async () => {
+  it('gives each saved category its own id, so a batch is not one row overwritten', async () => {
     mockDesktop();
-    renderScreen({ categories: { items: CATEGORIES, save: vi.fn() } });
-    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Rent' } });
-    fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
-    await waitFor(() => expect(screen.getByLabelText('Category name')).toHaveValue(''));
-    expect(screen.getByLabelText('Category name')).toHaveFocus();
-  });
-
-  it('ignores Shift+Enter on the phone shell, since this is a desktop-only shortcut', () => {
-    // window.matchMedia is left unmocked, matching this codebase's default
-    // "phone shell" behaviour (see useIsDesktop.js).
     const save = vi.fn();
     renderScreen({ categories: { items: CATEGORIES, save } });
-    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Rent' } });
-    fireEvent.keyDown(screen.getByLabelText('Category name'), { key: 'Enter', shiftKey: true });
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    fireEvent.change(name(2), { target: { value: 'Salary' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 categories' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    const ids = save.mock.calls.map(([c]) => c.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('falls back to the Income/Expense group per row, not per form', async () => {
+    mockDesktop();
+    const save = vi.fn();
+    renderScreen({ categories: { items: CATEGORIES, save } });
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    fireEvent.change(name(2), { target: { value: 'Salary' } });
+    fireEvent.change(entryType(2), { target: { value: 'income' } });
+    // Row 3 names its own group, which must survive untouched.
+    fireEvent.change(name(3), { target: { value: 'Petrol' } });
+    fireEvent.change(group(3), { target: { value: 'Transport' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 3 categories' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(3));
+    const groups = Object.fromEntries(save.mock.calls.map(([c]) => [c.name, c.group]));
+    expect(groups).toEqual({ Rent: 'Expense', Salary: 'Income', Petrol: 'Transport' });
+  });
+
+  it('shows the group it will fall back to instead of leaving the default unsaid', () => {
+    mockDesktop();
+    renderScreen();
+    expect(group(1)).toHaveAttribute('placeholder', 'Expense');
+    fireEvent.change(entryType(1), { target: { value: 'income' } });
+    expect(group(1)).toHaveAttribute('placeholder', 'Income');
+  });
+
+  it('adds a row on Shift+Enter and puts the caret in its name field', async () => {
+    mockDesktop();
+    renderScreen();
+    fireEvent.keyDown(name(1), { key: 'Enter', shiftKey: true });
+    await waitFor(() => expect(name(2)).toBeInTheDocument());
+    expect(name(2)).toHaveFocus();
+  });
+
+  it('moves to the row below on Shift+Enter instead of stranding a blank row above the caret', async () => {
+    mockDesktop();
+    renderScreen();
+    // Typing a name already grows a row underneath, so the shortcut from
+    // row 1 should land in that row rather than append a third.
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    fireEvent.keyDown(name(1), { key: 'Enter', shiftKey: true });
+    await waitFor(() => expect(name(2)).toHaveFocus());
+    expect(screen.queryByLabelText('Category name, row 3')).not.toBeInTheDocument();
+  });
+
+  it('grows a fresh row once a name is typed in the last one', () => {
+    mockDesktop();
+    renderScreen();
+    expect(screen.queryByLabelText('Category name, row 2')).not.toBeInTheDocument();
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    expect(name(2)).toBeInTheDocument();
+  });
+
+  it('adds a row from the button, for anyone who never finds the shortcut', () => {
+    mockDesktop();
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add a row' }));
+    expect(name(2)).toBeInTheDocument();
+  });
+
+  it('removes a row, and never the last one', () => {
+    mockDesktop();
+    renderScreen();
+    expect(screen.getByRole('button', { name: 'Remove row 1' })).toBeDisabled();
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove row 1' }));
+    expect(name(1)).toHaveValue('');
+    expect(screen.queryByLabelText('Category name, row 2')).not.toBeInTheDocument();
+  });
+
+  it('will not submit an unnamed row, so the button never promises nothing', () => {
+    mockDesktop();
+    const save = vi.fn();
+    renderScreen({ categories: { items: CATEGORIES, save } });
+    expect(screen.getByRole('button', { name: 'Add Category' })).toBeDisabled();
+    // A group with no name is not a category -- the name is the whole of
+    // one, which is why it alone gates the submit.
+    fireEvent.change(group(1), { target: { value: 'Living' } });
+    expect(screen.getByRole('button', { name: 'Add Category' })).toBeDisabled();
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    expect(screen.getByRole('button', { name: 'Add Category' })).toBeEnabled();
     expect(save).not.toHaveBeenCalled();
   });
 
-  // The hint names what this shortcut actually does -- it saves the draft
-  // in place. "adds a row" belongs to the rows forms (TransactionRows,
-  // RuleRows), where a row really does appear.
+  it('clears the rows after a batch, ready for the next one', async () => {
+    mockDesktop();
+    const save = vi.fn();
+    renderScreen({ categories: { items: CATEGORIES, save } });
+    fireEvent.change(name(1), { target: { value: 'Rent' } });
+    fireEvent.change(name(2), { target: { value: 'Salary' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 categories' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(name(1)).toHaveValue(''));
+    expect(screen.queryByLabelText('Category name, row 2')).not.toBeInTheDocument();
+  });
+
+  it('keeps "Add common categories" beside the batch submit', () => {
+    mockDesktop();
+    const addCommonCategories = vi.fn();
+    renderScreen({ addCommonCategories });
+    fireEvent.click(screen.getByRole('button', { name: 'Add common categories' }));
+    expect(addCommonCategories).toHaveBeenCalled();
+  });
+
   it('shows the shortcut hint on desktop', () => {
     mockDesktop();
     renderScreen();
-    expect(screen.getByText('Shift + Enter adds the category')).toBeInTheDocument();
+    expect(screen.getByText('Shift + Enter adds a row')).toBeInTheDocument();
+  });
+});
+
+describe('CategoriesScreen on the phone shell', () => {
+  afterEach(() => {
+    delete window.matchMedia;
   });
 
-  it('hides the shortcut hint on the phone shell, since the shortcut does nothing there', () => {
+  // window.matchMedia is left unmocked, matching this codebase's default
+  // "phone shell" behaviour (see useIsDesktop.js).
+  it('keeps the single draft form, which is what fits 375px', () => {
     renderScreen();
-    expect(screen.queryByText('Shift + Enter adds the category')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Category name')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Category name, row 1')).not.toBeInTheDocument();
+  });
+
+  it('saves the one draft category, income flag and all', async () => {
+    const save = vi.fn();
+    renderScreen({ categories: { items: CATEGORIES, save } });
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Salary' } });
+    fireEvent.click(screen.getByLabelText('This is an income category'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Category' }));
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Salary', is_income: true, group: 'Income' }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByLabelText('Category name')).toHaveValue(''));
+  });
+
+  it('hides the row shortcut hint, since there are no rows here', () => {
+    renderScreen();
+    expect(screen.queryByText('Shift + Enter adds a row')).not.toBeInTheDocument();
   });
 });
