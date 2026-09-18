@@ -5,6 +5,7 @@ import { makeFormatMoney } from '../currency';
 import CategoryBadge from './CategoryBadge';
 import CategoryChipPicker from './CategoryChipPicker';
 import CategoryRows from './CategoryRows';
+import useBatchRows, { rowKey } from '../useBatchRows';
 import {
   DEBT_PREFIX,
   GOAL_PREFIX,
@@ -45,12 +46,11 @@ import { useMonthBudget } from '../useMonthBudget';
  * income flag cannot drift between them.
  */
 
-let rowSeq = 0;
-export const emptyCategoryRow = () => ({
+const emptyCategoryRow = () => ({
   name: '',
   group: '',
   isIncome: false,
-  key: `category-row-${(rowSeq += 1)}`,
+  key: rowKey('category'),
 });
 
 export default function CategoriesScreen({
@@ -70,7 +70,10 @@ export default function CategoriesScreen({
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
   const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
-  const [rows, setRows] = useState(() => [emptyCategoryRow()]);
+  const { rows, setRow, addRow, removeRow, reset } = useBatchRows({
+    emptyRow: emptyCategoryRow,
+    isFilled: (row) => !!row.name.trim(),
+  });
   const [includeCommitments, setIncludeCommitments] = useState(() => loadIncludeCommitments());
   const [presetCategories, setPresetCategories] = useState([]);
   const [savingsResult, setSavingsResult] = useState(null);
@@ -174,23 +177,6 @@ export default function CategoriesScreen({
     setNewCategory({ name: '', group: '', isIncome: false });
   };
 
-  // A name in the last row grows a fresh row beneath it, the same way
-  // RuleRows grows on a keyword: the next row is already there by the
-  // time someone reaches for it, so "+ Add a row" is the fallback rather
-  // than the step everyone takes.
-  const setRow = (key, patch) => {
-    setRows((current) => {
-      const next = current.map((r) => (r.key === key ? { ...r, ...patch } : r));
-      const last = next[next.length - 1];
-      return last.name.trim() ? [...next, emptyCategoryRow()] : next;
-    });
-  };
-
-  const addRow = () => setRows((current) => [...current, emptyCategoryRow()]);
-
-  const removeRow = (key) =>
-    setRows((current) => (current.length === 1 ? current : current.filter((r) => r.key !== key)));
-
   // A name is the whole of a category: the group has a documented
   // fallback and the direction defaults to expense, so a named row is
   // always complete.
@@ -200,7 +186,7 @@ export default function CategoriesScreen({
     e.preventDefault();
     if (namedRows.length === 0) return;
     for (const row of namedRows) await saveCategory(row);
-    setRows([emptyCategoryRow()]);
+    reset();
   };
 
   // Counts what will actually be saved, so the button never promises
@@ -272,14 +258,14 @@ export default function CategoriesScreen({
         onAdd={addPresetCategory}
       />
       {isDesktop ? (
-        <form className="category-batch" onSubmit={addCategories}>
+        <form className="batch-form" onSubmit={addCategories}>
           <CategoryRows
             rows={rows}
             onRowChange={setRow}
             onAddRow={addRow}
             onRemoveRow={removeRow}
           />
-          <div className="category-batch-actions">
+          <div className="batch-actions">
             <button className="btn" type="submit" disabled={namedRows.length === 0}>
               {batchSubmitLabel()}
             </button>

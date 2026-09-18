@@ -2,9 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { todayIso } from '../month';
+import useIsDesktop from '../useIsDesktop';
+import useBatchRows, { rowKey } from '../useBatchRows';
 import NumberField from './NumberField';
 import CalcError from './CalcError';
 import DebtChart from './DebtChart';
+import DebtRows from './DebtRows';
+
+const emptyDebtRow = () => ({
+  name: '',
+  balance: '',
+  apr_percent: '',
+  min_payment: '',
+  key: rowKey('debt'),
+});
+
+// The same three fields the phone form requires before it will save --
+// APR is not among them, and defaults to 0 in both shapes. A debt with
+// no minimum payment has no payoff schedule to draw.
+const isCompleteDebt = (row) => !!row.name.trim() && !!row.balance && !!row.min_payment;
+const isBlankDebt = (row) =>
+  !row.name.trim() && !row.balance && !row.min_payment && !row.apr_percent;
 
 export default function DebtTab({
   wasmModule,
@@ -27,6 +45,11 @@ export default function DebtTab({
   const [paymentAmount, setPaymentAmount] = useState('');
   const [outcome, setOutcome] = useState(null);
   const [paymentError, setPaymentError] = useState(null);
+  const isDesktop = useIsDesktop();
+  const { rows, setRow, addRow, removeRow, reset } = useBatchRows({
+    emptyRow: emptyDebtRow,
+    isFilled: (row) => !!row.name.trim(),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -49,18 +72,44 @@ export default function DebtTab({
     };
   }, [wasmModule, debts.items, extraPayment, strategy]);
 
-  const addDebt = async (e) => {
-    e.preventDefault();
-    if (!draft.name.trim() || !draft.balance || !draft.min_payment) return;
+  // One save for both shapes, so the APR-defaults-to-zero rule cannot
+  // drift between the phone form and a desktop row.
+  const saveDebt = async ({ name, balance, apr_percent, min_payment }) => {
     await debts.save({
       id: newId(),
-      name: draft.name,
-      balance: Number(draft.balance),
-      apr_percent: Number(draft.apr_percent) || 0,
-      min_payment: Number(draft.min_payment),
+      name,
+      balance: Number(balance),
+      apr_percent: Number(apr_percent) || 0,
+      min_payment: Number(min_payment),
     });
+  };
+
+  const addDebt = async (e) => {
+    e.preventDefault();
+    if (!isCompleteDebt(draft)) return;
+    await saveDebt(draft);
     setDraft({ name: '', balance: '', apr_percent: '', min_payment: '' });
   };
+
+  const completeRows = rows.filter(isCompleteDebt);
+
+  /**
+   * Saves every finished row in one pass. Half-finished rows -- a name
+   * and a balance with no minimum payment yet -- stay on screen rather
+   * than being saved or silently dropped, which is the only honest
+   * report of what did and didn't go in.
+   */
+  const addDebts = async (e) => {
+    e.preventDefault();
+    if (completeRows.length === 0) return;
+    for (const row of completeRows) await saveDebt(row);
+    reset(rows.filter((r) => !isCompleteDebt(r) && !isBlankDebt(r)));
+  };
+
+  // Counts what will actually be saved, so the button never promises
+  // more than the rows hold.
+  const batchSubmitLabel = () =>
+    completeRows.length > 1 ? t('debt.addCount', { count: completeRows.length }) : t('debt.add');
 
   const debtName = (id) => debts.items.find((d) => d.id === id)?.name ?? id;
   const firstMonthRows = (plan?.schedule ?? []).filter((row) => row.month === 1);
@@ -211,38 +260,49 @@ export default function DebtTab({
         </p>
       )}
 
-      <form className="form-grid" onSubmit={addDebt}>
-        <label className="field">
-          <span className="field-label">{t('debt.name')}</span>
-          <div className="field-input">
-            <input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            />
+      {isDesktop ? (
+        <form className="batch-form" onSubmit={addDebts}>
+          <DebtRows rows={rows} onRowChange={setRow} onAddRow={addRow} onRemoveRow={removeRow} />
+          <div className="batch-actions">
+            <button className="btn" type="submit" disabled={completeRows.length === 0}>
+              {batchSubmitLabel()}
+            </button>
           </div>
-        </label>
-        <NumberField
-          label={t('debt.balance')}
-          value={draft.balance}
-          onChange={(v) => setDraft({ ...draft, balance: v })}
-          grouped
-        />
-        <NumberField
-          label={t('debt.apr')}
-          value={draft.apr_percent}
-          onChange={(v) => setDraft({ ...draft, apr_percent: v })}
-          suffix="%"
-        />
-        <NumberField
-          label={t('debt.minPayment')}
-          value={draft.min_payment}
-          onChange={(v) => setDraft({ ...draft, min_payment: v })}
-          grouped
-        />
-        <button className="btn" type="submit">
-          {t('debt.add')}
-        </button>
-      </form>
+        </form>
+      ) : (
+        <form className="form-grid" onSubmit={addDebt}>
+          <label className="field">
+            <span className="field-label">{t('debt.name')}</span>
+            <div className="field-input">
+              <input
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </div>
+          </label>
+          <NumberField
+            label={t('debt.balance')}
+            value={draft.balance}
+            onChange={(v) => setDraft({ ...draft, balance: v })}
+            grouped
+          />
+          <NumberField
+            label={t('debt.apr')}
+            value={draft.apr_percent}
+            onChange={(v) => setDraft({ ...draft, apr_percent: v })}
+            suffix="%"
+          />
+          <NumberField
+            label={t('debt.minPayment')}
+            value={draft.min_payment}
+            onChange={(v) => setDraft({ ...draft, min_payment: v })}
+            grouped
+          />
+          <button className="btn" type="submit">
+            {t('debt.add')}
+          </button>
+        </form>
+      )}
 
       {debts.items.length > 0 && (
         <>

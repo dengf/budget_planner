@@ -24,6 +24,16 @@ import { useI18n } from '../i18n';
  * type one at all), so a phone typing a plain positive number here would
  * silently save as income -- the toggle is a keyboard-independent way to set
  * the sign that works the same on every device, not a workaround for one.
+ *
+ * `bare` drops the stacked label block and renders the input alone, for a
+ * `BatchRows` grid where the column header is the label once for every row.
+ * `label` is still required and becomes the input's `aria-label`, so a
+ * screen reader gains nothing and loses nothing — it is the visible text
+ * that would be redundant, not the name. The alternative was a second
+ * implementation of the grouping and caret handling above inside each rows
+ * component, which is precisely the duplication this file exists to avoid.
+ * `data-batch-field` marks the input so `BatchRows` can find the first
+ * field of a row to focus.
  */
 export default function NumberField({
   label,
@@ -34,25 +44,35 @@ export default function NumberField({
   min,
   grouped = false,
   signed = false,
+  bare = false,
 }) {
   const { t } = useI18n();
   const [focused, setFocused] = useState(false);
 
-  if (!grouped) {
-    return (
+  const wrap = (children) =>
+    bare ? (
+      <div className="field-input">{children}</div>
+    ) : (
       <label className="field">
         <span className="field-label">{label}</span>
-        <div className="field-input">
-          <input
-            type="number"
-            value={value}
-            step={step}
-            min={min}
-            onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
-          />
-          {suffix && <span className="field-suffix">{suffix}</span>}
-        </div>
+        <div className="field-input">{children}</div>
       </label>
+    );
+
+  if (!grouped) {
+    return wrap(
+      <>
+        <input
+          type="number"
+          value={value}
+          step={step}
+          min={min}
+          aria-label={bare ? label : undefined}
+          data-batch-field={bare ? '' : undefined}
+          onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+        />
+        {suffix && <span className="field-suffix">{suffix}</span>}
+      </>,
     );
   }
 
@@ -76,38 +96,37 @@ export default function NumberField({
     onChange(-Number(value));
   };
 
-  return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      <div className="field-input">
-        {signed && (
-          <button
-            type="button"
-            className={`sign-toggle ${isNegative ? 'negative' : 'positive'}`}
-            onClick={flipSign}
-            aria-label={
-              isNegative ? t('transactions.switchToIncome') : t('transactions.switchToSpending')
-            }
-          >
-            {isNegative ? '−' : '+'}
-          </button>
-        )}
-        <input
-          type="text"
-          inputMode="decimal"
-          value={shown}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onChange={(e) => {
-            // Ignore anything that isn't a number under construction — a
-            // stray letter would otherwise blank the field mid-word.
-            const raw = e.target.value;
-            if (raw !== '' && !/^-?[\d,]*\.?\d*$/.test(raw)) return;
-            onChange(parse(raw));
-          }}
-        />
-        {suffix && <span className="field-suffix">{suffix}</span>}
-      </div>
-    </label>
+  return wrap(
+    <>
+      {signed && (
+        <button
+          type="button"
+          className={`sign-toggle ${isNegative ? 'negative' : 'positive'}`}
+          onClick={flipSign}
+          aria-label={
+            isNegative ? t('transactions.switchToIncome') : t('transactions.switchToSpending')
+          }
+        >
+          {isNegative ? '−' : '+'}
+        </button>
+      )}
+      <input
+        type="text"
+        inputMode="decimal"
+        value={shown}
+        aria-label={bare ? label : undefined}
+        data-batch-field={bare ? '' : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={(e) => {
+          // Ignore anything that isn't a number under construction — a
+          // stray letter would otherwise blank the field mid-word.
+          const raw = e.target.value;
+          if (raw !== '' && !/^-?[\d,]*\.?\d*$/.test(raw)) return;
+          onChange(parse(raw));
+        }}
+      />
+      {suffix && <span className="field-suffix">{suffix}</span>}
+    </>,
   );
 }

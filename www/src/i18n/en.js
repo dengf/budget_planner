@@ -352,6 +352,9 @@ export default {
 
   'goals.title': 'Savings goals',
   'goals.add': 'Add a goal',
+  // The desktop rows forms save a batch at once, so the button counts
+  // what is actually finished; one finished row keeps the singular.
+  'goals.addCount': 'Add {count} goals',
   'goals.name': 'Goal name',
   'goals.target': 'Target amount',
   'goals.current': 'Saved so far',
@@ -373,6 +376,7 @@ export default {
 
   'debt.title': 'Debt payoff',
   'debt.add': 'Add a debt',
+  'debt.addCount': 'Add {count} debts',
   'debt.name': 'Debt name',
   'debt.balance': 'Balance',
   'debt.apr': 'APR %',
