@@ -4,17 +4,25 @@ import { makeFormatMoney } from '../currency';
 import { monthLabel } from '../month';
 import CategoryBadge from './CategoryBadge';
 import CalcError from './CalcError';
+import RecurringBatchForm from './RecurringBatchForm';
 import { makeCategoryLookup } from '../presetCategories';
+import useIsDesktop from '../useIsDesktop';
 
 /**
  * Recurring expenses -- rent, subscriptions, anything on a schedule.
  *
  * Lifted out of the Transactions tab for the same reason as the rules
  * table beside it: this is something set up once and then watched, not
- * something touched on the way past. New ones are still created in the
- * Add sheet's own Recurring tab, behind the nav bar's "+", which is
- * where every other kind of record starts; this screen is the list of
- * what exists, and the way to remove one.
+ * something touched on the way past.
+ *
+ * At desktop width, setting them up happens here too: the schedule
+ * these rows land in is already on this screen, so covering it with a
+ * modal just to type five fields is a step for nothing -- the same call
+ * TransactionsTab makes about its own inline batch form. A phone still
+ * creates them through the nav bar's "+" and its Recurring tab, where
+ * every other kind of record starts, because five columns of controls
+ * do not fit 375px. The sheet keeps that tab at both widths regardless:
+ * it is how "+" answers "add a recurring expense" from any screen.
  *
  * It is also where a schedule meets the transactions that should have
  * been settling it. A recurring expense used to be a standing
@@ -38,6 +46,7 @@ export default function RecurringSection({
   newId,
 }) {
   const { t, locale } = useI18n();
+  const isDesktop = useIsDesktop();
   const formatMoney = makeFormatMoney(currencySymbol);
   const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
   const [status, setStatus] = useState(null);
@@ -179,6 +188,16 @@ export default function RecurringSection({
               </tbody>
             </table>
           </div>
+        </>
+      )}
+
+      {/* Below the schedule, the way it sits below the list on Goals,
+          Debt and Categories -- what exists first, then the way to add
+          to it. */}
+      {isDesktop && (
+        <>
+          <h2 className="section-start">{t('recurring.add')}</h2>
+          <RecurringBatchForm recurring={recurring} categories={categories} newId={newId} />
         </>
       )}
     </div>
