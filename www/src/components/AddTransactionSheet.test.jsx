@@ -410,3 +410,142 @@ describe('AddTransactionSheet category creation', () => {
     );
   });
 });
+
+/**
+ * The Recurring tab's desktop rows. Everything here asserts on the
+ * batch shape; the phone's single draft form is the `isDesktop: false`
+ * default the rest of this file renders, and the last case checks it is
+ * still what a narrow screen gets.
+ */
+describe('AddTransactionSheet recurring rows (desktop)', () => {
+  const renderRecurring = (props) => {
+    const recurring = { items: [], save: vi.fn() };
+    const onClose = vi.fn();
+    const utils = renderSheet({ isDesktop: true, recurring, onClose, ...props });
+    fireEvent.click(screen.getByRole('tab', { name: 'Recurring' }));
+    return { ...utils, recurring, onClose };
+  };
+
+  const fillRow = (n, { description, category = 'exp1', amount, date }) => {
+    fireEvent.change(screen.getByLabelText(`Description, row ${n}`), {
+      target: { value: description },
+    });
+    fireEvent.change(screen.getByLabelText(`Category, row ${n}`), { target: { value: category } });
+    fireEvent.change(screen.getByLabelText(`Amount per occurrence, row ${n}`), {
+      target: { value: amount },
+    });
+    fireEvent.change(screen.getByLabelText(`One real due date, row ${n}`), {
+      target: { value: date },
+    });
+  };
+
+  it('shows one empty row with the columns named once in the header', () => {
+    renderRecurring();
+    expect(screen.getByLabelText('Description, row 1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Description, row 2')).not.toBeInTheDocument();
+    expect(screen.getByText('Repeats')).toBeInTheDocument();
+  });
+
+  it('grows a fresh row once the last one has a description', () => {
+    renderRecurring();
+    fireEvent.change(screen.getByLabelText('Description, row 1'), { target: { value: 'Rent' } });
+    expect(screen.getByLabelText('Description, row 2')).toBeInTheDocument();
+  });
+
+  it('saves every complete row in one submit', async () => {
+    const { recurring } = renderRecurring();
+    fillRow(1, { description: 'Rent', amount: '2400', date: '2026-01-01' });
+    fillRow(2, { description: 'Phone', amount: '45', date: '2026-01-08' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 recurring expenses' }));
+
+    await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(2));
+    expect(recurring.save).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Rent', amount: 2400, anchor_date: '2026-01-01' }),
+    );
+    expect(recurring.save).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Phone', amount: 45, category_id: 'exp1' }),
+    );
+  });
+
+  it('defaults the cadence to monthly and saves the one that was picked', async () => {
+    const { recurring } = renderRecurring();
+    fillRow(1, { description: 'Rent', amount: '2400', date: '2026-01-01' });
+    expect(screen.getByLabelText('Repeats, row 1')).toHaveValue('monthly');
+    fireEvent.change(screen.getByLabelText('Repeats, row 1'), { target: { value: 'yearly' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+    await waitFor(() =>
+      expect(recurring.save).toHaveBeenCalledWith(expect.objectContaining({ cadence: 'yearly' })),
+    );
+  });
+
+  it('keeps the submit disabled until a row has every field the phone form needs', () => {
+    renderRecurring();
+    const submit = screen.getByRole('button', { name: 'Add recurring expense' });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Description, row 1'), { target: { value: 'Rent' } });
+    fireEvent.change(screen.getByLabelText('Amount per occurrence, row 1'), {
+      target: { value: '2400' },
+    });
+    expect(submit).toBeDisabled(); // no category, no due date yet
+
+    fireEvent.change(screen.getByLabelText('Category, row 1'), { target: { value: 'exp1' } });
+    fireEvent.change(screen.getByLabelText('One real due date, row 1'), {
+      target: { value: '2026-01-01' },
+    });
+    expect(submit).toBeEnabled();
+  });
+
+  it('closes the sheet on a clean batch but keeps an unfinished row open', async () => {
+    const { recurring, onClose } = renderRecurring();
+    fillRow(1, { description: 'Rent', amount: '2400', date: '2026-01-01' });
+    // Started but missing its due date: saving must not take it, and
+    // closing the sheet would throw it away with no report.
+    fireEvent.change(screen.getByLabelText('Description, row 2'), { target: { value: 'Gym' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+
+    await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(1));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Description, row 1')).toHaveValue('Gym');
+
+    fillRow(1, { description: 'Gym', amount: '60', date: '2026-01-15' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('adds a row on Shift+Enter and moves to an existing one below', () => {
+    renderRecurring();
+    const first = screen.getByLabelText('Description, row 1');
+    fireEvent.keyDown(first, { key: 'Enter', shiftKey: true });
+
+    const second = screen.getByLabelText('Description, row 2');
+    expect(second).toHaveFocus();
+
+    // Back up a row, and the shortcut should land on the row that
+    // already exists rather than appending a third.
+    fireEvent.keyDown(first, { key: 'Enter', shiftKey: true });
+    expect(second).toHaveFocus();
+    expect(screen.queryByLabelText('Description, row 3')).not.toBeInTheDocument();
+  });
+
+  it('removes a row, and never the last one', () => {
+    renderRecurring();
+    fireEvent.change(screen.getByLabelText('Description, row 1'), { target: { value: 'Rent' } });
+    expect(screen.getByRole('button', { name: 'Remove row 2' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove row 2' }));
+    expect(screen.queryByLabelText('Description, row 2')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove row 1' })).toBeDisabled();
+  });
+
+  it('leaves the phone on its single draft form', () => {
+    renderSheet({ isDesktop: false });
+    fireEvent.click(screen.getByRole('tab', { name: 'Recurring' }));
+    expect(screen.queryByLabelText('Description, row 1')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Description')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add recurring expense' })).toBeInTheDocument();
+  });
+});

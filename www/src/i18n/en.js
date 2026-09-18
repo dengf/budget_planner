@@ -330,6 +330,7 @@ export default {
   'recurring.anchorHint':
     "Pick any one real occurrence — this month's rent day, this month's bill date. Weekly and fortnightly expenses count actual calendar dates from it, so a 5-Friday month is counted as 5, not rounded down to 4.",
   'recurring.add': 'Add recurring expense',
+  'recurring.addCount': 'Add {count} recurring expenses',
   'recurring.upcomingTitle': 'Upcoming this month',
   'recurring.addToPlanned': 'Add to planned',
   'recurring.scheduleTitle': 'The schedule',

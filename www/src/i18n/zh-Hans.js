@@ -287,6 +287,7 @@ export default {
   'recurring.anchorHint':
     '选择任意一次真实发生的日期——本月的房租日、本月的账单日。每周或每两周一次的支出会按真实日历计算，五个星期五的月份会算作 5 次，而不是四舍五入为 4 次。',
   'recurring.add': '添加定期支出',
+  'recurring.addCount': '添加 {count} 项定期支出',
   'recurring.upcomingTitle': '本月即将到期',
   'recurring.addToPlanned': '计入计划金额',
   'recurring.scheduleTitle': '定期安排',

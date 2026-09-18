@@ -3949,8 +3949,8 @@ table.data tr:last-child td {
   }
   /* Wider again while the batch rows are showing -- six columns of
      controls, and narrower than this starts truncating category names
-     in the row selects. Only the Manual tab carries `.batch`, so the
-     sheet goes back to 560px on Receipt/Voice/CSV/Recurring. */
+     in the row selects. Only the Manual and Recurring tabs carry
+     `.batch`, so the sheet goes back to 560px on Receipt/Voice/CSV. */
   .add-txn-dialog.batch {
     max-width: 880px;
   }
@@ -4086,6 +4086,11 @@ table.data tr:last-child td {
   }
   .debt-rows {
     --batch-cols: minmax(0, 1.4fr) minmax(0, 1fr) 96px minmax(0, 1fr) 32px;
+  }
+  /* Inside the Add sheet rather than a panel, so it has the dialog's
+     880px to fit five fields plus the date input's fixed track. */
+  .recurring-rows {
+    --batch-cols: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 1fr) 132px 162px 32px;
   }
 
   /* Dashboard: the donut beside its own category rows, with the

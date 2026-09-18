@@ -4,10 +4,12 @@ import CalcError from './CalcError';
 import CategoryPicker from './CategoryPicker';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
+import RecurringRows from './RecurringRows';
 import TransactionBatchForm, { emptyRow } from './TransactionBatchForm';
 import VoiceCapture from './VoiceCapture';
 import { PenIcon, CameraIcon, MicIcon, SpreadsheetIcon, RecurringIcon } from './icons';
 import { categoryDisplayName } from '../presetCategories';
+import useBatchRows, { rowKey } from '../useBatchRows';
 import { useCategoryRank } from '../useCategoryRank';
 import { useCreateCategory } from '../useCreateCategory';
 
@@ -45,6 +47,15 @@ const EMPTY_RECURRING_DRAFT = {
   cadence: 'monthly',
   anchor_date: '',
 };
+
+const emptyRecurringRow = () => ({ ...EMPTY_RECURRING_DRAFT, key: rowKey('recurring') });
+
+// Every field the phone form requires before it will save, so neither
+// shape can create a recurring expense the other would have rejected.
+const isCompleteRecurring = (row) =>
+  !!row.description.trim() && !!row.category_id && !!row.amount && !!row.anchor_date;
+const isBlankRecurring = (row) =>
+  !row.description.trim() && !row.category_id && !row.amount && !row.anchor_date;
 
 /**
  * The four ways a transaction (or a recurring expense that generates
@@ -98,6 +109,12 @@ export default function AddTransactionSheet({
   const [columnsDetected, setColumnsDetected] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [recurringDraft, setRecurringDraft] = useState(EMPTY_RECURRING_DRAFT);
+  // The Recurring tab's desktop rows. Same shape as the manual batch
+  // above: several typed at once, one save.
+  const recurringRows = useBatchRows({
+    emptyRow: emptyRecurringRow,
+    isFilled: (row) => !!row.description.trim(),
+  });
   const [ruleMatch, setRuleMatch] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [ruleKeyword, setRuleKeyword] = useState('');
@@ -304,21 +321,56 @@ export default function AddTransactionSheet({
       : t('transactions.addAmount', { amount });
   };
 
-  const addRecurring = async (e) => {
-    e.preventDefault();
-    if (!recurringDraft.description.trim() || !recurringDraft.category_id) return;
-    if (!recurringDraft.amount || !recurringDraft.anchor_date) return;
+  // One save for both shapes, so a recurring expense created on a phone
+  // and one created in a desktop row cannot disagree about how the
+  // amount is parsed.
+  const saveRecurring = async ({ description, category_id, amount, cadence, anchor_date }) => {
     await recurring.save({
       id: newId(),
-      description: recurringDraft.description,
-      category_id: recurringDraft.category_id,
-      amount: Number(recurringDraft.amount),
-      cadence: recurringDraft.cadence,
-      anchor_date: recurringDraft.anchor_date,
+      description,
+      category_id,
+      amount: Number(amount),
+      cadence,
+      anchor_date,
     });
+  };
+
+  const addRecurring = async (e) => {
+    e.preventDefault();
+    if (!isCompleteRecurring(recurringDraft)) return;
+    await saveRecurring(recurringDraft);
     setRecurringDraft(EMPTY_RECURRING_DRAFT);
     onClose();
   };
+
+  const completeRecurringRows = recurringRows.rows.filter(isCompleteRecurring);
+
+  /**
+   * Saves every finished row in one pass.
+   *
+   * Half-finished rows -- a description and an amount with no real due
+   * date yet -- are kept rather than saved or silently dropped, and the
+   * sheet stays open when there are any. Closing on a clean batch is
+   * what every other tab here does; closing on an unfinished one would
+   * throw the row away with no report that it went nowhere.
+   */
+  const addRecurrings = async (e) => {
+    e.preventDefault();
+    if (completeRecurringRows.length === 0) return;
+    for (const row of completeRecurringRows) await saveRecurring(row);
+    const unfinished = recurringRows.rows.filter(
+      (r) => !isCompleteRecurring(r) && !isBlankRecurring(r),
+    );
+    recurringRows.reset(unfinished);
+    if (unfinished.length === 0) onClose();
+  };
+
+  // Counts what will actually be saved, so the button never promises
+  // more than the rows hold.
+  const recurringSubmitLabel = () =>
+    completeRecurringRows.length > 1
+      ? t('recurring.addCount', { count: completeRecurringRows.length })
+      : t('recurring.add');
 
   const onFile = (e) => {
     const file = e.target.files?.[0];
@@ -405,6 +457,7 @@ export default function AddTransactionSheet({
     setDraft(EMPTY_DRAFT);
     setRows([emptyRow()]);
     setRecurringDraft(EMPTY_RECURRING_DRAFT);
+    recurringRows.reset();
     setSaveError(null);
     setRuleSaved(null);
     onClose();
@@ -412,8 +465,11 @@ export default function AddTransactionSheet({
 
   // A batch is for entering new rows at a width that can show a table of
   // them. Correcting an existing transaction is one row, so it keeps the
-  // single form; so does every non-manual method.
+  // single form; so do the capture methods, which each produce one.
   const batch = isDesktop && !editing;
+  // The two tabs where a batch is what's on screen, and so the two that
+  // need the wider dialog below.
+  const batchMethod = batch && (method === 'manual' || method === 'recurring');
 
   const sheetTitle = editing ? t('transactions.editTitle') : t('transactions.addManual');
 
@@ -421,7 +477,7 @@ export default function AddTransactionSheet({
     <div className="add-txn-backdrop" role="presentation" onClick={closeAndReset}>
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- this handler only stops a click from reaching the backdrop's dismiss handler above; the panel itself is not something to activate, so there is no keyboard equivalent to add. Focus and Escape are handled by the dialog role. */}
       <div
-        className={`add-txn-dialog${batch && method === 'manual' ? ' batch' : ''}`}
+        className={`add-txn-dialog${batchMethod ? ' batch' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={sheetTitle}
@@ -782,7 +838,30 @@ export default function AddTransactionSheet({
             </>
           )}
 
-          {method === 'recurring' && (
+          {/* Desktop sets up several recurring expenses at once: rent,
+              the phone bill and two subscriptions all exist on day one
+              and get typed in one sitting. The phone form below is
+              unchanged. */}
+          {method === 'recurring' && batch && (
+            <form className="batch-form" onSubmit={addRecurrings}>
+              <RecurringRows
+                rows={recurringRows.rows}
+                onRowChange={recurringRows.setRow}
+                onAddRow={recurringRows.addRow}
+                onRemoveRow={recurringRows.removeRow}
+                categories={categories.items}
+                cadences={CADENCES}
+              />
+              <p className="field-label">{t('recurring.anchorHint')}</p>
+              <div className="batch-actions">
+                <button className="btn" type="submit" disabled={completeRecurringRows.length === 0}>
+                  {recurringSubmitLabel()}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {method === 'recurring' && !batch && (
             <>
               <form className="form-grid" onSubmit={addRecurring}>
                 <label className="field">
