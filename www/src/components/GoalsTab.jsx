@@ -3,11 +3,25 @@ import { useI18n } from '../i18n';
 import { makeFormatMoney } from '../currency';
 import { monthLabel, monthsBetween, todayIso } from '../month';
 import { useMonthSavings } from '../monthSavings';
+import useIsDesktop from '../useIsDesktop';
+import useBatchRows, { rowKey } from '../useBatchRows';
 import BlossomProgress from './BlossomProgress';
 import CalcError from './CalcError';
+import GoalRows, { CADENCES } from './GoalRows';
 import NumberField from './NumberField';
 
-const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
+const emptyGoalRow = () => ({
+  name: '',
+  target_amount: '',
+  target_date: '',
+  cadence: 'monthly',
+  key: rowKey('goal'),
+});
+
+// Every field the phone form requires before it will save, so neither
+// shape can create a goal the other would have rejected.
+const isCompleteGoal = (row) => !!row.name.trim() && !!row.target_amount && !!row.target_date;
+const isBlankGoal = (row) => !row.name.trim() && !row.target_amount && !row.target_date;
 
 function GoalCard({
   goal,
@@ -155,6 +169,11 @@ export default function GoalsTab({
     target_date: '',
     cadence: 'monthly',
   });
+  const isDesktop = useIsDesktop();
+  const { rows, setRow, addRow, removeRow, reset } = useBatchRows({
+    emptyRow: emptyGoalRow,
+    isFilled: (row) => !!row.name.trim(),
+  });
 
   // What the month actually saved, and how much of it no goal has
   // claimed yet. Both come from Rust: the residual from
@@ -185,20 +204,49 @@ export default function GoalsTab({
 
   const unallocated = unallocatedResult?.amount ?? 0;
 
-  const addGoal = async (e) => {
-    e.preventDefault();
-    if (!draft.name.trim() || !draft.target_amount || !draft.target_date) return;
+  // One save for both shapes, so a goal created on a phone and one
+  // created in a desktop row cannot disagree about `current_amount` or
+  // an empty `contributions` list.
+  const saveGoal = async ({ name, target_amount, target_date, cadence }) => {
     await goals.save({
       id: newId(),
-      name: draft.name,
-      target_amount: Number(draft.target_amount),
+      name,
+      target_amount: Number(target_amount),
       current_amount: 0,
-      target_date: draft.target_date,
-      cadence: draft.cadence,
+      target_date,
+      cadence,
       contributions: [],
     });
+  };
+
+  const addGoal = async (e) => {
+    e.preventDefault();
+    if (!isCompleteGoal(draft)) return;
+    await saveGoal(draft);
     setDraft({ name: '', target_amount: '', target_date: '', cadence: 'monthly' });
   };
+
+  const completeRows = rows.filter(isCompleteGoal);
+
+  /**
+   * Saves every finished row in one pass.
+   *
+   * Half-finished rows -- a name with no target date yet -- are kept
+   * rather than saved or silently dropped: they are the rows still
+   * needing a decision, and leaving them on screen is the only honest
+   * report of what did and didn't go in.
+   */
+  const addGoals = async (e) => {
+    e.preventDefault();
+    if (completeRows.length === 0) return;
+    for (const row of completeRows) await saveGoal(row);
+    reset(rows.filter((r) => !isCompleteGoal(r) && !isBlankGoal(r)));
+  };
+
+  // Counts what will actually be saved, so the button never promises
+  // more than the rows hold.
+  const batchSubmitLabel = () =>
+    completeRows.length > 1 ? t('goals.addCount', { count: completeRows.length }) : t('goals.add');
 
   return (
     <div className="panel">
@@ -259,50 +307,61 @@ export default function GoalsTab({
         </div>
       )}
 
-      <form className="form-grid" onSubmit={addGoal}>
-        <label className="field">
-          <span className="field-label">{t('goals.name')}</span>
-          <div className="field-input">
-            <input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            />
+      {isDesktop ? (
+        <form className="batch-form" onSubmit={addGoals}>
+          <GoalRows rows={rows} onRowChange={setRow} onAddRow={addRow} onRemoveRow={removeRow} />
+          <div className="batch-actions">
+            <button className="btn" type="submit" disabled={completeRows.length === 0}>
+              {batchSubmitLabel()}
+            </button>
           </div>
-        </label>
-        <NumberField
-          label={t('goals.target')}
-          value={draft.target_amount}
-          onChange={(v) => setDraft({ ...draft, target_amount: v })}
-          grouped
-        />
-        <label className="field">
-          <span className="field-label">{t('goals.targetDate')}</span>
-          <div className="field-input">
-            <input
-              type="date"
-              value={draft.target_date}
-              onChange={(e) => setDraft({ ...draft, target_date: e.target.value })}
-            />
-          </div>
-        </label>
-        <label className="field">
-          <span className="field-label">{t('goals.cadence')}</span>
-          <select
-            className="field-select"
-            value={draft.cadence}
-            onChange={(e) => setDraft({ ...draft, cadence: e.target.value })}
-          >
-            {CADENCES.map((c) => (
-              <option key={c} value={c}>
-                {t(`freq.${c}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="btn" type="submit">
-          {t('goals.add')}
-        </button>
-      </form>
+        </form>
+      ) : (
+        <form className="form-grid" onSubmit={addGoal}>
+          <label className="field">
+            <span className="field-label">{t('goals.name')}</span>
+            <div className="field-input">
+              <input
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </div>
+          </label>
+          <NumberField
+            label={t('goals.target')}
+            value={draft.target_amount}
+            onChange={(v) => setDraft({ ...draft, target_amount: v })}
+            grouped
+          />
+          <label className="field">
+            <span className="field-label">{t('goals.targetDate')}</span>
+            <div className="field-input">
+              <input
+                type="date"
+                value={draft.target_date}
+                onChange={(e) => setDraft({ ...draft, target_date: e.target.value })}
+              />
+            </div>
+          </label>
+          <label className="field">
+            <span className="field-label">{t('goals.cadence')}</span>
+            <select
+              className="field-select"
+              value={draft.cadence}
+              onChange={(e) => setDraft({ ...draft, cadence: e.target.value })}
+            >
+              {CADENCES.map((c) => (
+                <option key={c} value={c}>
+                  {t(`freq.${c}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="btn" type="submit">
+            {t('goals.add')}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

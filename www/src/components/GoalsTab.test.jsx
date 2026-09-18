@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import GoalsTab from './GoalsTab';
 
@@ -193,5 +193,146 @@ describe('GoalsTab: this month’s savings', () => {
     });
     await screen.findByText("All $800.00 of September 2026's savings is assigned to a goal.");
     expect(screen.queryByRole('button', { name: /^Add September/ })).not.toBeInTheDocument();
+  });
+});
+
+function mockDesktop() {
+  window.matchMedia = vi.fn(() => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+const goalName = (n) => screen.getByLabelText(`Goal name, row ${n}`);
+const goalTarget = (n) => screen.getByLabelText(`Target amount, row ${n}`);
+const goalDate = (n) => screen.getByLabelText(`Target date, row ${n}`);
+const goalCadence = (n) => screen.getByLabelText(`Contribute, row ${n}`);
+
+function fillGoal(n, { name, target, date }) {
+  fireEvent.change(goalName(n), { target: { value: name } });
+  fireEvent.change(goalTarget(n), { target: { value: target } });
+  fireEvent.change(goalDate(n), { target: { value: date } });
+}
+
+describe('GoalsTab desktop rows', () => {
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  it('saves every finished row in one submit', async () => {
+    mockDesktop();
+    let seq = 0;
+    const { save } = renderTab({ newId: () => `g-${(seq += 1)}` });
+    fillGoal(1, { name: 'Emergency fund', target: '10000', date: '2027-01-01' });
+    fillGoal(2, { name: 'Laptop', target: '2000', date: '2027-03-01' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 goals' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Emergency fund',
+        target_amount: 10000,
+        target_date: '2027-01-01',
+        // A new goal starts empty with no ledger, whichever shape made
+        // it -- both go through the same `saveGoal`.
+        current_amount: 0,
+        contributions: [],
+        cadence: 'monthly',
+      }),
+    );
+    const ids = save.mock.calls.map(([g]) => g.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('carries a per-row cadence, not one choice for the whole form', async () => {
+    mockDesktop();
+    let seq = 0;
+    const { save } = renderTab({ newId: () => `g-${(seq += 1)}` });
+    fillGoal(1, { name: 'Emergency fund', target: '10000', date: '2027-01-01' });
+    fillGoal(2, { name: 'Laptop', target: '2000', date: '2027-03-01' });
+    fireEvent.change(goalCadence(2), { target: { value: 'weekly' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 goals' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    const cadences = Object.fromEntries(save.mock.calls.map(([g]) => [g.name, g.cadence]));
+    expect(cadences).toEqual({ 'Emergency fund': 'monthly', Laptop: 'weekly' });
+  });
+
+  it('will not submit until a row has a name, a target and a date', () => {
+    mockDesktop();
+    const { save } = renderTab();
+    expect(screen.getByRole('button', { name: 'Add a goal' })).toBeDisabled();
+    fireEvent.change(goalName(1), { target: { value: 'Trip' } });
+    expect(screen.getByRole('button', { name: 'Add a goal' })).toBeDisabled();
+    fireEvent.change(goalTarget(1), { target: { value: '3000' } });
+    // Still short a date: the required contribution is meaningless
+    // without one, which is why the phone form demands it too.
+    expect(screen.getByRole('button', { name: 'Add a goal' })).toBeDisabled();
+    fireEvent.change(goalDate(1), { target: { value: '2027-01-01' } });
+    expect(screen.getByRole('button', { name: 'Add a goal' })).toBeEnabled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('counts only the finished rows in the button', () => {
+    mockDesktop();
+    renderTab();
+    fillGoal(1, { name: 'Emergency fund', target: '10000', date: '2027-01-01' });
+    fillGoal(2, { name: 'Laptop', target: '2000', date: '2027-03-01' });
+    fireEvent.change(goalName(3), { target: { value: 'Car' } });
+    expect(screen.getByRole('button', { name: 'Add 2 goals' })).toBeInTheDocument();
+  });
+
+  it('keeps a half-finished row after saving the finished ones', async () => {
+    mockDesktop();
+    let seq = 0;
+    const { save } = renderTab({ newId: () => `g-${(seq += 1)}` });
+    fillGoal(1, { name: 'Emergency fund', target: '10000', date: '2027-01-01' });
+    fireEvent.change(goalName(2), { target: { value: 'Car' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add a goal' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(goalName(1)).toHaveValue('Car'));
+    expect(goalName(2)).toHaveValue('');
+  });
+
+  it('adds a row on Shift+Enter and puts the caret in its name field', async () => {
+    mockDesktop();
+    renderTab();
+    fireEvent.keyDown(goalName(1), { key: 'Enter', shiftKey: true });
+    await waitFor(() => expect(goalName(2)).toBeInTheDocument());
+    expect(goalName(2)).toHaveFocus();
+  });
+
+  it('grows a fresh row once a name is typed in the last one', () => {
+    mockDesktop();
+    renderTab();
+    expect(screen.queryByLabelText('Goal name, row 2')).not.toBeInTheDocument();
+    fireEvent.change(goalName(1), { target: { value: 'Trip' } });
+    expect(goalName(2)).toBeInTheDocument();
+  });
+
+  it('groups a five-figure target at rest, as the phone form does', () => {
+    mockDesktop();
+    renderTab();
+    fireEvent.change(goalTarget(1), { target: { value: '25000' } });
+    fireEvent.blur(goalTarget(1));
+    expect(goalTarget(1)).toHaveValue('25,000');
+  });
+});
+
+describe('GoalsTab on the phone shell', () => {
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  // window.matchMedia is left unmocked, matching this codebase's default
+  // "phone shell" behaviour (see useIsDesktop.js).
+  it('keeps the single draft form, which is what fits 375px', () => {
+    renderTab();
+    expect(screen.getByLabelText('Goal name')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Goal name, row 1')).not.toBeInTheDocument();
+  });
+
+  it('hides the row shortcut hint, since there are no rows here', () => {
+    renderTab();
+    expect(screen.queryByText('Shift + Enter adds a row')).not.toBeInTheDocument();
   });
 });

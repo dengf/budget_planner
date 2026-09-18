@@ -4012,38 +4012,42 @@ table.data tr:last-child td {
     flex: none;
   }
 
-  /* The rules batch form, deliberately built out of the same pieces as
-     the transaction rows above: same gaps, same head-row-as-label,
-     same remove button. Three columns instead of six, so the keyword
-     and category take what's left and priority is sized to a number. */
-  .rule-batch {
+  /* Batch-entry rows: rules, categories, savings goals and debts all
+     render `BatchRows`, deliberately built out of the same pieces as
+     the transaction rows above -- same gaps, same head-row-as-label,
+     same remove button. Each form differs only in its column widths,
+     which it sets as `--batch-cols` on the container below, so there is
+     one grid rule here rather than one per form. Four near-identical
+     copies of this block is exactly the drift CLAUDE.md warns about
+     with `dash-header`. */
+  .batch-form {
     display: flex;
     flex-direction: column;
     gap: 12px;
   }
-  .rule-rows {
+  .batch-rows {
     display: flex;
     flex-direction: column;
     gap: 6px;
   }
-  .rule-rows-head,
-  .rule-row {
+  .batch-rows-head,
+  .batch-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 96px 32px;
+    grid-template-columns: var(--batch-cols);
     gap: 8px;
     align-items: center;
   }
-  .rule-rows-head {
+  .batch-rows-head {
     padding: 0 2px;
   }
   /* The row controls lose the stacked label/field block's own margins:
      the header above is the label, once, for the whole column. */
-  .rule-row .field-input,
-  .rule-row .field-select {
+  .batch-row .field-input,
+  .batch-row .field-select {
     margin: 0;
     width: 100%;
   }
-  .rule-row-remove {
+  .batch-row-remove {
     min-width: 32px;
     padding: 0;
     justify-self: center;
@@ -4051,86 +4055,37 @@ table.data tr:last-child td {
   /* Disabled only when it's the last row, where removing it would leave
      nowhere to type -- dimmed rather than gone so the column doesn't
      reflow the moment a second row appears. */
-  .rule-row-remove:disabled {
+  .batch-row-remove:disabled {
     opacity: 0.35;
   }
-  .rule-rows-foot {
+  .batch-rows-foot,
+  .batch-actions {
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
   }
-  .rule-rows-add {
-    flex: none;
-  }
-  .rule-batch-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .rule-batch-actions .btn {
+  .batch-rows-add,
+  .batch-actions .btn {
     flex: none;
   }
 
-  /* The categories batch form, third instance of the same rows pattern.
-     Name and group take what's left; direction is sized to its two
-     options. */
-  .category-batch {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  /* Per-form column widths. The last track is always the 32px remove
+     button; everything before it is that form's own fields, with the
+     longest strings given what's left. */
+  .rule-rows {
+    --batch-cols: minmax(0, 1fr) minmax(0, 1.1fr) 96px 32px;
   }
   .category-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    --batch-cols: minmax(0, 1.2fr) 120px minmax(0, 1fr) 32px;
   }
-  .category-rows-head,
-  .category-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) 120px minmax(0, 1fr) 32px;
-    gap: 8px;
-    align-items: center;
+  /* The date input has a fixed intrinsic width and will not shrink, so
+     it gets its own track rather than a fraction that it would overflow. */
+  .goal-rows {
+    --batch-cols: minmax(0, 1.3fr) minmax(0, 1fr) 162px 132px 32px;
   }
-  .category-rows-head {
-    padding: 0 2px;
-  }
-  /* The row controls lose the stacked label/field block's own margins:
-     the header above is the label, once, for the whole column. */
-  .category-row .field-input,
-  .category-row .field-select {
-    margin: 0;
-    width: 100%;
-  }
-  .category-row-remove {
-    min-width: 32px;
-    padding: 0;
-    justify-self: center;
-  }
-  /* Disabled only when it's the last row, where removing it would leave
-     nowhere to type -- dimmed rather than gone so the column doesn't
-     reflow the moment a second row appears. */
-  .category-row-remove:disabled {
-    opacity: 0.35;
-  }
-  .category-rows-foot {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .category-rows-add {
-    flex: none;
-  }
-  .category-batch-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .category-batch-actions .btn {
-    flex: none;
+  .debt-rows {
+    --batch-cols: minmax(0, 1.4fr) minmax(0, 1fr) 96px minmax(0, 1fr) 32px;
   }
 
   /* Dashboard: the donut beside its own category rows, with the

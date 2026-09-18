@@ -309,6 +309,7 @@ export default {
 
   'goals.title': '储蓄目标',
   'goals.add': '添加目标',
+  'goals.addCount': '添加 {count} 个目标',
   'goals.name': '目标名称',
   'goals.target': '目标金额',
   'goals.current': '已储蓄',
@@ -330,6 +331,7 @@ export default {
 
   'debt.title': '还债计划',
   'debt.add': '添加一笔债务',
+  'debt.addCount': '添加 {count} 笔债务',
   'debt.name': '债务名称',
   'debt.balance': '余额',
   'debt.apr': '年利率 %',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import DebtTab from './DebtTab';
 
@@ -108,5 +108,137 @@ describe('DebtTab: recording a payment', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Record it' }));
     await waitFor(() => expect(saveTransaction).not.toHaveBeenCalled());
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+function mockDesktop() {
+  window.matchMedia = vi.fn(() => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+const debtName = (n) => screen.getByLabelText(`Debt name, row ${n}`);
+const debtBalance = (n) => screen.getByLabelText(`Balance, row ${n}`);
+const debtApr = (n) => screen.getByLabelText(`APR %, row ${n}`);
+const debtMin = (n) => screen.getByLabelText(`Minimum payment, row ${n}`);
+
+function fillDebt(n, { name, balance, min, apr }) {
+  fireEvent.change(debtName(n), { target: { value: name } });
+  fireEvent.change(debtBalance(n), { target: { value: balance } });
+  fireEvent.change(debtMin(n), { target: { value: min } });
+  if (apr !== undefined) fireEvent.change(debtApr(n), { target: { value: apr } });
+}
+
+describe('DebtTab desktop rows', () => {
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  it('saves every finished row in one submit', async () => {
+    mockDesktop();
+    let seq = 0;
+    const { save } = renderTab({ newId: () => `d-${(seq += 1)}` });
+    fillDebt(1, { name: 'Visa', balance: '4000', min: '120', apr: '19.9' });
+    fillDebt(2, { name: 'Car loan', balance: '12000', min: '300', apr: '5' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 debts' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Visa', balance: 4000, min_payment: 120, apr_percent: 19.9 }),
+    );
+    const ids = save.mock.calls.map(([d]) => d.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('defaults a blank APR to 0 per row, as the phone form does', async () => {
+    mockDesktop();
+    let seq = 0;
+    const { save } = renderTab({ newId: () => `d-${(seq += 1)}` });
+    // An interest-free debt is a real thing (a family loan, a 0% plan),
+    // so a blank APR is a value, not an unfinished row.
+    fillDebt(1, { name: 'Family loan', balance: '1500', min: '100' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add a debt' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ apr_percent: 0 }));
+  });
+
+  it('will not submit until a row has a name, a balance and a minimum payment', () => {
+    mockDesktop();
+    const { save } = renderTab();
+    expect(screen.getByRole('button', { name: 'Add a debt' })).toBeDisabled();
+    fireEvent.change(debtName(1), { target: { value: 'Visa' } });
+    expect(screen.getByRole('button', { name: 'Add a debt' })).toBeDisabled();
+    fireEvent.change(debtBalance(1), { target: { value: '4000' } });
+    // Still short a minimum payment: without one there is no payoff
+    // schedule to draw, which is why the phone form demands it too.
+    expect(screen.getByRole('button', { name: 'Add a debt' })).toBeDisabled();
+    fireEvent.change(debtMin(1), { target: { value: '120' } });
+    expect(screen.getByRole('button', { name: 'Add a debt' })).toBeEnabled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('counts only the finished rows in the button', () => {
+    mockDesktop();
+    renderTab();
+    fillDebt(1, { name: 'Visa', balance: '4000', min: '120' });
+    fillDebt(2, { name: 'Car loan', balance: '12000', min: '300' });
+    fireEvent.change(debtName(3), { target: { value: 'Student loan' } });
+    expect(screen.getByRole('button', { name: 'Add 2 debts' })).toBeInTheDocument();
+  });
+
+  it('keeps a half-finished row after saving the finished ones', async () => {
+    mockDesktop();
+    let seq = 0;
+    const { save } = renderTab({ newId: () => `d-${(seq += 1)}` });
+    fillDebt(1, { name: 'Visa', balance: '4000', min: '120' });
+    fireEvent.change(debtName(2), { target: { value: 'Student loan' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add a debt' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(debtName(1)).toHaveValue('Student loan'));
+    expect(debtName(2)).toHaveValue('');
+  });
+
+  it('adds a row on Shift+Enter and puts the caret in its name field', async () => {
+    mockDesktop();
+    renderTab();
+    fireEvent.keyDown(debtName(1), { key: 'Enter', shiftKey: true });
+    await waitFor(() => expect(debtName(2)).toBeInTheDocument());
+    expect(debtName(2)).toHaveFocus();
+  });
+
+  it('grows a fresh row once a name is typed in the last one', () => {
+    mockDesktop();
+    renderTab();
+    expect(screen.queryByLabelText('Debt name, row 2')).not.toBeInTheDocument();
+    fireEvent.change(debtName(1), { target: { value: 'Visa' } });
+    expect(debtName(2)).toBeInTheDocument();
+  });
+
+  it('groups a five-figure balance at rest, as the phone form does', () => {
+    mockDesktop();
+    renderTab();
+    fireEvent.change(debtBalance(1), { target: { value: '12400' } });
+    fireEvent.blur(debtBalance(1));
+    expect(debtBalance(1)).toHaveValue('12,400');
+  });
+});
+
+describe('DebtTab on the phone shell', () => {
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  // window.matchMedia is left unmocked, matching this codebase's default
+  // "phone shell" behaviour (see useIsDesktop.js).
+  it('keeps the single draft form, which is what fits 375px', () => {
+    renderTab();
+    expect(screen.getByLabelText('Debt name')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Debt name, row 1')).not.toBeInTheDocument();
+  });
+
+  it('hides the row shortcut hint, since there are no rows here', () => {
+    renderTab();
+    expect(screen.queryByText('Shift + Enter adds a row')).not.toBeInTheDocument();
   });
 });

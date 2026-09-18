@@ -4,6 +4,7 @@ import CategoryBadge from './CategoryBadge';
 import RuleRows from './RuleRows';
 import { categoryDisplayName, makeCategoryLookup } from '../presetCategories';
 import useIsDesktop from '../useIsDesktop';
+import useBatchRows, { rowKey } from '../useBatchRows';
 
 /**
  * Categorization rules -- keyword in, category out.
@@ -25,12 +26,11 @@ import useIsDesktop from '../useIsDesktop';
  * case anyway. Both save through the same `saveRule` below.
  */
 
-let rowSeq = 0;
-export const emptyRuleRow = () => ({
+const emptyRuleRow = () => ({
   keyword: '',
   category_id: '',
   priority: '0',
-  key: `rule-row-${(rowSeq += 1)}`,
+  key: rowKey('rule'),
 });
 
 const isComplete = (row) => !!row.keyword.trim() && !!row.category_id;
@@ -47,8 +47,11 @@ export default function RulesSection({
   const { t } = useI18n();
   const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
-  const [rows, setRows] = useState(() => [emptyRuleRow()]);
   const isDesktop = useIsDesktop();
+  const { rows, setRow, addRow, removeRow, reset } = useBatchRows({
+    emptyRow: emptyRuleRow,
+    isFilled: (row) => !!row.keyword.trim(),
+  });
 
   const saveRule = ({ keyword, category_id, priority }) =>
     rules.save({
@@ -64,23 +67,6 @@ export default function RulesSection({
     await saveRule(ruleDraft);
     setRuleDraft({ keyword: '', category_id: '', priority: 0 });
   };
-
-  // A keyword in the last row grows a fresh row beneath it, the same way
-  // TransactionRows grows on an amount: the next row is already there by
-  // the time someone reaches for it, so "+ Add a row" is the fallback
-  // rather than the step everyone takes.
-  const setRow = (key, patch) => {
-    setRows((current) => {
-      const next = current.map((r) => (r.key === key ? { ...r, ...patch } : r));
-      const last = next[next.length - 1];
-      return last.keyword.trim() ? [...next, emptyRuleRow()] : next;
-    });
-  };
-
-  const addRow = () => setRows((current) => [...current, emptyRuleRow()]);
-
-  const removeRow = (key) =>
-    setRows((current) => (current.length === 1 ? current : current.filter((r) => r.key !== key)));
 
   const completeRows = rows.filter(isComplete);
 
@@ -98,10 +84,7 @@ export default function RulesSection({
     e.preventDefault();
     if (completeRows.length === 0) return;
     for (const row of completeRows) await saveRule(row);
-    setRows((current) => {
-      const left = current.filter((r) => !isComplete(r) && !isBlank(r));
-      return [...left, emptyRuleRow()];
-    });
+    reset(rows.filter((r) => !isComplete(r) && !isBlank(r)));
   };
 
   const applyRules = async () => {
@@ -170,7 +153,7 @@ export default function RulesSection({
         </div>
       )}
       {isDesktop ? (
-        <form className="rule-batch" onSubmit={addRules}>
+        <form className="batch-form" onSubmit={addRules}>
           <RuleRows
             rows={rows}
             categories={categories.items}
@@ -178,7 +161,7 @@ export default function RulesSection({
             onAddRow={addRow}
             onRemoveRow={removeRow}
           />
-          <div className="rule-batch-actions">
+          <div className="batch-actions">
             <button className="btn" type="submit" disabled={completeRows.length === 0}>
               {batchSubmitLabel()}
             </button>
