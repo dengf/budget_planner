@@ -76,6 +76,11 @@ export default {
   'budget.remove': 'Remove',
 
   'budget.addCommon': 'Add common categories',
+  // CategoriesScreen's Shift+Enter saves the draft in place; it does not
+  // add a row, so it says so rather than borrowing the rows forms'
+  // `transactions.addRowShortcut`, which now only appears where a row
+  // really does appear (TransactionRows, RuleRows).
+  'budget.addCategoryShortcut': 'Shift + Enter adds the category',
   'budget.includeCommitments': 'Count goal contributions and debt minimums against this month',
   'budget.commitmentsTitle': 'Goals & debt this month',
   'budget.progressAria': '{name}: {spent} of {planned} spent',
@@ -283,6 +288,9 @@ export default {
   'transactions.ruleKeyword': 'Keyword',
   'transactions.rulePriority': 'Priority',
   'transactions.addRule': 'Add rule',
+  // The desktop rules form saves a batch of rows at once, so the button
+  // counts what is actually finished; one finished row says "Add rule".
+  'transactions.addRuleCount': 'Add {count} rules',
   'transactions.applyRules': 'Apply rules to uncategorized',
   'transactions.noRules': 'No rules yet.',
   'transactions.receiptTitle': 'Add from a receipt',
