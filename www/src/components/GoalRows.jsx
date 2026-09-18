@@ -1,9 +1,8 @@
 import React from 'react';
 import { useI18n } from '../i18n';
+import { CADENCES } from '../cadences';
 import BatchRows from './BatchRows';
 import NumberField from './NumberField';
-
-export const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
 
 /**
  * New savings goals as a list of rows, for a screen wide enough to show

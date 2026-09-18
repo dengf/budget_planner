@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
+import { CADENCES } from '../cadences';
 import { makeFormatMoney } from '../currency';
 import { monthLabel, monthsBetween, todayIso } from '../month';
 import { useMonthSavings } from '../monthSavings';
@@ -7,7 +8,7 @@ import useIsDesktop from '../useIsDesktop';
 import useBatchRows, { rowKey } from '../useBatchRows';
 import BlossomProgress from './BlossomProgress';
 import CalcError from './CalcError';
-import GoalRows, { CADENCES } from './GoalRows';
+import GoalRows from './GoalRows';
 import NumberField from './NumberField';
 
 const emptyGoalRow = () => ({

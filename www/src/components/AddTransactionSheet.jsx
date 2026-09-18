@@ -4,9 +4,15 @@ import CalcError from './CalcError';
 import CategoryPicker from './CategoryPicker';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
+import RecurringBatchForm, {
+  EMPTY_RECURRING_DRAFT,
+  isCompleteRecurring,
+  saveRecurring,
+} from './RecurringBatchForm';
 import TransactionBatchForm, { emptyRow } from './TransactionBatchForm';
 import VoiceCapture from './VoiceCapture';
 import { PenIcon, CameraIcon, MicIcon, SpreadsheetIcon, RecurringIcon } from './icons';
+import { CADENCES } from '../cadences';
 import { categoryDisplayName } from '../presetCategories';
 import { useCategoryRank } from '../useCategoryRank';
 import { useCreateCategory } from '../useCreateCategory';
@@ -34,16 +40,6 @@ const EMPTY_DRAFT = {
   category_id: '',
   isIncome: false,
   categoryTouched: false,
-};
-
-const CADENCES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
-
-const EMPTY_RECURRING_DRAFT = {
-  description: '',
-  category_id: '',
-  amount: '',
-  cadence: 'monthly',
-  anchor_date: '',
 };
 
 /**
@@ -306,16 +302,8 @@ export default function AddTransactionSheet({
 
   const addRecurring = async (e) => {
     e.preventDefault();
-    if (!recurringDraft.description.trim() || !recurringDraft.category_id) return;
-    if (!recurringDraft.amount || !recurringDraft.anchor_date) return;
-    await recurring.save({
-      id: newId(),
-      description: recurringDraft.description,
-      category_id: recurringDraft.category_id,
-      amount: Number(recurringDraft.amount),
-      cadence: recurringDraft.cadence,
-      anchor_date: recurringDraft.anchor_date,
-    });
+    if (!isCompleteRecurring(recurringDraft)) return;
+    await saveRecurring(recurring, newId, recurringDraft);
     setRecurringDraft(EMPTY_RECURRING_DRAFT);
     onClose();
   };
@@ -412,8 +400,11 @@ export default function AddTransactionSheet({
 
   // A batch is for entering new rows at a width that can show a table of
   // them. Correcting an existing transaction is one row, so it keeps the
-  // single form; so does every non-manual method.
+  // single form; so do the capture methods, which each produce one.
   const batch = isDesktop && !editing;
+  // The two tabs where a batch is what's on screen, and so the two that
+  // need the wider dialog below.
+  const batchMethod = batch && (method === 'manual' || method === 'recurring');
 
   const sheetTitle = editing ? t('transactions.editTitle') : t('transactions.addManual');
 
@@ -421,7 +412,7 @@ export default function AddTransactionSheet({
     <div className="add-txn-backdrop" role="presentation" onClick={closeAndReset}>
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- this handler only stops a click from reaching the backdrop's dismiss handler above; the panel itself is not something to activate, so there is no keyboard equivalent to add. Focus and Escape are handled by the dialog role. */}
       <div
-        className={`add-txn-dialog${batch && method === 'manual' ? ' batch' : ''}`}
+        className={`add-txn-dialog${batchMethod ? ' batch' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={sheetTitle}
@@ -782,7 +773,20 @@ export default function AddTransactionSheet({
             </>
           )}
 
-          {method === 'recurring' && (
+          {/* Desktop sets up several recurring expenses at once: rent,
+              the phone bill and two subscriptions all exist on day one
+              and get typed in one sitting. The phone form below is
+              unchanged. */}
+          {method === 'recurring' && batch && (
+            <RecurringBatchForm
+              recurring={recurring}
+              categories={categories}
+              newId={newId}
+              onSaved={onClose}
+            />
+          )}
+
+          {method === 'recurring' && !batch && (
             <>
               <form className="form-grid" onSubmit={addRecurring}>
                 <label className="field">

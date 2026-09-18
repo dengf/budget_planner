@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import RecurringSection from './RecurringSection';
 
@@ -165,5 +165,139 @@ describe('RecurringSection: what is still due', () => {
     await screen.findByText('No recurring expenses set up yet.');
     expect(screen.queryByText(/still due/)).not.toBeInTheDocument();
     expect(screen.queryByText('Everything scheduled this month has been paid.')).toBeNull();
+  });
+});
+
+/**
+ * The inline batch form desktop gets instead of reaching for "+". The
+ * phone is the `useIsDesktop() === false` default every case above
+ * renders, and the last one here checks the form stays off it.
+ */
+describe('RecurringSection: adding on desktop', () => {
+  // jsdom has no matchMedia, so `useIsDesktop` reports a phone unless a
+  // test says otherwise -- which is what keeps every case above on the
+  // list-only screen.
+  const mockDesktop = () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: true,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+  };
+
+  afterEach(() => {
+    delete window.matchMedia;
+  });
+
+  const fillRow = (n, { description, category = 'housing', amount, date }) => {
+    fireEvent.change(screen.getByLabelText(`Description, row ${n}`), {
+      target: { value: description },
+    });
+    fireEvent.change(screen.getByLabelText(`Category, row ${n}`), { target: { value: category } });
+    fireEvent.change(screen.getByLabelText(`Amount per occurrence, row ${n}`), {
+      target: { value: amount },
+    });
+    fireEvent.change(screen.getByLabelText(`One real due date, row ${n}`), {
+      target: { value: date },
+    });
+  };
+
+  it('offers the rows on the screen itself, with no modal to open first', async () => {
+    mockDesktop();
+    renderSection();
+    expect(await screen.findByLabelText('Description, row 1')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('saves every complete row in one submit', async () => {
+    mockDesktop();
+    const recurring = { items: [RENT], save: vi.fn(), remove: vi.fn() };
+    renderSection({ recurring });
+
+    fillRow(1, { description: 'Insurance', amount: '180', date: '2026-10-03' });
+    fillRow(2, {
+      description: 'Broadband',
+      category: 'utilities',
+      amount: '65',
+      date: '2026-10-11',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 recurring expenses' }));
+
+    await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(2));
+    expect(recurring.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Insurance',
+        amount: 180,
+        category_id: 'housing',
+        cadence: 'monthly',
+        anchor_date: '2026-10-03',
+      }),
+    );
+    expect(recurring.save).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Broadband', category_id: 'utilities', amount: 65 }),
+    );
+  });
+
+  // Nothing to close here, so a clean batch just leaves empty rows
+  // ready for the next one -- and an unfinished row stays put either
+  // way, rather than being saved or silently dropped.
+  it('clears saved rows and keeps an unfinished one', async () => {
+    mockDesktop();
+    const recurring = { items: [RENT], save: vi.fn(), remove: vi.fn() };
+    renderSection({ recurring });
+
+    fillRow(1, { description: 'Insurance', amount: '180', date: '2026-10-03' });
+    fireEvent.change(screen.getByLabelText('Description, row 2'), { target: { value: 'Gym' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+
+    await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Description, row 1')).toHaveValue('Gym');
+    expect(screen.getByLabelText('Description, row 2')).toHaveValue('');
+  });
+
+  it('keeps the submit disabled until a row has every field', async () => {
+    mockDesktop();
+    renderSection();
+    const submit = await screen.findByRole('button', { name: 'Add recurring expense' });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Description, row 1'), { target: { value: 'Gym' } });
+    fireEvent.change(screen.getByLabelText('Amount per occurrence, row 1'), {
+      target: { value: '60' },
+    });
+    expect(submit).toBeDisabled(); // no category, no due date yet
+
+    fireEvent.change(screen.getByLabelText('Category, row 1'), { target: { value: 'housing' } });
+    fireEvent.change(screen.getByLabelText('One real due date, row 1'), {
+      target: { value: '2026-10-15' },
+    });
+    expect(submit).toBeEnabled();
+  });
+
+  it('adds a row on Shift+Enter', async () => {
+    mockDesktop();
+    renderSection();
+    fireEvent.keyDown(await screen.findByLabelText('Description, row 1'), {
+      key: 'Enter',
+      shiftKey: true,
+    });
+    expect(screen.getByLabelText('Description, row 2')).toHaveFocus();
+  });
+
+  it('shows the rows on an empty screen, under the empty state', async () => {
+    mockDesktop();
+    renderSection({ recurring: { items: [], save: vi.fn(), remove: vi.fn() } });
+    expect(await screen.findByText('No recurring expenses set up yet.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Description, row 1')).toBeInTheDocument();
+  });
+
+  it('leaves the phone reaching for the "+" instead', async () => {
+    renderSection();
+    await screen.findByText('The schedule');
+    expect(screen.queryByLabelText('Description, row 1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add recurring expense' })).not.toBeInTheDocument();
   });
 });
