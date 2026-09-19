@@ -7,63 +7,150 @@
     <title>Open Source Licenses — Budget Planner</title>
     <meta name="description" content="License text for every open-source component Budget Planner is built from, including its five on-device models.">
     <link rel="icon" href="favicon.ico" sizes="any">
-    <meta name="theme-color" content="#0f1720">
-    <style>
-        :root { color-scheme: dark; }
+    <meta id="theme-color-meta" name="theme-color" content="#0f1720">
+    <script>
+      // The app's own theme picker writes this key (src/theme.js) and
+      // index.html reads it back the same way before first paint. These two
+      // static pages are outside React entirely, so without this they would
+      // sit in whatever the OS says while the app beside them honours an
+      // explicit choice -- open the privacy policy from a deliberately dark
+      // app on a light laptop and the page flipped to light. Inline and
+      // synchronous on purpose: anything deferred paints the wrong theme
+      // first. Wrapped in try/catch because Safari's private mode throws on
+      // localStorage rather than returning null.
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('bp:theme');
+        } catch (e) {}
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        var isLight =
+          t === 'light' ||
+          (t !== 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches);
+        var meta = document.getElementById('theme-color-meta');
+        if (meta) meta.setAttribute('content', isLight ? '#f7f8fa' : '#0f1720');
+      })();
+    </script>
+      <style>
+        /* Three-tier light/dark, the same mechanism and the same guard as
+           main.css: bare `:root` is dark, the media query applies when the
+           OS says light and nothing has overridden it, and the explicit
+           `[data-theme='light']` block wins over both. These pages used to
+           be dark-only while all three apps shipped a light theme and a
+           picker, so following a link out of a light app landed on a black
+           page. Values are this tool's own palette; the link is the brand
+           plum (meifio-brand/README.md) rather than the three different
+           link colours these pages had between them. */
+        :root {
+          color-scheme: dark;
+          --pg-bg: #0f1720;
+          --pg-ink: #e6edf3;
+          --pg-body: #c6d2df;
+          --pg-muted: #8b9bad;
+          --pg-line: #223;
+          --pg-code: #161e2b;
+          --pg-box: #131c26;
+          --pg-link: #f2547f;
+          --pg-lede-bg: #16311f;
+          --pg-lede-border: #2f6b3f;
+        }
+        @media (prefers-color-scheme: light) {
+          :root:not([data-theme='dark']) {
+            color-scheme: light;
+            --pg-bg: #f7f8fa;
+            --pg-ink: #16202b;
+            --pg-body: #33414f;
+            --pg-muted: #5f6e80;
+            --pg-line: #dde3ea;
+            --pg-code: #eef1f5;
+            --pg-box: #ffffff;
+            --pg-link: #b01243;
+            --pg-lede-bg: #e4f3e8;
+            --pg-lede-border: #b8ddc2;
+          }
+        }
+        /* Same values, applied on an explicit choice instead of an OS
+           preference -- keep the two in step. */
+        :root[data-theme='light'] {
+          color-scheme: light;
+          --pg-bg: #f7f8fa;
+          --pg-ink: #16202b;
+          --pg-body: #33414f;
+          --pg-muted: #5f6e80;
+          --pg-line: #dde3ea;
+          --pg-code: #eef1f5;
+          --pg-box: #ffffff;
+          --pg-link: #b01243;
+          --pg-lede-bg: #e4f3e8;
+          --pg-lede-border: #b8ddc2;
+        }
         body {
-            margin: 0;
-            background: #0f1720;
-            color: #e6edf3;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.65;
+          margin: 0;
+          background: var(--pg-bg);
+          color: var(--pg-ink);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          line-height: 1.65;
         }
         main { max-width: 40rem; margin: 0 auto; padding: 48px 20px 80px; }
         h1 { font-size: 1.6rem; margin: 0 0 4px; }
         h2 { font-size: 1.05rem; margin: 36px 0 8px; }
-        h3 { font-size: 1rem; margin: 28px 0 4px; }
-        h4 { font-size: 0.85rem; margin: 12px 0 4px; color: #9fb0c2; font-weight: 600; }
-        p, li { color: #c6d2df; }
-        a { color: #7ee787; }
-        .updated { color: #8b9bad; font-size: 0.85rem; margin: 0 0 32px; }
-        .licenses-overview, .licenses-list, .license-used-by {
-            list-style-type: none;
-            margin: 0;
-            padding: 0;
+        p, li { color: var(--pg-body); }
+        a { color: var(--pg-link); }
+        .updated { color: var(--pg-muted); font-size: 0.85rem; margin: 0 0 32px; }
+        footer {
+          margin-top: 48px;
+          border-top: 1px solid var(--pg-line);
+          padding-top: 16px;
+          font-size: 0.85rem;
         }
-        .note { color: #9fb0c2; font-size: 0.9rem; }
+
+        h3 { font-size: 1rem; margin: 28px 0 4px; }
+        h4 { font-size: 0.85rem; margin: 12px 0 4px; color: var(--pg-muted); font-weight: 600; }
+        code {
+          background: var(--pg-code);
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-size: 0.9em;
+        }
+        .licenses-overview, .licenses-list, .license-used-by {
+          list-style-type: none;
+          margin: 0;
+          padding: 0;
+        }
+        .note { color: var(--pg-muted); font-size: 0.9rem; }
         .licenses-overview li { display: inline-block; margin: 0 12px 6px 0; }
         .license-used-by li { display: inline-block; margin: 0 10px 4px 0; font-size: 0.9rem; }
-        .license { border-top: 1px solid #223; padding-top: 4px; }
-        /* The model table has three columns of real prose, which does not
-           fit a 375px phone. Let it scroll sideways inside its own box
-           rather than widening the page. Same treatment as privacy.html. */
+        .license { border-top: 1px solid var(--pg-line); padding-top: 4px; }
+        /* The license texts are long and there are dozens of them; a scroll box
+           keeps the page navigable without hiding anything. `pre-wrap` matters
+           more than it looks -- these texts are hard-wrapped at 80 columns,
+           which overflows a 375px phone without it. */
+        .license-text {
+          max-height: 240px;
+          overflow-y: auto;
+          white-space: pre-wrap;
+          font-size: 0.8rem;
+          background: var(--pg-box);
+          border: 1px solid var(--pg-line);
+          border-radius: 8px;
+          padding: 12px 14px;
+          color: var(--pg-body);
+        }
+
+        /* The model table has three columns of real prose, which does not fit a
+           375px phone. Let it scroll sideways inside its own box rather than
+           widening the page, and keep the cells from wrapping to one word. */
         .models-wrap { overflow-x: auto; margin: 12px 0; }
         table.models { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.9rem; }
         table.models th, table.models td {
-            text-align: left;
-            vertical-align: top;
-            padding: 8px 12px 8px 0;
-            border-bottom: 1px solid #223;
-            color: #c6d2df;
+          text-align: left;
+          vertical-align: top;
+          padding: 8px 12px 8px 0;
+          border-bottom: 1px solid var(--pg-line);
+          color: var(--pg-body);
         }
-        table.models th { color: #e6edf3; font-weight: 600; }
-        /* The license texts are long and there are dozens of them; a scroll
-           box keeps the page navigable without hiding anything. `pre-wrap`
-           matters more than it looks — these texts are hard-wrapped at 80
-           columns, which overflows a 375px phone without it. */
-        .license-text {
-            max-height: 240px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-size: 0.8rem;
-            background: #131c26;
-            border: 1px solid #223;
-            border-radius: 8px;
-            padding: 12px 14px;
-            color: #c6d2df;
-        }
-        footer { margin-top: 48px; border-top: 1px solid #223; padding-top: 16px; font-size: 0.85rem; }
-    </style>
+        table.models th { color: var(--pg-ink); font-weight: 600; }
+      </style>
 </head>
 
 <body>

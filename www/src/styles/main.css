@@ -24,6 +24,17 @@
    twice (media-guarded and explicit) since plain CSS custom properties
    have no shared-block/mixin mechanism to avoid it. */
 :root {
+  /* Tells the browser which palette to draw its own native chrome in --
+     scrollbars, checkbox and radio ticks, and critically a <select>'s
+     built-in dropdown arrow and the popup it opens. This app has a theme
+     picker, so an explicit choice can now disagree with the OS, and
+     without this a dark page on a light device gets a light dropdown
+     drawn on it. mortgage_calculator and postcard_maker both declare it
+     across all three tiers; this file was the only one of the three that
+     never did.
+     Note it is NOT the same thing as the custom properties below -- UA
+     form-control rendering keys off `color-scheme` and cannot see them. */
+  color-scheme: dark;
   --bg: #0f1720;
   --panel: #131c26;
   --panel-alt: #161e2b;
@@ -39,8 +50,24 @@
   --line-soft: #1a2433;
   --input-border: #2a3546;
 
-  --accent: #d1436a;
+  /* Was #d1436a, which put `--accent-ink` on it at 4.22:1 -- the primary
+     button's own label, the most-pressed control in the app, under
+     WCAG AA's 4.5:1. One step darker takes the label to 4.65:1 while the
+     fill still reads 3.68:1 against the page, over 1.4.11's 3:1 floor for
+     a non-text boundary. postcard_maker's identical token moved with it. */
+  --accent: #c93b62;
   --accent-ink: #fff7f9;
+  /* The same intent drawn as ink instead of as a fill, which is a
+     different contrast problem against the same background: the old
+     #d1436a measured 3.76-3.86:1 as text on `--panel`/`--panel-alt`, so
+     every `color: var(--accent)` site below was failing AA. This is the
+     brand's own dark plum (meifio-brand/README.md), 5.06-5.46:1. Borders
+     and fills keep `--accent`; only ink uses this. */
+  --accent-text: #f2547f;
+  /* The blossom in MeifioMark, which needs to follow the theme between
+     the brand's two plums rather than hardcode the light one on a dark
+     page. See that component's comment. */
+  --brand-plum: #f2547f;
 
   /* Selection is state, not intent. `--accent` used to fill both the
      selected nav item *and* the primary button, so on the desktop
@@ -65,11 +92,21 @@
      The fill alone lands ~1.4:1 against `--panel` and can't do better
      without becoming a grey slab -- a neutral on a neutral has nowhere
      to go. `--selected-edge` is what carries WCAG 1.4.11's 3:1 for a
-     non-text indicator (3.9:1 dark, 7.0:1 light against `--panel`), and
-     `aria-current`/`aria-selected` carries it for a screen reader. */
+     non-text indicator, and `aria-current`/`aria-selected` carries it
+     for a screen reader.
+
+     It points at `--accent-text`, not `--accent`, and the earlier
+     numbers here were measured against the wrong surface. The ring is
+     an inset shadow *on the selected element*, so the colour it has to
+     clear is `--selected`, not the `--panel` behind it -- and at
+     `--accent` that is 2.53:1 in dark, which is a fail, not the 3.9:1
+     recorded before. `--accent-text` gives 3.75:1 against `--selected`
+     and 5.20:1 against `--panel`. Light is #b01243 either way (5.29:1),
+     so this only moves the dark tier -- and it makes this token agree
+     with mortgage_calculator's, which is the same control. */
   --selected: #27354a;
   --selected-ink: var(--ink);
-  --selected-edge: var(--accent);
+  --selected-edge: var(--accent-text);
 
   --positive: #7ee787;
   --positive-ink: #0f1720;
@@ -91,6 +128,7 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
+    color-scheme: light;
     --bg: #f7f8fa;
     --panel: #ffffff;
     --panel-alt: #eef1f5;
@@ -100,21 +138,35 @@
     /* Was #8492a3 -- ~3.17:1 on white, same AA failure as the dark value
        above but needs to move darker here instead of lighter. #667484
        clears 4.5:1. */
-    --muted-2: #667484;
-    --byline: #6b7a8a;
+    /* Was #667484, which measures 4.4952:1 on `--bg` -- under 4.5 by a
+       hair. The earlier fix checked it against white `--panel` (4.75:1)
+       and not against the page behind it, which is where this token's
+       secondary text actually sits. #5f6e80 is 4.91:1 on `--bg` and
+       5.21:1 on `--panel`, and matches mortgage_calculator's. */
+    --muted-2: #5f6e80;
+    /* #6b7a8a measured 4.14:1 on `--bg` -- the byline is normal-size text,
+       so it wants 4.5:1, and it failed in both light tiers of both apps
+       (postcard_maker's own light byline was corrected in the same pass).
+       #617180 is 4.73:1 on `--bg` and 5.02:1 on `--panel`, and stays a
+       shade lighter than `--muted-2` so the hierarchy is unchanged. */
+    --byline: #617180;
     --line: #dde3ea;
     --line-soft: #e7ebf0;
     --input-border: #c7d0da;
 
     --accent: #b01243;
     --accent-ink: #ffffff;
+    /* Light needs no split -- #B01243 is 6.15:1 even on the
+       lightest panel, so the fill colour doubles as the ink. */
+    --accent-text: #b01243;
+    --brand-plum: #b01243;
 
     /* See the `:root` block for why selection has its own token. Light
        has to move *darker* than both panels rather than lighter, since
        `--panel` is already white and there is nowhere above it to go. */
     --selected: #dae1ea;
     --selected-ink: var(--ink);
-    --selected-edge: var(--accent);
+    --selected-edge: var(--accent-text);
 
     --positive: #1f7a3d;
     --positive-ink: #ffffff;
@@ -135,24 +187,29 @@
    identical to the media-guarded block above; see this file's opening
    comment for why they can't be shared instead of duplicated. */
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #f7f8fa;
   --panel: #ffffff;
   --panel-alt: #eef1f5;
   --surface: #ffffff;
   --ink: #16202b;
   --muted: #5a6b7d;
-  --muted-2: #667484;
-  --byline: #6b7a8a;
+  /* See the media-query block above. */
+  --muted-2: #5f6e80;
+  --byline: #617180;
   --line: #dde3ea;
   --line-soft: #e7ebf0;
   --input-border: #c7d0da;
 
   --accent: #b01243;
   --accent-ink: #ffffff;
+  /* See the media-query block above. */
+  --accent-text: #b01243;
+  --brand-plum: #b01243;
 
   --selected: #dae1ea;
   --selected-ink: var(--ink);
-  --selected-edge: var(--accent);
+  --selected-edge: var(--accent-text);
 
   --positive: #1f7a3d;
   --positive-ink: #ffffff;
@@ -760,8 +817,11 @@ body {
   font-size: 0.9rem;
   color: var(--muted);
 }
+/* Same link colour as everything else in the family -- the privacy page
+   this points at uses the brand plum for its own links (`--pg-link`), and
+   `--positive` here means a surplus, not a link. */
 .intro-privacy a {
-  color: var(--positive);
+  color: var(--accent-text);
 }
 
 .panel {
@@ -974,8 +1034,17 @@ body {
   border-radius: 8px;
   padding: 0 10px;
 }
+/* `align-self: stretch` is what makes the 44px above a real tap target and
+   not just a taller box. The wrapper is a plain `<div>`, so the ~3px strip
+   the centred 38px input leaves above and below it is dead: a tap there
+   hits the div and focuses nothing. Stretching the control to the
+   wrapper's own height hands it the whole 44px -- and the shorter
+   `.txn-row`/`.batch-row` variants further down get the same treatment
+   against their own height, since this tracks the wrapper rather than
+   naming a number. Matches mortgage_calculator's copy of this rule. */
 .field-input input,
 .field-input select {
+  align-self: stretch;
   background: transparent;
   border: none;
   color: var(--ink);
@@ -2449,6 +2518,12 @@ table.data tr:last-child td {
   cursor: pointer;
   padding: 0;
   font: inherit;
+  /* `padding: 0` on a one-line label measured 18px tall at 375px, sitting
+     between two deliberately-44px arrows -- the "small glyph with padding"
+     warning above, in its other form: no padding at all. The row is
+     already 44px because of those arrows and is `align-items: center`, so
+     this only grows the tappable box; nothing moves. */
+  min-height: 44px;
 }
 
 .monthpicker-backdrop {
@@ -2573,7 +2648,10 @@ table.data tr:last-child td {
   height: 36px;
   border-radius: 50%;
   background: var(--panel);
-  color: var(--positive);
+  /* The "next step" arrow on the setup card, sitting directly above a
+     plum `.btn` that is the step itself. `--positive` is this file's
+     surplus colour and carries a money meaning it doesn't have here. */
+  color: var(--accent-text);
   font-size: 1.1rem;
 }
 .dash-setup-body {
@@ -2668,7 +2746,10 @@ table.data tr:last-child td {
   right: -18px;
   width: 120px;
   height: 120px;
-  color: var(--accent);
+  /* This one is literally the blossom, so it takes the brand token rather
+     than the app accent -- they are the same hue, but only one of them is
+     allowed to stay put if the accent ever moves again. */
+  color: var(--brand-plum);
   opacity: 0.1;
   pointer-events: none;
 }
@@ -3593,7 +3674,8 @@ table.data tr:last-child td {
   flex-shrink: 0;
   border-radius: 999px;
   background: var(--panel-alt);
-  color: var(--accent);
+  /* Ink on a surface, not a fill -- see `--accent-text`. */
+  color: var(--accent-text);
 }
 .more-item-body {
   flex: 1;
@@ -3628,7 +3710,9 @@ table.data tr:last-child td {
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--accent);
+  /* Real text at 0.92rem, so AA's 4.5:1 applies -- `--accent` measured
+     3.86:1 here. See `--accent-text`. */
+  color: var(--accent-text);
   font-size: 0.92rem;
   font-weight: 600;
   cursor: pointer;
