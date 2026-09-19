@@ -100,3 +100,29 @@ once deployed, or read it directly in this repo.
 ## License
 
 MIT — see `LICENSE`.
+
+### Third-party licenses
+
+The full license text for every crate compiled into the wasm is generated
+by [`cargo-about`](https://github.com/EmbarkStudios/cargo-about) into
+`www/static/third-party-licenses.html`, a shipped page linked from the
+privacy policy — that is where an MIT/Apache-2.0/BSD notice actually
+reaches a user, since a `.wasm` is a binary distribution of every crate
+inside it and those licenses all condition binary redistribution on the
+notice travelling along. Regenerate with:
+
+```
+cargo about generate about.hbs -o www/static/third-party-licenses.html
+```
+
+CI's `licenses` job regenerates and fails on any diff, so a new
+dependency cannot ship without its notice. This page went a whole round
+stale once — the voice work added `rustfft` and four of its dependencies
+with no notice at all — which is why the gate exists.
+
+The five ONNX/`.rten` models are **not** Cargo dependencies, so
+`cargo-about` cannot see them. Their notices live in
+[`MODEL-LICENSES.md`](MODEL-LICENSES.md) and in `about.hbs`'s own
+"Machine-learning models" section, both maintained by hand.
+`vendor/pdf-extract-0.12.0/` is a vendored, patched crate and carries its
+own `LICENSE` for the same reason.

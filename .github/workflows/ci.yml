@@ -58,6 +58,12 @@ jobs:
       # crates with no notice at all. Regenerating and diffing here is what
       # stops that recurring: a new dependency now fails CI until its notice
       # is committed alongside it.
+      #
+      # This does NOT cover the five ML models — they are not Cargo
+      # dependencies, so `cargo about` cannot see them. Their notices are
+      # hand-maintained in MODEL-LICENSES.md and in about.hbs's own
+      # "Machine-learning models" section (which this job does render, so a
+      # botched edit to that section still fails here).
       - name: cargo about generate
         run: cargo about generate about.hbs -o www/static/third-party-licenses.html
 
