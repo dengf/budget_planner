@@ -5,9 +5,14 @@ import { useI18n } from '../i18n';
 // charting library would cost more gzipped than the wasm module this app
 // is built around.
 
-const BLUE = '#4f8cff';
-const AMBER = '#f59e0b';
-const GRID = '#243044';
+// No colour constants here on purpose. These used to be `#4f8cff`/`#f59e0b`
+// (the pre-rebrand blue/amber) and `#243044` for the gridlines, hardcoded
+// past the token system: the grid was a dark-theme value painted on a
+// white card in light theme, and no chart in the app carried the brand at
+// all. Colour now lives in main.css against `--accent` (the balance owed),
+// `--gold` (what the borrowing costs) and `--line` (the grid) -- the same
+// classes mortgage_calculator's charts use, since these three files are
+// the same hand-rolled SVG.
 
 const W = 300;
 const H = 140;
@@ -73,11 +78,11 @@ export default function DebtChart({ schedule, monthsToDebtFree, formatMoney }) {
     <figure className="chart">
       <figcaption className="chart-title">{t('chart.debtTitle')}</figcaption>
       <div className="chart-legend">
-        <span className="chart-key">
-          <i style={{ background: BLUE }} /> {t('chart.remainingBalance')}
+        <span className="chart-key chart-key-balance">
+          <i /> {t('chart.remainingBalance')}
         </span>
-        <span className="chart-key">
-          <i style={{ background: AMBER }} /> {t('chart.interestToDate')}
+        <span className="chart-key chart-key-interest">
+          <i /> {t('chart.interestToDate')}
         </span>
       </div>
       <svg
@@ -92,34 +97,29 @@ export default function DebtChart({ schedule, monthsToDebtFree, formatMoney }) {
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={BLUE} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={BLUE} stopOpacity="0.02" />
+            <stop className="chart-area-from" offset="0%" />
+            <stop className="chart-area-to" offset="100%" />
           </linearGradient>
         </defs>
         {[0.25, 0.5, 0.75].map((f) => (
           <line
             key={f}
+            className="chart-grid-line"
             x1={PAD_L}
             x2={W - PAD_R}
             y1={PAD_T + (H - PAD_T - PAD_B) * f}
             y2={PAD_T + (H - PAD_T - PAD_B) * f}
-            stroke={GRID}
-            strokeWidth="0.5"
           />
         ))}
         <path d={pathFrom(balances, max, { close: true })} fill={`url(#${gradientId})`} />
         <path
+          className="chart-line chart-line-balance"
           d={pathFrom(balances, max)}
-          fill="none"
-          stroke={BLUE}
-          strokeWidth="2"
           vectorEffect="non-scaling-stroke"
         />
         <path
+          className="chart-line chart-line-interest"
           d={pathFrom(cumulativeInterest, max)}
-          fill="none"
-          stroke={AMBER}
-          strokeWidth="2"
           vectorEffect="non-scaling-stroke"
         />
       </svg>

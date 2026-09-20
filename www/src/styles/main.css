@@ -24,6 +24,13 @@
    twice (media-guarded and explicit) since plain CSS custom properties
    have no shared-block/mixin mechanism to avoid it. */
 :root {
+  /* One page width across the three tools. This app was already the wide
+     one at 1240px while mortgage_calculator and postcard_maker both
+     capped at 960px; those two now match this. Named rather than left as
+     a literal so the number is greppable across all three repos and
+     changes in one place per app. Only the desktop rule reads it -- see
+     the `@media (min-width: 960px)` block at the bottom of this file. */
+  --content-max: 1240px;
   /* Tells the browser which palette to draw its own native chrome in --
      scrollbars, checkbox and radio ticks, and critically a <select>'s
      built-in dropdown arrow and the popup it opens. This app has a theme
@@ -2270,6 +2277,44 @@ table.data tr:last-child td {
   border-radius: 5px;
   flex: none;
 }
+
+/* The two series DebtChart and SpendOverTimeChart plot, and the colours
+   their keys take. These lived in the JSX as `#4f8cff`/`#f59e0b` with
+   `#243044` gridlines -- outside the token system, so the charts never
+   followed a theme change and the grid was a dark-theme navy drawn on a
+   white card in light mode. `--accent` for the balance (the figure the
+   tab exists to show), `--gold` for what the borrowing costs. Same class
+   names and same tokens as mortgage_calculator's copy of this chart, so
+   the two apps' charts read as one family. */
+.chart-key-balance i {
+  background: var(--accent);
+}
+.chart-key-interest i {
+  background: var(--gold);
+}
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+}
+.chart-line-balance {
+  stroke: var(--accent);
+}
+.chart-line-interest {
+  stroke: var(--gold);
+}
+.chart-grid-line {
+  stroke: var(--line);
+  stroke-width: 0.5;
+}
+.chart-area-from {
+  stop-color: var(--accent);
+  stop-opacity: 0.28;
+}
+.chart-area-to {
+  stop-color: var(--accent);
+  stop-opacity: 0.02;
+}
+
 .chart-svg {
   width: 100%;
   height: 180px;
@@ -3968,7 +4013,7 @@ table.data tr:last-child td {
     flex-direction: row;
     align-items: flex-start;
     gap: 32px;
-    max-width: 1240px;
+    max-width: var(--content-max);
     padding: 0 32px;
   }
   .app-sidebar {
