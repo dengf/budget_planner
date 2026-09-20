@@ -180,7 +180,7 @@
     </p>
     <p>
       Beyond loading the page itself, the app sends nothing out — no figure
-      you type, no receipt, no recording ever leaves your device. It does
+      you type and no receipt ever leaves your device. It does
       make one kind of outgoing request, described next, and it only ever
       <em>downloads</em>. You can verify this in your browser's developer
       tools: open the Network tab and use the app — nothing is sent.
@@ -188,11 +188,11 @@
 
     <h2>Third-party models</h2>
     <p>
-      Receipt scanning and voice entry each run a machine-learning model in
-      your browser. Those model files are not part of the initial page load:
-      the first time you use one of those features, the app downloads the
-      model it needs from this same site and then runs it entirely on your
-      device. The download is one-way — it fetches the model file and sends
+      Receipt scanning and statement import each run a machine-learning
+      model in your browser. Those model files are not part of the initial
+      page load: the first time you use one of those features, the app
+      downloads the model it needs from this same site and then runs it
+      entirely on your device. The download is one-way — it fetches the model file and sends
       nothing back. If you never open those features, nothing is ever
       downloaded.
     </p>
@@ -217,39 +217,15 @@
           <td>Deciding whether an unsigned statement row is income or expense</td>
           <td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td>
         </tr>
-        <tr>
-          <td>
-            <a href="https://catalog.ngc.nvidia.com/orgs/nvidia/nemo/models/stt_en_quartznet15x5">QuartzNet15x5</a>
-            (NVIDIA NeMo)
-          </td>
-          <td>English speech-to-text for voice entry</td>
-          <td>© NVIDIA, NeMo toolkit</td>
-        </tr>
-        <tr>
-          <td>
-            <a href="https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/stt_zh_citrinet_512">Citrinet-512</a>
-            (NVIDIA NeMo)
-          </td>
-          <td>Mandarin speech-to-text for voice entry</td>
-          <td>© NVIDIA, NeMo toolkit</td>
-        </tr>
-        <tr>
-          <td>
-            <a href="https://huggingface.co/ASLP-lab/WSYue-ASR">u2pp-Conformer-Yue</a>
-            (WenetSpeech-Yue)
-          </td>
-          <td>Cantonese speech-to-text for voice entry</td>
-          <td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td>
-        </tr>
       </tbody>
     </table>
     </div>
     <p>
-      All five run in pure Rust in your browser via <code>rten</code>. Four
-      of them were converted to that runtime's own <code>.rten</code> file
-      format first; all-MiniLM-L6-v2 ships as the ONNX file it was
-      downloaded as. That conversion changes the file format only, not the
-      model's architecture or its trained weights.
+      Both run in pure Rust in your browser via <code>rten</code>. The two
+      PP-OCRv6_tiny files were converted to that runtime's own
+      <code>.rten</code> file format first; all-MiniLM-L6-v2 ships as the
+      ONNX file it was downloaded as. That conversion changes the file
+      format only, not the model's architecture or its trained weights.
       Full attribution, including the required notices and the statement of
       what was changed, is in
       <a href="https://github.com/dengf/budget_planner/blob/main/MODEL-LICENSES.md">MODEL-LICENSES.md</a>.

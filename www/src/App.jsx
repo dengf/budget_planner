@@ -152,7 +152,7 @@ export function AppShell({ wasmModule }) {
    * time, and then stays mounted (so a half-typed draft survives a close
    * and reopen). Rendering a closed one from the start would resolve its
    * `React.lazy` import during first paint, pulling ReceiptCapture,
-   * VoiceCapture and their worker entry points onto the critical path --
+   * their worker entry points onto the critical path --
    * exactly the download this sheet is lazy to avoid.
    */
   const [addMounted, setAddMounted] = useState(false);
@@ -642,8 +642,8 @@ export function AppShell({ wasmModule }) {
 
 /**
  * Lazy like the tab panels, and for the same reason: this pulls in
- * ReceiptCapture and VoiceCapture (and through them the lazy OCR/PDF/
- * voice worker entry points), none of which a session that never opens
+ * ReceiptCapture (and through it the lazy OCR/PDF worker entry
+ * points), none of which a session that never opens
  * the sheet should pay for on first paint. It is mounted at shell level
  * so the "+" works from every tab, which is exactly what would otherwise
  * have made it a static import on the app's critical path.
