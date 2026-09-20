@@ -260,8 +260,17 @@ gets skipped, so ask it explicitly.
 ## Landing changes
 
 One branch per round of work, focused commits, then a PR with a Summary
-and Test plan. **Do not self-merge** — wait for approval. Verify
+and Test plan. **Pushing the branch and opening the PR is routine — do it
+when a round is ready, without asking first.** What still needs the user
+is the *merge*: **do not self-merge**, wait for approval, and verify
 `state == "MERGED"` before deleting any branch.
+
+(This file used to say the opposite — never push without being asked in
+that exact moment, on the reasoning that a plan calling the repo public
+isn't permission to publish it. That was written before the repo existed
+publicly; it has been public and deployed for a while now, and the rule
+had turned into a question asked at the end of every round with the same
+answer each time. Removed at the user's instruction on 2026-09-20.)
 
 ### Tunneling a local preview for the user to look at
 
@@ -277,8 +286,3 @@ stdout (`INF ... Your quick Tunnel has been created! ... https://...`)
 rather than guessing it. `devServer.allowedHosts: 'all'` in
 `webpack.config.js` is already set to accept a tunnel's Host header, for
 either tool.
-
-**Never push to a remote, or run `gh repo create`, without the user asking
-in that exact moment** — a plan having said the repo would be public is
-not the same as permission to publish it. Build, commit and test locally;
-ask before the first push.
