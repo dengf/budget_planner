@@ -73,7 +73,7 @@ let_underscore_must_use = "warn"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Feng Deng", "Dongmei Tang"]
+authors = ["meifio"]
 license = "MIT"
 
 [workspace.dependencies]
