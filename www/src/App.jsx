@@ -537,6 +537,19 @@ export function AppShell({ wasmModule }) {
 
   return (
     <div className="app">
+      {/* The app's one <h1>. This page had none at all, on any screen or
+          width -- mortgage_calculator and postcard_maker both name
+          themselves in an <h1> in the header, but this app's header
+          carries the month strip instead and the title lives in More, so
+          nothing ever emitted one. That leaves a screen reader's document
+          outline headless and every <h2> below orphaned under nothing.
+
+          Visually hidden rather than drawn: the name is already on screen
+          at desktop (the sidebar brand) and deliberately absent on the
+          phone layout, where the bar is only as tall as the month strip.
+          Making the sidebar's brand the <h1> would fix desktop and leave
+          the phone without one, so the heading lives here, above both. */}
+      <h1 className="visually-hidden">{t('app.title')}</h1>
       {isDesktop && (
         <DesktopSidebar
           activeTab={activeTab}
