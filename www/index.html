@@ -69,16 +69,27 @@
     })();
   </script>
   <style>
+    html { color-scheme: dark; }
     html, body { background-color: #0f1720; }
     body { margin: 0; padding: 0; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     #root { min-height: 100vh; }
-    .loading { display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.2rem; color: #7ee787; }
+    /* The brand plum, matching `--brand-plum` in main.css and the mark
+       itself. This used to be #7ee787, a green that measured 1.45:1 on
+       the light background two lines down -- so on a light device
+       "Loading..." was, for the length of the wasm load, very nearly
+       invisible. The light tiers below were the half of this rule that
+       had never been written. */
+    .loading { display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.2rem; color: #f2547f; }
     @media (prefers-color-scheme: light) {
+      html:not([data-theme='dark']) { color-scheme: light; }
       html:not([data-theme='dark']), html:not([data-theme='dark']) body { background-color: #f7f8fa; }
       html:not([data-theme='dark']) body { color: #16202b; }
+      html:not([data-theme='dark']) .loading { color: #b01243; }
     }
+    html[data-theme='light'] { color-scheme: light; }
     html[data-theme='light'], html[data-theme='light'] body { background-color: #f7f8fa; }
     html[data-theme='light'] body { color: #16202b; }
+    html[data-theme='light'] .loading { color: #b01243; }
   </style>
 </head>
 <body>

@@ -7,37 +7,131 @@
   <meta name="description" content="Budget Planner collects nothing. All calculations run in your browser and saved scenarios stay on your device.">
   <link rel="canonical" href="https://dengf.github.io/budget_planner/privacy.html">
   <link rel="icon" href="favicon.ico" sizes="any">
-  <meta name="theme-color" content="#0f1720">
+  <meta id="theme-color-meta" name="theme-color" content="#0f1720">
+  <script>
+    // The app's own theme picker writes this key (src/theme.js) and
+    // index.html reads it back the same way before first paint. These two
+    // static pages are outside React entirely, so without this they would
+    // sit in whatever the OS says while the app beside them honours an
+    // explicit choice -- open the privacy policy from a deliberately dark
+    // app on a light laptop and the page flipped to light. Inline and
+    // synchronous on purpose: anything deferred paints the wrong theme
+    // first. Wrapped in try/catch because Safari's private mode throws on
+    // localStorage rather than returning null.
+    (function () {
+      var t = null;
+      try {
+        t = localStorage.getItem('bp:theme');
+      } catch (e) {}
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      var isLight =
+        t === 'light' ||
+        (t !== 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches);
+      var meta = document.getElementById('theme-color-meta');
+      if (meta) meta.setAttribute('content', isLight ? '#f7f8fa' : '#0f1720');
+    })();
+  </script>
   <style>
-    :root { color-scheme: dark; }
+    /* Three-tier light/dark, the same mechanism and the same guard as
+       main.css: bare `:root` is dark, the media query applies when the
+       OS says light and nothing has overridden it, and the explicit
+       `[data-theme='light']` block wins over both. These pages used to
+       be dark-only while all three apps shipped a light theme and a
+       picker, so following a link out of a light app landed on a black
+       page. Values are this tool's own palette; the link is the brand
+       plum (meifio-brand/README.md) rather than the three different
+       link colours these pages had between them. */
+    :root {
+      color-scheme: dark;
+      --pg-bg: #0f1720;
+      --pg-ink: #e6edf3;
+      --pg-body: #c6d2df;
+      --pg-muted: #8b9bad;
+      --pg-line: #223;
+      --pg-code: #161e2b;
+      --pg-box: #131c26;
+      --pg-link: #f2547f;
+      --pg-lede-bg: #16311f;
+      --pg-lede-border: #2f6b3f;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme='dark']) {
+        color-scheme: light;
+        --pg-bg: #f7f8fa;
+        --pg-ink: #16202b;
+        --pg-body: #33414f;
+        --pg-muted: #5f6e80;
+        --pg-line: #dde3ea;
+        --pg-code: #eef1f5;
+        --pg-box: #ffffff;
+        --pg-link: #b01243;
+        --pg-lede-bg: #e4f3e8;
+        --pg-lede-border: #b8ddc2;
+      }
+    }
+    /* Same values, applied on an explicit choice instead of an OS
+       preference -- keep the two in step. */
+    :root[data-theme='light'] {
+      color-scheme: light;
+      --pg-bg: #f7f8fa;
+      --pg-ink: #16202b;
+      --pg-body: #33414f;
+      --pg-muted: #5f6e80;
+      --pg-line: #dde3ea;
+      --pg-code: #eef1f5;
+      --pg-box: #ffffff;
+      --pg-link: #b01243;
+      --pg-lede-bg: #e4f3e8;
+      --pg-lede-border: #b8ddc2;
+    }
     body {
       margin: 0;
-      background: #0f1720;
-      color: #e6edf3;
+      background: var(--pg-bg);
+      color: var(--pg-ink);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.65;
     }
     main { max-width: 40rem; margin: 0 auto; padding: 48px 20px 80px; }
     h1 { font-size: 1.6rem; margin: 0 0 4px; }
     h2 { font-size: 1.05rem; margin: 36px 0 8px; }
-    p, li { color: #c6d2df; }
-    .updated { color: #5c6b7d; font-size: 0.85rem; margin: 0 0 32px; }
+    p, li { color: var(--pg-body); }
+    a { color: var(--pg-link); }
+    .updated { color: var(--pg-muted); font-size: 0.85rem; margin: 0 0 32px; }
+    footer {
+      margin-top: 48px;
+      border-top: 1px solid var(--pg-line);
+      padding-top: 16px;
+      font-size: 0.85rem;
+    }
+
     .lede {
-      background: #16311f;
-      border: 1px solid #2f6b3f;
+      background: var(--pg-lede-bg);
+      border: 1px solid var(--pg-lede-border);
       border-radius: 10px;
       padding: 16px 20px;
       font-weight: 600;
-      color: #e6edf3;
+      color: var(--pg-ink);
     }
     code {
-      background: #161e2b;
+      background: var(--pg-code);
       padding: 1px 5px;
       border-radius: 4px;
       font-size: 0.9em;
     }
-    a { color: #7ee787; }
-    footer { margin-top: 48px; border-top: 1px solid #223; padding-top: 16px; font-size: 0.85rem; }
+
+    /* The model table has three columns of real prose, which does not fit a
+       375px phone. Let it scroll sideways inside its own box rather than
+       widening the page, and keep the cells from wrapping to one word. */
+    .models-wrap { overflow-x: auto; margin: 12px 0; }
+    table.models { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.9rem; }
+    table.models th, table.models td {
+      text-align: left;
+      vertical-align: top;
+      padding: 8px 12px 8px 0;
+      border-bottom: 1px solid var(--pg-line);
+      color: var(--pg-body);
+    }
+    table.models th { color: var(--pg-ink); font-weight: 600; }
   </style>
 </head>
 <body>
@@ -85,21 +179,80 @@
       to those logs.
     </p>
     <p>
-      Beyond loading the page itself, the app makes no network requests. You
-      can verify this in your browser's developer tools: open the Network
-      tab and use the calculators — nothing is sent.
+      Beyond loading the page itself, the app sends nothing out — no figure
+      you type, no receipt, no recording ever leaves your device. It does
+      make one kind of outgoing request, described next, and it only ever
+      <em>downloads</em>. You can verify this in your browser's developer
+      tools: open the Network tab and use the app — nothing is sent.
     </p>
 
     <h2>Third-party models</h2>
     <p>
-      The receipt-scanning feature runs two OCR models (text detection and
-      text recognition) from
-      <a href="https://github.com/PaddlePaddle/PaddleOCR">PaddleOCR's</a>
-      PP-OCRv6_tiny, converted to run with the pure-Rust <code>rten</code>
-      engine and licensed
-      <a href="https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE">Apache
-      License 2.0</a>. They run entirely on your device, the same as
-      everything else in this app.
+      Receipt scanning and voice entry each run a machine-learning model in
+      your browser. Those model files are not part of the initial page load:
+      the first time you use one of those features, the app downloads the
+      model it needs from this same site and then runs it entirely on your
+      device. The download is one-way — it fetches the model file and sends
+      nothing back. If you never open those features, nothing is ever
+      downloaded.
+    </p>
+    <div class="models-wrap">
+    <table class="models">
+      <thead>
+        <tr><th>Model</th><th>Used for</th><th>License</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <a href="https://github.com/PaddlePaddle/PaddleOCR">PP-OCRv6_tiny</a>
+            (detection + recognition)
+          </td>
+          <td>Reading text off a photographed receipt</td>
+          <td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://huggingface.co/Xenova/all-MiniLM-L6-v2">all-MiniLM-L6-v2</a>
+          </td>
+          <td>Deciding whether an unsigned statement row is income or expense</td>
+          <td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://catalog.ngc.nvidia.com/orgs/nvidia/nemo/models/stt_en_quartznet15x5">QuartzNet15x5</a>
+            (NVIDIA NeMo)
+          </td>
+          <td>English speech-to-text for voice entry</td>
+          <td>© NVIDIA, NeMo toolkit</td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/stt_zh_citrinet_512">Citrinet-512</a>
+            (NVIDIA NeMo)
+          </td>
+          <td>Mandarin speech-to-text for voice entry</td>
+          <td>© NVIDIA, NeMo toolkit</td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://huggingface.co/ASLP-lab/WSYue-ASR">u2pp-Conformer-Yue</a>
+            (WenetSpeech-Yue)
+          </td>
+          <td>Cantonese speech-to-text for voice entry</td>
+          <td><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0</a></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p>
+      All five run in pure Rust in your browser via <code>rten</code>. Four
+      of them were converted to that runtime's own <code>.rten</code> file
+      format first; all-MiniLM-L6-v2 ships as the ONNX file it was
+      downloaded as. That conversion changes the file format only, not the
+      model's architecture or its trained weights.
+      Full attribution, including the required notices and the statement of
+      what was changed, is in
+      <a href="https://github.com/dengf/budget_planner/blob/main/MODEL-LICENSES.md">MODEL-LICENSES.md</a>.
     </p>
     <p>
       Full license text for every open-source component this app is built

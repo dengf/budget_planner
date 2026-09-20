@@ -206,7 +206,7 @@ export default function YourDataMenu({
         className="app-data-trigger data-menu-trigger"
         aria-haspopup="true"
         aria-expanded={open}
-        aria-label={t('data.title')}
+        aria-label={t('settings.title')}
         onClick={openMenu}
       >
         <SettingsIcon />
@@ -235,11 +235,11 @@ export default function YourDataMenu({
             className="data-menu-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label={t('data.title')}
+            aria-label={t('settings.title')}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="data-menu-header">
-              <span className="data-menu-title">{t('data.title')}</span>
+              <span className="data-menu-title">{t('settings.title')}</span>
               <button
                 type="button"
                 className="dash-month-btn"

@@ -9,14 +9,36 @@ import React from 'react';
  * changes.
  *
  * The letters take currentColor so the mark inherits the colour of the byline
- * it sits in. Only the blossom is fixed -- it is the brand's one constant.
+ * it sits in. Only the blossom is fixed -- it is the brand's one constant, and
+ * meifio-brand/README.md is explicit that it does not recolour per tool.
+ *
+ * "Fixed" means fixed per theme, not one literal. The brand book gives the
+ * blossom two values, #B01243 on light and #F2547F on dark, and this file used
+ * to hardcode the light one -- so every one of these tools, all three of which
+ * default to a dark page, drew the blossom in the plum meant for white paper.
+ * It reads as a muddy maroon smudge at tittle size on #0f1720. `--brand-plum`
+ * is declared in each app's main.css across all three theme tiers; the literal
+ * stays as a fallback for any context that renders the mark without those
+ * tokens.
  *
  * Default height is deliberately larger than the surrounding text: at 1em the
  * mark rendered 35px wide, and six letters across 35px is mush. A logotype set
  * into running text normally sits a little above the text size for exactly
  * this reason.
+ *
+ * This file is identical in mortgage_calculator, budget_planner and
+ * postcard_maker, and is meant to stay that way -- the three copies had
+ * already drifted to two different SVG element ids. Copy it whole rather than
+ * editing one in place.
  */
 export default function MeifioMark({ height = '1.4em' }) {
+  /* The petal is drawn once and re-used five times, which needs an id, and an
+     id is document-global. A hardcoded one breaks the moment the mark renders
+     twice on a page (a header and a footer both wanting it is not exotic):
+     every `use` in both copies resolves to whichever definition the document
+     happens to reach first. `useId` makes it per-instance. */
+  const petalId = `meifio-petal-${React.useId()}`;
+
   return (
     <svg
       className="meifio-mark"
@@ -54,12 +76,12 @@ export default function MeifioMark({ height = '1.4em' }) {
         strokeWidth="3.2"
         strokeLinejoin="round"
       />
-      <g transform="translate(192.50 -25.00) scale(0.39)" fill="#B01243">
-        <path id="mf-petal" d="M50 50 C41 46 34 38 34 27 A16 16 0 1 1 66 27 C66 38 59 46 50 50 Z" />
-        <use href="#mf-petal" transform="rotate(72 50 50)" />
-        <use href="#mf-petal" transform="rotate(144 50 50)" />
-        <use href="#mf-petal" transform="rotate(216 50 50)" />
-        <use href="#mf-petal" transform="rotate(288 50 50)" />
+      <g transform="translate(192.50 -25.00) scale(0.39)" fill="var(--brand-plum, #B01243)">
+        <path id={petalId} d="M50 50 C41 46 34 38 34 27 A16 16 0 1 1 66 27 C66 38 59 46 50 50 Z" />
+        <use href={`#${petalId}`} transform="rotate(72 50 50)" />
+        <use href={`#${petalId}`} transform="rotate(144 50 50)" />
+        <use href={`#${petalId}`} transform="rotate(216 50 50)" />
+        <use href={`#${petalId}`} transform="rotate(288 50 50)" />
       </g>
     </svg>
   );

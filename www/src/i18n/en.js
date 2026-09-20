@@ -502,7 +502,7 @@ export default {
   'confirm.removeRecurring': 'Stop tracking "{description}"? It will no longer show as upcoming.',
   'confirm.removeDebt': 'Remove "{name}" from the payoff plan?',
 
-  'data.title': 'Settings',
+  'settings.title': 'Settings',
   'data.backupSection': 'Backup & restore',
   'data.exportHint': 'Download everything you have entered as a single JSON file.',
   'data.export': 'Export all data',

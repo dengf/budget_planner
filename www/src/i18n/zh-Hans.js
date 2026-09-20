@@ -447,7 +447,7 @@ export default {
   'confirm.removeRecurring': '停止追踪“{description}”？它将不再显示在即将到期列表中。',
   'confirm.removeDebt': '将“{name}”从还债计划中删除？',
 
-  'data.title': '设置',
+  'settings.title': '设置',
   'data.backupSection': '备份与还原',
   'data.exportHint': '将您输入的所有内容下载为单个 JSON 文件。',
   'data.export': '导出所有数据',

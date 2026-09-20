@@ -2,6 +2,7 @@
   "name": "budget-planner-web",
   "version": "0.1.0",
   "description": "Zero-based budgeting, CSV import, savings goals and debt payoff, powered by Rust/WASM",
+  "license": "MIT",
   "scripts": {
     "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:pdfrender && npm run build:wasm:llm && npm run build:wasm:voice && npm run build:wasm:voice-cmn && npm run build:wasm:voice-yue",
     "build:wasm:core": "cd ../crates/budget-wasm && wasm-pack build --target web --out-dir ../../www/pkg",

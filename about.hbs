@@ -1,55 +1,241 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-    <style>
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: #333;
-                color: white;
-            }
-            a {
-                color: skyblue;
-            }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Source Licenses — Budget Planner</title>
+    <meta name="description" content="License text for every open-source component Budget Planner is built from, including its five on-device models.">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <meta id="theme-color-meta" name="theme-color" content="#0f1720">
+    <script>
+      // The app's own theme picker writes this key (src/theme.js) and
+      // index.html reads it back the same way before first paint. These two
+      // static pages are outside React entirely, so without this they would
+      // sit in whatever the OS says while the app beside them honours an
+      // explicit choice -- open the privacy policy from a deliberately dark
+      // app on a light laptop and the page flipped to light. Inline and
+      // synchronous on purpose: anything deferred paints the wrong theme
+      // first. Wrapped in try/catch because Safari's private mode throws on
+      // localStorage rather than returning null.
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('bp:theme');
+        } catch (e) {}
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        var isLight =
+          t === 'light' ||
+          (t !== 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches);
+        var meta = document.getElementById('theme-color-meta');
+        if (meta) meta.setAttribute('content', isLight ? '#f7f8fa' : '#0f1720');
+      })();
+    </script>
+      <style>
+        /* Three-tier light/dark, the same mechanism and the same guard as
+           main.css: bare `:root` is dark, the media query applies when the
+           OS says light and nothing has overridden it, and the explicit
+           `[data-theme='light']` block wins over both. These pages used to
+           be dark-only while all three apps shipped a light theme and a
+           picker, so following a link out of a light app landed on a black
+           page. Values are this tool's own palette; the link is the brand
+           plum (meifio-brand/README.md) rather than the three different
+           link colours these pages had between them. */
+        :root {
+          color-scheme: dark;
+          --pg-bg: #0f1720;
+          --pg-ink: #e6edf3;
+          --pg-body: #c6d2df;
+          --pg-muted: #8b9bad;
+          --pg-line: #223;
+          --pg-code: #161e2b;
+          --pg-box: #131c26;
+          --pg-link: #f2547f;
+          --pg-lede-bg: #16311f;
+          --pg-lede-border: #2f6b3f;
         }
-        .container {
-            font-family: sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+        @media (prefers-color-scheme: light) {
+          :root:not([data-theme='dark']) {
+            color-scheme: light;
+            --pg-bg: #f7f8fa;
+            --pg-ink: #16202b;
+            --pg-body: #33414f;
+            --pg-muted: #5f6e80;
+            --pg-line: #dde3ea;
+            --pg-code: #eef1f5;
+            --pg-box: #ffffff;
+            --pg-link: #b01243;
+            --pg-lede-bg: #e4f3e8;
+            --pg-lede-border: #b8ddc2;
+          }
         }
-        .intro {
-            text-align: center;
+        /* Same values, applied on an explicit choice instead of an OS
+           preference -- keep the two in step. */
+        :root[data-theme='light'] {
+          color-scheme: light;
+          --pg-bg: #f7f8fa;
+          --pg-ink: #16202b;
+          --pg-body: #33414f;
+          --pg-muted: #5f6e80;
+          --pg-line: #dde3ea;
+          --pg-code: #eef1f5;
+          --pg-box: #ffffff;
+          --pg-link: #b01243;
+          --pg-lede-bg: #e4f3e8;
+          --pg-lede-border: #b8ddc2;
         }
-        .licenses-list {
-            list-style-type: none;
-            margin: 0;
-            padding: 0;
+        body {
+          margin: 0;
+          background: var(--pg-bg);
+          color: var(--pg-ink);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          line-height: 1.65;
         }
-        .license-used-by {
-            margin-top: -10px;
+        main { max-width: 40rem; margin: 0 auto; padding: 48px 20px 80px; }
+        h1 { font-size: 1.6rem; margin: 0 0 4px; }
+        h2 { font-size: 1.05rem; margin: 36px 0 8px; }
+        p, li { color: var(--pg-body); }
+        a { color: var(--pg-link); }
+        .updated { color: var(--pg-muted); font-size: 0.85rem; margin: 0 0 32px; }
+        footer {
+          margin-top: 48px;
+          border-top: 1px solid var(--pg-line);
+          padding-top: 16px;
+          font-size: 0.85rem;
         }
+
+        h3 { font-size: 1rem; margin: 28px 0 4px; }
+        h4 { font-size: 0.85rem; margin: 12px 0 4px; color: var(--pg-muted); font-weight: 600; }
+        code {
+          background: var(--pg-code);
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-size: 0.9em;
+        }
+        .licenses-overview, .licenses-list, .license-used-by {
+          list-style-type: none;
+          margin: 0;
+          padding: 0;
+        }
+        .note { color: var(--pg-muted); font-size: 0.9rem; }
+        .licenses-overview li { display: inline-block; margin: 0 12px 6px 0; }
+        .license-used-by li { display: inline-block; margin: 0 10px 4px 0; font-size: 0.9rem; }
+        .license { border-top: 1px solid var(--pg-line); padding-top: 4px; }
+        /* The license texts are long and there are dozens of them; a scroll box
+           keeps the page navigable without hiding anything. `pre-wrap` matters
+           more than it looks -- these texts are hard-wrapped at 80 columns,
+           which overflows a 375px phone without it. */
         .license-text {
-            max-height: 200px;
-            overflow-y: scroll;
-            white-space: pre-wrap;
+          max-height: 240px;
+          overflow-y: auto;
+          white-space: pre-wrap;
+          font-size: 0.8rem;
+          background: var(--pg-box);
+          border: 1px solid var(--pg-line);
+          border-radius: 8px;
+          padding: 12px 14px;
+          color: var(--pg-body);
         }
-    </style>
+
+        /* The model table has three columns of real prose, which does not fit a
+           375px phone. Let it scroll sideways inside its own box rather than
+           widening the page, and keep the cells from wrapping to one word. */
+        .models-wrap { overflow-x: auto; margin: 12px 0; }
+        table.models { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.9rem; }
+        table.models th, table.models td {
+          text-align: left;
+          vertical-align: top;
+          padding: 8px 12px 8px 0;
+          border-bottom: 1px solid var(--pg-line);
+          color: var(--pg-body);
+        }
+        table.models th { color: var(--pg-ink); font-weight: 600; }
+      </style>
 </head>
 
 <body>
-    <main class="container">
-        <div class="intro">
-            <h1>Third Party Licenses</h1>
-            <p>This page lists the licenses of the projects used in cargo-about.</p>
+    <main>
+        <h1>Open Source Licenses</h1>
+        <p class="updated">Generated by <code>cargo about</code> from this app's own dependency graph.</p>
+
+        <p>
+            Budget Planner is built from open-source software. Most of it is
+            compiled into the WebAssembly engine your browser downloads, which
+            makes that file a binary distribution of every project listed
+            below — and their licenses ask that their copyright notices travel
+            with it. This page is where those notices travel. Nothing here is
+            a network service; none of it sees a figure you type.
+        </p>
+
+        <h2>Machine-learning models</h2>
+        <p>
+            The five models behind receipt scanning and voice entry are not
+            Cargo dependencies, so they are listed by hand rather than
+            generated. Four were converted to the <code>rten</code> runtime's
+            own file format and all-MiniLM-L6-v2 ships as the ONNX file it was
+            downloaded as; in neither case does anything change about the
+            model's architecture or its trained weights. See
+            <a href="https://github.com/dengf/budget_planner/blob/main/MODEL-LICENSES.md">MODEL-LICENSES.md</a>
+            for the fuller record, including the copyright line each project
+            asks to be carried.
+        </p>
+        <div class="models-wrap">
+        <table class="models">
+            <thead>
+                <tr><th>Model</th><th>Used for</th><th>License</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><a href="https://github.com/PaddlePaddle/PaddleOCR">PP-OCRv6_tiny</a></td>
+                    <td>Reading text off a photographed receipt</td>
+                    <td><a href="#Apache-2.0">Apache-2.0</a></td>
+                </tr>
+                <tr>
+                    <td><a href="https://huggingface.co/Xenova/all-MiniLM-L6-v2">all-MiniLM-L6-v2</a></td>
+                    <td>Income or expense, for an unsigned statement row</td>
+                    <td><a href="#Apache-2.0">Apache-2.0</a></td>
+                </tr>
+                <tr>
+                    <td><a href="https://catalog.ngc.nvidia.com/orgs/nvidia/nemo/models/stt_en_quartznet15x5">QuartzNet15x5</a></td>
+                    <td>English speech-to-text</td>
+                    <td>© NVIDIA, NeMo toolkit</td>
+                </tr>
+                <tr>
+                    <td><a href="https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/stt_zh_citrinet_512">Citrinet-512</a></td>
+                    <td>Mandarin speech-to-text</td>
+                    <td>© NVIDIA, NeMo toolkit</td>
+                </tr>
+                <tr>
+                    <td><a href="https://huggingface.co/ASLP-lab/WSYue-ASR">u2pp-Conformer-Yue</a></td>
+                    <td>Cantonese speech-to-text</td>
+                    <td><a href="#Apache-2.0">Apache-2.0</a></td>
+                </tr>
+            </tbody>
+        </table>
         </div>
-    
-        <h2>Overview of licenses:</h2>
+        <p>
+            PP-OCRv6_tiny is © 2020 PaddlePaddle Authors. u2pp-Conformer-Yue
+            is © ASLP-lab, Northwestern Polytechnical University, trained on
+            WenetSpeech-Yue (arXiv:2509.03959). The Apache-2.0 text those
+            three are licensed under is reproduced in full below, under
+            <a href="#Apache-2.0">Apache-2.0</a>.
+        </p>
+
+        <h2>Rust crates — overview</h2>
         <ul class="licenses-overview">
             {{#each overview}}
             <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
             {{/each}}
         </ul>
 
-        <h2>All license text:</h2>
+        <h2>Rust crates — full license text</h2>
+        <p class="note">
+            A license appears once per distinct copyright notice, so the same
+            license shows up several times with a different "Used by" list
+            each time — that repetition is the point, since it is the
+            copyright lines, not the license body, that each project asks to
+            have carried.
+        </p>
         <ul class="licenses-list">
             {{#each licenses}}
             <li class="license">
@@ -57,13 +243,19 @@
                 <h4>Used by:</h4>
                 <ul class="license-used-by">
                     {{#each used_by}}
-                    <li><a href="{{#if crate.repository}} {{crate.repository}} {{else}} https://crates.io/crates/{{crate.name}} {{/if}}">{{crate.name}} {{crate.version}}</a></li>
+                    <li><a href="{{#if crate.repository}}{{crate.repository}}{{else}}https://crates.io/crates/{{crate.name}}{{/if}}">{{crate.name}} {{crate.version}}</a></li>
                     {{/each}}
                 </ul>
                 <pre class="license-text">{{text}}</pre>
             </li>
             {{/each}}
         </ul>
+
+        <footer>
+            <a href="./">&larr; Back to the calculator</a>
+            &nbsp;·&nbsp;
+            <a href="privacy.html">Privacy policy</a>
+        </footer>
     </main>
 </body>
 

@@ -68,10 +68,15 @@ export function SpreadsheetIcon() {
  * the approved plan's own icon rather than that earlier substitution.
  * Sized via `nav-icon` rather than the inherited `.field-icon` -- like
  * the bottom nav's icons, this one stands alone in its own 44px tap
- * target instead of sitting beside label text. */
+ * target instead of sitting beside label text.
+ *
+ * mortgage_calculator now carries this same glyph for the same button;
+ * the two were different icons on the same control until this round.
+ * Change both or neither. (The redundant `aria-hidden` that used to be
+ * spelled out on the <svg> is gone -- `ICON_PROPS` already sets it.) */
 export function SettingsIcon() {
   return (
-    <svg {...ICON_PROPS} className="nav-icon" aria-hidden="true">
+    <svg {...ICON_PROPS} className="nav-icon">
       <circle cx="12" cy="12" r="3" />
       <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3" />
     </svg>
@@ -191,8 +196,10 @@ export function CategoriesIcon() {
  * same shape as `SettingsIcon` above. Both can be on screen at once (the
  * header keeps its settings trigger while More holds Goals/Debt), and
  * two near-identical dot-and-line glyphs a few hundred pixels apart read
- * as the same control rendered twice. Sliders for settings, three dots
- * for "the rest of the app" -- the distinction has to survive at 19px.
+ * as the same control rendered twice. A spoked circle for settings,
+ * three dots for "the rest of the app" -- the distinction has to survive
+ * at 19px. (This note used to say "sliders for settings", describing a
+ * glyph SettingsIcon no longer draws; the point it makes is unchanged.)
  */
 export function MoreIcon() {
   return (
