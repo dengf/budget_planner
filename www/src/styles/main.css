@@ -3123,7 +3123,16 @@ table.data tr:last-child td {
 }
 .toast-message {
   flex: 1;
+  /* A flex item floors at its content by default, which makes the row
+     overflow rather than compress once the dismiss target is a real 44px
+     square. Let the sentence wrap inside its own column instead. */
+  min-width: 0;
 }
+/* 44x44, the floor the top-level CLAUDE.md sets for a tap target. This was
+   an 18x22 box -- the visible glyph plus 2px of padding -- which is the
+   exact failure that rule describes: a small icon that looks fine and
+   measures small. It is also the only way out of a toast for someone who
+   doesn't want to reload, so missing it costs them the reload. */
 .toast-dismiss {
   border: none;
   background: transparent;
@@ -3131,8 +3140,12 @@ table.data tr:last-child td {
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
-  padding: 2px 4px;
   flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* A new deploy being available isn't an error -- the base .toast is
