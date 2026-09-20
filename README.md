@@ -117,10 +117,10 @@ cargo about generate about.hbs -o www/static/third-party-licenses.html
 
 CI's `licenses` job regenerates and fails on any diff, so a new
 dependency cannot ship without its notice. This page went a whole round
-stale once — the voice work added `rustfft` and four of its dependencies
-with no notice at all — which is why the gate exists.
+stale once — the since-removed voice work added `rustfft` and four of
+its dependencies with no notice at all — which is why the gate exists.
 
-The five ONNX/`.rten` models are **not** Cargo dependencies, so
+The ONNX/`.rten` models are **not** Cargo dependencies, so
 `cargo-about` cannot see them. Their notices live in
 [`MODEL-LICENSES.md`](MODEL-LICENSES.md) and in `about.hbs`'s own
 "Machine-learning models" section, both maintained by hand.

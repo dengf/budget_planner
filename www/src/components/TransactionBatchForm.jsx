@@ -27,9 +27,9 @@ export const emptyRow = (date = '') => ({
  * own doc comment for that call.
  *
  * `rows`/`setRows` are lifted to the caller rather than owned here:
- * AddTransactionSheet's voice-capture tab writes a parsed transaction
+ * AddTransactionSheet's receipt-capture tab writes a parsed transaction
  * into the current batch rows, so that state has to live somewhere both
- * it and this form can reach. TransactionsTab, which has no voice tab,
+ * it and this form can reach. TransactionsTab, which has no such tab,
  * just keeps its own local pair.
  *
  * `onSaved` is optional: the sheet passes its own `onClose` so a batch

@@ -169,12 +169,12 @@
 
         <h2>Machine-learning models</h2>
         <p>
-            The five models behind receipt scanning and voice entry are not
+            The models behind receipt scanning and statement import are not
             Cargo dependencies, so they are listed by hand rather than
-            generated. Four were converted to the <code>rten</code> runtime's
-            own file format and all-MiniLM-L6-v2 ships as the ONNX file it was
-            downloaded as; in neither case does anything change about the
-            model's architecture or its trained weights. See
+            generated. PP-OCRv6_tiny was converted to the <code>rten</code>
+            runtime's own file format and all-MiniLM-L6-v2 ships as the ONNX
+            file it was downloaded as; in neither case does anything change
+            about the model's architecture or its trained weights. See
             <a href="https://github.com/dengf/budget_planner/blob/main/MODEL-LICENSES.md">MODEL-LICENSES.md</a>
             for the fuller record, including the copyright line each project
             asks to be carried.
@@ -195,30 +195,13 @@
                     <td>Income or expense, for an unsigned statement row</td>
                     <td><a href="#Apache-2.0">Apache-2.0</a></td>
                 </tr>
-                <tr>
-                    <td><a href="https://catalog.ngc.nvidia.com/orgs/nvidia/nemo/models/stt_en_quartznet15x5">QuartzNet15x5</a></td>
-                    <td>English speech-to-text</td>
-                    <td>© NVIDIA, NeMo toolkit</td>
-                </tr>
-                <tr>
-                    <td><a href="https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/stt_zh_citrinet_512">Citrinet-512</a></td>
-                    <td>Mandarin speech-to-text</td>
-                    <td>© NVIDIA, NeMo toolkit</td>
-                </tr>
-                <tr>
-                    <td><a href="https://huggingface.co/ASLP-lab/WSYue-ASR">u2pp-Conformer-Yue</a></td>
-                    <td>Cantonese speech-to-text</td>
-                    <td><a href="#Apache-2.0">Apache-2.0</a></td>
-                </tr>
             </tbody>
         </table>
         </div>
         <p>
-            PP-OCRv6_tiny is © 2020 PaddlePaddle Authors. u2pp-Conformer-Yue
-            is © ASLP-lab, Northwestern Polytechnical University, trained on
-            WenetSpeech-Yue (arXiv:2509.03959). The Apache-2.0 text those
-            three are licensed under is reproduced in full below, under
-            <a href="#Apache-2.0">Apache-2.0</a>.
+            PP-OCRv6_tiny is © 2020 PaddlePaddle Authors. The Apache-2.0
+            text both of these are licensed under is reproduced in full
+            below, under <a href="#Apache-2.0">Apache-2.0</a>.
         </p>
 
         <h2>Rust crates — overview</h2>

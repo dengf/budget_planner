@@ -465,30 +465,6 @@ pub struct DateAmountDto {
     pub amount: f64,
 }
 
-// ---- voice entry (grammar parsing only -- ASR itself lives in the
-// sibling budget-wasm-voice crate) ------------------------------------------
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ParseVoiceCommandParams {
-    pub transcript: String,
-    pub categories: Vec<CategoryDto>,
-    /// `"en"`/`"cmn"`/`"yue"` -- a plain string rather than a typed enum
-    /// for JS-friendliness. `#[serde(default)]` so a stale cached JS
-    /// bundle mid-deploy that predates this field still deserializes;
-    /// an empty or unrecognized value defaults to `VoiceLanguage::En`,
-    /// same as it always behaved before this field existed.
-    #[serde(default)]
-    pub language: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct ParseVoiceCommandResult {
-    pub category_id: Option<String>,
-    pub is_income: Option<bool>,
-    pub amount: Option<f64>,
-    pub error: Option<String>,
-}
-
 // ---- CSV import -----------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

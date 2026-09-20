@@ -10,8 +10,7 @@ import RecurringBatchForm, {
   saveRecurring,
 } from './RecurringBatchForm';
 import TransactionBatchForm, { emptyRow } from './TransactionBatchForm';
-import VoiceCapture from './VoiceCapture';
-import { PenIcon, CameraIcon, MicIcon, SpreadsheetIcon, RecurringIcon } from './icons';
+import { PenIcon, CameraIcon, SpreadsheetIcon, RecurringIcon } from './icons';
 import { CADENCES } from '../cadences';
 import { categoryDisplayName } from '../presetCategories';
 import { useCategoryRank } from '../useCategoryRank';
@@ -75,7 +74,7 @@ export default function AddTransactionSheet({
   isDesktop = false,
 }) {
   const { t } = useI18n();
-  const [method, setMethod] = useState(initialMethod); // 'manual' | 'receipt' | 'voice' | 'csv' | 'recurring'
+  const [method, setMethod] = useState(initialMethod); // 'manual' | 'receipt' | 'csv' | 'recurring'
 
   // The sheet stays mounted (and its state alive) even while closed, so a
   // caller that reopens it wanting a specific tab -- the Transactions
@@ -346,49 +345,6 @@ export default function AddTransactionSheet({
     }
   };
 
-  // Fills the ordinary manual form and switches back to it, rather than
-  // saving directly -- see VoiceCapture.jsx's own doc comment for why: a
-  // mis-transcribed word or a missed category should go through the same
-  // review step every other entry method already requires, and this
-  // keeps `transactions.save` called from exactly one place in this file.
-  const onVoiceParsed = (patch) => {
-    // Batch mode renders rows, not the draft, so a spoken transaction
-    // has to land in a row or it would vanish on the way back to the
-    // manual tab. It takes the first empty one -- the trailing row the
-    // form always keeps ready -- and leaves any typed rows alone.
-    if (batch) {
-      const row = {
-        date: patch.date,
-        description: patch.description,
-        amount: patch.amount === '' || patch.amount == null ? '' : String(patch.amount),
-        category_id: patch.category_id,
-        isIncome: patch.isIncome,
-        categoryTouched: Boolean(patch.category_id),
-      };
-      setRows((current) => {
-        const target = current.find((r) => r.amount === '');
-        const next = target
-          ? current.map((r) => (r.key === target.key ? { ...r, ...row } : r))
-          : [...current, { ...emptyRow(patch.date), ...row }];
-        const last = next[next.length - 1];
-        return last.amount !== '' ? [...next, emptyRow(last.date)] : next;
-      });
-      setMethod('manual');
-      return;
-    }
-    setDraft({
-      date: patch.date,
-      description: patch.description,
-      amount: patch.amount,
-      category_id: patch.category_id,
-      isIncome: patch.isIncome,
-      // A category heard in the utterance is the person's own answer,
-      // not a guess to be overwritten by the ranking a moment later.
-      categoryTouched: Boolean(patch.category_id),
-    });
-    setMethod('manual');
-  };
-
   const closeAndReset = () => {
     setDraft(EMPTY_DRAFT);
     setRows([emptyRow()]);
@@ -431,7 +387,7 @@ export default function AddTransactionSheet({
         </div>
 
         {/* No method row when correcting an existing transaction. A
-            receipt scan, a voice note or a CSV import all create rows;
+            receipt scan or a CSV import both create rows;
             none of them edits the one already on screen, so offering
             them here would be five tabs where four do nothing. */}
         {!editing && (
@@ -455,16 +411,6 @@ export default function AddTransactionSheet({
             >
               <CameraIcon />
               <span>{t('transactions.methodReceipt')}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={method === 'voice'}
-              className={`add-txn-method-btn${method === 'voice' ? ' active' : ''}`}
-              onClick={() => setMethod('voice')}
-            >
-              <MicIcon />
-              <span>{t('transactions.methodVoice')}</span>
             </button>
             <button
               type="button"
@@ -665,14 +611,6 @@ export default function AddTransactionSheet({
               rules={rules}
               transactions={transactions}
               formatMoney={formatMoney}
-            />
-          )}
-
-          {method === 'voice' && (
-            <VoiceCapture
-              wasmModule={wasmModule}
-              categories={categories}
-              onParsed={onVoiceParsed}
             />
           )}
 
