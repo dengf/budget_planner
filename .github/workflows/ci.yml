@@ -79,6 +79,18 @@ jobs:
           fi
           echo "Attribution page is current."
 
+      # The step above covers the crates compiled into the .wasm and nothing
+      # else — `cargo about` reads Cargo metadata, and React is an npm package.
+      # React's code ships too, in the bundle the browser downloads, which makes
+      # that file a binary distribution of it in exactly the same way; its
+      # notices are hand-maintained in about.hbs's "JavaScript in the page"
+      # section. This guards the one thing the diff above cannot: a new runtime
+      # dependency arriving without a notice. It reads package-lock.json, so it
+      # needs no npm install and no network. devDependencies are deliberately
+      # not checked — the bundler and test runner ship no code to anyone.
+      - name: every runtime npm dependency is attributed
+        run: node scripts/check-runtime-deps.mjs
+
   test:
     name: cargo test --workspace
     runs-on: ubuntu-latest
