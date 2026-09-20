@@ -4,7 +4,7 @@ import YourDataMenu from './YourDataMenu';
 import MonthYearPicker from './MonthYearPicker';
 import MeifioMark from './MeifioMark';
 import { TABS, ADD_BUTTON_INDEX } from '../tabs';
-import { MEIFIO_HOME } from '../meifioHome';
+import { meifioHome } from '../meifioHome';
 
 export default function Header({
   activeTab,
@@ -137,7 +137,7 @@ export default function Header({
               >
                 <span aria-hidden="true">+</span>
               </button>
-              <a className="app-tab-brand" href={MEIFIO_HOME} aria-label={t('nav.meifio')}>
+              <a className="app-tab-brand" href={meifioHome(locale)} aria-label={t('nav.meifio')}>
                 <MeifioMark height="11px" />
               </a>
             </span>,

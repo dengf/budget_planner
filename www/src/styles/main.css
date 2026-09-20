@@ -371,6 +371,12 @@ body {
   font-weight: 700;
   margin: 0;
 }
+/* The More tab's byline is this app's real link back to meifio -- the one
+   with room to be a proper target, unlike the credit under the phone bar's
+   "+" (see `.app-tab-brand`). It measured 103x18, the text's own line box,
+   against the 44px floor the top-level CLAUDE.md sets. The height is bought
+   with padding so the words sit where they did, and spent back with negative
+   margins so nothing around it moves. */
 .app-byline {
   display: flex;
   align-items: center;
@@ -378,6 +384,10 @@ body {
   font-size: 0.82rem;
   color: var(--byline);
   text-decoration: none;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0.8125rem 0;
+  margin: -0.5625rem 0 -0.8125rem;
 }
 .app-byline:hover,
 .app-byline:focus-visible {
@@ -716,6 +726,18 @@ body {
      than claiming its own flex slot so the row's five-way spacing among
      the real tabs is untouched; free to be wider than the wrap itself
      (the wordmark's aspect ratio makes it so) since nothing here clips. */
+  /* The one place in the three tools where 44x44 is not reachable, so it is
+     written down rather than quietly missed. This credit sits in the 28px
+     between the "+" button's bottom edge and the viewport's, and the "+" is
+     the app's single most-used control: growing this to 44 tall was tried
+     and measured, and it put the two targets 3px into each other, which the
+     top-level CLAUDE.md rules out for the better reason of the two -- an
+     overlapping target is worse than a small one.
+
+     So it takes the width it can have and leaves the height alone, and the
+     obligation is met properly elsewhere: the More tab's `.app-byline` and
+     the desktop sidebar's brand are both full-size links to the same place,
+     and the "+" above it keeps its own clear 5px. */
   .app-tab-brand {
     display: flex;
     align-items: center;
@@ -724,6 +746,7 @@ body {
     left: 50%;
     bottom: 0;
     transform: translateX(-50%);
+    min-width: 44px;
     padding: 2px 6px;
   }
   /* `.meifio-mark` (main.css, near `.app-byline`) fixes its own colour to
@@ -829,6 +852,16 @@ body {
    `--positive` here means a surplus, not a link. */
 .intro-privacy a {
   color: var(--accent-text);
+
+  /* 45x16 before this -- wide enough by accident, never tall enough.
+     `inline-flex` is what lets a link inside a sentence take a height at
+     all; the negative block margin keeps the paragraph its own height. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  margin-block: -0.875rem;
 }
 
 .panel {

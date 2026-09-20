@@ -7,7 +7,7 @@ import RecurringSection from './RecurringSection';
 import CategoriesScreen from './CategoriesScreen';
 import MeifioMark from './MeifioMark';
 import { GoalsIcon, DebtIcon, RulesIcon, RecurringIcon, CategoriesIcon } from './icons';
-import { MEIFIO_HOME } from '../meifioHome';
+import { meifioHome } from '../meifioHome';
 
 /**
  * Everything that isn't one of the three screens someone opens daily.
@@ -96,7 +96,7 @@ export const SECTIONS = [
 ];
 
 export default function MoreTab({ moreSectionId, onMoreSectionChange, ...props }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const section = SECTIONS.find((s) => s.id === moreSectionId);
 
@@ -123,7 +123,7 @@ export default function MoreTab({ moreSectionId, onMoreSectionChange, ...props }
     <div className="panel">
       <div className="app-brand">
         <h1 className="app-title">{t('app.title')}</h1>
-        <a className="app-byline" href={MEIFIO_HOME}>
+        <a className="app-byline" href={meifioHome(locale)}>
           {t('app.byline')
             .split('{logo}')
             .flatMap((part, i) => (i === 0 ? [part] : [<MeifioMark key="mark" />, part]))}

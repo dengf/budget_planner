@@ -3,7 +3,7 @@ import { useI18n } from '../i18n';
 import { TABS } from '../tabs';
 import { SECTIONS } from './MoreTab';
 import MeifioMark from './MeifioMark';
-import { MEIFIO_HOME } from '../meifioHome';
+import { meifioHome } from '../meifioHome';
 
 /**
  * The desktop-width nav -- a persistent left column, mounted only when
@@ -18,13 +18,13 @@ import { MEIFIO_HOME } from '../meifioHome';
  * label/icon list can't drift between the two navs.
  */
 export default function DesktopSidebar({ activeTab, moreSectionId, onNavigate, onOpenAdd }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const tabItems = TABS.filter((tab) => tab.id !== 'more');
 
   return (
     <nav className="app-sidebar" aria-label={t('nav.sidebarLabel')}>
-      <a className="app-sidebar-brand" href={MEIFIO_HOME} aria-label={t('nav.meifio')}>
+      <a className="app-sidebar-brand" href={meifioHome(locale)} aria-label={t('nav.meifio')}>
         <MeifioMark height="1.1em" />
         <span>{t('app.title')}</span>
       </a>
