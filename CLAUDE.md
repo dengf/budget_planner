@@ -146,6 +146,15 @@ core rather than a frontend filter.
   UTF-8-in, UTF-8-out.** A test bans the Latin-1-supplement range
   (hex 80 through FF) across all three catalogs; a single mis-encoded
   write turns Chinese text into mojibake that passes every other check.
+- **Chinese second person is 你, never 您, in both scripts.** The whole meifio
+  line agrees on this since the 2026-09-22 copy pass; 您 reads as a bank
+  letter, and this is a consumer tool. Three more conventions from that pass,
+  all of them things a character-by-character conversion gets wrong: a
+  transaction is 交易 (账目/帳目 reads as bookkeeping, not as the row someone
+  just added), a receipt is 收据/收據 (小票 is mainland-colloquial and means
+  nothing in Taiwan), and an em dash between two CJK runs is set unspaced
+  (`——`) -- with `meta.title` and `meta.ogTitle` the deliberate exceptions,
+  since their ` — ` is a separator shared with the other two tools.
 
 ## The other rule: it has to be obvious to use
 
