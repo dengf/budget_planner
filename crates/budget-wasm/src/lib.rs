@@ -12,6 +12,7 @@
 //! - [`debt`] -- `build_payoff_plan`
 //! - [`presets`] -- `preset_categories`
 //! - [`recurring`] -- `recurring_occurrences`
+//! - [`voice_parse`] -- `parse_voice_command`
 //! - [`storage`] (wasm32 only) -- `init_storage` plus save/list/delete for
 //!   each of the six persisted collections, backed by
 //!   `budget-ext-redb`'s wasm/IndexedDB-persisted store. Gated to wasm32
@@ -25,18 +26,19 @@
 //! Receipt OCR (`run_ocr`), PDF text extraction (`extract_pdf_text`),
 //! statement-row income/expense classification
 //! (`classify_statement_descriptions`), PDF page rasterization
-//! (`pdf_page_count`, `render_pdf_page`) live in the sibling
-//! `budget-wasm-ocr`, `budget-wasm-pdf`, `budget-wasm-llm` and
-//! `budget-wasm-pdfrender` crates instead, each compiled to its own
-//! separate `.wasm` file that `www/src/*Worker.js` only loads the first
-//! time someone actually takes that path (a photo scan never downloads
-//! the PDF, classifier or rasterizer crate's weight, and vice versa).
-//! `ocrs-cjk`/`rten`, `pdf-extract`, a BERT-family embedding model and
-//! `hayro` respectively are why -- see each crate's own doc comment for
-//! the measured size. This crate's own [`receipt`] module, by contrast,
-//! is plain text/`Decimal` parsing with no heavy dependency, so it lives
-//! here in the always-loaded core instead of duplicated across the lazy
-//! crates.
+//! (`pdf_page_count`, `render_pdf_page`) and voice transcription
+//! (`transcribe_voice_command`) live in the sibling `budget-wasm-ocr`,
+//! `budget-wasm-pdf`, `budget-wasm-llm`, `budget-wasm-pdfrender` and
+//! `budget-wasm-voice` crates instead, each compiled to its own separate
+//! `.wasm` file that `www/src/*Worker.js` only loads the first time
+//! someone actually takes that path (a photo scan never downloads the
+//! PDF, classifier, rasterizer or voice crate's weight, and vice versa).
+//! `ocrs-cjk`/`rten`, `pdf-extract`, a BERT-family embedding model,
+//! `hayro` and a CTC ASR model respectively are why -- see each crate's
+//! own doc comment for the measured size. This crate's own [`receipt`]
+//! and [`voice_parse`] modules, by contrast, are plain text/`Decimal`
+//! parsing with no heavy dependency, so they live here in the
+//! always-loaded core instead of duplicated across the lazy crates.
 
 use wasm_bindgen::prelude::*;
 
@@ -54,6 +56,7 @@ pub mod rules;
 #[cfg(target_arch = "wasm32")]
 pub mod storage;
 pub mod transaction;
+pub mod voice_parse;
 
 pub use category::{
     build_month, build_savings_line, carry_plan_forward, category_rank, category_shares,
@@ -80,6 +83,7 @@ pub use storage::{
 pub use transaction::{
     income_by_category, signed_amount, spend_by_category, split_amount, uncategorized,
 };
+pub use voice_parse::parse_voice_command;
 
 /// A new locally-generated record id, for the frontend to assign before
 /// calling any `save_*` storage function -- see `convert::new_record_id`.
@@ -110,6 +114,18 @@ mod bridge_coverage {
         (
             "pdf_render",
             "bridged in the sibling budget-wasm-pdfrender crate, not here -- see this crate's lib.rs doc comment",
+        ),
+        (
+            "voice",
+            "bridged in the sibling budget-wasm-voice crate, not here -- see this crate's lib.rs doc comment",
+        ),
+        (
+            "voice_cmn",
+            "bridged in the sibling budget-wasm-voice-cmn crate, not here -- see this crate's lib.rs doc comment",
+        ),
+        (
+            "voice_yue",
+            "bridged in the sibling budget-wasm-voice-yue crate, not here -- see this crate's lib.rs doc comment",
         ),
     ];
 

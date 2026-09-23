@@ -20,7 +20,7 @@ import useIsDesktop from '../useIsDesktop';
  * batch-rows form AddTransactionSheet shows for every other tab's "+" --
  * except this tab already *is* the list those rows land in, so there is
  * no reason to cover it with a modal first. Reaching for "+" opens the
- * modal, still, for the phone-parity methods (receipt/CSV/
+ * modal, still, for the phone-parity methods (receipt/voice/CSV/
  * recurring) it doesn't cover. Phone is untouched: no `isDesktop` means
  * no inline form, so a phone still reaches every method through "+".
  */
@@ -43,7 +43,7 @@ export default function TransactionsTab({
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [onlyUncategorized, setOnlyUncategorized] = useState(false);
   // Its own local pair, distinct from AddTransactionSheet's -- this form
-  // has nothing reaching in to fill a row, so nothing else needs to
+  // has no voice tab reaching in to fill a row, so nothing else needs to
   // see or drive this state from outside.
   const [batchRows, setBatchRows] = useState(() => [emptyRow()]);
 
@@ -125,7 +125,7 @@ export default function TransactionsTab({
       {/* Desktop skips the modal for the one method it can show inline --
           the rows are the same ones AddTransactionSheet's "+" opens onto
           everywhere else, just rendered on the page instead of over it.
-          Receipt/CSV/recurring still go through "+"; typing rows
+          Receipt/voice/CSV/recurring still go through "+"; typing rows
           here has no equivalent for a photo, a recording or a file. */}
       {isDesktop && (
         <>

@@ -28,6 +28,7 @@ mod no_debug_formatted_errors {
         ("presets.rs", include_str!("presets.rs")),
         ("receipt.rs", include_str!("receipt.rs")),
         ("recurring.rs", include_str!("recurring.rs")),
+        ("voice_parse.rs", include_str!("voice_parse.rs")),
         // include_str! reads the file regardless of the target the crate is
         // compiled for -- only the `pub mod storage;` declaration in lib.rs
         // is cfg-gated to wasm32, so this line is safe to keep unconditional.

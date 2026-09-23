@@ -1,0 +1,1 @@
+www/static/voice/*.rten filter=lfs diff=lfs merge=lfs -text
