@@ -117,8 +117,8 @@ cargo about generate about.hbs -o www/static/third-party-licenses.html
 
 CI's `licenses` job regenerates and fails on any diff, so a new
 dependency cannot ship without its notice. This page went a whole round
-stale once — the since-removed voice work added `rustfft` and four of
-its dependencies with no notice at all — which is why the gate exists.
+stale once — the voice work added `rustfft` and four of its dependencies
+with no notice at all — which is why the gate exists.
 
 React is **not** a Cargo dependency either, and its code ships in the
 bundle your browser downloads — which makes that file a binary

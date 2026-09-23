@@ -40,6 +40,16 @@ export function PdfIcon() {
   );
 }
 
+export function MicIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3M9 21h6" />
+    </svg>
+  );
+}
+
 export function SpreadsheetIcon() {
   return (
     <svg {...ICON_PROPS}>
@@ -103,9 +113,9 @@ export function BudgetIcon() {
 }
 
 /** Manual entry, in the "Add a transaction" method row -- a pen, the
- *  plan artifact's own `#i-pen` glyph, matching `CameraIcon`/
+ *  plan artifact's own `#i-pen` glyph, matching `CameraIcon`/`MicIcon`/
  *  `SpreadsheetIcon`/`RecurringIcon` right below it as that row's other
- *  three method icons. */
+ *  four method icons. */
 export function PenIcon() {
   return (
     <svg {...NAV_ICON_PROPS}>
