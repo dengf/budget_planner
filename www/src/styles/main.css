@@ -2637,7 +2637,17 @@ table.data tr:last-child td {
   background: transparent;
   cursor: pointer;
   padding: 0;
-  font: inherit;
+  /* Longhands, not the `font` shorthand. `font: inherit` also resets
+     `font-weight`, and this rule sits below `.dash-month-label`'s
+     `font-weight: 600` in source order -- so the month label, which both
+     classes are on, had been rendering at 400 on every tab since the
+     label became a button. The shorthand is what a button needs to shed
+     the UA font; the weight is the one part of it that belongs to the
+     label. */
+  font-family: inherit;
+  font-size: inherit;
+  font-style: inherit;
+  line-height: inherit;
   /* `padding: 0` on a one-line label measured 18px tall at 375px, sitting
      between two deliberately-44px arrows -- the "small glyph with padding"
      warning above, in its other form: no padding at all. The row is
