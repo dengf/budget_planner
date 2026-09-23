@@ -156,6 +156,20 @@ core rather than a frontend filter.
   (`——`) -- with `meta.title` and `meta.ogTitle` the deliberate exceptions,
   since their ` — ` is a separator shared with the other two tools.
 
+- **A `<select>` at `appearance: auto` ignores `min-height` and `padding`
+  in WebKit.** Not "renders differently" -- ignores. `.field-select` and
+  `.app-language-select` both carried `min-height: 44px` and both measured
+  23px and 19px in Safari, while Chromium showed the 44px that made them
+  look finished. Measured in situ on the Categorization rules and Savings
+  goals screens at iPhone 13 size. `height` is honoured too and is still
+  the wrong fix -- it stops the control growing with its text.
+  `appearance: none` is what makes the floor real, and it costs the native
+  arrow, which `--select-arrow` draws back in each of the three palette
+  tiers. Found first in mortgage_calculator (#99), which carried the
+  identical dead rule; **measure tap targets in WebKit, not only
+  Chromium**, because a rule that does nothing looks exactly like one that
+  works.
+
 ## The other rule: it has to be obvious to use
 
 Near-perfect, intuitive user experience is a requirement for every tool we

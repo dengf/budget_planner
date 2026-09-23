@@ -48,6 +48,12 @@
   --surface: #0f1720;
   --ink: #e6edf3;
   --muted: #9fb0c3;
+  /* The <select>s draw their own arrow now -- see `.field-select` for why.
+     A token per palette tier rather than one `currentColor` glyph because
+     a data URI cannot read a custom property, so the ink is baked into
+     each copy. Keep it in step with --muted above: same grey. Matches
+     mortgage_calculator's copy of this token. */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%239fb0c3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* Was #5c6b7d -- ~3.16:1 on --panel, under WCAG AA's 4.5:1 floor for the
      normal-size text this token is actually used on (column headers, cell
      labels, Remove links). #7a8ca0 clears 4.5:1 with a small margin. */
@@ -142,6 +148,7 @@
     --surface: #ffffff;
     --ink: #16202b;
     --muted: #5a6b7d;
+    --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%235a6b7d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     /* Was #8492a3 -- ~3.17:1 on white, same AA failure as the dark value
        above but needs to move darker here instead of lighter. #667484
        clears 4.5:1. */
@@ -201,6 +208,7 @@
   --surface: #ffffff;
   --ink: #16202b;
   --muted: #5a6b7d;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%235a6b7d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* See the media-query block above. */
   --muted-2: #5f6e80;
   --byline: #617180;
@@ -414,11 +422,20 @@ body {
    need finding More first. `.app-region`/`.app-region.active` below are
    unrelated (SpendOverTimeChart's Daily/Weekly toggle is their only
    remaining caller). */
+/* `appearance: none` for the reason spelled out at `.field-select`. This
+   one mattered more: it sits directly in the header, not inside a <label>,
+   so there was no larger box behind it to catch the tap -- it measured
+   84x19 in WebKit against Chromium's 91x44. */
 .app-language-select {
-  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 6px center;
   color: var(--muted);
   border: none;
-  padding: 6px 8px;
+  padding: 6px 24px 6px 8px;
   min-height: 44px;
   border-radius: 8px;
   cursor: pointer;
@@ -1138,12 +1155,37 @@ body {
   background: var(--positive-bg);
 }
 
+/* `appearance: none` is load-bearing, not tidying. A <select> left at
+   `appearance: auto` renders as a native menulist, and WebKit sizes a
+   menulist from its own metrics: it ignores author `min-height` and
+   `padding` outright. Measured in situ on the Categorization rules and
+   Savings goals screens, same build, iPhone 13 size:
+
+     declaration                       WebKit   Chromium
+     min-height: 44px (what we had)      23px     44px
+     appearance: none + min-height       44px     44px
+
+   So the floor below had been silently dead in Safari since it was
+   written, while Chrome showed the 44px that made it look done. `height`
+   is the other thing WebKit honours and is not the fix -- a fixed height
+   stops the control growing with its text, which is why this file uses
+   min-height everywhere. Turning the native control off is what makes the
+   declared intent real in both engines, and it costs the native arrow,
+   which is what `--select-arrow` draws back. Found and fixed first in
+   mortgage_calculator (#99), which carried the identical dead rule. */
 .field-select {
-  background: var(--surface);
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--surface);
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
   border: 1px solid var(--input-border);
   border-radius: 8px;
   color: var(--ink);
-  padding: 10px;
+  /* Right padding clears the arrow we now draw; the other three are the
+     10px this rule always had. */
+  padding: 10px 34px 10px 10px;
   min-height: 44px;
   font-size: 0.95rem;
 }
