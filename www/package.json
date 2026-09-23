@@ -4,7 +4,7 @@
   "description": "Zero-based budgeting, CSV import, savings goals and debt payoff, powered by Rust/WASM",
   "license": "MIT",
   "scripts": {
-    "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:pdfrender && npm run build:wasm:llm && npm run build:wasm:voice && npm run build:wasm:voice-cmn && npm run build:wasm:voice-yue",
+    "build:wasm": "npm run build:wasm:core && npm run build:wasm:ocr && npm run build:wasm:pdf && npm run build:wasm:pdfrender && npm run build:wasm:llm && npm run build:wasm:voice && npm run build:wasm:voice-cmn",
     "build:wasm:core": "cd ../crates/budget-wasm && wasm-pack build --target web --out-dir ../../www/pkg",
     "build:wasm:ocr": "cd ../crates/budget-wasm-ocr && wasm-pack build --target web --out-dir ../../www/pkg-ocr",
     "build:wasm:pdf": "cd ../crates/budget-wasm-pdf && wasm-pack build --target web --out-dir ../../www/pkg-pdf",
@@ -12,7 +12,6 @@
     "build:wasm:llm": "cd ../crates/budget-wasm-llm && wasm-pack build --target web --out-dir ../../www/pkg-llm",
     "build:wasm:voice": "cd ../crates/budget-wasm-voice && wasm-pack build --target web --out-dir ../../www/pkg-voice",
     "build:wasm:voice-cmn": "cd ../crates/budget-wasm-voice-cmn && wasm-pack build --target web --out-dir ../../www/pkg-voice-cmn",
-    "build:wasm:voice-yue": "cd ../crates/budget-wasm-voice-yue && wasm-pack build --target web --out-dir ../../www/pkg-voice-yue",
     "start": "npm run build:wasm && webpack serve --mode development",
     "build": "webpack --mode production",
     "deploy": "npm run build:wasm && npm run build",

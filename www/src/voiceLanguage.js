@@ -13,9 +13,11 @@ export const DEFAULT_VOICE_LANGUAGE = 'en';
 export const VOICE_LANGUAGES = [
   { id: 'en', label: 'English' },
   { id: 'cmn', label: '普通话 (Mandarin)' },
-  { id: 'yue', label: '廣東話 (Cantonese)' },
 ];
 
+// A stored id that is no longer offered (Cantonese was shipped, then
+// withdrawn) falls through this same membership check to the default
+// rather than needing its own migration.
 export function getVoiceLanguage() {
   try {
     const value = localStorage.getItem(STORAGE_KEY);

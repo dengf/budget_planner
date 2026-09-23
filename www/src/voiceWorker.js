@@ -4,11 +4,11 @@
 // its own multi-model dispatcher following that file's template: one
 // worker file, one `self.onmessage`, a per-language wasm module and model
 // path, each loaded only the first time that language's own message type
-// actually arrives. English (`budget-wasm-voice`, QuartzNet15x5, ~72MB),
-// Mandarin (`budget-wasm-voice-cmn`, zh-citrinet-512, ~159.7MB) and
-// Cantonese (`budget-wasm-voice-yue`, WeNet Conformer, ~360.9MB) are
+// actually arrives. English (`budget-wasm-voice`, WeNet LibriSpeech
+// U2++ Conformer, ~69.4MB) and Mandarin (`budget-wasm-voice-cmn`, WeNet
+// AISHELL-1 U2++ Conformer, ~68.9MB) are
 // mutually exclusive per user action -- a session that only ever speaks
-// one language never downloads either other one's model or wasm module --
+// one language never downloads the other one's model or wasm module --
 // see budget-wasm-voice-cmn/src/lib.rs's own doc comment for the
 // architecture rationale (CTC, not autoregressive; fp32, not int8 -- both
 // measured, not assumed).
@@ -17,14 +17,14 @@
 // not a root-relative or page-relative path -- see `ocrWorker.js`'s own
 // doc comment for the exact GitHub Pages subpath bug this avoids.
 const VOICE_MODEL_PATHS = {
-  en: new URL('voice/quartznet15x5-fp32.rten', self.location.href).href,
-  cmn: new URL('voice/zh-citrinet-512-fp32.rten', self.location.href).href,
-  yue: new URL('voice/yue-conformer-fp32.rten', self.location.href).href,
+  en: new URL('voice/en-wenet-f16.onnx', self.location.href).href,
+  cmn: new URL('voice/zh-wenet-f16.onnx', self.location.href).href,
 };
 
-// Voice models are far larger than OCR's (tens to low hundreds of MB,
-// fp32 -- see budget-wasm-voice/budget-wasm-voice-cmn's doc comments for
-// why fp32 specifically), so unlike `ocrWorker.js`'s `modelBytesPromise`
+// Voice models are far larger than OCR's (tens of MB even as f16 -- see
+// budget-wasm-voice/budget-wasm-voice-cmn's doc comments for why the
+// weights are f16 but the arithmetic is not), so unlike `ocrWorker.js`'s
+// `modelBytesPromise`
 // (memoized only for the lifetime of one worker instance), this also
 // persists the bytes across page reloads via the Cache Storage API.
 // Without it, reopening the voice tab in a new tab or after a refresh
@@ -32,9 +32,12 @@ const VOICE_MODEL_PATHS = {
 // gap found during phone testing that plain worker-lifetime memoization
 // doesn't address at all.
 //
-// Bumped to v2 (was v1, English-only) now that this cache holds more than
-// one language's model keyed by URL -- old v1 entries simply go unused
-// rather than needing an explicit migration.
+// Bumped to v2 (was v1, English-only) when this cache started holding
+// more than one language's model keyed by URL; old entries simply go
+// unused rather than needing an explicit migration. The English and
+// Mandarin model swap did not need another bump for the same reason --
+// the keys are the model URLs, and both filenames changed. Nor did the
+// f16 swap, which changed both filenames again.
 const MODEL_CACHE_NAME = 'budget-planner-voice-model-v2';
 
 // Each language's real model is comfortably larger than this; a git-lfs
@@ -46,13 +49,12 @@ const MODEL_CACHE_NAME = 'budget-planner-voice-model-v2';
 // and served back indefinitely, long after the server is fixed -- nothing
 // else would ever invalidate it. This threshold is what actually catches
 // that, for bytes already sitting in the cache and for anything freshly
-// fetched before it's allowed to be cached. Mandarin's floor is well below
-// its real ~159.7MB file, same margin English's 10MB floor keeps below its
-// real ~72MB file. Cantonese's floor is well below its real ~360.9MB file.
+// fetched before it's allowed to be cached. Every floor stays well below
+// its own model's real size -- English ~69.4MB, Mandarin ~68.9MB -- so
+// the check only ever rejects something that is not a model at all.
 const MIN_VALID_MODEL_BYTES = {
-  en: 10 * 1024 * 1024,
+  en: 50 * 1024 * 1024,
   cmn: 50 * 1024 * 1024,
-  yue: 100 * 1024 * 1024,
 };
 
 async function fetchModelBytes(url, minValidBytes) {
@@ -116,19 +118,8 @@ function loadCmnWasm() {
   return voiceWasmPromises.cmn;
 }
 
-function loadYueWasm() {
-  if (!voiceWasmPromises.yue) {
-    voiceWasmPromises.yue = import('../pkg-voice-yue').then(async (wasm) => {
-      if (wasm.default) await wasm.default();
-      return wasm;
-    });
-  }
-  return voiceWasmPromises.yue;
-}
-
 function loadVoiceWasm(language) {
   if (language === 'cmn') return loadCmnWasm();
-  if (language === 'yue') return loadYueWasm();
   return loadEnWasm();
 }
 
@@ -152,15 +143,13 @@ self.onmessage = async (event) => {
   const { id, type } = event.data;
   try {
     let result;
-    if (type === 'transcribe-en' || type === 'transcribe-cmn' || type === 'transcribe-yue') {
+    if (type === 'transcribe-en' || type === 'transcribe-cmn') {
       const language = type.slice('transcribe-'.length);
       const wasm = await loadVoiceWasm(language);
       const modelBytes = await loadModel(language);
       const { samples } = event.data;
       if (language === 'cmn') {
         result = wasm.transcribe_voice_command_cmn(modelBytes, samples);
-      } else if (language === 'yue') {
-        result = wasm.transcribe_voice_command_yue(modelBytes, samples);
       } else {
         result = wasm.transcribe_voice_command(modelBytes, samples);
       }

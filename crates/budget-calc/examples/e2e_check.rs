@@ -5,9 +5,22 @@
 // synthetic tensors -- never a real `model.run_n` call -- which is
 // exactly how the "model has two inputs, only one was ever supplied" bug
 // shipped to production undetected. Usage:
-//   cargo run --release --features voice-cmn,voice-yue --example e2e_check \
-//     -- <cmn|yue> <model.rten> <samples.f32>
+//   cargo run --release --features voice,voice-cmn --example e2e_check \
+//     -- <en|cmn> <model.rten> <samples.f32>
 
+// Two `main`s, because every language arm below is behind a `cfg` and
+// `cargo clippy --all-targets` (what CI runs) compiles this example with
+// no voice feature at all. With none of them on, the real body is a match
+// whose only arm diverges: the `Result` has no type to infer and the
+// printing below it is unreachable -- an error and a `-D warnings`
+// failure, in a file nobody would think to check. Splitting on the cfg
+// means the no-feature build compiles the stub instead.
+#[cfg(not(any(feature = "voice", feature = "voice-cmn")))]
+fn main() {
+    panic!("build with --features voice and/or voice-cmn to use this example");
+}
+
+#[cfg(any(feature = "voice", feature = "voice-cmn"))]
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let language = &args[1];
@@ -20,10 +33,10 @@ fn main() {
     }
 
     let result = match language.as_str() {
+        #[cfg(feature = "voice")]
+        "en" => budget_calc::transcribe_voice_command(model_bytes, &samples),
         #[cfg(feature = "voice-cmn")]
         "cmn" => budget_calc::transcribe_voice_command_cmn(model_bytes, &samples),
-        #[cfg(feature = "voice-yue")]
-        "yue" => budget_calc::transcribe_voice_command_yue(model_bytes, &samples),
         other => panic!("unknown or not-compiled-in language: {other}"),
     };
     match result {

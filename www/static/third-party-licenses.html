@@ -170,12 +170,15 @@
 
         <h2>Machine-learning models</h2>
         <p>
-            The five models behind receipt scanning and voice entry are not
+            The four models behind receipt scanning and voice entry are not
             Cargo dependencies, so they are listed by hand rather than
-            generated. Four were converted to the <code>rten</code> runtime's
+            generated. Two were converted to the <code>rten</code> runtime's
             own file format and all-MiniLM-L6-v2 ships as the ONNX file it was
-            downloaded as; in neither case does anything change about the
-            model's architecture or its trained weights. See
+            downloaded as, neither of which changes anything about the model's
+            architecture or its trained weights. The two voice models ship as
+            ONNX with their weights cast to float16, which halves the download
+            and is the one place a weight changes; the arithmetic still runs in
+            float32. See
             <a href="https://github.com/dengf/budget_planner/blob/main/MODEL-LICENSES.md">MODEL-LICENSES.md</a>
             for the fuller record, including the copyright line each project
             asks to be carried.
@@ -197,28 +200,22 @@
                     <td><a href="#Apache-2.0">Apache-2.0</a></td>
                 </tr>
                 <tr>
-                    <td><a href="https://catalog.ngc.nvidia.com/orgs/nvidia/nemo/models/stt_en_quartznet15x5">QuartzNet15x5</a></td>
+                    <td><a href="https://huggingface.co/csukuangfj/sherpa-onnx-en-wenet-librispeech">WeNet U2++ Conformer (LibriSpeech)</a></td>
                     <td>English speech-to-text</td>
-                    <td>© NVIDIA, NeMo toolkit</td>
+                    <td><a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></td>
                 </tr>
                 <tr>
-                    <td><a href="https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/stt_zh_citrinet_512">Citrinet-512</a></td>
+                    <td><a href="https://huggingface.co/csukuangfj/sherpa-onnx-zh-wenet-aishell">WeNet U2++ Conformer (AISHELL-1)</a></td>
                     <td>Mandarin speech-to-text</td>
-                    <td>© NVIDIA, NeMo toolkit</td>
-                </tr>
-                <tr>
-                    <td><a href="https://huggingface.co/ASLP-lab/WSYue-ASR">u2pp-Conformer-Yue</a></td>
-                    <td>Cantonese speech-to-text</td>
                     <td><a href="#Apache-2.0">Apache-2.0</a></td>
                 </tr>
             </tbody>
         </table>
         </div>
         <p>
-            PP-OCRv6_tiny is © 2020 PaddlePaddle Authors. u2pp-Conformer-Yue
-            is © ASLP-lab, Northwestern Polytechnical University, trained on
-            WenetSpeech-Yue (arXiv:2509.03959). The Apache-2.0 text those
-            three are licensed under is reproduced in full below, under
+            PP-OCRv6_tiny is © 2020 PaddlePaddle Authors. The Apache-2.0
+            text it and the other Apache-2.0 models are licensed under is
+            reproduced in full below, under
             <a href="#Apache-2.0">Apache-2.0</a>.
         </p>
 
@@ -332,7 +329,7 @@ SOFTWARE.</pre>
         <h2>Rust crates — overview</h2>
         <ul class="licenses-overview">
             <li><a href="#Apache-2.0">Apache License 2.0</a> (180)</li>
-            <li><a href="#MIT">MIT License</a> (46)</li>
+            <li><a href="#MIT">MIT License</a> (45)</li>
             <li><a href="#BSD-3-Clause">BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License</a> (5)</li>
             <li><a href="#Unicode-3.0">Unicode License v3</a> (5)</li>
             <li><a href="#Zlib">zlib License</a> (1)</li>
@@ -5707,7 +5704,6 @@ SOFTWARE.
                     <li><a href="https://crates.io/crates/budget-wasm-pdfrender">budget-wasm-pdfrender 0.1.0</a></li>
                     <li><a href="https://crates.io/crates/budget-wasm-voice">budget-wasm-voice 0.1.0</a></li>
                     <li><a href="https://crates.io/crates/budget-wasm-voice-cmn">budget-wasm-voice-cmn 0.1.0</a></li>
-                    <li><a href="https://crates.io/crates/budget-wasm-voice-yue">budget-wasm-voice-yue 0.1.0</a></li>
                     <li><a href="https://github.com/jrmuizel/pdf-extract">pdf-extract 0.12.0</a></li>
                     <li><a href="https://github.com/jrmuizel/adobe-cmap-parser">adobe-cmap-parser 0.4.1</a></li>
                     <li><a href="https://github.com/dropbox/rust-brotli-decompressor">brotli-decompressor 5.0.3</a></li>

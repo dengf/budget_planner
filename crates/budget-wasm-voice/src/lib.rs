@@ -2,10 +2,11 @@
 //!
 //! Split out from `budget-wasm` for the same reason as
 //! `budget-wasm-ocr`/`budget-wasm-pdf`/`budget-wasm-llm`/
-//! `budget-wasm-pdfrender`: the CTC ASR model this binds (`QuartzNet15x5`,
-//! fp32 -- see `voice.rs`'s own doc comment in `budget-calc` for why fp32
-//! and why this architecture) plus `rten-embed`/`rten-tensor`/`rustfft`
-//! would otherwise sit in every session's always-loaded download even
+//! `budget-wasm-pdfrender`: the CTC ASR model this binds (a `WeNet` U2++
+//! Conformer, f16 weights -- see `voice.rs`'s own doc comment in
+//! `budget-calc` for why not int8 and why this architecture) plus
+//! `rten-embed`/`rten-tensor`/`rustfft` would otherwise sit in every
+//! session's always-loaded download even
 //! though most budgeting sessions never open the voice tab.
 //! `budget-calc`'s `voice` feature (which this crate is the only one to
 //! enable) keeps that dependency graph out of `budget-wasm` entirely, not

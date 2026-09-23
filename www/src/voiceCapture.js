@@ -152,7 +152,7 @@ export function startRecording() {
 /**
  * Runs the ASR model over already-decoded 16kHz mono samples, returning
  * the raw transcript. `language` is one of `voiceLanguage.js`'s
- * `VOICE_LANGUAGES` ids (`'en'`/`'cmn'`/`'yue'`) and selects which model
+ * `VOICE_LANGUAGES` ids (`'en'`/`'cmn'`) and selects which model
  * `voiceWorker.js` loads -- see that file's own doc comment for why each
  * language is its own lazy wasm module. Empty/silent recordings and
  * model-load failures both surface via `result.error`, mirroring every

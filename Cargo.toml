@@ -20,7 +20,6 @@ members = [
     "crates/budget-wasm-llm",
     "crates/budget-wasm-voice",
     "crates/budget-wasm-voice-cmn",
-    "crates/budget-wasm-voice-yue",
 ]
 resolver = "2"
 

@@ -59,7 +59,7 @@ jobs:
       # stops that recurring: a new dependency now fails CI until its notice
       # is committed alongside it.
       #
-      # This does NOT cover the five ML models — they are not Cargo
+      # This does NOT cover the four ML models — they are not Cargo
       # dependencies, so `cargo about` cannot see them. Their notices are
       # hand-maintained in MODEL-LICENSES.md and in about.hbs's own
       # "Machine-learning models" section (which this job does render, so a
@@ -169,9 +169,6 @@ jobs:
 
       - name: cargo build -p budget-wasm-voice-cmn --target wasm32-unknown-unknown
         run: cargo build -p budget-wasm-voice-cmn --target wasm32-unknown-unknown
-
-      - name: cargo build -p budget-wasm-voice-yue --target wasm32-unknown-unknown
-        run: cargo build -p budget-wasm-voice-yue --target wasm32-unknown-unknown
 
   coverage:
     name: cargo llvm-cov (coverage gate)

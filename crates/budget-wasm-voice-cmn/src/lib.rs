@@ -3,8 +3,8 @@
 //! Its own crate for the same reason as `budget-wasm-voice`
 //! (English) rather than a second message type inside that crate: the
 //! two spoken languages are mutually exclusive per user action (one
-//! language selected at a time), and `zh-citrinet-512`'s vocabulary/model
-//! bytes (159.7MB fp32) have no reason to sit in an English-only
+//! language selected at a time), and the Mandarin model's vocabulary and
+//! bytes (68.9MB, f16 weights) have no reason to sit in an English-only
 //! session's download, or vice versa -- see `budget-calc`'s `voice-cmn`
 //! feature and `budget-wasm-voice`'s own doc comment for the fuller
 //! rationale, which applies here unchanged.

@@ -354,19 +354,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "budget-wasm-voice-yue"
-version = "0.1.0"
-dependencies = [
- "budget-calc",
- "budget-core",
- "console_error_panic_hook",
- "serde",
- "serde-wasm-bindgen",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

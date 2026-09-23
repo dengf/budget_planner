@@ -32,14 +32,14 @@
 //! anchoring to the unit word immediately before/after it is the same
 //! "narrow the search space" principle as the category matching above.
 //!
-//! **Why Mandarin/Cantonese tokenize by character, not by whitespace.**
+//! **Why Mandarin tokenizes by character, not by whitespace.**
 //! English's raw transcript is naturally space-separated into words; a
 //! CTC Chinese model's decoded transcript is not -- its `▁` word-boundary
 //! marker (see `voice_cmn.rs`'s decode) reflects whatever segmentation its
 //! own training vocabulary happened to encode, not real word breaks, and
 //! in practice the spike's real Mandarin transcripts came back as one
 //! contiguous run of characters with no internal spaces at all. So for
-//! `Cmn`/`Yue`, `cjk_tokenize` splits into individual Unicode characters
+//! `Cmn`, `cjk_tokenize` splits into individual Unicode characters
 //! (keeping an embedded run of ASCII letters/digits as one token) rather
 //! than reusing `split_whitespace()`. This still lets the existing
 //! `best_span_distance` machinery work unchanged: a Chinese word is
@@ -79,14 +79,12 @@ pub struct VoiceDraft {
 pub enum VoiceLanguage {
     En,
     Cmn,
-    Yue,
 }
 
 fn aliases_for_preset(preset_key: &str, language: VoiceLanguage) -> &'static [&'static str] {
     match language {
         VoiceLanguage::En => aliases_for_preset_en(preset_key),
         VoiceLanguage::Cmn => aliases_for_preset_cmn(preset_key),
-        VoiceLanguage::Yue => aliases_for_preset_yue(preset_key),
     }
 }
 
@@ -291,116 +289,35 @@ fn aliases_for_preset_cmn(preset_key: &str) -> &'static [&'static str] {
     }
 }
 
-/// Extra spoken aliases per starter category, Cantonese. Written directly
-/// in Simplified script -- the same script `voice_yue.rs`'s model always
-/// emits, confirmed against its own real decode output, not just its
-/// tokens file -- so these match natively without depending on
-/// `normalize_yue` at all (that function's real job is converting a
-/// *category's own display name*, which follows the app's display locale
-/// and so can be Traditional, down to this same script -- see its own
-/// doc comment). Seeded from the spike's own test utterances
-/// (`cantonese_utterances.tsv`, written in Traditional since that's how
-/// Cantonese is normally written, but every alias here is that
-/// utterance's vocabulary hand-converted to Simplified) plus colloquial
-/// Cantonese terms (人工 salary, 蚊 dollar, 咗/嚟/睇 verb particles) that
-/// have no Mandarin equivalent in `aliases_for_preset_cmn` at all.
-fn aliases_for_preset_yue(preset_key: &str) -> &'static [&'static str] {
-    match preset_key {
-        "cat.primaryEarnedIncome" => &["人工", "薪水", "薪金", "花红", "奖金", "贴士"],
-        "cat.selfEmploymentBusiness" => &["自由职业", "散工", "生意", "兼职", "顾问费"],
-        "cat.investmentCapitalIncome" => &["投资", "股息", "利息", "股票", "租金收入"],
-        "cat.governmentSupplemental" => &["政府福利", "综援", "退休金", "退税", "赡养费"],
-        "cat.otherIncome" => &["其他收入", "利是", "外快", "退款"],
-        "cat.housing" => &["租", "屋租", "房租", "供楼", "管理费"],
-        "cat.utilities" => &[
-            "水电费",
-            "电费",
-            "水费",
-            "煤气费",
-            "上网费",
-            "电话费",
-            // Not a Traditional/Simplified script pair -- `cat.utilities`'
-            // own Simplified name is a different word ("水电煤") from its
-            // Traditional name ("水電費"), confirmed by diffing
-            // `zh-Hant.js`/`zh-Hans.js` directly, so `normalize_yue`
-            // cannot bridge it and this alias is added explicitly.
-            "水电煤",
-        ],
-        "cat.foodGroceries" => &["餸", "买餸", "食饭", "咖啡", "生果", "外卖"],
-        "cat.transportation" => &["车钱", "的士", "泊车", "油钱", "巴士", "地铁"],
-        "cat.healthcareInsurance" => &["保险", "睇医生", "买药", "睇病", "牙医"],
-        "cat.debtServicing" => &["还款", "卡数", "贷款", "学生贷款"],
-        "cat.personalLifestyle" => &["买衫", "睇戏", "买手机", "娱乐", "兴趣"],
-        "cat.subscriptionsMemberships" => &[
-            "订阅",
-            "会籍",
-            "健身",
-            "会员",
-            // Same non-cognate-pair reasoning as `cat.utilities` above:
-            // "訂閱與會籍" (Traditional) vs "订阅与会员" (Simplified) differ
-            // in the second word, not just script.
-            "订阅与会员",
-        ],
-        "cat.familyDependents" => &["学费", "补习", "小朋友", "凑仔", "宠物"],
-        "cat.giftsDonations" => &["礼物", "捐款", "慈善"],
-        "cat.otherExpenses" => &["其他", "杂费"],
-        _ => &[],
-    }
-}
-
-/// A closed, small character substitution -- not a general
-/// Traditional/Simplified converter, which would be both far larger than
-/// this app needs and occasionally ambiguous (several characters map to
-/// more than one Simplified form depending on the word). Every entry
-/// here was verified against a real, specific need:
-///
-/// - `使` -> `洗`: a real ASR homophone slip the spike found -- the model
-///   hears the intended 洗 ("spent") as 使, a different but
-///   similar-sounding word. Not a script issue at all (使 is unchanged
-///   between scripts), but the fix is the same shape: a character
-///   substitution applied before matching.
-/// - Every other entry is a Traditional character that appears in this
-///   app's own `zh-Hant.js` `cat.*` category names but not in the
-///   corresponding `zh-Hans.js` name (diffed directly, not guessed) --
-///   `aliases_for_preset_yue` above is written in Simplified to match
-///   `voice_yue.rs`'s model output natively, so a category's own
-///   *display* name (which follows the app's locale, and so can arrive
-///   here in Traditional) needs this same conversion to compare equal.
-///
-/// Applied to both the transcript and every candidate category name/alias
-/// before matching -- see `parse_voice_command` and `match_category`.
-fn normalize_yue(text: &str) -> String {
-    text.chars()
-        .map(|c| match c {
-            '使' => '洗',
-            '勞' => '劳',
-            '僱' => '雇',
-            '與' => '与',
-            '經' => '经',
-            '資' => '资',
-            '飲' => '饮',
-            '醫' => '医',
-            '療' => '疗',
-            '險' => '险',
-            '償' => '偿',
-            '還' => '还',
-            '債' => '债',
-            '務' => '务',
-            '個' => '个',
-            '扶' => '抚',
-            '養' => '养',
-            '禮' => '礼',
-            '贈' => '赠',
-            '買' => '买',
-            other => other,
-        })
-        .collect()
-}
-
 // ---------------------------------------------------------------------
 // English number words: tens-before-ones word order ("twenty three"),
 // with "hundred" as a multiplier and "and" a skippable joiner.
 // ---------------------------------------------------------------------
+
+/// Strips the punctuation a written-out transcript puts around a
+/// number -- currency symbols, thousands separators, sentence-final
+/// periods -- so "$2,500." reaches the parser as "2500".
+fn normalize_number_token(word: &str) -> String {
+    word.chars()
+        .filter(|c| !matches!(c, '$' | ',' | '\u{00a3}' | '\u{20ac}' | '\u{00a5}'))
+        .collect::<String>()
+        .trim_end_matches('.')
+        .to_string()
+}
+
+/// A "$12.50"/"$2,500" token as a single amount, or `None` if the token
+/// isn't currency-shaped. Kept separate from `parse_number_words` because
+/// the decimal point means cents here, where a spoken transcript says
+/// "cents" in words.
+fn currency_token_amount(word: &str) -> Option<f64> {
+    let word = word.trim_end_matches(['.', ',', '!', '?']);
+    let rest = word.strip_prefix('$')?;
+    let cleaned: String = rest.chars().filter(|c| *c != ',').collect();
+    if cleaned.is_empty() || !cleaned.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return None;
+    }
+    cleaned.parse::<f64>().ok()
+}
 
 const ONES: &[(&str, u64)] = &[
     ("zero", 0),
@@ -446,7 +363,8 @@ fn parse_number_words(words: &[&str]) -> Option<(u64, usize)> {
     let mut saw_any = false;
 
     for word in words {
-        let word = word.trim_end_matches(',');
+        let word = &normalize_number_token(word);
+        let word = word.as_str();
         if let Ok(digits) = word.parse::<u64>() {
             current += digits;
             saw_any = true;
@@ -464,17 +382,25 @@ fn parse_number_words(words: &[&str]) -> Option<(u64, usize)> {
         } else if word == "hundred" && saw_any {
             current *= 100;
             consumed += 1;
+        } else if (word == "thousand" || word == "million") && saw_any {
+            // Scale and bank what has accumulated so far, so the ones
+            // that follow ("two thousand five hundred") add to it
+            // rather than replacing it. `max(1)` covers a bare
+            // "thousand dollars".
+            let scale = if word == "thousand" { 1_000 } else { 1_000_000 };
+            total += current.max(1) * scale;
+            current = 0;
+            consumed += 1;
         } else if word == "and" && saw_any {
             // "four hundred and fifty" -- skip the joiner, keep scanning.
             consumed += 1;
         } else {
             break;
         }
-        total = current;
     }
 
     if saw_any {
-        Some((total, consumed))
+        Some((total + current, consumed))
     } else {
         None
     }
@@ -506,15 +432,14 @@ fn number_runs(words: &[&str]) -> Vec<(usize, usize, u64)> {
 // Chinese number words: multiplicative, not positional -- 十/百/千/万
 // each multiply whatever digit immediately preceded them (or 1, for a
 // bare leading unit: "十五" = 15, not "one-ten-five"), and the results
-// sum. Shared by `Cmn` and `Yue`: written Cantonese numerals use the
-// same Han-numeral grammar as Mandarin: only the pronunciation differs.
+// sum. Used by `Cmn`.
 // ---------------------------------------------------------------------
 
 fn cjk_digit(c: char) -> Option<u64> {
     match c {
         '零' => Some(0),
         '一' => Some(1),
-        '二' | '两' => Some(2),
+        '二' | '两' | '兩' => Some(2),
         '三' => Some(3),
         '四' => Some(4),
         '五' => Some(5),
@@ -531,7 +456,7 @@ fn cjk_unit(c: char) -> Option<u64> {
         '十' => Some(10),
         '百' => Some(100),
         '千' => Some(1000),
-        '万' => Some(10_000),
+        '万' | '萬' => Some(10_000),
         _ => None,
     }
 }
@@ -552,6 +477,20 @@ fn parse_number_words_cjk(words: &[&str]) -> Option<(u64, usize)> {
     let mut saw_any = false;
 
     for word in words {
+        // An all-digit token ("8000") is a whole value, not a run of
+        // units-place digits: whisper-class models write numbers in
+        // Arabic digits where a CTC model spelled them in Han numerals.
+        if word.len() > 1 && word.chars().all(|c| c.is_ascii_digit()) {
+            if let Ok(v) = word.parse::<u64>() {
+                if let Some(prev) = digit.take() {
+                    section += prev;
+                }
+                section += v;
+                saw_any = true;
+                consumed += 1;
+                continue;
+            }
+        }
         let mut chars = word.chars();
         // Not a single-character token -- outside this run.
         let (Some(c), None) = (chars.next(), chars.next()) else {
@@ -637,10 +576,6 @@ fn cjk_tokenize(transcript: &str) -> Vec<String> {
 fn cjk_dollar_units(language: VoiceLanguage) -> &'static [&'static str] {
     match language {
         VoiceLanguage::Cmn => &["元", "块"],
-        // 蚊 (literally "mosquito") is Hong Kong Cantonese slang for
-        // "dollar" -- confirmed against every one of the spike's 25
-        // Cantonese test utterances, which use it exclusively over 元/块.
-        VoiceLanguage::Yue => &["蚊", "元"],
         VoiceLanguage::En => &[],
     }
 }
@@ -673,6 +608,15 @@ fn extract_amount_cjk(words: &[&str], language: VoiceLanguage) -> Option<f64> {
 /// amount. A lone dollar amount with no cents mentioned is fine; cents
 /// with no dollar amount is treated as a whole-cents-only amount.
 fn extract_amount_en(words: &[&str]) -> Option<f64> {
+    // A "$12.50"-shaped token is its own anchor: the symbol is the unit
+    // word. Checked before the spoken-unit scan so an utterance that
+    // has both ("$12 dollars") still resolves once.
+    for word in words {
+        if let Some(v) = currency_token_amount(word) {
+            return Some(v);
+        }
+    }
+
     let runs = number_runs(words);
     let mut dollars: Option<u64> = None;
     let mut cents: Option<u64> = None;
@@ -701,7 +645,7 @@ fn extract_amount_en(words: &[&str]) -> Option<f64> {
 fn extract_amount(words: &[&str], language: VoiceLanguage) -> Option<f64> {
     match language {
         VoiceLanguage::En => extract_amount_en(words),
-        VoiceLanguage::Cmn | VoiceLanguage::Yue => extract_amount_cjk(words, language),
+        VoiceLanguage::Cmn => extract_amount_cjk(words, language),
     }
 }
 
@@ -785,12 +729,6 @@ fn match_category<'a>(
             );
         }
 
-        if language == VoiceLanguage::Yue {
-            for alias in &mut aliases {
-                *alias = normalize_yue(alias);
-            }
-        }
-
         for alias in &aliases {
             if alias.trim().is_empty() {
                 continue;
@@ -819,13 +757,6 @@ fn match_category<'a>(
 
 const CMN_INCOME_VERBS: &[&str] = &["收入", "收到", "赚"];
 const CMN_EXPENSE_VERBS: &[&str] = &["支出", "花了", "花", "付了", "付", "买了", "买"];
-
-/// Written in Simplified to match the transcript *after* `normalize_yue`
-/// has run (see `parse_voice_command`) -- `使咗`/`買` never appear here
-/// since normalization already turns them into `洗咗`/`买` before this
-/// runs, the same reasoning `aliases_for_preset_yue` documents.
-const YUE_INCOME_VERBS: &[&str] = &["收到", "收咗", "赚咗", "赚"];
-const YUE_EXPENSE_VERBS: &[&str] = &["洗咗", "交咗", "买"];
 
 /// Last-resort direction fallback for a CJK transcript whose category
 /// match failed entirely -- substring search over the joined transcript
@@ -862,7 +793,6 @@ fn verb_fallback_income(words: &[&str], language: VoiceLanguage) -> Option<bool>
             verb_income
         }
         VoiceLanguage::Cmn => verb_fallback_income_cjk(words, CMN_INCOME_VERBS, CMN_EXPENSE_VERBS),
-        VoiceLanguage::Yue => verb_fallback_income_cjk(words, YUE_INCOME_VERBS, YUE_EXPENSE_VERBS),
     }
 }
 
@@ -882,10 +812,6 @@ pub fn parse_voice_command(
             .map(ToString::to_string)
             .collect(),
         VoiceLanguage::Cmn => cjk_tokenize(transcript),
-        // See `normalize_yue`'s own doc comment: this model's real output
-        // needs the 使/洗 homophone fix applied before anything else
-        // touches the transcript.
-        VoiceLanguage::Yue => cjk_tokenize(&normalize_yue(transcript)),
     };
     let words: Vec<&str> = owned_words.iter().map(String::as_str).collect();
 
@@ -1053,6 +979,75 @@ mod tests {
         assert_eq!(draft, VoiceDraft::default());
     }
 
+    /// A spoken amount over $999 used to lose its thousands entirely:
+    /// "two thousand five hundred dollars" broke into the runs "two"
+    /// and "five hundred", the extractor took the one touching
+    /// "dollars", and the user silently got $500. Wrong amounts are
+    /// worse than missing ones -- there is nothing to prompt a
+    /// correction.
+    #[test]
+    fn word_number_parsing_handles_thousands() {
+        assert_eq!(
+            parse_number_words(&["two", "thousand", "five", "hundred"]),
+            Some((2500, 4))
+        );
+        assert_eq!(
+            parse_number_words(&["one", "thousand", "eight", "hundred"]),
+            Some((1800, 4))
+        );
+        // A bare "thousand dollars" is one thousand, not zero.
+        assert_eq!(parse_number_words(&["thousand"]), None);
+        assert_eq!(parse_number_words(&["a"]), None);
+        assert_eq!(
+            parse_number_words(&["three", "million", "two", "thousand"]),
+            Some((3_002_000, 4))
+        );
+        // The pre-existing hundreds behaviour is unchanged.
+        assert_eq!(
+            parse_number_words(&["four", "hundred", "and", "fifty"]),
+            Some((450, 4))
+        );
+    }
+
+    /// Traditional Han numerals used to be lost outright: 萬 and 兩 were
+    /// missing from the tables, so "一萬二千" parsed as $2,000 rather than
+    /// $12,000 -- again silently wrong rather than absent. A Mandarin
+    /// speaker writing Traditional is the ordinary case for this, and a
+    /// model is free to emit either script whatever was spoken.
+    #[test]
+    fn cjk_number_parsing_accepts_traditional_numerals() {
+        let trad: Vec<&str> = "一萬二千".split("").filter(|s| !s.is_empty()).collect();
+        assert_eq!(parse_number_words_cjk(&trad), Some((12_000, 4)));
+        let two_thousand: Vec<&str> = "兩千".split("").filter(|s| !s.is_empty()).collect();
+        assert_eq!(parse_number_words_cjk(&two_thousand), Some((2000, 2)));
+        // Simplified keeps parsing identically.
+        let simp: Vec<&str> = "一万二千".split("").filter(|s| !s.is_empty()).collect();
+        assert_eq!(parse_number_words_cjk(&simp), Some((12_000, 4)));
+    }
+
+    /// A transcript that writes amounts as digits carries its own unit
+    /// marker, so there is no "dollars" word to anchor to and nothing
+    /// parsed at all.
+    #[test]
+    fn amounts_written_as_digits_are_parsed() {
+        assert_eq!(
+            extract_amount_en(&["got", "paid", "$2,500", "salary"]),
+            Some(2500.0)
+        );
+        assert_eq!(
+            extract_amount_en(&["spent", "$32.50", "on", "gas"]),
+            Some(32.50)
+        );
+        assert_eq!(extract_amount_en(&["paid", "$800."]), Some(800.0));
+        // Not currency-shaped: left alone rather than guessed at.
+        assert_eq!(extract_amount_en(&["call", "me", "$maybe"]), None);
+        // The spoken path still works.
+        assert_eq!(
+            extract_amount_en(&["twelve", "dollars", "fifty", "cents"]),
+            Some(12.50)
+        );
+    }
+
     #[test]
     fn word_number_parsing_handles_teens_and_compound_tens() {
         assert_eq!(parse_number_words(&["nineteen"]), Some((19, 1)));
@@ -1183,139 +1178,6 @@ mod tests {
     #[test]
     fn empty_mandarin_transcript_produces_a_fully_blank_draft() {
         let draft = parse_cmn("", &mandarin_starter_categories());
-        assert_eq!(draft, VoiceDraft::default());
-    }
-
-    // -- Cantonese ---------------------------------------------------
-
-    fn parse_yue(transcript: &str, categories: &[VoiceCategoryCandidate]) -> VoiceDraft {
-        parse_voice_command(transcript, categories, VoiceLanguage::Yue)
-    }
-
-    /// Category names given in Traditional -- this app's own
-    /// `zh-Hant.js` strings, not hand-simplified -- specifically to
-    /// exercise `normalize_yue` converting a category's *display* name
-    /// down to the Simplified script `voice_yue.rs`'s model always
-    /// emits. See `mandarin_starter_categories` for the equivalent
-    /// already-Simplified fixture Mandarin's own tests use.
-    fn cantonese_starter_categories() -> Vec<VoiceCategoryCandidate> {
-        vec![
-            category(
-                "inc-1",
-                "主要勞動收入",
-                true,
-                Some("cat.primaryEarnedIncome"),
-            ),
-            category("exp-1", "飲食與日用品", false, Some("cat.foodGroceries")),
-            category("exp-2", "交通", false, Some("cat.transportation")),
-            category("exp-3", "住房", false, Some("cat.housing")),
-            category(
-                "exp-4",
-                "醫療與保險",
-                false,
-                Some("cat.healthcareInsurance"),
-            ),
-        ]
-    }
-
-    #[test]
-    fn parses_a_real_cantonese_expense_utterance() {
-        // c04 from the spike's own test set, ground truth "今日洗咗一百
-        // 二十蚊車錢" -- converted to the Simplified script the real
-        // model actually emits (车钱, not 車錢), same convention the
-        // Mandarin tests already follow: the transcript here models real
-        // ASR *output*, and only a category's own *display* name is ever
-        // Traditional (see `a_traditional_category_name_still_matches_a_
-        // simplified_transcript` below for that case).
-        let draft = parse_yue("今日洗咗一百二十蚊车钱", &cantonese_starter_categories());
-        assert_eq!(draft.amount, Some(120.0));
-        assert_eq!(draft.is_income, Some(false));
-        assert_eq!(draft.category_id.as_deref(), Some("exp-2"));
-    }
-
-    #[test]
-    fn parses_a_real_cantonese_income_utterance() {
-        // c02, Simplified: "人工两千蚊落咗嚟" -- salary of 2000, no
-        // explicit "income" category alias hit needed since 人工 is
-        // itself in the table. 嚟 is a Cantonese vernacular particle with
-        // no Simplified variant, so it's unchanged from the TSV's own
-        // Traditional-written original.
-        let draft = parse_yue("人工两千蚊落咗嚟", &cantonese_starter_categories());
-        assert_eq!(draft.amount, Some(2000.0));
-        assert_eq!(draft.is_income, Some(true));
-        assert_eq!(draft.category_id.as_deref(), Some("inc-1"));
-    }
-
-    #[test]
-    fn parses_cantonese_housing_rent() {
-        // c05, Simplified: "交咗八百蚊租" (identical to the TSV's own
-        // Traditional spelling here -- none of its characters differ
-        // between scripts).
-        let draft = parse_yue("交咗八百蚊租", &cantonese_starter_categories());
-        assert_eq!(draft.amount, Some(800.0));
-        assert_eq!(draft.is_income, Some(false));
-        assert_eq!(draft.category_id.as_deref(), Some("exp-3"));
-    }
-
-    #[test]
-    fn the_shi_xi_homophone_slip_still_parses_via_normalize_yue() {
-        // The spike's own documented ASR artifact: this model hears the
-        // intended 洗 ("spent") as 使. Seeded from this session's own
-        // real decode of c01's audio through the actual model
-        // (`sherpa_onnx.OfflineRecognizer.from_wenet_ctc`), not invented:
-        // the real hypothesis was "使咗五十蚊买" against a ground truth of
-        // "洗咗五十蚊買餸" -- both the homophone slip and the 買/买
-        // script difference showed up in that one utterance.
-        let draft = parse_yue("使咗五十蚊买", &cantonese_starter_categories());
-        assert_eq!(draft.amount, Some(50.0));
-        assert_eq!(draft.is_income, Some(false));
-    }
-
-    #[test]
-    fn a_traditional_category_name_still_matches_a_simplified_transcript() {
-        // `cantonese_starter_categories`'s healthcare category name is
-        // Traditional ("醫療與保險"); the transcript below is the
-        // Simplified script the model actually emits -- this only
-        // resolves to exp-4 if `normalize_yue` is applied to the
-        // category's own display name, not just the transcript.
-        let draft = parse_yue("洗咗一百蚊买药", &cantonese_starter_categories());
-        assert_eq!(draft.amount, Some(100.0));
-        assert_eq!(draft.category_id.as_deref(), Some("exp-4"));
-        assert_eq!(draft.is_income, Some(false));
-    }
-
-    #[test]
-    fn utilities_matches_its_non_cognate_simplified_alias() {
-        // "水電費" (Traditional) vs "水电煤" (Simplified) aren't a script
-        // pair -- the second word actually differs -- so this only
-        // resolves if the Simplified form is a real alias, not something
-        // `normalize_yue`'s character substitution could ever bridge.
-        let categories = vec![category(
-            "exp-utils",
-            "水電費",
-            false,
-            Some("cat.utilities"),
-        )];
-        let draft = parse_yue("交咗六十蚊电费", &categories);
-        assert_eq!(draft.amount, Some(60.0));
-        assert_eq!(draft.category_id.as_deref(), Some("exp-utils"));
-        assert_eq!(draft.is_income, Some(false));
-    }
-
-    #[test]
-    fn falls_back_to_the_spoken_cantonese_verb_when_no_category_matches() {
-        // No category-specific word at all, just the expense verb and an
-        // amount -- none of `cantonese_starter_categories`'s aliases
-        // should fuzzy-match a bare "洗咗二十蚊".
-        let draft = parse_yue("洗咗二十蚊", &cantonese_starter_categories());
-        assert_eq!(draft.category_id, None);
-        assert_eq!(draft.is_income, Some(false));
-        assert_eq!(draft.amount, Some(20.0));
-    }
-
-    #[test]
-    fn empty_cantonese_transcript_produces_a_fully_blank_draft() {
-        let draft = parse_yue("", &cantonese_starter_categories());
         assert_eq!(draft, VoiceDraft::default());
     }
 }

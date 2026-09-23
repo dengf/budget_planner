@@ -1,115 +1,72 @@
-//! Speech-to-text for voice-entered transactions, using `QuartzNet15x5` (a
-//! CTC acoustic model) via `rten` -- one forward pass over precomputed
-//! log-mel features, no autoregressive decode loop.
+//! English speech-to-text via `wenet-librispeech-u2pp-conformer` (the
+//! CTC branch of a `WeNet` U2++ Conformer) -- see `voice_wenet.rs` for
+//! the one forward pass all three languages now share, and
+//! `voice_fbank.rs` for the Kaldi-style fbank DSP it needs.
 //!
-//! A generative/autoregressive model (Whisper, any KV-cached decoder) was
-//! tried first in a throwaway spike and rejected on the same grounds as
-//! the GLM-OCR VLM this app already pulled: multi-hundred-MB to GB scale,
-//! fragile on real phones, not the shape that has worked here (`ocr.rs`'s
-//! `PP-OCRv6_tiny` and `embed_classify.rs`'s `MiniLM` are both single-forward-
-//! pass). `QuartzNet15x5` (72MB fp32) was the smallest CTC model measured
-//! that stayed above 90% *parsed-transaction* accuracy -- not word-error
-//! rate, which stayed poor (single digits) even on much larger models.
-//! `voice_parse.rs`'s constrained matching against a closed category
-//! vocabulary is what makes a noisy transcript usable; this module's job
-//! is only to produce that noisy transcript as fast as possible.
+//! **Why this model and not `QuartzNet15x5`, which shipped first.** The
+//! `NeMo` models were re-hosted from NVIDIA's NGC catalogue, whose terms
+//! are not a permissive open-source licence -- this app serves the model
+//! file from its own origin, which is redistribution, so "it's free to
+//! download" was never the question. `WeNet`'s pretrained models
+//! follow the licence of the corpus they were trained on
+//! (<https://github.com/wenet-e2e/wenet/blob/main/docs/pretrained_models.md>:
+//! "The pretrained model in `WeNet` follows the license of it's
+//! corresponding dataset"), and `LibriSpeech` is **CC BY 4.0**. That is a
+//! licence this project can actually satisfy, and `MODEL-LICENSES.md`
+//! carries the attribution and statement of modification it requires.
 //!
-//! `rten`'s int8 quantized export of a much larger model (Citrinet-512,
-//! same architecture family) was measured and rejected: it ran at full
+//! Choosing the same architecture as the Cantonese model that shipped
+//! first (since withdrawn, see `MODEL-LICENSES.md`) was deliberate: the fbank recipe, the two-input `x`/`x_lens` graph
+//! shape, the blank-at-index-0 convention and the `▁` join rule all
+//! carried over unchanged, so this swap moved weights and a tokens file
+//! rather than introducing a fourth DSP path.
+//!
+//! What matters here is *parsed-transaction* accuracy, not word error
+//! rate -- `voice_parse.rs`'s constrained matching against a closed
+//! category vocabulary is what turns a noisy transcript into a usable
+//! draft. This module's job is only to produce that transcript.
+//!
+//! `rten`'s int8 quantized export was measured and rejected during the
+//! `QuartzNet15x5` work and that finding still stands: it ran at full
 //! speed and returned confidently empty transcripts on every input,
 //! verified against an fp32 control that scored 100% on the identical
-//! features. int8 through this rten version is not safe to ship -- fp32
-//! is the real size floor, not the size anyone would prefer.
+//! features. int8 through this `rten` version is not safe to ship.
 //!
-//! Model and audio bytes arrive as plain buffers, no filesystem inside
-//! wasm -- same reasoning as `ocr.rs` and `embed_classify.rs`.
-//!
-//! The log-mel feature extraction and the index-level CTC decode are
-//! shared with Mandarin's Citrinet-512 (`voice_cmn.rs`, same `NeMo`
-//! architecture family, same DSP, just a different mel-bin count and
-//! vocabulary) via `voice_mel.rs` -- see that module's own doc comment.
+//! f16 is not the same bet and was taken: it stores the weights at half
+//! precision and `rten` widens them back to f32 at load, so it halves
+//! the download without changing what any operator computes. Measured
+//! the same way -- all 96 corpus transcripts came back byte-identical
+//! to the f32 model's.
 
-// `rten_embed` is this crate's Cargo.toml alias for a *second*, 0.26.0
-// pin of the plain `rten` crate -- reused from `embed_classify.rs` rather
-// than adding a third pin, since both are single-forward-pass models on
-// the same runtime. See that Cargo.toml feature's own doc comment.
-use rten_embed::Model;
-use rten_tensor::Tensor;
+use std::sync::OnceLock;
 
 use budget_core::BudgetError;
 
-use crate::voice_mel::{ctc_greedy_decode_indices, log_mel_features, mel_filterbank};
+use crate::voice_wenet::{parse_tokens_txt, transcribe};
 
-const N_MELS: usize = 64;
+/// Read from the model's own shipped tokens file, whose first line is
+/// `<blank> 0`. The `NeMo` model this replaced put blank *last* (28), so
+/// this is pinned per model and asserted below rather than assumed.
+const BLANK_ID: usize = 0;
 
-/// `QuartzNet15x5`'s own label set: index 0 is the word separator, 28 is
-/// the CTC blank -- note the blank is *last* here, unlike some CTC
-/// models (wav2vec2, spiked and rejected above) that put it first.
-/// Getting this wrong produces confident nonsense, not an error, so it
-/// is pinned to this exact model rather than read from a config file
-/// that could drift.
-const QUARTZNET_BLANK: usize = 28;
+const TOKENS_TXT: &str = include_str!("../assets/voice/en-wenet-tokens.txt");
 
-fn quartznet_label(index: usize) -> &'static str {
-    const LABELS: [&str; 29] = [
-        " ", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
-        "r", "s", "t", "u", "v", "w", "x", "y", "z", "'", "",
-    ];
-    LABELS[index]
+fn vocab() -> &'static [String] {
+    static VOCAB: OnceLock<Vec<String>> = OnceLock::new();
+    VOCAB.get_or_init(|| parse_tokens_txt(TOKENS_TXT, "voice"))
 }
 
-fn ctc_greedy_decode(logits: &Tensor<f32>) -> String {
-    let text: String = ctc_greedy_decode_indices(logits, QUARTZNET_BLANK)
-        .into_iter()
-        .map(quartznet_label)
-        .collect();
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-/// Transcribes one spoken command. `samples` is 16kHz mono `f32` in
-/// `[-1.0, 1.0]`; `model_bytes` is `QuartzNet15x5`'s `.rten` file, fetched
+/// Transcribes one spoken English command. `samples` is 16kHz mono `f32`
+/// in `[-1.0, 1.0]`; `model_bytes` is the model's `.rten` file, fetched
 /// by the host layer (no filesystem inside wasm).
 ///
 /// Returns the raw, often-misheard transcript -- never the parsed
-/// transaction. See `voice_parse::parse_voice_command`, the always-
-/// loaded module that turns this into a draft: the accuracy that matters
-/// (parsed transaction, not word error rate) lives entirely in that
-/// constrained match, not here.
+/// transaction.
 pub fn transcribe_voice_command(
     model_bytes: Vec<u8>,
     samples: &[f32],
 ) -> Result<String, BudgetError> {
-    if samples.is_empty() {
-        return Err(BudgetError::EmptyAudio);
-    }
-
-    let model =
-        Model::load(model_bytes).map_err(|e| BudgetError::VoiceModelLoadFailed(e.to_string()))?;
-    let input_id = *model
-        .input_ids()
-        .first()
-        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no input".into()))?;
-    let output_id = *model
-        .output_ids()
-        .first()
-        .ok_or_else(|| BudgetError::VoiceModelLoadFailed("model has no output".into()))?;
-
-    let filterbank = mel_filterbank(N_MELS);
-    // `QuartzNet15x5`'s compiled graph has only one input (`audio_signal`,
-    // confirmed by inspecting it directly) -- the true, pre-padding frame
-    // count `log_mel_features` also returns is Citrinet's `length` input's
-    // concern (`voice_cmn.rs`), not this model's.
-    let (features, n_mels, n_frames, _true_frames) = log_mel_features(samples, &filterbank, N_MELS);
-    let input = Tensor::from_data(&[1, n_mels, n_frames], features);
-
-    let [output] = model
-        .run_n(vec![(input_id, input.into())], [output_id], None)
-        .map_err(|e| BudgetError::VoiceTranscribeFailed(e.to_string()))?;
-    let logits: Tensor<f32> = output
-        .try_into()
-        .map_err(|_| BudgetError::VoiceTranscribeFailed("unexpected output shape".into()))?;
-
-    Ok(ctc_greedy_decode(&logits))
+    transcribe(model_bytes, samples, vocab(), BLANK_ID)
 }
 
 #[cfg(test)]
@@ -130,32 +87,24 @@ mod tests {
     }
 
     #[test]
-    fn ctc_decode_collapses_repeats_and_drops_the_blank() {
-        // logits: [1, 4, 29], each frame's argmax hand-picked.
-        // Frame 0: 'h' (7... wait, use real indices) -- see LABELS above:
-        // index 8='h', 5='e', repeated, then blank, then 12='l'.
-        let classes = 29;
-        let frames = 5;
-        let mut data = vec![-10.0f32; frames * classes];
-        let mut set = |f: usize, c: usize| data[f * classes + c] = 10.0;
-        set(0, 8); // h
-        set(1, 5); // e
-        set(2, 5); // e (repeat -- collapsed to one)
-        set(3, QUARTZNET_BLANK); // blank -- resets the repeat guard
-        set(4, 5); // e (not collapsed with frame 1/2: a blank came between)
-        let logits = Tensor::from_data(&[1, frames, classes], data);
-        assert_eq!(ctc_greedy_decode(&logits), "hee");
+    fn the_tokens_file_parses_into_a_dense_vocab_with_blank_first() {
+        let vocab = vocab();
+        assert_eq!(vocab.len(), 5002);
+        assert_eq!(vocab[BLANK_ID], "<blank>");
+        assert_eq!(vocab[1], "<unk>");
+        assert_eq!(vocab[5001], "<sos/eos>");
+        assert!(vocab.iter().all(|t| !t.is_empty()));
     }
 
+    /// The vocabulary is `SentencePiece` word-pieces, not the 29 characters
+    /// `QuartzNet15x5` used -- so a transcript is assembled from pieces
+    /// carrying `▁`, and this pins that the asset really is that shape.
     #[test]
-    fn ctc_decode_of_all_blank_is_empty() {
-        let classes = 29;
-        let frames = 3;
-        let mut data = vec![-10.0f32; frames * classes];
-        for f in 0..frames {
-            data[f * classes + QUARTZNET_BLANK] = 10.0;
-        }
-        let logits = Tensor::from_data(&[1, frames, classes], data);
-        assert_eq!(ctc_greedy_decode(&logits), "");
+    fn the_vocabulary_is_word_pieces_carrying_the_boundary_marker() {
+        let marked = vocab().iter().filter(|t| t.starts_with('▁')).count();
+        assert!(
+            marked > 1000,
+            "expected a SentencePiece vocab, found {marked} marked pieces"
+        );
     }
 }

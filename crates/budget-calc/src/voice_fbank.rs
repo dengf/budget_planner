@@ -1,8 +1,12 @@
-//! Kaldi-style fbank feature extraction for Cantonese's `WeNet`
-//! Conformer-CTC model (`voice_yue.rs`) -- a genuinely different DSP
-//! pipeline from `voice_mel.rs`'s `NeMo` log-mel recipe, not a
-//! reparameterization of it: HTK/Kaldi's single-formula mel scale (not
-//! Slaney's, which `voice_mel.rs` uses because that's what `NeMo` trained
+//! Kaldi-style fbank feature extraction for the `WeNet` Conformer-CTC
+//! models -- both of them now (`voice.rs`, `voice_cmn.rs`), where this
+//! module once served Cantonese alone.
+//!
+//! Written against Cantonese first (since withdrawn over its corpus
+//! licence, see `MODEL-LICENSES.md`), and against the `NeMo` log-mel
+//! recipe the other two then used, which this is a genuinely different
+//! DSP pipeline from rather than a reparameterization of: HTK/Kaldi's
+//! single-formula mel scale (not Slaney's, which `NeMo` trained
 //! against), a Povey analysis window (not Hann), non-normalized
 //! triangular mel filters (no Slaney equal-area scaling), Kaldi's
 //! `snip_edges=false` reflect-padded framing, and critically **no
@@ -28,15 +32,18 @@ const FRAME_LENGTH: usize = 400; // 25ms
 const PADDED_SIZE: usize = 512; // next power of two >= FRAME_LENGTH
 const PREEMPHASIS: f32 = 0.97;
 /// `sherpa_onnx.FeatureExtractorConfig.normalize_samples=True`: this
-/// model's fbank recipe was trained against 16-bit-PCM-scale amplitude,
-/// not `[-1.0, 1.0]` float samples -- every other model in this codebase
-/// (`voice_mel.rs`) takes `[-1.0, 1.0]` directly, so this scale-up is
-/// specific to this one pipeline.
+/// recipe was trained against 16-bit-PCM-scale amplitude, not
+/// `[-1.0, 1.0]` float samples, so callers handing over the latter (all
+/// of them -- that is the convention at the wasm boundary) get scaled up
+/// here. The `NeMo` models that shipped first took `[-1.0, 1.0]`
+/// directly, which is why this is worth stating rather than assuming.
+/// Verified by the `kaldi-native-fbank` reference test below: getting it
+/// wrong shifts every log-energy by a constant, which a Conformer partly
+/// absorbs, so it degrades short utterances instead of failing loudly.
 const SAMPLE_SCALE: f32 = 32768.0;
 
 /// Kaldi/HTK mel scale -- a single formula across the whole range, unlike
-/// `voice_mel.rs::hz_to_mel`'s Slaney formula, which switches to a linear
-/// segment below 1000Hz. Confirmed against `kaldi-native-fbank`'s own
+/// Slaney's, which switches to a linear segment below 1000Hz. Confirmed against `kaldi-native-fbank`'s own
 /// `MelBanks::MelScale` (`is_librosa=false`, the default, is what this
 /// model's own feature config leaves unset).
 fn hz_to_mel(f: f64) -> f64 {
@@ -45,8 +52,7 @@ fn hz_to_mel(f: f64) -> f64 {
 
 /// `pow(0.5 - 0.5*cos(2*pi*n/(N-1)), 0.85)` -- Kaldi's own window,
 /// documented in `feature-window.h` as "similar to Hamming but goes to
-/// zero at the edges"; not Hann/Hamming, and not the same shape as
-/// `voice_mel.rs::hann_window`. Length `FRAME_LENGTH` (400), not the
+/// zero at the edges"; not Hann/Hamming. Length `FRAME_LENGTH` (400), not the
 /// FFT's padded size -- the padding to `PADDED_SIZE` happens after this
 /// window is applied, as zeros.
 fn povey_window() -> Vec<f32> {
@@ -59,15 +65,14 @@ fn povey_window() -> Vec<f32> {
         .collect()
 }
 
-/// Kaldi's triangular mel filterbank: unlike `voice_mel.rs::mel_filterbank`,
-/// weights are the raw linear ramp (0 at each edge, 1 at the center),
+/// Kaldi's triangular mel filterbank: weights are the raw linear ramp (0 at each edge, 1 at the center),
 /// never rescaled for equal filter area -- Slaney normalization is a
 /// librosa/`NeMo` detail this recipe doesn't have. `num_fft_bins` is
 /// `PADDED_SIZE / 2`, not `/ 2 + 1`: Kaldi's own mel-filter construction
 /// never looks at the Nyquist bin at all, so `voice_fbank_features`
 /// below only computes power for indices `0..num_fft_bins`, matching
-/// this filterbank's shape exactly rather than the one-wider shape
-/// `voice_mel.rs` uses for its own (different) recipe.
+/// this filterbank's shape exactly rather than the one-wider shape a
+/// librosa-style recipe uses.
 fn mel_filterbank(num_bins: usize, low_freq: f64, high_freq_offset: f64) -> Vec<Vec<f32>> {
     let nyquist = SAMPLE_RATE / 2.0;
     let high_freq = if high_freq_offset > 0.0 {
@@ -136,8 +141,7 @@ fn num_frames(num_samples: usize) -> usize {
 /// the frame is centered on `f*FRAME_SHIFT + FRAME_SHIFT/2`, so the first
 /// and last frames legitimately reach before sample 0 or past the end --
 /// `reflect_index` mirrors those back in, rather than the truncate-only
-/// behavior `snip_edges=true` would use (and which `voice_mel.rs`'s
-/// `center=True` reflect-pad approximates differently for its own recipe).
+/// behavior `snip_edges=true` would use.
 fn extract_frame(samples: &[f32], f: usize) -> Vec<f32> {
     let midpoint = (f * FRAME_SHIFT + FRAME_SHIFT / 2) as i64;
     let start = midpoint - (FRAME_LENGTH / 2) as i64;
@@ -150,7 +154,8 @@ fn extract_frame(samples: &[f32], f: usize) -> Vec<f32> {
 /// Povey window on the raw frame, zero-padded to `PADDED_SIZE`, FFT'd,
 /// mel-filtered, then logged with Kaldi's own epsilon floor (never
 /// normalized against other frames -- there is no CMVN step in this
-/// recipe at all, unlike every mean/std step in `voice_mel.rs`).
+/// recipe at all, which is confirmed against the real feature config
+/// rather than inferred from the absence of a cmvn file).
 fn frame_features(
     raw_frame: &[f32],
     window: &[f32],
@@ -197,16 +202,17 @@ fn frame_features(
 }
 
 /// `[-1.0, 1.0]` 16kHz mono samples in; `(features, n_mels, n_frames)`
-/// out, row-major `[n_frames, n_mels]` -- **not** `voice_mel::log_mel_features`'s
-/// `[n_mels, n_frames]` convention. Confirmed by inspecting the compiled
-/// `yue-conformer-fp32.rten` graph directly: its `x` input is shaped
-/// `[N, T, 80]` (batch, time, mel-bins), the opposite axis order from the
-/// `NeMo` family's `audio_signal` input. No frame-count padding here
-/// (unlike `voice_mel.rs`'s `FRAME_PAD_MULTIPLE`): the `WeNet` Conformer
-/// export this feeds has no matching conv-stride constraint that was
-/// found in the spike, and padding un-asked-for silence into a short
-/// recording would change the model's own (already-correct) output
-/// length assumptions.
+/// out, row-major `[n_frames, n_mels]` -- time-major, **not** the
+/// `[n_mels, n_frames]` convention the `NeMo` models that shipped first
+/// used. Confirmed by inspecting each compiled `.rten` graph directly:
+/// the `x` input is shaped `[N, T, 80]` (batch, time, mel-bins), the
+/// opposite axis order from the `NeMo` family's `audio_signal` input.
+///
+/// No frame-count padding to a stride multiple here: these `WeNet`
+/// exports have no such conv-stride constraint. Silence *is* added at
+/// both ends before this is reached, but by
+/// `voice_wenet::with_lead_in_silence` and for an unrelated, measured
+/// reason -- see that function's own doc comment.
 pub(crate) fn fbank_features(
     samples: &[f32],
     filterbank: &[Vec<f32>],
@@ -231,7 +237,7 @@ pub(crate) fn fbank_features(
     (out, num_bins, n_frames)
 }
 
-pub(crate) fn yue_mel_filterbank(num_bins: usize) -> Vec<Vec<f32>> {
+pub(crate) fn wenet_mel_filterbank(num_bins: usize) -> Vec<Vec<f32>> {
     mel_filterbank(num_bins, 20.0, -400.0)
 }
 
@@ -264,14 +270,14 @@ mod tests {
         // (800 + 80) / 160 = 5, integer division -- confirmed against the
         // real Python run, which reported exactly 5 frames for this input.
         assert_eq!(num_frames(800), 5);
-        let fb = yue_mel_filterbank(80);
+        let fb = wenet_mel_filterbank(80);
         let (_, _, n_frames) = fbank_features(&synthetic_samples(), &fb, 80);
         assert_eq!(n_frames, 5);
     }
 
     #[test]
     fn matches_the_real_kaldi_native_fbank_reference_within_tolerance() {
-        let fb = yue_mel_filterbank(80);
+        let fb = wenet_mel_filterbank(80);
         let (data, num_bins, n_frames) = fbank_features(&synthetic_samples(), &fb, 80);
         assert_eq!(num_bins, 80);
         assert_eq!(n_frames, 5);
@@ -296,7 +302,7 @@ mod tests {
 
     #[test]
     fn silence_produces_finite_features_not_nan() {
-        let fb = yue_mel_filterbank(80);
+        let fb = wenet_mel_filterbank(80);
         let samples = vec![0.0f32; 1600];
         let (data, _, _) = fbank_features(&samples, &fb, 80);
         assert!(data.iter().all(|v| v.is_finite()));
@@ -308,7 +314,7 @@ mod tests {
         // `PADDED_SIZE / 2` fft bins, not `/ 2 + 1` -- pinned explicitly
         // since getting this off-by-one wrong silently shifts every mel
         // bin's frequency mapping rather than erroring.
-        let fb = yue_mel_filterbank(80);
+        let fb = wenet_mel_filterbank(80);
         for row in &fb {
             assert_eq!(row.len(), PADDED_SIZE / 2);
         }

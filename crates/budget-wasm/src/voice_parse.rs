@@ -22,7 +22,6 @@ fn candidate_from_dto(dto: &CategoryDto) -> budget_calc::VoiceCategoryCandidate 
 fn language_from_str(s: &str) -> budget_calc::VoiceLanguage {
     match s {
         "cmn" => budget_calc::VoiceLanguage::Cmn,
-        "yue" => budget_calc::VoiceLanguage::Yue,
         // Unrecognized (including a stale JS bundle sending nothing at
         // all) defaults to English rather than failing the request.
         _ => budget_calc::VoiceLanguage::En,
