@@ -1,30 +1,17 @@
-import { useEffect, useState } from 'react';
+import useMediaQuery from './useMediaQuery';
 
 const QUERY = '(min-width: 960px)';
 
 /**
- * Reactive, unlike the one-shot `window.matchMedia?.(...).matches` reads
- * this codebase already uses for `prefers-reduced-motion`/`pointer:coarse`
- * (theme.js, SwipeHint.jsx, NewCategoryField.jsx, DashboardTab.jsx) --
- * those only need the value at the moment they run, but swapping the nav
- * shell has to track a window being resized live, not just read once at
- * mount. Same optional-chaining guard as those call sites: `matchMedia`
- * is unavailable in jsdom, so this returns `false` under test, which is
- * exactly the "stay on the phone shell" default every existing test
- * already assumes.
+ * True once the window is wide enough for the desktop shell (sidebar nav,
+ * multi-column panels). The plumbing lives in `useMediaQuery`; this is
+ * the one place that names the breakpoint, so the dozen callers that swap
+ * a phone layout for a desktop one can never drift apart on the number.
+ *
+ * `matchMedia` is unavailable in jsdom, so this returns `false` under
+ * test, which is exactly the "stay on the phone shell" default every
+ * existing test already assumes.
  */
 export default function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && !!window.matchMedia?.(QUERY).matches,
-  );
-
-  useEffect(() => {
-    const mql = window.matchMedia?.(QUERY);
-    if (!mql) return undefined;
-    const onChange = (e) => setIsDesktop(e.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-
-  return isDesktop;
+  return useMediaQuery(QUERY, false);
 }

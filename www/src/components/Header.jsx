@@ -5,6 +5,7 @@ import MonthYearPicker from './MonthYearPicker';
 import MeifioMark from './MeifioMark';
 import { TABS, ADD_BUTTON_INDEX } from '../tabs';
 import { meifioHome } from '../meifioHome';
+import useMediaQuery from '../useMediaQuery';
 
 export default function Header({
   activeTab,
@@ -29,6 +30,22 @@ export default function Header({
   importData,
 }) {
   const { t, locale, setLocale } = useI18n();
+  // The header is one row -- month stepper left, language and settings
+  // right -- and at 375px it did not fit: the two 44px arrows and
+  // "September 2026" are 219px, the full language name and the gear
+  // another 133px, against 327px of content width. It wrapped, and the
+  // language picker sat on a line of its own costing 48px of every phone
+  // screen. The compact locale labels (`LOCALES[].label` -- the same
+  // EN/简/繁 VoiceCapture's own language toggle shows) bring that side to
+  // 93px and the row back to one line, with the month name left spelled
+  // out: it names what the whole screen is about, the language is a
+  // control someone sets once.
+  //
+  // Phone only. Wider windows have the room for the full names, which is
+  // what mortgage_calculator and postcard_maker show in the same slot.
+  // `(max-width: 640px)` is `.app-header`'s own breakpoint in main.css,
+  // not `useIsDesktop`'s 960px -- a tablet is nowhere near this tight.
+  const isPhone = useMediaQuery('(max-width: 640px)', true);
 
   return (
     <>
@@ -58,7 +75,7 @@ export default function Header({
           >
             {LOCALES.map((l) => (
               <option key={l.id} value={l.id} lang={l.id}>
-                {l.name}
+                {isPhone ? l.label : l.name}
               </option>
             ))}
           </select>

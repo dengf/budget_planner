@@ -3547,13 +3547,31 @@ table.data tr:last-child td {
 @media (max-width: 640px) {
   /* No longer stacked into two rows here -- that was for fitting a
      title, byline and language select alongside the settings gear on
-     one 375px-wide line. Round 3 moved all three into More, so this row
-     is just the month control and the gear, which fit side by side at
-     any width; only the padding stays tightened, since every pixel here
-     still pushes the content below it further down a phone screen. */
+     one 375px-wide line. Round 3 moved all three into More; the language
+     picker later came back, and with it the wrap: at 375px the month
+     stepper (219px) plus the full language name and the gear (133px)
+     needed 356px against 327px of content width, so `flex-wrap` put the
+     language picker on a line of its own and the header stood 117px
+     tall. Header.jsx now shows the compact locale labels at this width,
+     which is what brings the row back to one line (69px). The padding
+     stays tightened for the same reason it always was: every pixel here
+     pushes the content below it further down a phone screen. */
   .app-header {
     padding: 14px 0 10px;
     gap: 4px;
+  }
+
+  /* With "EN"/"简"/"繁" in it rather than "English"/"简体中文", this is a
+     square chip beside the square settings gear, not a word with an
+     arrow after it. The padding is trimmed to suit -- the 44px floor
+     comes from `min-width`/`min-height` now, not from a long label, so
+     it is still a real tap target at its narrowest. The arrow keeps its
+     `right 6px` position from the base rule; `padding-right` is what
+     reserves the room for it. */
+  .app-language-select {
+    min-width: 44px;
+    padding: 6px 20px 6px 6px;
+    text-align: center;
   }
 
   /* The intro/headline/panel chrome above the fold is identical on every
