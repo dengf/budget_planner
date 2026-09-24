@@ -904,6 +904,30 @@ mod tests {
         assert_eq!(draft.category_id.as_deref(), Some("exp-1"));
     }
 
+    /// The two examples `transactions.voiceHint` puts on screen, one per
+    /// direction. The hint is a promise about what this parser accepts --
+    /// it read as expense-only until the income example was added -- so
+    /// the exact wording it suggests is asserted here rather than left to
+    /// drift away from the copy.
+    #[test]
+    fn parses_both_utterances_the_on_screen_hint_suggests() {
+        let expense = parse_en(
+            "add expense twelve dollars groceries",
+            &starter_categories(),
+        );
+        assert_eq!(expense.amount, Some(12.0));
+        assert_eq!(expense.is_income, Some(false));
+        assert_eq!(expense.category_id.as_deref(), Some("exp-1"));
+
+        let income = parse_en(
+            "add income two thousand dollars salary",
+            &starter_categories(),
+        );
+        assert_eq!(income.amount, Some(2000.0));
+        assert_eq!(income.is_income, Some(true));
+        assert_eq!(income.category_id.as_deref(), Some("inc-1"));
+    }
+
     #[test]
     fn parses_a_clean_income_with_an_alias_word() {
         let draft = parse_en(
