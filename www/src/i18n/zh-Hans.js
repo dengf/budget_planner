@@ -271,7 +271,7 @@ export default {
   'transactions.statementAddAll': '添加 {count} 笔交易',
   'transactions.voiceTitle': '语音添加',
   'transactions.voiceHint':
-    '说一句类似"添加支出十二元 食品杂货"的话。全部在您的设备上转录——不会上传任何内容。',
+    '说一句类似“添加支出十二元 食品杂货”或“收入两千元 工资”的话。全部在你的设备上转录——不会上传任何内容。',
   'transactions.voiceLanguageLabel': '语言',
   'transactions.voiceStart': '点按说话',
   'transactions.voiceRecording': '正在聆听…点按停止',

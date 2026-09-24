@@ -755,44 +755,113 @@ fn match_category<'a>(
     best.map(|(category, _)| category)
 }
 
-const CMN_INCOME_VERBS: &[&str] = &["收入", "收到", "赚"];
-const CMN_EXPENSE_VERBS: &[&str] = &["支出", "花了", "花", "付了", "付", "买了", "买"];
+/// Direction cues for the last-resort fallback, in two tiers per
+/// language.
+///
+/// **Explicit** is someone naming the direction outright ("add income",
+/// 收入/支出). **Soft** is a verb that only implies it ("got paid",
+/// "spent", 赚, 花了). Explicit outranks soft, because a sentence can
+/// carry both -- "add expense fifty dollars, it was a refund" -- and the
+/// word the person chose on purpose should win over one they used in
+/// passing.
+///
+/// Between two soft cues of opposite direction, income wins. That looks
+/// arbitrary and isn't: an unset direction already lands on the form as
+/// an expense (`is_income ?? false` in VoiceCapture.jsx), so a soft
+/// expense cue changes nothing that silence wouldn't, while a missed
+/// income cue is the one that puts the transaction on the wrong side.
+/// Nothing is saved without the person seeing the filled-in form, so the
+/// cost of guessing income wrongly is one tap on a toggle.
+const EN_EXPLICIT_INCOME: &[&[&str]] = &[&["income"]];
+const EN_EXPLICIT_EXPENSE: &[&[&str]] = &[&["expense"], &["expenses"]];
 
-/// Last-resort direction fallback for a CJK transcript whose category
-/// match failed entirely -- substring search over the joined transcript
-/// rather than per-token equality, since these verbs are 1-2 characters
-/// and `words` is tokenized per-character (see `cjk_tokenize`), unlike
+/// Phrases, not bare words, wherever the word alone is ambiguous:
+/// "paid" is income in "got paid" and expense in "paid for", so neither
+/// list carries it on its own.
+const EN_INCOME_CUES: &[&[&str]] = &[
+    &["got", "paid"],
+    &["get", "paid"],
+    &["getting", "paid"],
+    &["paid", "me"],
+    &["received"],
+    &["receive"],
+    &["earned"],
+    &["earn"],
+    &["deposited"],
+    &["deposit"],
+    &["refunded"],
+    &["refund"],
+    &["bonus"],
+    &["payout"],
+];
+const EN_EXPENSE_CUES: &[&[&str]] = &[
+    &["spent"],
+    &["spend"],
+    &["bought"],
+    &["buy"],
+    &["paid", "for"],
+];
+
+const CMN_EXPLICIT_INCOME: &[&str] = &["收入"];
+const CMN_EXPLICIT_EXPENSE: &[&str] = &["支出"];
+const CMN_INCOME_CUES: &[&str] = &["收到", "赚", "挣", "到账", "进账", "领到", "发了"];
+const CMN_EXPENSE_CUES: &[&str] = &["花了", "花", "付了", "付", "买了", "买"];
+
+/// True if any cue appears as a run of whole words in `words`.
+fn contains_cue_en(words: &[&str], cues: &[&[&str]]) -> bool {
+    (0..words.len()).any(|i| {
+        cues.iter()
+            .any(|cue| words.len() >= i + cue.len() && words[i..i + cue.len()] == **cue)
+    })
+}
+
+/// Substring search over the joined transcript rather than per-token
+/// equality, since these cues are 1-3 characters and `words` is
+/// tokenized per-character for CJK (see `cjk_tokenize`), unlike
 /// English's whole-word tokens.
-fn verb_fallback_income_cjk(words: &[&str], income: &[&str], expense: &[&str]) -> Option<bool> {
-    let joined = words.concat();
-    let mut result = None;
-    for v in expense {
-        if joined.contains(v) {
-            result = Some(false);
-        }
+fn contains_cue_cjk(joined: &str, cues: &[&str]) -> bool {
+    cues.iter().any(|cue| joined.contains(cue))
+}
+
+/// Resolves the two tiers. A sentence carrying *both* explicit words
+/// ("income, not an expense") has named no direction unambiguously, so
+/// it falls through to the soft cues rather than picking whichever came
+/// last.
+fn resolve_direction(
+    explicit_income: bool,
+    explicit_expense: bool,
+    soft_income: bool,
+    soft_expense: bool,
+) -> Option<bool> {
+    if explicit_income != explicit_expense {
+        return Some(explicit_income);
     }
-    for v in income {
-        if joined.contains(v) {
-            result = Some(true);
-        }
+    if soft_income {
+        return Some(true);
     }
-    result
+    if soft_expense {
+        return Some(false);
+    }
+    None
 }
 
 fn verb_fallback_income(words: &[&str], language: VoiceLanguage) -> Option<bool> {
     match language {
-        VoiceLanguage::En => {
-            let mut verb_income = None;
-            for w in words {
-                if *w == "income" {
-                    verb_income = Some(true);
-                } else if *w == "expense" || *w == "expenses" {
-                    verb_income = Some(false);
-                }
-            }
-            verb_income
+        VoiceLanguage::En => resolve_direction(
+            contains_cue_en(words, EN_EXPLICIT_INCOME),
+            contains_cue_en(words, EN_EXPLICIT_EXPENSE),
+            contains_cue_en(words, EN_INCOME_CUES),
+            contains_cue_en(words, EN_EXPENSE_CUES),
+        ),
+        VoiceLanguage::Cmn => {
+            let joined = words.concat();
+            resolve_direction(
+                contains_cue_cjk(&joined, CMN_EXPLICIT_INCOME),
+                contains_cue_cjk(&joined, CMN_EXPLICIT_EXPENSE),
+                contains_cue_cjk(&joined, CMN_INCOME_CUES),
+                contains_cue_cjk(&joined, CMN_EXPENSE_CUES),
+            )
         }
-        VoiceLanguage::Cmn => verb_fallback_income_cjk(words, CMN_INCOME_VERBS, CMN_EXPENSE_VERBS),
     }
 }
 
@@ -902,6 +971,96 @@ mod tests {
         assert_eq!(draft.amount, Some(12.0));
         assert_eq!(draft.is_income, Some(false));
         assert_eq!(draft.category_id.as_deref(), Some("exp-1"));
+    }
+
+    /// The two examples `transactions.voiceHint` puts on screen, one per
+    /// direction. The hint is a promise about what this parser accepts --
+    /// it read as expense-only until the income example was added -- so
+    /// the exact wording it suggests is asserted here rather than left to
+    /// drift away from the copy.
+    #[test]
+    fn parses_both_utterances_the_on_screen_hint_suggests() {
+        let expense = parse_en(
+            "add expense twelve dollars groceries",
+            &starter_categories(),
+        );
+        assert_eq!(expense.amount, Some(12.0));
+        assert_eq!(expense.is_income, Some(false));
+        assert_eq!(expense.category_id.as_deref(), Some("exp-1"));
+
+        let income = parse_en(
+            "add income two thousand dollars salary",
+            &starter_categories(),
+        );
+        assert_eq!(income.amount, Some(2000.0));
+        assert_eq!(income.is_income, Some(true));
+        assert_eq!(income.category_id.as_deref(), Some("inc-1"));
+    }
+
+    /// The direction fallback only runs when no category matched at
+    /// all, and it used to recognize exactly one income word: "income".
+    /// So "I got paid two thousand dollars" -- a perfectly ordinary way
+    /// to say it -- came back with no direction, which the form renders
+    /// as an expense. These are the phrasings that now carry it.
+    #[test]
+    fn reads_income_from_the_ordinary_verbs_people_actually_use() {
+        for transcript in [
+            "i got paid two thousand dollars",
+            "they paid me two thousand dollars",
+            "received two thousand dollars",
+            "earned two thousand dollars",
+            "deposited two thousand dollars",
+            "two thousand dollars bonus",
+            "refund of two thousand dollars",
+        ] {
+            let draft = parse_en(transcript, &starter_categories());
+            assert_eq!(draft.is_income, Some(true), "{transcript}");
+            assert_eq!(draft.amount, Some(2000.0), "{transcript}");
+        }
+    }
+
+    #[test]
+    fn reads_expense_from_the_ordinary_verbs_too() {
+        for transcript in ["spent forty dollars", "bought something for forty dollars"] {
+            let draft = parse_en(transcript, &starter_categories());
+            assert_eq!(draft.is_income, Some(false), "{transcript}");
+        }
+    }
+
+    /// "paid" alone is income in "got paid" and expense in "paid for",
+    /// so it is in neither cue list on its own -- only as part of a
+    /// phrase. This is the case that would silently invert a direction
+    /// if a bare word were ever added.
+    #[test]
+    fn a_bare_paid_does_not_decide_a_direction_by_itself() {
+        let draft = parse_en("paid forty dollars", &starter_categories());
+        assert_eq!(draft.is_income, None);
+
+        let expense = parse_en("paid for forty dollars of something", &starter_categories());
+        assert_eq!(expense.is_income, Some(false));
+    }
+
+    /// An explicitly spoken direction outranks a verb used in passing.
+    #[test]
+    fn an_explicit_direction_word_beats_a_soft_verb_cue() {
+        let draft = parse_en(
+            "add expense forty dollars it was a refund",
+            &starter_categories(),
+        );
+        assert_eq!(draft.is_income, Some(false));
+    }
+
+    /// Unchanged by the widening: a matched category still decides the
+    /// direction, whatever verb was spoken (see the module doc).
+    #[test]
+    fn a_matched_category_still_outranks_every_widened_cue() {
+        let draft = parse_en("spent twelve dollars on groceries", &starter_categories());
+        assert_eq!(draft.category_id.as_deref(), Some("exp-1"));
+        assert_eq!(draft.is_income, Some(false));
+
+        let income = parse_en("bought two thousand dollars salary", &starter_categories());
+        assert_eq!(income.category_id.as_deref(), Some("inc-1"));
+        assert_eq!(income.is_income, Some(true));
     }
 
     #[test]
@@ -1134,6 +1293,19 @@ mod tests {
         assert_eq!(draft.amount, Some(50.0));
         assert_eq!(draft.is_income, Some(false));
         assert_eq!(draft.category_id.as_deref(), Some("exp-1"));
+    }
+
+    /// Mandarin's soft income cues, widened alongside English's. 收到
+    /// and 赚 were already there; 挣/到账/进账/领到/发了 are the ones an
+    /// ordinary sentence is just as likely to use.
+    #[test]
+    fn reads_mandarin_income_from_the_widened_verbs() {
+        for transcript in ["挣了两千元", "两千元到账", "领到两千元", "发了两千元"]
+        {
+            let draft = parse_cmn(transcript, &mandarin_starter_categories());
+            assert_eq!(draft.is_income, Some(true), "{transcript}");
+            assert_eq!(draft.amount, Some(2000.0), "{transcript}");
+        }
     }
 
     #[test]
