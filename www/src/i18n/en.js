@@ -267,8 +267,12 @@ export default {
   'transactions.add': 'Add',
   'transactions.noTransactions': 'No transactions yet.',
   'transactions.importTitle': 'Import from a bank export',
+  // Names the three columns before the file picker, not after: the one
+  // moment this is worth knowing is while choosing which export to
+  // download from the bank, and an export missing an amount column can't
+  // be rescued by any amount of mapping afterwards.
   'transactions.importHint':
-    'Drop a CSV your bank or card exports. It is parsed on this page — nothing is uploaded.',
+    'Drop a CSV your bank or card exports. It needs a date, a description and an amount — or money-out and money-in as two columns. Dates in any common order are fine. It is parsed on this page — nothing is uploaded.',
   'transactions.chooseFile': 'Upload CSV',
   'transactions.columnsDetected': 'Columns matched automatically from the header row.',
   'transactions.columnsNotDetected': "Couldn't match columns automatically — check them below.",
@@ -276,11 +280,13 @@ export default {
   'transactions.dateColumn': 'Date column',
   'transactions.descriptionColumn': 'Description column',
   'transactions.amountColumn': 'Amount column',
-  'transactions.creditColumn': 'Credit column (optional, for separate debit/credit exports)',
+  'transactions.creditColumn': 'Money-in column (only if separate)',
+  'transactions.noColumn': "— this file doesn't have one",
   'transactions.hasHeader': 'First row is a header',
   'transactions.import': 'Import',
   'transactions.importedCount': '{count} transactions imported',
   'transactions.skippedCount': '{count} rows skipped',
+  'transactions.datesReadAs': 'Dates read as {format} — worth checking a row or two.',
   'transactions.rulesTitle': 'Categorization rules',
   'transactions.rulesHint':
     'A plain keyword match you can read and edit — never a hidden model guessing on your data.',

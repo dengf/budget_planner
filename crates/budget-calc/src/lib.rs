@@ -42,7 +42,8 @@ pub use category::{
     MIN_TRANSACTIONS_FOR_PLAN, SAVINGS_CATEGORY_ID,
 };
 pub use csv_import::{
-    detect_columns, import_csv, ColumnMapping, ImportOutcome, ImportedTransaction, SkippedRow,
+    detect_columns, import_csv, preview_columns, ColumnMapping, CsvColumn, ImportOutcome,
+    ImportedTransaction, SkippedRow,
 };
 pub use debt::{
     apply_payment, build_plan, payoff_amount, Debt, PaymentOutcome, PayoffMonth, PayoffPlan,

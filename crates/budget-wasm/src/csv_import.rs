@@ -4,8 +4,8 @@ use wasm_bindgen::prelude::*;
 
 use crate::convert::{decimal_to_f64, new_record_id, to_js};
 use crate::dto::{
-    ColumnMappingDto, DetectColumnsResult, ImportCsvParams, ImportCsvResult,
-    ImportedTransactionDto, SkippedRowDto, TransactionDto,
+    ColumnMappingDto, CsvColumnDto, CsvColumnsParams, DetectColumnsResult, ImportCsvParams,
+    ImportCsvResult, ImportedTransactionDto, SkippedRowDto, TransactionDto,
 };
 use crate::message::Message;
 
@@ -29,15 +29,49 @@ fn mapping_to_dto(mapping: budget_calc::ColumnMapping) -> ColumnMappingDto {
     }
 }
 
+fn columns_to_dto(columns: Vec<budget_calc::CsvColumn>) -> Vec<CsvColumnDto> {
+    columns
+        .into_iter()
+        .map(|c| CsvColumnDto {
+            index: c.index,
+            header: c.header,
+            sample: c.sample,
+        })
+        .collect()
+}
+
 /// Guesses a column mapping from the CSV's header row, so the common
-/// case needs no manual setup -- see `budget_calc::detect_columns`.
-/// `mapping: null` in the result means it couldn't confidently guess;
-/// the frontend falls back to its own manual defaults, already visible
-/// for exactly this case.
+/// case needs no manual setup -- see `budget_calc::detect_columns` -- and
+/// returns the file's columns alongside it either way, so the picker can
+/// name them whether or not the guess landed. `mapping: null` in the result
+/// means it couldn't confidently guess; the frontend falls back to its own
+/// manual defaults, and opens the picker on its own for exactly this case.
 #[wasm_bindgen]
 pub fn detect_csv_columns(csv_text: &str) -> JsValue {
+    let mapping = budget_calc::detect_columns(csv_text);
+    // The frontend's own fallback default is a header row, so an undetected
+    // file is previewed the same way it will be imported.
+    let has_header = mapping.is_none_or(|m| m.has_header);
     to_js(&DetectColumnsResult {
-        mapping: budget_calc::detect_columns(csv_text).map(mapping_to_dto),
+        mapping: mapping.map(mapping_to_dto),
+        columns: columns_to_dto(budget_calc::preview_columns(csv_text, has_header)),
+    })
+}
+
+/// The file's columns re-read under a different `has_header` -- what the
+/// picker needs when someone corrects the "first row is a header"
+/// checkbox, since that flips whether row 0 is a label or a value.
+#[wasm_bindgen]
+pub fn csv_columns(params: JsValue) -> JsValue {
+    let Ok(params) = serde_wasm_bindgen::from_value::<CsvColumnsParams>(params) else {
+        return to_js(&DetectColumnsResult::default());
+    };
+    to_js(&DetectColumnsResult {
+        mapping: None,
+        columns: columns_to_dto(budget_calc::preview_columns(
+            &params.csv_text,
+            params.has_header,
+        )),
     })
 }
 
@@ -86,6 +120,7 @@ fn import_csv_impl(params: JsValue) -> ImportCsvResult {
                     reason: s.reason,
                 })
                 .collect(),
+            date_format: outcome.date_format,
             error: None,
             error_message: None,
         },

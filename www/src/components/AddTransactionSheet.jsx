@@ -92,6 +92,10 @@ export default function AddTransactionSheet({
   const [csvText, setCsvText] = useState('');
   const [mapping, setMapping] = useState(DEFAULT_MAPPING);
   const [columnsDetected, setColumnsDetected] = useState(false);
+  // The file's own columns, so the picker below can name them. See
+  // `budget_calc::preview_columns` for why a column *number* is not a fair
+  // thing to ask anyone for.
+  const [csvColumns, setCsvColumns] = useState([]);
   const [importResult, setImportResult] = useState(null);
   const [recurringDraft, setRecurringDraft] = useState(EMPTY_RECURRING_DRAFT);
   const [ruleMatch, setRuleMatch] = useState(null);
@@ -324,6 +328,7 @@ export default function AddTransactionSheet({
       // the same manual defaults as before -- nothing is lost, the
       // "Adjust columns" panel below just opens on its own to prompt it.
       const detected = await wasmModule?.detect_csv_columns?.(text);
+      setCsvColumns(detected?.columns ?? []);
       if (detected?.mapping) {
         setMapping(detected.mapping);
         setColumnsDetected(true);
@@ -334,6 +339,54 @@ export default function AddTransactionSheet({
     };
     reader.readAsText(file);
   };
+
+  // Flipping "first row is a header" changes whether row 0 is a set of
+  // labels or the first set of values, so the picker's own option text has
+  // to be re-read under the new answer -- it's the same Rust preview, asked
+  // again, rather than a second guess at it here.
+  const setHasHeader = async (has_header) => {
+    setMapping({ ...mapping, has_header });
+    const preview = await wasmModule?.csv_columns?.({ csv_text: csvText, has_header });
+    if (preview?.columns) setCsvColumns(preview.columns);
+  };
+
+  // "3 · Amount (-4.50)" -- the position a person can count to if they want
+  // to, the label if the file has one, and a real value from the column,
+  // which is what actually identifies it when the label is missing or in a
+  // language the header matcher doesn't list.
+  const columnLabel = (column) =>
+    [
+      `${column.index + 1}`,
+      column.header ? ` · ${column.header}` : '',
+      column.sample ? ` (${column.sample})` : '',
+    ].join('');
+
+  // A plain function returning JSX, not a nested component: a component
+  // declared in a render body is a fresh type every render, which remounts
+  // the <select> and drops the open dropdown mid-choice.
+  const columnField = (labelKey, value, onPick, optional = false) => (
+    <label className="field" key={labelKey}>
+      <span className="field-label">{t(labelKey)}</span>
+      {/* No `.field-input` wrapper, unlike the text fields around it: the
+          more specific `.field-input select` rule overrides `.field-select`
+          and takes the dropdown arrow with it, leaving a control that reads
+          as a text box. Every other <select> in the app (GoalsTab,
+          RuleRows, CategoryRows) sits directly under `.field` for the same
+          reason. */}
+      <select
+        className="field-select"
+        value={value ?? ''}
+        onChange={(e) => onPick(e.target.value === '' ? null : Number(e.target.value))}
+      >
+        {optional && <option value="">{t('transactions.noColumn')}</option>}
+        {csvColumns.map((column) => (
+          <option key={column.index} value={column.index}>
+            {columnLabel(column)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   const runImport = async () => {
     if (!wasmModule?.import_csv || !csvText) return;
@@ -700,54 +753,43 @@ export default function AddTransactionSheet({
                 </p>
               )}
 
-              {csvText && !columnsDetected && (
-                <details className="csv-columns" open>
+              {/* Open on its own when the guess didn't land, but present
+                  either way: a guess that lands on the wrong column is
+                  every bit as wrong as no guess, and the only person who
+                  can see that it picked "Posted date" over "Transaction
+                  date" is the one looking at the file. */}
+              {csvText && (
+                <details className="csv-columns" open={!columnsDetected}>
                   <summary>{t('transactions.mapColumns')}</summary>
                   <div className="form-grid">
-                    <label className="field">
-                      <span className="field-label">{t('transactions.dateColumn')}</span>
-                      <div className="field-input">
-                        <input
-                          type="number"
-                          min="0"
-                          value={mapping.date_col}
-                          onChange={(e) =>
-                            setMapping({ ...mapping, date_col: Number(e.target.value) })
-                          }
-                        />
-                      </div>
-                    </label>
-                    <label className="field">
-                      <span className="field-label">{t('transactions.descriptionColumn')}</span>
-                      <div className="field-input">
-                        <input
-                          type="number"
-                          min="0"
-                          value={mapping.description_col}
-                          onChange={(e) =>
-                            setMapping({ ...mapping, description_col: Number(e.target.value) })
-                          }
-                        />
-                      </div>
-                    </label>
-                    <label className="field">
-                      <span className="field-label">{t('transactions.amountColumn')}</span>
-                      <div className="field-input">
-                        <input
-                          type="number"
-                          min="0"
-                          value={mapping.amount_col}
-                          onChange={(e) =>
-                            setMapping({ ...mapping, amount_col: Number(e.target.value) })
-                          }
-                        />
-                      </div>
-                    </label>
+                    {columnField('transactions.dateColumn', mapping.date_col, (date_col) =>
+                      setMapping({ ...mapping, date_col }),
+                    )}
+                    {columnField(
+                      'transactions.descriptionColumn',
+                      mapping.description_col,
+                      (description_col) => setMapping({ ...mapping, description_col }),
+                    )}
+                    {columnField('transactions.amountColumn', mapping.amount_col, (amount_col) =>
+                      setMapping({ ...mapping, amount_col }),
+                    )}
+                    {/* Optional, and the only way to import a statement
+                        that splits money out and money in across two
+                        columns when its headers aren't ones
+                        `detect_columns` recognizes -- a non-English export
+                        had no way to say so at all before this field
+                        existed. */}
+                    {columnField(
+                      'transactions.creditColumn',
+                      mapping.credit_col,
+                      (credit_col) => setMapping({ ...mapping, credit_col }),
+                      true,
+                    )}
                     <label className="field field-check">
                       <input
                         type="checkbox"
                         checked={mapping.has_header}
-                        onChange={(e) => setMapping({ ...mapping, has_header: e.target.checked })}
+                        onChange={(e) => setHasHeader(e.target.checked)}
                       />
                       <span>{t('transactions.hasHeader')}</span>
                     </label>
@@ -763,12 +805,24 @@ export default function AddTransactionSheet({
 
               {importResult?.error && <CalcError result={importResult} />}
               {importResult && !importResult.error && (
-                <p className="headline">
-                  {t('transactions.importedCount', { count: importResult.imported?.length ?? 0 })}
-                  {importResult.skipped?.length
-                    ? ` · ${t('transactions.skippedCount', { count: importResult.skipped.length })}`
-                    : ''}
-                </p>
+                <>
+                  <p className="headline">
+                    {t('transactions.importedCount', { count: importResult.imported?.length ?? 0 })}
+                    {importResult.skipped?.length
+                      ? ` · ${t('transactions.skippedCount', { count: importResult.skipped.length })}`
+                      : ''}
+                  </p>
+                  {/* Only when it isn't ISO: "03/08/2026" had to be read as
+                      one of two months and the person is the only one who
+                      knows which, so the reading is stated rather than left
+                      to be discovered in a wrong month's total. An
+                      unambiguous YYYY-MM-DD file has nothing to check. */}
+                  {importResult.date_format && importResult.date_format !== 'YYYY-MM-DD' && (
+                    <p className="panel-subtitle">
+                      {t('transactions.datesReadAs', { format: importResult.date_format })}
+                    </p>
+                  )}
+                </>
               )}
             </>
           )}
