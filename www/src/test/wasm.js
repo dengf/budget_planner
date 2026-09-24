@@ -40,7 +40,9 @@ export function stubWasm(overrides = {}) {
       };
     },
     apply_rules: async ({ transactions = [] } = {}) => ({ transactions, error: null }),
-    import_csv: async () => ({ imported: [], skipped: [], error: null }),
+    import_csv: async () => ({ imported: [], skipped: [], date_format: null, error: null }),
+    detect_csv_columns: async () => ({ mapping: null, columns: [] }),
+    csv_columns: async () => ({ mapping: null, columns: [] }),
     goal_progress: async ({ current_amount = 0, target_amount = 1 } = {}) => ({
       ratio: Math.min(1, current_amount / target_amount),
       petals_filled: Math.min(5, Math.floor((current_amount / target_amount) * 5)),

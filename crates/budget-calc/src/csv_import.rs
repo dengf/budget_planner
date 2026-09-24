@@ -46,6 +46,25 @@ pub struct ImportOutcome {
     /// dropped. A row a bank pads with a running-balance footer line is a
     /// real, common shape and should show up here rather than vanish.
     pub skipped: Vec<SkippedRow>,
+    /// Which date convention the whole file was read under, as a pattern a
+    /// person can check ("DD/MM/YYYY"). Surfaced because `03/08/2026` is
+    /// genuinely ambiguous and this module has to pick one reading of it --
+    /// a review line naming the pick is the difference between a guess the
+    /// person can catch and one that silently files August as March.
+    pub date_format: Option<String>,
+}
+
+/// One column of the file as a person picking it out of a menu would see
+/// it, rather than as a number they have to count commas to find.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CsvColumn {
+    pub index: usize,
+    /// The header cell, when the file has a header row.
+    pub header: Option<String>,
+    /// The first non-blank value below the header -- what makes a column
+    /// recognizable when its label is missing, unhelpful, or in a language
+    /// `DATE_HEADERS` and friends below don't list.
+    pub sample: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,15 +131,77 @@ fn detect_from_header(headers: &[String]) -> Option<ColumnMapping> {
     })
 }
 
-const CONTENT_DATE_FORMATS: [&str; 6] = [
-    "%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y",
+/// Every date shape this module recognizes -- used both to sniff which
+/// column holds the dates and to normalize the ones it reads, so the two
+/// can never drift into "detected it, then couldn't import it".
+///
+/// Day-first before month-first, deliberately, the same order and for the
+/// same reason as `receipt::NUMERIC_DATE_FORMATS`: a date whose halves are
+/// both <= 12 ("03/08/2026") is genuinely ambiguous, and the
+/// international convention is the better default for this app's
+/// userbase. An unambiguous date resolves the same way whichever comes
+/// first.
+const DATE_FORMATS: [&str; 12] = [
+    "%Y-%m-%d",
+    "%Y/%m/%d",
+    "%d/%m/%Y",
+    "%m/%d/%Y",
+    "%d-%m-%Y",
+    "%m-%d-%Y",
+    "%d/%m/%y",
+    "%m/%d/%y",
+    "%d %B %Y",
+    "%d %b %Y",
+    "%B %d, %Y",
+    "%b %d, %Y",
 ];
 
+fn parse_date_with(raw: &str, fmt: &str) -> Option<chrono::NaiveDate> {
+    chrono::NaiveDate::parse_from_str(raw.trim(), fmt).ok()
+}
+
 fn looks_like_a_date(raw: &str) -> bool {
-    let trimmed = raw.trim();
-    CONTENT_DATE_FORMATS
+    DATE_FORMATS
         .iter()
-        .any(|fmt| chrono::NaiveDate::parse_from_str(trimmed, fmt).is_ok())
+        .any(|fmt| parse_date_with(raw, fmt).is_some())
+}
+
+/// The one format the whole file's dates are read under.
+///
+/// Resolved per file rather than per row on purpose. Letting each row pick
+/// its own best match is how `09/24/2026` and `03/08/2026` in the same
+/// statement end up read as September and March -- the second one silently
+/// wrong by five months, because nothing in that row alone says which half
+/// is the day. One bank writes one convention, so the whole column votes:
+/// the format that reads the most of the sampled dates wins, which makes a
+/// single unambiguous `24/09/2026` anywhere in the column settle the
+/// reading of every other row in it.
+fn resolve_date_format(dates: &[String]) -> Option<&'static str> {
+    let mut best: Option<(&'static str, usize)> = None;
+    for fmt in DATE_FORMATS {
+        let hits = dates
+            .iter()
+            .filter(|d| parse_date_with(d, fmt).is_some())
+            .count();
+        // Strictly greater, so a tie keeps the earlier format -- which is
+        // what makes `DATE_FORMATS`' day-first ordering the tie-break for a
+        // file where every date is ambiguous.
+        if hits > 0 && best.is_none_or(|(_, most)| hits > most) {
+            best = Some((fmt, hits));
+        }
+    }
+    best.map(|(fmt, _)| fmt)
+}
+
+/// A `strftime` pattern as the shape a person reads it as, for the review
+/// line that says how the dates were taken.
+fn human_date_format(fmt: &str) -> String {
+    fmt.replace("%Y", "YYYY")
+        .replace("%y", "YY")
+        .replace("%m", "MM")
+        .replace("%d", "DD")
+        .replace("%B", "Month")
+        .replace("%b", "Mon")
 }
 
 /// Deliberately narrower than `parse_amount` alone: a bare integer like
@@ -252,19 +333,60 @@ fn detect_columns_from_content(rows: &[Vec<String>]) -> Option<ColumnMapping> {
 /// back to its own manual defaults in that case, so nothing is lost by
 /// trying this first.
 pub fn detect_columns(csv_text: &str) -> Option<ColumnMapping> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .flexible(true)
-        .from_reader(csv_text.as_bytes());
-    let rows: Vec<Vec<String>> = reader
-        .records()
-        .take(11) // a possible header, plus up to 10 data rows to sample
-        .filter_map(Result::ok)
-        .map(|r| r.iter().map(str::to_string).collect())
-        .collect();
-
+    // A possible header, plus up to 10 data rows to sample.
+    let rows = sample_rows(csv_text, 11);
     let first_row = rows.first()?;
     detect_from_header(first_row).or_else(|| detect_columns_from_content(&rows))
+}
+
+/// The first `limit` rows, cells trimmed of nothing and kept as-is -- every
+/// caller here reads rows the same way, and a second copy of this reader
+/// setup is a second place for `flexible(true)` to go missing.
+fn sample_rows(csv_text: &str, limit: usize) -> Vec<Vec<String>> {
+    csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .from_reader(csv_text.as_bytes())
+        .records()
+        .take(limit)
+        .filter_map(Result::ok)
+        .map(|r| r.iter().map(str::to_string).collect())
+        .collect()
+}
+
+/// The file's columns, labelled the way a person would recognize them, for
+/// a "which column is which" picker.
+///
+/// Exists because the only thing a UI can otherwise ask for is a column
+/// *number*, which means counting separators in a file the person is not
+/// looking at -- and a mis-picked column doesn't announce itself, it just
+/// skips or mis-reads rows. `has_header` decides whether row 0 is a set of
+/// labels or the first set of values; it's the caller's own mapping flag,
+/// so the picker and the import can't disagree about it.
+pub fn preview_columns(csv_text: &str, has_header: bool) -> Vec<CsvColumn> {
+    let rows = sample_rows(csv_text, 6);
+    let width = rows.iter().map(Vec::len).max().unwrap_or(0);
+    let skip = usize::from(has_header);
+
+    (0..width)
+        .map(|index| {
+            let cell = |row: &Vec<String>| {
+                row.get(index)
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string)
+            };
+            CsvColumn {
+                index,
+                header: if has_header {
+                    rows.first().and_then(cell)
+                } else {
+                    None
+                },
+                sample: rows.iter().skip(skip).find_map(cell),
+            }
+        })
+        .collect()
 }
 
 /// Common thousands separators and a currency symbol prefix/suffix a bank
@@ -307,7 +429,21 @@ pub fn import_csv(
         .flexible(true)
         .from_reader(csv_text.as_bytes());
 
-    let mut outcome = ImportOutcome::default();
+    // The date column read once, before a single row is imported, so every
+    // row is taken under one convention -- see `resolve_date_format`. Cheap:
+    // the whole file is already in memory, this is a second walk over it.
+    let date_format = resolve_date_format(
+        &sample_rows(csv_text, usize::MAX)
+            .into_iter()
+            .skip(usize::from(mapping.has_header))
+            .filter_map(|row| row.get(mapping.date_col).cloned())
+            .collect::<Vec<String>>(),
+    );
+
+    let mut outcome = ImportOutcome {
+        date_format: date_format.map(human_date_format),
+        ..Default::default()
+    };
     let header_offset = if mapping.has_header { 1 } else { 0 };
     let max_col = [
         mapping.date_col,
@@ -385,6 +521,24 @@ pub fn import_csv(
             });
             continue;
         }
+
+        // Stored ISO, always. Every month view in the app filters on a
+        // `YYYY-MM` prefix of this string, so a date left in the file's own
+        // `09/24/2026` form imports "successfully", counts towards the
+        // imported total, and then appears on no screen in the app -- the
+        // worst shape a bug can take here, since the person is told it
+        // worked. A date no recognized format reads is skipped and surfaced
+        // rather than stored in a form nothing can use.
+        let Some(date) = date_format
+            .and_then(|fmt| parse_date_with(&date, fmt))
+            .map(|d| d.format("%Y-%m-%d").to_string())
+        else {
+            outcome.skipped.push(SkippedRow {
+                row,
+                reason: format!("could not read a date from \"{date}\""),
+            });
+            continue;
+        };
 
         let transaction = Transaction::new(next_id(), date, description, amount);
         outcome.imported.push(ImportedTransaction {
@@ -601,5 +755,116 @@ mod tests {
         let csv = "Date,Description,Amount\n2026-08-01,COFFEE,-3.50\n";
         let outcome = import_csv(csv, mapping(), ids()).unwrap();
         assert_eq!(outcome.imported[0].source_row, 2);
+    }
+
+    #[test]
+    fn stores_a_slash_date_as_iso_so_the_month_views_can_find_it() {
+        // The whole point. Every month view in the app filters on a
+        // `YYYY-MM` prefix, so before this the rows below imported, counted
+        // as a success, and showed up nowhere.
+        let csv = "Date,Description,Amount\n09/24/2026,COFFEE,-4.50\n09/23/2026,PAYCHECK,2000.00\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.skipped.len(), 0);
+        assert_eq!(outcome.imported[0].transaction.date, "2026-09-24");
+        assert_eq!(outcome.imported[1].transaction.date, "2026-09-23");
+        assert!(outcome
+            .imported
+            .iter()
+            .all(|i| i.transaction.date.starts_with("2026-09")));
+    }
+
+    #[test]
+    fn an_iso_export_is_left_exactly_as_it_was() {
+        let csv = "Date,Description,Amount\n2026-08-01,STARBUCKS,-5.50\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.imported[0].transaction.date, "2026-08-01");
+        assert_eq!(outcome.date_format.as_deref(), Some("YYYY-MM-DD"));
+    }
+
+    #[test]
+    fn one_unambiguous_row_settles_the_day_month_order_for_the_whole_file() {
+        // Row 2 is ambiguous on its own -- 03/08 could be either order. Row
+        // 1 cannot be month-first (there is no month 24), and one bank
+        // writes one convention, so row 2 is read day-first with it. Read
+        // row by row, row 2 would come out as March 8th instead.
+        let csv = "Date,Description,Amount\n24/09/2026,COFFEE,-4.50\n03/08/2026,RENT,-2000.00\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.imported[0].transaction.date, "2026-09-24");
+        assert_eq!(outcome.imported[1].transaction.date, "2026-08-03");
+        assert_eq!(outcome.date_format.as_deref(), Some("DD/MM/YYYY"));
+    }
+
+    #[test]
+    fn the_same_file_written_month_first_resolves_the_other_way() {
+        let csv = "Date,Description,Amount\n09/24/2026,COFFEE,-4.50\n08/03/2026,RENT,-2000.00\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.imported[1].transaction.date, "2026-08-03");
+        assert_eq!(outcome.date_format.as_deref(), Some("MM/DD/YYYY"));
+    }
+
+    #[test]
+    fn a_file_of_only_ambiguous_dates_reads_day_first_and_says_so() {
+        // Nothing in the file can settle it, so this falls back to the
+        // international reading -- the same default `receipt.rs` takes --
+        // and reports it, which is what gives the person a chance to catch
+        // a US export that needed the other one.
+        let csv = "Date,Description,Amount\n03/08/2026,RENT,-2000.00\n05/06/2026,COFFEE,-4.50\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.imported[0].transaction.date, "2026-08-03");
+        assert_eq!(outcome.date_format.as_deref(), Some("DD/MM/YYYY"));
+    }
+
+    #[test]
+    fn reads_a_written_out_month_name() {
+        let csv = "Date,Description,Amount\n\"24 Sep 2026\",COFFEE,-4.50\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.imported[0].transaction.date, "2026-09-24");
+    }
+
+    #[test]
+    fn a_date_no_format_reads_is_skipped_rather_than_stored_unusable() {
+        let csv = "Date,Description,Amount\n2026-08-01,COFFEE,-4.50\nlast Tuesday,RENT,-2000.00\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.imported.len(), 1);
+        assert_eq!(outcome.skipped.len(), 1);
+        assert_eq!(outcome.skipped[0].row, 3);
+        assert!(
+            outcome.skipped[0].reason.contains("last Tuesday"),
+            "the reason should name the cell it could not read: {:?}",
+            outcome.skipped[0].reason
+        );
+    }
+
+    #[test]
+    fn column_preview_labels_each_column_with_its_header_and_first_value() {
+        let csv = "Date,Description,Amount\n2026-08-01,STARBUCKS,-5.50\n";
+        let columns = preview_columns(csv, true);
+        assert_eq!(columns.len(), 3);
+        assert_eq!(columns[1].index, 1);
+        assert_eq!(columns[1].header.as_deref(), Some("Description"));
+        assert_eq!(columns[1].sample.as_deref(), Some("STARBUCKS"));
+    }
+
+    #[test]
+    fn column_preview_takes_the_first_value_below_a_blank_cell() {
+        // A debit/credit split is half-empty by design, so the first row
+        // under the header is exactly where a sample is likely to be blank.
+        let csv = "Date,Payee,Debit,Credit\n2026-08-01,COFFEE,4.50,\n2026-08-02,SALARY,,3000.00\n";
+        let columns = preview_columns(csv, true);
+        assert_eq!(columns[3].header.as_deref(), Some("Credit"));
+        assert_eq!(columns[3].sample.as_deref(), Some("3000.00"));
+    }
+
+    #[test]
+    fn column_preview_on_a_headerless_file_offers_values_and_no_labels() {
+        let csv = "2026-08-01,STARBUCKS,-5.50\n";
+        let columns = preview_columns(csv, false);
+        assert_eq!(columns[0].header, None);
+        assert_eq!(columns[0].sample.as_deref(), Some("2026-08-01"));
+    }
+
+    #[test]
+    fn column_preview_of_an_empty_file_is_empty_not_a_panic() {
+        assert_eq!(preview_columns("", true), Vec::new());
     }
 }

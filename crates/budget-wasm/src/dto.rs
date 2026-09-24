@@ -500,9 +500,26 @@ pub struct ColumnMappingDto {
     pub has_header: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct CsvColumnDto {
+    pub index: usize,
+    pub header: Option<String>,
+    pub sample: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct DetectColumnsResult {
     pub mapping: Option<ColumnMappingDto>,
+    /// Every column the file has, so the "which column is which" picker can
+    /// offer them by name instead of asking for an index -- returned by the
+    /// same call as the guess, since the UI needs both together.
+    pub columns: Vec<CsvColumnDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CsvColumnsParams {
+    pub csv_text: String,
+    pub has_header: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -527,6 +544,9 @@ pub struct SkippedRowDto {
 pub struct ImportCsvResult {
     pub imported: Vec<ImportedTransactionDto>,
     pub skipped: Vec<SkippedRowDto>,
+    /// Which date convention the file was read under -- see
+    /// `budget_calc::ImportOutcome::date_format`.
+    pub date_format: Option<String>,
     pub error: Option<String>,
     pub error_message: Option<Message>,
 }

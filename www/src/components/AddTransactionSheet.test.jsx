@@ -549,3 +549,90 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     expect(screen.getByRole('button', { name: 'Add recurring expense' })).toBeInTheDocument();
   });
 });
+
+describe('AddTransactionSheet CSV import', () => {
+  // The header names are matched in Rust (`detect_columns`); what these
+  // cover is the half that can't be: that the picker offers the file's own
+  // columns by name, that it stays reachable when the guess did land, and
+  // that a split debit/credit export has somewhere to say so.
+  const CSV = 'Date,Payee,Debit,Credit\n2026-08-01,COFFEE,4.50,\n2026-08-02,SALARY,,3000.00\n';
+
+  const COLUMNS = [
+    { index: 0, header: 'Date', sample: '2026-08-01' },
+    { index: 1, header: 'Payee', sample: 'COFFEE' },
+    { index: 2, header: 'Debit', sample: '4.50' },
+    { index: 3, header: 'Credit', sample: '3000.00' },
+  ];
+
+  const csvWasm = (detected) => ({
+    ...WASM,
+    detect_csv_columns: vi.fn(async () => ({ mapping: detected, columns: COLUMNS })),
+    csv_columns: vi.fn(async () => ({ mapping: null, columns: COLUMNS })),
+    import_csv: vi.fn(async () => ({ imported: [], skipped: [], date_format: 'DD/MM/YYYY' })),
+  });
+
+  const dropFile = async (wasm) => {
+    const utils = renderSheet({ initialMethod: 'csv', wasmModule: wasm });
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, {
+      target: { files: [new File([CSV], 'statement.csv', { type: 'text/csv' })] },
+    });
+    // The file is read asynchronously and the picker only exists once the
+    // columns come back from the (mocked) detect call.
+    await screen.findByLabelText('Date column');
+    return utils;
+  };
+
+  it('offers each column by its header and a real value from it', async () => {
+    await dropFile(csvWasm(null));
+    const options = [...screen.getByLabelText('Date column').options].map((o) => o.textContent);
+    expect(options).toEqual([
+      '1 · Date (2026-08-01)',
+      '2 · Payee (COFFEE)',
+      '3 · Debit (4.50)',
+      '4 · Credit (3000.00)',
+    ]);
+  });
+
+  it('lets a split debit/credit export name its money-in column', async () => {
+    await dropFile(csvWasm(null));
+    const credit = screen.getByLabelText('Money-in column (only if separate)');
+    // Its own option, so "this file has one column, signed" stays sayable.
+    expect(credit.value).toBe('');
+    fireEvent.change(credit, { target: { value: '3' } });
+    expect(credit.value).toBe('3');
+  });
+
+  it('keeps the picker reachable when the columns were detected', async () => {
+    // A guess that lands on the wrong column is as wrong as no guess, and
+    // only the person looking at the file can see that it did.
+    const detected = {
+      date_col: 0,
+      description_col: 1,
+      amount_col: 2,
+      credit_col: 3,
+      has_header: true,
+    };
+    await dropFile(csvWasm(detected));
+    expect(screen.getByText('Columns matched automatically from the header row.')).toBeTruthy();
+    expect(screen.getByLabelText('Amount column').value).toBe('2');
+  });
+
+  it('re-reads the columns when the header row answer changes', async () => {
+    const wasm = csvWasm(null);
+    await dropFile(wasm);
+    fireEvent.click(screen.getByLabelText('First row is a header'));
+    await waitFor(() =>
+      expect(wasm.csv_columns).toHaveBeenCalledWith({ csv_text: CSV, has_header: false }),
+    );
+  });
+
+  it('says which way an ambiguous date column was read', async () => {
+    const wasm = csvWasm(null);
+    await dropFile(wasm);
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    expect(
+      await screen.findByText('Dates read as DD/MM/YYYY — worth checking a row or two.'),
+    ).toBeTruthy();
+  });
+});
