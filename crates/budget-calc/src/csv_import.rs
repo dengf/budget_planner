@@ -141,7 +141,7 @@ fn detect_from_header(headers: &[String]) -> Option<ColumnMapping> {
 /// international convention is the better default for this app's
 /// userbase. An unambiguous date resolves the same way whichever comes
 /// first.
-const DATE_FORMATS: [&str; 12] = [
+const DATE_FORMATS: [&str; 14] = [
     "%Y-%m-%d",
     "%Y/%m/%d",
     "%d/%m/%Y",
@@ -150,14 +150,30 @@ const DATE_FORMATS: [&str; 12] = [
     "%m-%d-%Y",
     "%d/%m/%y",
     "%m/%d/%y",
+    "%d-%m-%y",
+    "%m-%d-%y",
     "%d %B %Y",
     "%d %b %Y",
     "%B %d, %Y",
     "%b %d, %Y",
 ];
 
+/// One date under one format, with the four-digit-year formats held to
+/// four digits.
+///
+/// chrono's `%Y` takes however many digits it is given, so `%Y/%m/%d`
+/// happily reads `15/09/26` as the year 15 -- and since that format sits
+/// ahead of `%d/%m/%y` in `DATE_FORMATS`, it used to win the tie and file
+/// a whole `DD/MM/YY` statement under the year 0015, which is in no
+/// month this app can show. A year is either written out in full or it
+/// isn't, so requiring the full four digits is the actual rule rather
+/// than a guess at which years are plausible.
 fn parse_date_with(raw: &str, fmt: &str) -> Option<chrono::NaiveDate> {
-    chrono::NaiveDate::parse_from_str(raw.trim(), fmt).ok()
+    let date = chrono::NaiveDate::parse_from_str(raw.trim(), fmt).ok()?;
+    if fmt.contains("%Y") && !(1000..=9999).contains(&chrono::Datelike::year(&date)) {
+        return None;
+    }
+    Some(date)
 }
 
 fn looks_like_a_date(raw: &str) -> bool {
@@ -812,6 +828,37 @@ mod tests {
         let outcome = import_csv(csv, mapping(), ids()).unwrap();
         assert_eq!(outcome.imported[0].transaction.date, "2026-08-03");
         assert_eq!(outcome.date_format.as_deref(), Some("DD/MM/YYYY"));
+    }
+
+    #[test]
+    fn a_two_digit_year_is_not_read_as_the_year_fifteen() {
+        // `%Y` will take two digits if offered them, so `%Y/%m/%d` used to
+        // claim this file and store 0015-09-26 -- a row that then appeared
+        // in no month view at all, which is the exact failure normalising
+        // the dates was meant to end.
+        let csv = "Date,Description,Amount\n15/09/26,BUS FARE,-2.10\n02/09/26,MRT,-1.50\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.date_format.as_deref(), Some("DD/MM/YY"));
+        assert_eq!(outcome.imported[0].transaction.date, "2026-09-15");
+        assert_eq!(outcome.imported[1].transaction.date, "2026-09-02");
+        assert!(outcome.skipped.is_empty());
+    }
+
+    #[test]
+    fn a_two_digit_year_written_with_dashes_reads_the_same_way() {
+        let csv = "Date,Description,Amount\n15-09-26,BUS FARE,-2.10\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.date_format.as_deref(), Some("DD-MM-YY"));
+        assert_eq!(outcome.imported[0].transaction.date, "2026-09-15");
+    }
+
+    #[test]
+    fn a_four_digit_year_still_wins_where_it_is_actually_written_out() {
+        // The guard must not cost the ISO path anything.
+        let csv = "Date,Description,Amount\n2026/09/15,BUS FARE,-2.10\n";
+        let outcome = import_csv(csv, mapping(), ids()).unwrap();
+        assert_eq!(outcome.date_format.as_deref(), Some("YYYY/MM/DD"));
+        assert_eq!(outcome.imported[0].transaction.date, "2026-09-15");
     }
 
     #[test]
