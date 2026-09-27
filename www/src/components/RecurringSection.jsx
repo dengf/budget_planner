@@ -51,6 +51,7 @@ export default function RecurringSection({
   const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
   const [status, setStatus] = useState(null);
   const [payError, setPayError] = useState(null);
+  const isIncome = (id) => Boolean(categoryFor(id)?.is_income);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +64,7 @@ export default function RecurringSection({
         recurring: recurring.items,
         transactions: transactions.items.filter((tx) => tx.date?.startsWith(viewMonth)),
         month: viewMonth,
+        income_category_ids: categories.items.filter((c) => c.is_income).map((c) => c.id),
       });
       if (!cancelled) setStatus(result?.error ? null : result);
     }
@@ -70,7 +72,7 @@ export default function RecurringSection({
     return () => {
       cancelled = true;
     };
-  }, [wasmModule, recurring.items, transactions.items, viewMonth]);
+  }, [wasmModule, recurring.items, transactions.items, viewMonth, categories.items]);
 
   const removeRecurring = async (item) => {
     const ok = await confirm(t('confirm.removeRecurring', { description: item.description }));
@@ -83,7 +85,10 @@ export default function RecurringSection({
   // occurrence it came from.
   const markPaid = async (occurrence) => {
     if (!wasmModule?.occurrence_payment) return;
-    const payment = await wasmModule.occurrence_payment({ occurrence });
+    const payment = await wasmModule.occurrence_payment({
+      occurrence,
+      is_income: isIncome(occurrence.category_id),
+    });
     if (payment?.error) {
       setPayError(payment);
       return;
@@ -109,12 +114,22 @@ export default function RecurringSection({
             {t('recurring.thisMonthTitle', { month: monthLabel(viewMonth, locale) })}
           </h2>
           <p className="panel-subtitle">
-            {status.unpaid_count === 0
+            {status.unpaid_count === 0 && !status.expected_count
               ? t('recurring.allPaid')
-              : t('recurring.stillDue', {
-                  count: status.unpaid_count,
-                  amount: formatMoney(status.unpaid_total),
-                })}
+              : [
+                  status.unpaid_count > 0 &&
+                    t('recurring.stillDue', {
+                      count: status.unpaid_count,
+                      amount: formatMoney(status.unpaid_total),
+                    }),
+                  status.expected_count > 0 &&
+                    t('recurring.stillExpected', {
+                      count: status.expected_count,
+                      amount: formatMoney(status.expected_total),
+                    }),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
           </p>
           {payError && <CalcError result={payError} />}
           <ul className="recurring-status-list">
@@ -132,14 +147,22 @@ export default function RecurringSection({
                   </span>
                 </span>
                 {s.paid ? (
-                  <span className="recurring-status-tag">{t('recurring.paid')}</span>
+                  <span className="recurring-status-tag">
+                    {t(
+                      isIncome(s.occurrence.category_id) ? 'recurring.received' : 'recurring.paid',
+                    )}
+                  </span>
                 ) : (
                   <button
                     type="button"
                     className="btn secondary"
                     onClick={() => markPaid(s.occurrence)}
                   >
-                    {t('recurring.markPaid')}
+                    {t(
+                      isIncome(s.occurrence.category_id)
+                        ? 'recurring.markReceived'
+                        : 'recurring.markPaid',
+                    )}
                   </button>
                 )}
               </li>

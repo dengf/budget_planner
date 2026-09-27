@@ -40,25 +40,32 @@ function occurrenceFor(r) {
  * rather than deciding for itself.
  */
 const WASM = {
-  recurring_status: async ({ recurring, transactions }) => {
+  recurring_status: async ({ recurring, transactions, income_category_ids = [] }) => {
     const statuses = recurring.map((r) => {
       const hit = transactions.find(
         (tx) => tx.category_id === r.category_id && Math.abs(tx.amount) === r.amount,
       );
       return { occurrence: occurrenceFor(r), paid: !!hit, transaction_id: hit?.id ?? null };
     });
-    const unpaid = statuses.filter((s) => !s.paid);
+    const unpaid = statuses.filter(
+      (s) => !s.paid && !income_category_ids.includes(s.occurrence.category_id),
+    );
+    const expected = statuses.filter(
+      (s) => !s.paid && income_category_ids.includes(s.occurrence.category_id),
+    );
     return {
       statuses,
       unpaid_count: unpaid.length,
       unpaid_total: unpaid.reduce((sum, s) => sum + s.occurrence.amount, 0),
+      expected_count: expected.length,
+      expected_total: expected.reduce((sum, s) => sum + s.occurrence.amount, 0),
       error: null,
     };
   },
-  occurrence_payment: async ({ occurrence }) => ({
+  occurrence_payment: async ({ occurrence, is_income }) => ({
     date: occurrence.date,
     description: occurrence.description,
-    amount: -Math.abs(occurrence.amount),
+    amount: is_income ? Math.abs(occurrence.amount) : -Math.abs(occurrence.amount),
     category_id: occurrence.category_id,
     error: null,
   }),
@@ -68,6 +75,7 @@ const CATEGORIES = {
   items: [
     { id: 'housing', name: 'Housing', is_income: false },
     { id: 'utilities', name: 'Utilities', is_income: false },
+    { id: 'salary', name: 'Salary', is_income: true },
   ],
 };
 
@@ -156,15 +164,42 @@ describe('RecurringSection: what is still due', () => {
         remove: vi.fn(),
       },
     });
-    await screen.findByText('Everything scheduled this month has been paid.');
+    await screen.findByText('Everything scheduled this month has been paid or received.');
     expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument();
+  });
+
+  // A paycheck is not a bill: it is counted as income still to come, and
+  // settling it writes money in, not out.
+  it('keeps recurring income apart from bills and records it as money in', async () => {
+    const PAYCHECK = {
+      ...RENT,
+      id: 'pay',
+      description: 'Paycheck',
+      category_id: 'salary',
+      amount: 3000,
+    };
+    const { save } = renderSection({
+      recurring: { items: [RENT, PAYCHECK], save: vi.fn(), remove: vi.fn() },
+    });
+    expect(
+      await screen.findByText('1 still due — $500.00 · 1 income still expected — $3,000.00'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as received' }));
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0]).toMatchObject({
+      description: 'Paycheck',
+      amount: 3000,
+      category_id: 'salary',
+    });
   });
 
   it('shows no status list at all when nothing is scheduled', async () => {
     renderSection({ recurring: { items: [], save: vi.fn(), remove: vi.fn() } });
-    await screen.findByText('No recurring expenses set up yet.');
+    await screen.findByText('Nothing recurring set up yet.');
     expect(screen.queryByText(/still due/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Everything scheduled this month has been paid.')).toBeNull();
+    expect(
+      screen.queryByText('Everything scheduled this month has been paid or received.'),
+    ).toBeNull();
   });
 });
 
@@ -198,7 +233,7 @@ describe('RecurringSection: adding on desktop', () => {
     fireEvent.change(screen.getByLabelText(`Amount per occurrence, row ${n}`), {
       target: { value: amount },
     });
-    fireEvent.change(screen.getByLabelText(`One real due date, row ${n}`), {
+    fireEvent.change(screen.getByLabelText(`One real date, row ${n}`), {
       target: { value: date },
     });
   };
@@ -223,7 +258,7 @@ describe('RecurringSection: adding on desktop', () => {
       date: '2026-10-11',
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add 2 recurring expenses' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 recurring items' }));
 
     await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(2));
     expect(recurring.save).toHaveBeenCalledWith(
@@ -251,7 +286,7 @@ describe('RecurringSection: adding on desktop', () => {
     fillRow(1, { description: 'Insurance', amount: '180', date: '2026-10-03' });
     fireEvent.change(screen.getByLabelText('Description, row 2'), { target: { value: 'Gym' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring item' }));
 
     await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Description, row 1')).toHaveValue('Gym');
@@ -261,7 +296,7 @@ describe('RecurringSection: adding on desktop', () => {
   it('keeps the submit disabled until a row has every field', async () => {
     mockDesktop();
     renderSection();
-    const submit = await screen.findByRole('button', { name: 'Add recurring expense' });
+    const submit = await screen.findByRole('button', { name: 'Add recurring item' });
     expect(submit).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Description, row 1'), { target: { value: 'Gym' } });
@@ -271,7 +306,7 @@ describe('RecurringSection: adding on desktop', () => {
     expect(submit).toBeDisabled(); // no category, no due date yet
 
     fireEvent.change(screen.getByLabelText('Category, row 1'), { target: { value: 'housing' } });
-    fireEvent.change(screen.getByLabelText('One real due date, row 1'), {
+    fireEvent.change(screen.getByLabelText('One real date, row 1'), {
       target: { value: '2026-10-15' },
     });
     expect(submit).toBeEnabled();
@@ -290,7 +325,7 @@ describe('RecurringSection: adding on desktop', () => {
   it('shows the rows on an empty screen, under the empty state', async () => {
     mockDesktop();
     renderSection({ recurring: { items: [], save: vi.fn(), remove: vi.fn() } });
-    expect(await screen.findByText('No recurring expenses set up yet.')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing recurring set up yet.')).toBeInTheDocument();
     expect(screen.getByLabelText('Description, row 1')).toBeInTheDocument();
   });
 
@@ -298,6 +333,6 @@ describe('RecurringSection: adding on desktop', () => {
     renderSection();
     await screen.findByText('The schedule');
     expect(screen.queryByLabelText('Description, row 1')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add recurring expense' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add recurring item' })).not.toBeInTheDocument();
   });
 });

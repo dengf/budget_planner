@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '../i18n';
-import { categoryDisplayName } from '../presetCategories';
+import CategoryOptions from './CategoryOptions';
 import BatchRows from './BatchRows';
 import NumberField from './NumberField';
 
@@ -72,11 +72,7 @@ export default function RecurringRows({
             onChange={(e) => onRowChange(row.key, { category_id: e.target.value })}
           >
             <option value="">—</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {categoryDisplayName(c, t)}
-              </option>
-            ))}
+            <CategoryOptions categories={categories} />
           </select>
 
           <NumberField

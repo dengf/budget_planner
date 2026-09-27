@@ -125,16 +125,15 @@ fn recurring_status_impl(params: JsValue) -> RecurringStatusResult {
     }
 
     let statuses = budget_calc::match_occurrences(&occurrences, &transactions);
-    let unpaid_count = statuses.iter().filter(|s| !s.paid).count();
-    let unpaid_total = statuses
-        .iter()
-        .filter(|s| !s.paid)
-        .map(|s| s.occurrence.amount)
-        .sum();
+    let outstanding = budget_calc::outstanding(&statuses, |id| {
+        params.income_category_ids.iter().any(|i| i == id)
+    });
 
     RecurringStatusResult {
-        unpaid_count,
-        unpaid_total: decimal_to_f64(unpaid_total),
+        unpaid_count: outstanding.due_count,
+        unpaid_total: decimal_to_f64(outstanding.due_total),
+        expected_count: outstanding.expected_count,
+        expected_total: decimal_to_f64(outstanding.expected_total),
         statuses: statuses
             .into_iter()
             .map(|s| OccurrenceStatusDto {
@@ -174,7 +173,7 @@ fn occurrence_payment_impl(params: JsValue) -> OccurrencePaymentResult {
         return failed(Message::bad_request());
     };
 
-    let payment = budget_calc::payment_for_occurrence(&occurrence);
+    let payment = budget_calc::payment_for_occurrence(&occurrence, params.is_income);
     OccurrencePaymentResult {
         date: payment.date,
         description: payment.description,

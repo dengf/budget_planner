@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import CalcError from './CalcError';
+import CategoryOptions from './CategoryOptions';
 import CategoryPicker from './CategoryPicker';
 import NumberField from './NumberField';
 import ReceiptCapture from './ReceiptCapture';
@@ -864,11 +865,7 @@ export default function AddTransactionSheet({
                     }
                   >
                     <option value="">—</option>
-                    {categories.items.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {categoryDisplayName(c, t)}
-                      </option>
-                    ))}
+                    <CategoryOptions categories={categories.items} />
                   </select>
                 </label>
                 <NumberField
