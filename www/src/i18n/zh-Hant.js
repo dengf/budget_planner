@@ -163,8 +163,9 @@ export default {
   'category.subCount': '子分類（{count}）',
   'category.newSubIn': '在「{name}」下新增子分類',
   'budget.subcategories': '子分類',
-  'budget.subPlanHint': '只有想單獨追蹤某個子分類時才需要替它做計畫——它會計入「{name}」的總額。',
-  'budget.plannedRest': '「{name}」其餘部分的計畫',
+  'budget.subPlanHint':
+    '可以把它分到各個子分類——只要有一個子分類填了金額，「{name}」的總額就是子分類之和。',
+  'budget.plannedIsSubSum': '各子分類之和。',
   'budget.plannedTotal': '計畫總額',
   'confirm.removeGroup': '要刪除「{name}」及其 {count} 個子分類嗎？',
 

@@ -150,6 +150,54 @@ pub fn roll_up(
     rolled
 }
 
+/// A group's planned total from its own plan and its subcategories'.
+///
+/// Once any subcategory carries a plan, the group's total *is* the sum of
+/// its subcategories -- the group's own amount no longer counts. Adding
+/// the two double-counted the most natural way to use it: type the
+/// group's total, then split that same money across its subcategories.
+/// The group's own amount only stands while nothing under it is planned,
+/// so someone who never splits can still plan at the group level.
+pub fn group_planned(own: Decimal, subcategories: &[Decimal]) -> Decimal {
+    if subcategories.iter().any(|a| !a.is_zero()) {
+        subcategories.iter().copied().sum()
+    } else {
+        own
+    }
+}
+
+/// [`roll_up`] for planned amounts: each group's total by
+/// [`group_planned`], in the same first-seen order.
+pub fn roll_up_planned(
+    planned: &[(String, Decimal)],
+    parents: &HashMap<String, String>,
+) -> Vec<(String, Decimal)> {
+    let mut groups: Vec<(String, Decimal, Vec<Decimal>)> = Vec::new();
+    for (id, amount) in planned {
+        let (root, is_sub) = match parents.get(id) {
+            Some(root) => (root, true),
+            None => (id, false),
+        };
+        let index = groups
+            .iter()
+            .position(|(r, _, _)| r == root)
+            .unwrap_or_else(|| {
+                groups.push((root.clone(), Decimal::ZERO, Vec::new()));
+                groups.len() - 1
+            });
+        let (_, own, subs) = &mut groups[index];
+        if is_sub {
+            subs.push(*amount);
+        } else {
+            *own += *amount;
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(id, own, subs)| (id, group_planned(own, &subs)))
+        .collect()
+}
+
 /// A month's lines at both levels.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MonthTree {
@@ -167,7 +215,9 @@ pub struct MonthTree {
 ///
 /// Planning happens at the top level, with a subcategory optionally
 /// carrying a plan of its own; a top-level row's planned amount is then
-/// its own plan plus every subcategory's, and the same for spent. A
+/// [`group_planned`] -- its subcategories' sum once any is planned, else
+/// its own -- while spent is always the group's own plus every
+/// subcategory's (money spent is never ambiguous the way a plan is). A
 /// category nobody has filed anything under yet still gets its line --
 /// `planned` lists every category, same as `build_month` expects.
 pub fn build_month_tree(
@@ -177,7 +227,7 @@ pub fn build_month_tree(
     parents: &HashMap<String, String>,
 ) -> BudgetResult<MonthTree> {
     let lines = build_month(
-        &roll_up(planned, parents),
+        &roll_up_planned(planned, parents),
         &roll_up(previous_remaining, parents),
         &roll_up(spent, parents),
     )?;
@@ -185,6 +235,100 @@ pub fn build_month_tree(
     let sub_planned: Vec<_> = planned.iter().filter(is_sub).cloned().collect();
     let sub_lines = build_month(&sub_planned, previous_remaining, spent)?;
     Ok(MonthTree { lines, sub_lines })
+}
+
+/// Where a group's own planned amount goes when it has to leave the group.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FoldTarget {
+    /// An existing subcategory, by id.
+    Existing(String),
+    /// The group's primary subcategory, which the budget doesn't have yet
+    /// -- create it from this preset, under the group, then plan it.
+    Create(String),
+}
+
+/// One month's plan with a group's own amount moved onto a subcategory.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlanFold {
+    pub group_id: String,
+    pub target: FoldTarget,
+    /// The group's own amount, which moves. The group's own plan becomes
+    /// zero.
+    pub amount: Decimal,
+    /// The target's plan after the move: what it had, plus `amount`.
+    pub target_planned: Decimal,
+}
+
+/// Old budgets whose plans still count a group's own amount *and* its
+/// subcategories'.
+///
+/// Before [`group_planned`], a group's total was its own plan plus every
+/// subcategory's, and the move onto the CPA's list made that common:
+/// "Housing" and "Utilities", planned separately, became a group and its
+/// subcategory. Under the sum rule the group's own amount would silently
+/// stop counting, so it moves -- onto the group's primary subcategory
+/// (`presets::PRIMARY_SUBCATEGORY`: Housing's rent onto Mortgage / Rent),
+/// created if the budget lacks it, or for a group with no primary on the
+/// list, its first subcategory. The month's total is unchanged either way.
+///
+/// Nothing the app writes today can produce this state -- a split zeroes
+/// the group's own amount, and a spending suggestion is only offered for
+/// an empty month -- so a group with both is always one of these, and
+/// this is idempotent: its output never qualifies again.
+pub fn settle_split_plans(
+    categories: &[CategoryNode],
+    planned: &[(String, Decimal)],
+) -> Vec<PlanFold> {
+    let amount_of = |id: &str| {
+        planned
+            .iter()
+            .filter(|(c, _)| c == id)
+            .map(|(_, a)| *a)
+            .sum::<Decimal>()
+    };
+    let links: Vec<(String, Option<String>)> = categories
+        .iter()
+        .map(|c| (c.id.clone(), c.parent_id.clone()))
+        .collect();
+    let parents = parent_map(&links);
+    let mut folds = Vec::new();
+    for group in categories.iter().filter(|c| !parents.contains_key(&c.id)) {
+        let own = amount_of(&group.id);
+        if own <= Decimal::ZERO {
+            continue;
+        }
+        let subs: Vec<&CategoryNode> = categories
+            .iter()
+            .filter(|c| parents.get(&c.id) == Some(&group.id))
+            .collect();
+        if !subs.iter().any(|s| !amount_of(&s.id).is_zero()) {
+            continue;
+        }
+        let primary = group.preset_key.as_deref().and_then(|key| {
+            crate::presets::PRIMARY_SUBCATEGORY
+                .iter()
+                .find(|(g, _)| *g == key)
+                .map(|(_, sub)| *sub)
+        });
+        let target = match primary {
+            Some(key) => match subs.iter().find(|s| s.preset_key.as_deref() == Some(key)) {
+                Some(existing) => FoldTarget::Existing(existing.id.clone()),
+                None => FoldTarget::Create(key.to_string()),
+            },
+            None => FoldTarget::Existing(subs[0].id.clone()),
+        };
+        let already = match &target {
+            FoldTarget::Existing(id) => amount_of(id),
+            FoldTarget::Create(_) => Decimal::ZERO,
+        };
+        folds.push(PlanFold {
+            group_id: group.id.clone(),
+            target,
+            amount: own,
+            target_planned: already + own,
+        });
+    }
+    folds
 }
 
 /// A saved category as the one-time move onto the CPA's list needs to
@@ -2832,16 +2976,18 @@ mod tests {
         .unwrap();
 
         let food = tree.lines.iter().find(|l| l.category_id == "food").unwrap();
-        assert_eq!(food.planned, Decimal::from(500));
+        // The group's own 100 is set aside once a subcategory is planned:
+        // its total is the subcategories' sum, never own + subs.
+        assert_eq!(food.planned, Decimal::from(400));
         assert_eq!(food.spent, Decimal::from(400));
-        assert_eq!(food.remaining, Decimal::from(100));
+        assert_eq!(food.remaining, Decimal::ZERO);
         assert_eq!(tree.lines.len(), 2, "subcategories are not top-level lines");
 
         let summary = summarize_month(&tree.lines, &["pay".to_string()]);
         assert_eq!(summary.income, Decimal::from(3000));
         assert_eq!(
             summary.total_planned,
-            Decimal::from(500),
+            Decimal::from(400),
             "nothing counted twice"
         );
 
@@ -2859,6 +3005,109 @@ mod tests {
             .unwrap();
         assert_eq!(care.planned, Decimal::ZERO);
         assert_eq!(care.spent, Decimal::from(40));
+    }
+
+    #[test]
+    fn a_group_total_is_its_subcategories_sum_once_any_is_planned() {
+        let d = Decimal::from;
+        // The bug report: 5000 typed on the group, then split 3000/2000.
+        assert_eq!(group_planned(d(5000), &[d(3000), d(2000)]), d(5000));
+        assert_eq!(group_planned(d(5000), &[d(3000), d(0)]), d(3000));
+        // Nothing split: the group's own plan stands.
+        assert_eq!(group_planned(d(5000), &[d(0), d(0)]), d(5000));
+        assert_eq!(group_planned(d(5000), &[]), d(5000));
+    }
+
+    #[test]
+    fn rolled_up_plans_never_add_a_group_to_its_subcategories() {
+        let map = parent_map(&links(&[
+            ("pay", None),
+            ("salary", Some("pay")),
+            ("bonus", Some("pay")),
+            ("food", None),
+            ("groceries", Some("food")),
+        ]));
+        let rolled = roll_up_planned(
+            &amounts(&[
+                ("pay", 5000),
+                ("salary", 3000),
+                ("bonus", 2000),
+                ("food", 600),
+                ("groceries", 0),
+            ]),
+            &map,
+        );
+        assert_eq!(rolled, amounts(&[("pay", 5000), ("food", 600)]));
+    }
+
+    fn tree_node(id: &str, key: Option<&str>, parent: Option<&str>) -> CategoryNode {
+        CategoryNode {
+            id: id.to_string(),
+            preset_key: key.map(str::to_string),
+            parent_id: parent.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn an_old_group_plan_moves_onto_its_primary_subcategory_created_if_missing() {
+        // Housing 1500 + Utilities 200 from the old flat list: after the
+        // move Housing is the group and Utilities its subcategory.
+        let categories = vec![
+            tree_node("h1", Some("cat.housingUtilities"), None),
+            tree_node("u1", Some("cat.utilityBills"), Some("h1")),
+        ];
+        let folds = settle_split_plans(&categories, &amounts(&[("h1", 1500), ("u1", 200)]));
+        assert_eq!(
+            folds,
+            vec![PlanFold {
+                group_id: "h1".into(),
+                target: FoldTarget::Create("cat.mortgageRent".into()),
+                amount: Decimal::from(1500),
+                target_planned: Decimal::from(1500),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_old_group_plan_joins_an_existing_primary_subcategory() {
+        let categories = vec![
+            tree_node("pay", Some("cat.earnedIncome"), None),
+            tree_node("salary", Some("cat.salaryWages"), Some("pay")),
+            tree_node("gig", Some("cat.freelanceSideGig"), Some("pay")),
+        ];
+        let folds = settle_split_plans(
+            &categories,
+            &amounts(&[("pay", 4000), ("salary", 250), ("gig", 500)]),
+        );
+        assert_eq!(folds[0].target, FoldTarget::Existing("salary".into()));
+        assert_eq!(folds[0].target_planned, Decimal::from(4250));
+    }
+
+    #[test]
+    fn a_hand_typed_group_folds_onto_its_first_subcategory() {
+        let categories = vec![
+            tree_node("pets", None, None),
+            tree_node("vet", None, Some("pets")),
+            tree_node("food", None, Some("pets")),
+        ];
+        let folds = settle_split_plans(&categories, &amounts(&[("pets", 90), ("food", 40)]));
+        assert_eq!(folds[0].target, FoldTarget::Existing("vet".into()));
+    }
+
+    #[test]
+    fn settling_leaves_consistent_plans_alone() {
+        let categories = vec![
+            tree_node("h1", Some("cat.housingUtilities"), None),
+            tree_node("u1", Some("cat.utilityBills"), Some("h1")),
+        ];
+        // Group only, split only, and nothing at all: none needs a move.
+        for plan in [
+            amounts(&[("h1", 1500), ("u1", 0)]),
+            amounts(&[("h1", 0), ("u1", 200)]),
+            amounts(&[]),
+        ] {
+            assert!(settle_split_plans(&categories, &plan).is_empty());
+        }
     }
 
     #[test]

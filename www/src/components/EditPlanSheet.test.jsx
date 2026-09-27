@@ -78,19 +78,45 @@ describe('EditPlanSheet', () => {
       { id: 'care', name: 'Toiletries', spent: 10, planned: 20 },
     ];
 
-    it('says the main field is the rest of the group once any subcategory has its own plan', () => {
-      renderSheet({ subcategories: SUBS, plannedTotal: 120, onSaveSub: () => {} });
-      expect(screen.getByText('$120.00')).toBeInTheDocument();
-      expect(screen.getByLabelText('Planned for the rest of Food')).toHaveValue('100');
+    // Stands in for `budget_calc::group_planned`, which is tested in Rust.
+    const groupPlanned = (own, subs) => ({
+      total: subs.some((n) => n > 0) ? subs.reduce((a, n) => a + n, 0) : own,
     });
 
-    it('saves only the subcategory amounts that changed', () => {
+    it('shows the subcategories’ sum as the total, with no second group amount to type', async () => {
+      renderSheet({ subcategories: SUBS, plannedTotal: 20, onSaveSub: () => {}, groupPlanned });
+      expect(await screen.findByText('$20.00')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Planned')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Planned — Groceries'), { target: { value: '50' } });
+      expect(await screen.findByText('$70.00')).toBeInTheDocument();
+    });
+
+    it('never adds a typed group total to the split it is divided into', async () => {
+      // The bug report: 5000 typed on the group, then split 3000/2000.
       const onSave = vi.fn();
       const onSaveSub = vi.fn();
-      renderSheet({ subcategories: SUBS, plannedTotal: 120, onSave, onSaveSub });
+      const subs = [
+        { id: 'salary', name: 'Salary', spent: 0, planned: 0 },
+        { id: 'bonus', name: 'Bonus', spent: 0, planned: 0 },
+      ];
+      renderSheet({ planned: 0, subcategories: subs, onSave, onSaveSub, groupPlanned });
+      fireEvent.change(screen.getByLabelText('Planned'), { target: { value: '5000' } });
+      fireEvent.change(screen.getByLabelText('Planned — Salary'), { target: { value: '3000' } });
+      fireEvent.change(screen.getByLabelText('Planned — Bonus'), { target: { value: '2000' } });
+      expect(await screen.findByText('$5000.00')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(onSave).not.toHaveBeenCalled();
+      expect(onSaveSub).toHaveBeenCalledWith('salary', 3000);
+      expect(onSaveSub).toHaveBeenCalledWith('bonus', 2000);
+    });
+
+    it('clears the group’s own amount when saving a split, so it cannot resurface', () => {
+      const onSave = vi.fn();
+      const onSaveSub = vi.fn();
+      renderSheet({ subcategories: SUBS, plannedTotal: 20, onSave, onSaveSub, groupPlanned });
       fireEvent.change(screen.getByLabelText('Planned — Groceries'), { target: { value: '50' } });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      expect(onSave).toHaveBeenCalledWith(100);
+      expect(onSave).toHaveBeenCalledWith(0);
       expect(onSaveSub).toHaveBeenCalledTimes(1);
       expect(onSaveSub).toHaveBeenCalledWith('groceries', 50);
     });

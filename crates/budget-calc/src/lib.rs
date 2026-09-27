@@ -34,13 +34,14 @@ mod voice_wenet;
 
 pub use category::{
     build_month, build_month_tree, build_savings_line, carry_plan_forward, category_rank,
-    category_shares, migrate_legacy_categories, month_review, month_setup_state, parent_map,
-    previous_plan_month, resolve_category_name, roll_up, suggest_plan_from_spending,
-    summarize_month, CarriedPlan, Category, CategoryDelta, CategoryLine, CategoryMigration,
-    CategoryNode, CategoryShare, Direction, MonthFacts, MonthPosition, MonthReview,
-    MonthSetupState, MonthSummary, MonthTree, NamedCategory, NamedPreset, NewCategoryOutcome,
-    PlanBasis, PlanEntry, PlanSuggestionState, RankedCategory, SuggestedPlan, SuggestedRow,
-    MIN_TRANSACTIONS_FOR_PLAN, SAVINGS_CATEGORY_ID,
+    category_shares, group_planned, migrate_legacy_categories, month_review, month_setup_state,
+    parent_map, previous_plan_month, resolve_category_name, roll_up, roll_up_planned,
+    settle_split_plans, suggest_plan_from_spending, summarize_month, CarriedPlan, Category,
+    CategoryDelta, CategoryLine, CategoryMigration, CategoryNode, CategoryShare, Direction,
+    FoldTarget, MonthFacts, MonthPosition, MonthReview, MonthSetupState, MonthSummary, MonthTree,
+    NamedCategory, NamedPreset, NewCategoryOutcome, PlanBasis, PlanEntry, PlanFold,
+    PlanSuggestionState, RankedCategory, SuggestedPlan, SuggestedRow, MIN_TRANSACTIONS_FOR_PLAN,
+    SAVINGS_CATEGORY_ID,
 };
 pub use csv_import::{
     detect_columns, import_csv, preview_columns, ColumnMapping, CsvColumn, ImportOutcome,

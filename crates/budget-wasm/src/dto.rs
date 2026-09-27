@@ -50,6 +50,48 @@ pub struct AmountEntryDto {
     pub amount: f64,
 }
 
+/// `settle_split_plans`: the budget's categories and one month's plan.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SettleSplitPlansParams {
+    pub categories: Vec<CategoryDto>,
+    pub planned: Vec<AmountEntryDto>,
+}
+
+/// One move -- see `budget_calc::PlanFold`. Exactly one of
+/// `target_id` (an existing subcategory) and `create_preset_key` (the
+/// group's primary subcategory, to create under `group_id` first) is set.
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanFoldDto {
+    pub group_id: String,
+    pub target_id: Option<String>,
+    pub create_preset_key: Option<String>,
+    pub amount: f64,
+    /// The target's plan after the move, to save as-is.
+    pub target_planned: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SettleSplitPlansResult {
+    pub folds: Vec<PlanFoldDto>,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
+/// `group_planned`: a group's own plan and its subcategories' plans.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GroupPlannedParams {
+    pub own: f64,
+    #[serde(default)]
+    pub subcategories: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct GroupPlannedResult {
+    pub total: Option<f64>,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct BuildMonthParams {
     pub planned: Vec<AmountEntryDto>,

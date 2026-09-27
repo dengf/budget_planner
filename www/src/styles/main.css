@@ -2240,6 +2240,23 @@ table.data tr:last-child td {
   flex-direction: column;
   gap: 2px;
 }
+/* A split group's total in EditPlanSheet: read-only, the amount on the
+   label's line and the "sum of its subcategories" note under both. */
+.edit-plan-stat.edit-plan-total {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 12px;
+}
+.edit-plan-total .num {
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.edit-plan-total .field-label {
+  grid-column: 1 / -1;
+}
+
 /* EditPlanSheet's optional per-subcategory plans. One row per
    subcategory: name and spent on the left, amount on the right; the
    "add upcoming" offer wraps under them at 375px rather than squeezing

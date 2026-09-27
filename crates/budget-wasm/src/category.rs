@@ -1,7 +1,7 @@
 //! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
 //! `month_setup_state`, `carry_plan_forward`, `month_review`,
 //! `suggest_plan_from_spending`, `resolve_category_name`,
-//! `migrate_legacy_categories`.
+//! `migrate_legacy_categories`, `group_planned`, `settle_split_plans`.
 
 use wasm_bindgen::prelude::*;
 
@@ -10,13 +10,97 @@ use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
     CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto, CategoryLineDto,
     CategoryMigrationDto, CategoryRankParams, CategoryRankResult, CategoryShareDto,
-    CategorySharesParams, CategorySharesResult, MigrateCategoriesParams, MigrateCategoriesResult,
-    MonthReviewParams, MonthReviewResult, MonthSetupStateParams, MonthSetupStateResult,
-    MonthSummaryDto, PlanEntryDto, RankedCategoryDto, ResolveCategoryNameParams,
-    ResolveCategoryNameResult, SuggestPlanParams, SuggestPlanResult, SuggestedRowDto,
-    TransactionDto,
+    CategorySharesParams, CategorySharesResult, GroupPlannedParams, GroupPlannedResult,
+    MigrateCategoriesParams, MigrateCategoriesResult, MonthReviewParams, MonthReviewResult,
+    MonthSetupStateParams, MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, PlanFoldDto,
+    RankedCategoryDto, ResolveCategoryNameParams, ResolveCategoryNameResult,
+    SettleSplitPlansParams, SettleSplitPlansResult, SuggestPlanParams, SuggestPlanResult,
+    SuggestedRowDto, TransactionDto,
 };
 use crate::message::Message;
+
+/// A group's planned total while its plan is being edited -- the same
+/// rule `build_month` rolls groups up by, so the edit sheet's live total
+/// can never disagree with the row it lands in.
+#[wasm_bindgen]
+pub fn group_planned(params: JsValue) -> JsValue {
+    let bad_request = || {
+        let message = Message::bad_request();
+        GroupPlannedResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        }
+    };
+    let result = match serde_wasm_bindgen::from_value::<GroupPlannedParams>(params) {
+        Ok(p) => {
+            let subs: Option<Vec<_>> = p.subcategories.iter().map(|a| f64_to_decimal(*a)).collect();
+            match (f64_to_decimal(p.own), subs) {
+                (Some(own), Some(subs)) => GroupPlannedResult {
+                    total: Some(decimal_to_f64(budget_calc::group_planned(own, &subs))),
+                    ..Default::default()
+                },
+                _ => bad_request(),
+            }
+        }
+        Err(_) => bad_request(),
+    };
+    to_js(&result)
+}
+
+/// One month's old-style plans settled onto the sum rule -- see
+/// `budget_calc::settle_split_plans`.
+#[wasm_bindgen]
+pub fn settle_split_plans(params: JsValue) -> JsValue {
+    let bad_request = || {
+        let message = Message::bad_request();
+        SettleSplitPlansResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        }
+    };
+    let Ok(params) = serde_wasm_bindgen::from_value::<SettleSplitPlansParams>(params) else {
+        return to_js(&bad_request());
+    };
+    let planned: Option<Vec<(String, rust_decimal::Decimal)>> = params
+        .planned
+        .iter()
+        .map(|e| Some((e.category_id.clone(), f64_to_decimal(e.amount)?)))
+        .collect();
+    let Some(planned) = planned else {
+        return to_js(&bad_request());
+    };
+    let nodes: Vec<budget_calc::CategoryNode> = params
+        .categories
+        .into_iter()
+        .map(|c| budget_calc::CategoryNode {
+            id: c.id,
+            preset_key: c.preset_key,
+            parent_id: c.parent_id,
+        })
+        .collect();
+    let folds = budget_calc::settle_split_plans(&nodes, &planned)
+        .into_iter()
+        .map(|fold| {
+            let (target_id, create_preset_key) = match fold.target {
+                budget_calc::FoldTarget::Existing(id) => (Some(id), None),
+                budget_calc::FoldTarget::Create(key) => (None, Some(key)),
+            };
+            PlanFoldDto {
+                group_id: fold.group_id,
+                target_id,
+                create_preset_key,
+                amount: decimal_to_f64(fold.amount),
+                target_planned: decimal_to_f64(fold.target_planned),
+            }
+        })
+        .collect();
+    to_js(&SettleSplitPlansResult {
+        folds,
+        ..Default::default()
+    })
+}
 
 #[wasm_bindgen]
 pub fn build_month(params: JsValue) -> JsValue {

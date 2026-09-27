@@ -14,6 +14,7 @@ import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth, todayIso } from './month';
 import {
   availablePresets,
+  buildCategoryFromPreset,
   categoryDisplayName,
   categoryTree,
   presetsToAdd,
@@ -420,6 +421,82 @@ export function AppShell({ wasmModule }) {
       }
     })();
   }, [categories.loaded, categories.items, categories, wasmModule, t]);
+
+  /**
+   * Plans saved before a group's total became its subcategories' sum
+   * (`budget_calc::group_planned`) -- a group planned on its own *and*
+   * something under it -- would otherwise lose the group's own amount
+   * from every total. `budget_calc::settle_split_plans` moves it onto the
+   * group's primary subcategory (Housing's rent onto Mortgage / Rent,
+   * created if the budget lacks it); this saves what it says. Runs for
+   * whichever month is on screen, since plans load a month at a time, and
+   * finds nothing to do on any month already settled.
+   *
+   * Every row keeps the month it was read with, so a fold computed from
+   * a list that is still the previous month's can only ever write that
+   * month, never stamp its amounts onto the one being loaded.
+   */
+  const settlingRef = useRef(false);
+  const settleCheckedRef = useRef(null);
+  useEffect(() => {
+    if (!categories.loaded || !budgetPlan.loaded) return;
+    if (settlingRef.current || migratingRef.current) return;
+    if (!wasmModule?.settle_split_plans || !wasmModule?.preset_categories) return;
+    const key = `${viewMonth}`;
+    if (
+      settleCheckedRef.current?.plan === budgetPlan.items &&
+      settleCheckedRef.current?.categories === categories.items &&
+      settleCheckedRef.current?.key === key
+    )
+      return;
+    settleCheckedRef.current = { plan: budgetPlan.items, categories: categories.items, key };
+    settlingRef.current = true;
+    (async () => {
+      try {
+        const plan = budgetPlan.items;
+        const result = await wasmModule.settle_split_plans({
+          categories: categories.items,
+          planned: plan.map((p) => ({ category_id: p.category_id, amount: p.planned })),
+        });
+        const folds = result?.folds ?? [];
+        if (folds.length === 0) return;
+        const presets = (await wasmModule.preset_categories()) ?? [];
+        for (const fold of folds) {
+          const groupRow = plan.find((p) => p.category_id === fold.group_id);
+          if (!groupRow) continue;
+          let targetId = fold.target_id;
+          if (!targetId) {
+            const preset = presets.find((p) => p.key === fold.create_preset_key);
+            if (!preset) continue;
+            const record = buildCategoryFromPreset(preset, t, newId, fold.group_id);
+            await categories.save(record);
+            targetId = record.id;
+          }
+          const targetRow = plan.find((p) => p.category_id === targetId);
+          await budgetPlan.save({
+            id: targetRow?.id ?? newId(),
+            month: targetRow?.month ?? groupRow.month,
+            category_id: targetId,
+            planned: fold.target_planned,
+          });
+          await budgetPlan.save({ ...groupRow, planned: 0 });
+        }
+      } finally {
+        settlingRef.current = false;
+      }
+    })();
+  }, [
+    categories.loaded,
+    categories.items,
+    categories,
+    budgetPlan.loaded,
+    budgetPlan.items,
+    budgetPlan,
+    viewMonth,
+    wasmModule,
+    newId,
+    t,
+  ]);
 
   /**
    * A budget with zero categories opens with the starter set already in

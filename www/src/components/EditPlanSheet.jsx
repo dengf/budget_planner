@@ -26,9 +26,14 @@ import NumberField from './NumberField';
  * subcategory is optional -- most people plan the group and let the
  * subcategories only sort where the money went -- so each has its own
  * field, saved with the group's by the one Save button. Once any
- * subcategory carries a plan, the main field is the group's plan for
- * everything else, and `plannedTotal` (Rust's rolled-up figure) shows
- * what the two add up to; nothing here adds them itself.
+ * subcategory has an amount, the group's total *is* their sum
+ * (`budget_calc::group_planned`) -- so the group's own field gives way to
+ * that total, read-only, rather than sitting beside the subcategories as
+ * a second number that used to be added on top of them. `groupPlanned`
+ * is that Rust rule over the wasm boundary, run as the fields change so
+ * the total shown is what Save will produce; nothing here adds amounts
+ * itself. Saving a split clears the group's own amount, so it can't
+ * quietly come back if the subcategories are later emptied.
  */
 export default function EditPlanSheet({
   open,
@@ -46,10 +51,12 @@ export default function EditPlanSheet({
   subcategories = [],
   plannedTotal,
   onSaveSub,
+  groupPlanned,
 }) {
   const { t } = useI18n();
   const [amount, setAmount] = useState(planned);
   const [subAmounts, setSubAmounts] = useState({});
+  const [liveTotal, setLiveTotal] = useState(null);
 
   // Re-seeds every time a different row's sheet opens -- the sheet stays
   // mounted (App.jsx's usual lazy-but-persistent pattern) so the draft
@@ -61,13 +68,34 @@ export default function EditPlanSheet({
     if (open) setSubAmounts({});
   }, [open, title]);
 
-  if (!open) return null;
+  const subValue = (sub) => subAmounts[sub.id] ?? (sub.planned > 0 ? sub.planned : '');
+  const subNumbers = subcategories.map((sub) => Number(subValue(sub)) || 0);
+  const splitBySub = subNumbers.some((n) => n > 0);
+  const subKey = subNumbers.join(',');
 
-  const splitBySub = subcategories.some((s) => s.planned > 0);
+  useEffect(() => {
+    let cancelled = false;
+    if (!open || !splitBySub || !groupPlanned) return undefined;
+    Promise.resolve(groupPlanned(Number(amount) || 0, subNumbers)).then((result) => {
+      if (!cancelled) setLiveTotal(result?.total ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `subKey` stands for `subNumbers`, which is rebuilt every render.
+  }, [open, splitBySub, subKey, amount, groupPlanned]);
+
+  if (!open) return null;
 
   const submit = (e) => {
     e.preventDefault();
-    onSave(amount === '' ? 0 : amount);
+    // A split group's total is its subcategories' sum; its own amount is
+    // zeroed rather than left to resurface if the split is undone.
+    if (splitBySub) {
+      if (Number(planned) > 0) onSave(0);
+    } else {
+      onSave(amount === '' ? 0 : amount);
+    }
     for (const [id, value] of Object.entries(subAmounts)) {
       const before = subcategories.find((s) => s.id === id)?.planned ?? 0;
       const after = value === '' || value == null ? 0 : Number(value);
@@ -121,18 +149,20 @@ export default function EditPlanSheet({
           </div>
 
           <form className="form-grid" onSubmit={submit}>
-            {splitBySub && (
-              <div className="edit-plan-stat">
+            {splitBySub ? (
+              <div className="edit-plan-stat edit-plan-total">
                 <span className="cell-label">{t('budget.plannedTotal')}</span>
-                <span className="num">{formatMoney(plannedTotal)}</span>
+                <span className="num">{formatMoney(liveTotal ?? plannedTotal)}</span>
+                <span className="field-label">{t('budget.plannedIsSubSum')}</span>
               </div>
+            ) : (
+              <NumberField
+                label={t('budget.planned')}
+                value={amount}
+                onChange={setAmount}
+                grouped
+              />
             )}
-            <NumberField
-              label={splitBySub ? t('budget.plannedRest', { name: title }) : t('budget.planned')}
-              value={amount}
-              onChange={setAmount}
-              grouped
-            />
             {subcategories.length > 0 && (
               <fieldset className="edit-plan-subs">
                 <legend className="cell-label">{t('budget.subcategories')}</legend>
@@ -167,7 +197,7 @@ export default function EditPlanSheet({
                       className="edit-plan-sub-input"
                       aria-label={`${t('budget.planned')} — ${sub.name}`}
                       placeholder="0"
-                      value={subAmounts[sub.id] ?? (sub.planned > 0 ? sub.planned : '')}
+                      value={subValue(sub)}
                       onChange={(e) =>
                         setSubAmounts((prev) => ({ ...prev, [sub.id]: e.target.value }))
                       }
@@ -181,7 +211,7 @@ export default function EditPlanSheet({
             </button>
           </form>
 
-          {upcoming && upcoming.amount > 0 && (
+          {!splitBySub && upcoming && upcoming.amount > 0 && (
             <div className="upcoming-total-row">
               <span className="upcoming-total-name">{t('recurring.upcomingTitle')}</span>
               <span className="upcoming-total-amount">{formatMoney(upcoming.amount)}</span>
