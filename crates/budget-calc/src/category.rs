@@ -178,13 +178,13 @@ pub fn roll_up_planned(
             Some(root) => (root, true),
             None => (id, false),
         };
-        let index = match groups.iter().position(|(r, _, _)| r == root) {
-            Some(i) => i,
-            None => {
+        let index = groups
+            .iter()
+            .position(|(r, _, _)| r == root)
+            .unwrap_or_else(|| {
                 groups.push((root.clone(), Decimal::ZERO, Vec::new()));
                 groups.len() - 1
-            }
-        };
+            });
         let (_, own, subs) = &mut groups[index];
         if is_sub {
             subs.push(*amount);
