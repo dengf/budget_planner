@@ -51,7 +51,7 @@ describe('MoreTab', () => {
       'Savings goals',
       'Debt payoff',
       'Categorization rules',
-      'Recurring bills & income',
+      'Recurring expenses & income',
     ]) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
     }
@@ -65,10 +65,10 @@ describe('MoreTab', () => {
 
     expect(screen.getByRole('heading', { name: 'Categorization rules' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /Recurring bills & income/ }),
+      screen.queryByRole('button', { name: /Recurring expenses & income/ }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /More/ }));
-    expect(screen.getByRole('button', { name: /Recurring bills & income/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Recurring expenses & income/ })).toBeInTheDocument();
   });
 });
