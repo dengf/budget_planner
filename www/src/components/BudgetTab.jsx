@@ -239,10 +239,13 @@ export default function BudgetTab({
   // The group's total is its subcategories' sum once any has an amount
   // (`budget_calc::group_planned`), so the group's own amount is zeroed
   // the moment a subcategory gets one -- otherwise it would sit unseen
-  // and come back if the split were later undone.
+  // and come back if the split were later undone. Zeroed *first*, so no
+  // moment between the two writes -- nor a tab closed mid-way -- leaves
+  // a plan on both the group and a subcategory, which is what an old
+  // budget looks like to App's plan fold.
   const saveSubPlanned = (groupId) => async (subId, amount) => {
-    await savePlanned(subId, amount);
     if (Number(amount) > 0 && ownPlanned(groupId) > 0) await savePlanned(groupId, 0);
+    await savePlanned(subId, amount);
   };
   const groupPlanned = wasmModule?.group_planned
     ? (own, subcategories) => wasmModule.group_planned({ own, subcategories })

@@ -46,12 +46,17 @@ const SWIPE_TRIGGER_PX = 60;
 function useCollection(wasmModule, listFn, saveFn, deleteFn, listArg) {
   const [items, setItems] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  // Counts reads from storage, never local writes -- how a caller tells
+  // "this arrived" (a load, a month switch, an import) apart from "this
+  // session just saved it".
+  const [generation, setGeneration] = useState(0);
 
   const reload = useCallback(async () => {
     if (!wasmModule?.[listFn]) return;
     const result = await wasmModule[listFn](listArg);
     setItems(Array.isArray(result) ? result : []);
     setLoaded(true);
+    setGeneration((g) => g + 1);
   }, [wasmModule, listArg]);
 
   useEffect(() => {
@@ -90,7 +95,7 @@ function useCollection(wasmModule, listFn, saveFn, deleteFn, listArg) {
     [wasmModule, deleteFn],
   );
 
-  return { items, loaded, save, remove, reload };
+  return { items, loaded, generation, save, remove, reload };
 }
 
 function TabFallback() {
@@ -374,6 +379,10 @@ export function AppShell({ wasmModule }) {
    */
   const migratingRef = useRef(false);
   const migrationCheckedRef = useRef(null);
+  // Bumped when a migration run re-parents something, or finishes while
+  // the plan fold below was waiting on it -- see `settle` below.
+  const [migrationRuns, setMigrationRuns] = useState(0);
+  const settleWaitingRef = useRef(false);
   useEffect(() => {
     if (!categories.loaded || migratingRef.current) return;
     if (!wasmModule?.migrate_legacy_categories || !wasmModule?.preset_categories) return;
@@ -388,6 +397,7 @@ export function AppShell({ wasmModule }) {
           categories: categories.items,
         });
         const steps = result?.steps ?? [];
+        if (steps.length > 0) settleWaitingRef.current = true;
         if (steps.length === 0) return;
         const presets = (await wasmModule.preset_categories()) ?? [];
         const presetFor = (key) => presets.find((p) => p.key === key);
@@ -418,6 +428,10 @@ export function AppShell({ wasmModule }) {
         }
       } finally {
         migratingRef.current = false;
+        if (settleWaitingRef.current) {
+          settleWaitingRef.current = false;
+          setMigrationRuns((n) => n + 1);
+        }
       }
     })();
   }, [categories.loaded, categories.items, categories, wasmModule, t]);
@@ -435,21 +449,28 @@ export function AppShell({ wasmModule }) {
    * Every row keeps the month it was read with, so a fold computed from
    * a list that is still the previous month's can only ever write that
    * month, never stamp its amounts onto the one being loaded.
+   *
+   * Only ever on plans as they *arrive* -- read from storage (a load, a
+   * month switch, the re-read that ends an import) or just re-parented by
+   * the migration above -- never on the state this session's own edits
+   * pass through. A desktop edit once saved a subcategory's 430 a moment
+   * before zeroing its group's 400; this ran in between, took the 400 for
+   * an old plan and moved it onto a newly created subcategory, and the
+   * group read 830. Keyed on `budgetPlan.generation` and `migrationRuns`,
+   * neither of which a local save moves.
    */
   const settlingRef = useRef(false);
   const settleCheckedRef = useRef(null);
   useEffect(() => {
     if (!categories.loaded || !budgetPlan.loaded) return;
-    if (settlingRef.current || migratingRef.current) return;
     if (!wasmModule?.settle_split_plans || !wasmModule?.preset_categories) return;
-    const key = `${viewMonth}`;
-    if (
-      settleCheckedRef.current?.plan === budgetPlan.items &&
-      settleCheckedRef.current?.categories === categories.items &&
-      settleCheckedRef.current?.key === key
-    )
+    const key = `${budgetPlan.generation}:${migrationRuns}`;
+    if (settleCheckedRef.current === key || settlingRef.current) return;
+    if (migratingRef.current) {
+      settleWaitingRef.current = true;
       return;
-    settleCheckedRef.current = { plan: budgetPlan.items, categories: categories.items, key };
+    }
+    settleCheckedRef.current = key;
     settlingRef.current = true;
     (async () => {
       try {
@@ -491,8 +512,9 @@ export function AppShell({ wasmModule }) {
     categories,
     budgetPlan.loaded,
     budgetPlan.items,
+    budgetPlan.generation,
     budgetPlan,
-    viewMonth,
+    migrationRuns,
     wasmModule,
     newId,
     t,
@@ -592,6 +614,9 @@ export function AppShell({ wasmModule }) {
           if (result?.error) return { error: t('err.importIncomplete') };
         }
       }
+      // Re-read what was restored, so the plan fold treats it as arrived
+      // data, as it would the same backup on its next load.
+      await budgetPlan.reload();
       // No separate income restore: income is derived from the categories
       // and budget-plan entries just restored above (see DashboardTab's
       // exportData for why the export itself carries nothing else).

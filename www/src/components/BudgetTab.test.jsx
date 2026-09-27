@@ -393,6 +393,39 @@ describe('BudgetTab desktop planned editing', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('zeroes a group’s own plan before saving the subcategory that splits it', async () => {
+    // The other order leaves a moment -- or, with the tab closed, a saved
+    // budget -- holding both, which is what App's plan fold takes for a
+    // plan saved before the sum rule, and moves.
+    const order = [];
+    const save = vi.fn(async (row) => order.push(`${row.category_id}=${row.planned}`));
+    mockDesktop();
+    renderBudget({
+      categories: {
+        items: [
+          ...CATEGORIES,
+          { id: 'snacks', name: 'Snacks', is_income: false, parent_id: 'food' },
+        ],
+      },
+      budgetPlan: {
+        items: [{ id: 'p-food', month: '2026-01', category_id: 'food', planned: 400 }],
+        save,
+        remove: vi.fn(),
+      },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Subcategories/ }));
+    // The stand-in build_month doesn't roll subcategories up, so Snacks
+    // has a top-level row of its own too -- take the one under Food.
+    const sub = within(document.querySelector('.budget-sub-rows')).getByRole('spinbutton', {
+      name: 'Planned — Snacks',
+    });
+    fireEvent.change(sub, { target: { value: '430' } });
+    fireEvent.blur(sub);
+
+    await vi.waitFor(() => expect(order).toEqual(['food=0', 'snacks=430']));
+  });
+
   it('keeps the inline add-category controls working on desktop too', async () => {
     mockDesktop();
     renderBudget();
