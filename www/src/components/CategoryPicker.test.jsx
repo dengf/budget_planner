@@ -1,11 +1,11 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import CategoryPicker from './CategoryPicker';
 
 const CREATE = {
-  create: vi.fn(),
+  create: vi.fn(async () => ({ outcome: 'create', categoryId: 'new-sub' })),
   availableIncomePresets: [],
   availableExpensePresets: [],
   availableSubPresets: () => [],
@@ -91,5 +91,19 @@ describe('CategoryPicker groups and subcategories', () => {
     fireEvent.click(screen.getByRole('button', { name: 'All' }));
     fireEvent.change(screen.getByLabelText('Find a category'), { target: { value: 'toil' } });
     expect(screen.getByRole('button', { name: 'Toiletries' })).toBeInTheDocument();
+  });
+
+  it('creates a subcategory under the chosen group from the sheet, and selects it', async () => {
+    const { onChange } = renderPicker({ value: 'food' });
+    fireEvent.click(screen.getByRole('button', { name: 'New subcategory in Food' }));
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Snacks' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Snacks”' }));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('new-sub'));
+    expect(CREATE.create).toHaveBeenCalledWith('Snacks', false, 'food');
+  });
+
+  it('offers "+ New" under a chosen group that has no subcategories yet', () => {
+    renderPicker({ value: 'rent' });
+    expect(screen.getByRole('button', { name: 'New subcategory in Rent' })).toBeInTheDocument();
   });
 });

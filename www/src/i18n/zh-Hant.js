@@ -161,6 +161,7 @@ export default {
   'category.topLevel': '無——獨立分類',
   'category.narrowDown': '更具體一點（可選）',
   'category.subCount': '子分類（{count}）',
+  'category.newSubIn': '在「{name}」下新增子分類',
   'budget.subcategories': '子分類',
   'budget.subPlanHint': '只有想單獨追蹤某個子分類時才需要替它做計畫——它會計入「{name}」的總額。',
   'budget.plannedRest': '「{name}」其餘部分的計畫',

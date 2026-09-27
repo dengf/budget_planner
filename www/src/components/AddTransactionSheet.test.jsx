@@ -405,7 +405,7 @@ describe('AddTransactionSheet category creation', () => {
       ),
     );
     // Selected, exactly as a typed-and-created category would be.
-    expect(await screen.findByRole('button', { name: /Dining & Social/ })).toHaveClass('active');
+    expect(await screen.findByRole('button', { name: 'Dining & Social' })).toHaveClass('active');
   });
 });
 

@@ -161,6 +161,7 @@ export default {
   'category.topLevel': '无——独立分类',
   'category.narrowDown': '更具体一些（可选）',
   'category.subCount': '子分类（{count}）',
+  'category.newSubIn': '在“{name}”下新建子分类',
   'budget.subcategories': '子分类',
   'budget.subPlanHint': '只有想单独追踪某个子分类时才需要给它做计划——它会计入“{name}”的总额。',
   'budget.plannedRest': '“{name}”其余部分的计划',

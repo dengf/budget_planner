@@ -184,6 +184,7 @@ export default {
   'category.topLevel': 'None — a category of its own',
   'category.narrowDown': 'More specific (optional)',
   'category.subCount': 'Subcategories ({count})',
+  'category.newSubIn': 'New subcategory in {name}',
   'budget.subcategories': 'Subcategories',
   'budget.subPlanHint':
     'Plan a subcategory on its own only if you want to track it separately — it adds to {name}’s total.',

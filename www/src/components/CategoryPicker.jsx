@@ -55,6 +55,9 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
   // Null when closed; otherwise the name to open the field with, which is
   // '' from the "+ New" chip and the filter text when nothing matched it.
   const [creatingFrom, setCreatingFrom] = useState(null);
+  // Whether the "More specific" row's own "+ New" field is open -- a
+  // subcategory of whichever group is selected.
+  const [creatingSub, setCreatingSub] = useState(false);
 
   // `createCategory` is `useCreateCategory`'s whole return value, not
   // just its `create` function -- this picker is the one place that
@@ -84,6 +87,9 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
   const chips = groups.slice(0, CHIP_COUNT);
   if (selectedGroup && !chips.includes(selectedGroup)) chips[CHIP_COUNT - 1] = selectedGroup;
   const subChips = selectedGroup ? tree.childrenOf(selectedGroup.id) : [];
+  const subPresets = selectedGroup
+    ? (createCategory.availableSubPresets?.(selectedGroup) ?? [])
+    : [];
   const subsRef = useRef(null);
   const subsFor = subChips.length > 0 ? selectedGroup.id : null;
 
@@ -113,6 +119,7 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
   const onCreated = (id) => {
     onChange(id);
     setCreatingFrom(null);
+    setCreatingSub(false);
     setFilter('');
     setShowAll(false);
   };
@@ -167,7 +174,10 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
       type="button"
       className={`category-chip category-chip-new${creatingFrom !== null ? ' active' : ''}`}
       aria-expanded={creatingFrom !== null}
-      onClick={() => setCreatingFrom(creatingFrom === null ? '' : null)}
+      onClick={() => {
+        setCreatingFrom(creatingFrom === null ? '' : null);
+        setCreatingSub(false);
+      }}
     >
       {t('category.newChip')}
     </button>
@@ -208,7 +218,10 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
         {newChip}
       </div>
 
-      {subChips.length > 0 && (
+      {/* Shown for any chosen group, even one with no subcategories yet:
+          its "+ New" is how the first one gets made without leaving the
+          sheet. The top row's "+ New" still makes a category of its own. */}
+      {selectedGroup && (
         <div className="category-picker-subs" ref={subsRef}>
           <span className="field-label">{t('category.narrowDown')}</span>
           <div className="category-chips">
@@ -217,7 +230,35 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
                 onChange(sub.id === value ? selectedGroup.id : sub.id),
               ),
             )}
+            <button
+              type="button"
+              className={`category-chip category-chip-new${creatingSub ? ' active' : ''}`}
+              aria-expanded={creatingSub}
+              aria-label={t('category.newSubIn', {
+                name: categoryDisplayName(selectedGroup, t),
+              })}
+              onClick={() => {
+                setCreatingSub((open) => !open);
+                setCreatingFrom(null);
+              }}
+            >
+              {t('category.newChip')}
+            </button>
           </div>
+          {creatingSub && (
+            <NewCategoryField
+              key={`${selectedGroup.id}-${createCategory.presetsReady}`}
+              isIncome={isIncome}
+              parentId={selectedGroup.id}
+              create={createCategory.create}
+              presets={subPresets}
+              onCreated={onCreated}
+              // Same rule as the top-level field: the caret only when
+              // there is no preset chip to tap instead.
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- conditional; the caret belongs in the field exactly when nothing else does.
+              autoFocus={createCategory.presetsReady && subPresets.length === 0}
+            />
+          )}
         </div>
       )}
 
