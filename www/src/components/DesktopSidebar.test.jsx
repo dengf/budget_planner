@@ -29,7 +29,7 @@ describe('DesktopSidebar', () => {
       'Savings goals',
       'Debt payoff',
       'Categorization rules',
-      'Recurring bills & income',
+      'Recurring expenses & income',
     ]) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
     }
