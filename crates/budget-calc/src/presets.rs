@@ -238,6 +238,24 @@ pub fn compact_starter_categories() -> Vec<PresetCategory> {
 /// category ("Other Expenses") the new list deliberately has no bucket
 /// for. `category::migrate_legacy_categories` is what applies it.
 ///
+/// Each group's catch-all subcategory: where a group's own planned amount
+/// goes when an old budget had planned both the group and something under
+/// it (see `category::settle_split_plans`). "Housing" on the old list was
+/// the rent line, so Housing & Utilities' own amount is Mortgage / Rent's.
+pub const PRIMARY_SUBCATEGORY: &[(&str, &str)] = &[
+    ("cat.earnedIncome", "cat.salaryWages"),
+    ("cat.passiveIncome", "cat.dividendsInterest"),
+    ("cat.miscIncome", "cat.giftsReimbursements"),
+    ("cat.housingUtilities", "cat.mortgageRent"),
+    ("cat.transport", "cat.fuelCharging"),
+    ("cat.foodBasics", "cat.groceries"),
+    ("cat.healthInsurance", "cat.insurancePremiums"),
+    ("cat.obligationsSupport", "cat.debtPayments"),
+    ("cat.diningSocial", "cat.restaurantsCafes"),
+    ("cat.entertainmentLeisure", "cat.hobbiesRecreation"),
+    ("cat.lifestyleShopping", "cat.personalUpkeep"),
+];
+
 /// Each old key maps to exactly one new one, and the category keeps its
 /// id when it moves -- which is what keeps every transaction, plan and
 /// rule that points at it pointing at the right thing afterwards. Where
@@ -268,6 +286,27 @@ pub const LEGACY_PRESETS: &[(&str, Option<&str>)] = &[
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn every_group_names_one_of_its_own_subcategories_as_primary() {
+        for group in starter_categories()
+            .iter()
+            .filter(|p| p.parent_key.is_none())
+        {
+            let (_, sub) = PRIMARY_SUBCATEGORY
+                .iter()
+                .find(|(g, _)| *g == group.key)
+                .unwrap_or_else(|| panic!("{} has no primary subcategory", group.key));
+            let sub = preset_by_key(sub).expect("primary is a real preset");
+            assert_eq!(
+                sub.parent_key,
+                Some(group.key),
+                "{} is not under {}",
+                sub.key,
+                group.key
+            );
+        }
+    }
     use super::*;
     use crate::Category;
 
