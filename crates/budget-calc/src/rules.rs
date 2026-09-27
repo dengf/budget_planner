@@ -15,6 +15,10 @@ pub struct CategorizationRule {
     /// description -- deliberately not a regex. A regex a bank statement
     /// can defeat with a stray special character is a worse bug than a
     /// substring match being slightly blunt.
+    ///
+    /// One field can hold several keywords separated by commas
+    /// ("costco, walmart, target"); the rule matches if any one of them
+    /// does. See [`keywords`](Self::keywords).
     pub keyword: String,
     pub category_id: String,
     /// Rules are tried in this order and the first match wins, so a
@@ -32,7 +36,7 @@ impl CategorizationRule {
         priority: i32,
     ) -> BudgetResult<Self> {
         let keyword = keyword.into();
-        if keyword.trim().is_empty() {
+        if split_keywords(&keyword).next().is_none() {
             return Err(BudgetError::BlankRuleKeyword);
         }
         Ok(Self {
@@ -43,11 +47,28 @@ impl CategorizationRule {
         })
     }
 
-    fn matches(&self, description: &str) -> bool {
-        description
-            .to_lowercase()
-            .contains(&self.keyword.to_lowercase())
+    /// The separate keywords this rule's field holds, trimmed, with empty
+    /// pieces (a trailing comma, ", ,") dropped.
+    pub fn keywords(&self) -> impl Iterator<Item = &str> {
+        split_keywords(&self.keyword)
     }
+
+    fn matches(&self, description: &str) -> bool {
+        let description = description.to_lowercase();
+        self.keywords()
+            .any(|k| description.contains(&k.to_lowercase()))
+    }
+}
+
+/// Splits on the ASCII comma and the full-width `，` a Chinese keyboard
+/// types, so a list written in either language splits the same way.
+/// Otherwise "全聯，家樂福" would be one keyword that no bank description
+/// ever contains.
+fn split_keywords(field: &str) -> impl Iterator<Item = &str> {
+    field
+        .split([',', '，'])
+        .map(str::trim)
+        .filter(|k| !k.is_empty())
 }
 
 /// Applies rules to every transaction that has no category yet.
@@ -146,6 +167,64 @@ mod tests {
             CategorizationRule::new("r", "  ", "dining", 0),
             Err(BudgetError::BlankRuleKeyword)
         );
+    }
+
+    #[test]
+    fn a_keyword_field_of_only_commas_is_rejected() {
+        // It splits into nothing, and nothing would match nothing -- a
+        // rule that can never fire is a mistake worth saying out loud.
+        assert_eq!(
+            CategorizationRule::new("r", " , ，", "dining", 0),
+            Err(BudgetError::BlankRuleKeyword)
+        );
+    }
+
+    #[test]
+    fn any_one_of_several_comma_separated_keywords_matches() {
+        let rules = [rule("costco, walmart,target", "groceries", 0)];
+        let mut txs = vec![
+            tx("WALMART #12"),
+            tx("TARGET T-100"),
+            tx("COSTCO WHSE"),
+            tx("SHELL"),
+        ];
+        apply_rules(&mut txs, &rules);
+        let got: Vec<_> = txs.iter().map(|t| t.category_id.as_deref()).collect();
+        assert_eq!(
+            got,
+            [
+                Some("groceries"),
+                Some("groceries"),
+                Some("groceries"),
+                None
+            ]
+        );
+    }
+
+    #[test]
+    fn a_full_width_comma_separates_keywords_too() {
+        let mut txs = vec![tx("家樂福 新店")];
+        apply_rules(&mut txs, &[rule("全聯，家樂福", "groceries", 0)]);
+        assert_eq!(txs[0].category_id, Some("groceries".to_string()));
+    }
+
+    #[test]
+    fn empty_pieces_between_commas_never_match_everything() {
+        // "costco,,": an empty piece is a substring of every description,
+        // so it must be dropped, not matched.
+        let mut txs = vec![tx("SHELL")];
+        apply_rules(&mut txs, &[rule("costco, ,", "groceries", 0)]);
+        assert_eq!(txs[0].category_id, None);
+    }
+
+    #[test]
+    fn a_rule_can_file_into_a_subcategory() {
+        // A rule stores a category id and nothing more, so a subcategory's
+        // id is as good as a group's; the month's roll-up then counts it
+        // under its group (`group_planned` / `build_month`).
+        let mut txs = vec![tx("NTUC FAIRPRICE")];
+        apply_rules(&mut txs, &[rule("fairprice", "sub-groceries", 0)]);
+        assert_eq!(txs[0].category_id, Some("sub-groceries".to_string()));
     }
 
     #[test]

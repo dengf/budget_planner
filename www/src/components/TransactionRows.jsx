@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useI18n } from '../i18n';
-import { categoryDisplayName, categoryTree } from '../presetCategories';
+import CategoryOptions from './CategoryOptions';
 
 /**
  * The manual form as a list of rows, for a screen wide enough to show
@@ -38,30 +38,6 @@ export default function TransactionRows({
   const { t } = useI18n();
   const rowsRef = useRef(null);
   const focusNewRow = useRef(false);
-
-  // A group with subcategories becomes an <optgroup> headed by its name,
-  // holding the group itself first (it is a complete answer on its own --
-  // an optgroup label can't be selected) and then its subcategories, so
-  // "Utilities" reads as belonging to Housing & Utilities rather than as
-  // a stray name in a flat list.
-  const categoryOptions = (list) => {
-    const tree = categoryTree(list);
-    return tree.tops.map((c) => {
-      const subs = tree.childrenOf(c.id);
-      const option = (x) => (
-        <option key={x.id} value={x.id}>
-          {categoryDisplayName(x, t)}
-        </option>
-      );
-      if (subs.length === 0) return option(c);
-      return (
-        <optgroup key={c.id} label={categoryDisplayName(c, t)}>
-          {option(c)}
-          {subs.map(option)}
-        </optgroup>
-      );
-    });
-  };
 
   // The column headers are visual, so every control names its own row
   // for a screen reader instead of leaning on them.
@@ -174,7 +150,7 @@ export default function TransactionRows({
             }
           >
             <option value="">{t('transactions.uncategorized')}</option>
-            {categoryOptions(row.isIncome ? incomeCategories : expenseCategories)}
+            <CategoryOptions categories={row.isIncome ? incomeCategories : expenseCategories} />
           </select>
 
           <div className="field-input">

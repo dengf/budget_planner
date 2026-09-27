@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '../i18n';
 import BatchRows from './BatchRows';
-import { categoryDisplayName } from '../presetCategories';
+import CategoryOptions from './CategoryOptions';
 
 /**
  * Categorization rules as a list of rows, for a screen wide enough to
@@ -47,6 +47,7 @@ export default function RuleRows({ rows, categories, onRowChange, onAddRow, onRe
             <input
               type="text"
               data-row-keyword=""
+              placeholder={t('transactions.ruleKeywordPlaceholder')}
               aria-label={rowLabel(t('transactions.ruleKeyword'), i)}
               value={row.keyword}
               onChange={(e) => onRowChange(row.key, { keyword: e.target.value })}
@@ -60,11 +61,7 @@ export default function RuleRows({ rows, categories, onRowChange, onAddRow, onRe
             onChange={(e) => onRowChange(row.key, { category_id: e.target.value })}
           >
             <option value="">&#8212;</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {categoryDisplayName(c, t)}
-              </option>
-            ))}
+            <CategoryOptions categories={categories} />
           </select>
 
           <div className="field-input">

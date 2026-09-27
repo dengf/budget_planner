@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import CategoryBadge from './CategoryBadge';
+import CategoryOptions from './CategoryOptions';
 import RuleRows from './RuleRows';
-import { categoryDisplayName, makeCategoryLookup } from '../presetCategories';
+import { makeCategoryLookup } from '../presetCategories';
 import useIsDesktop from '../useIsDesktop';
 import useBatchRows, { rowKey } from '../useBatchRows';
 
@@ -46,6 +47,15 @@ export default function RulesSection({
 }) {
   const { t } = useI18n();
   const { categoryFor, categoryName } = makeCategoryLookup(categories.items, t);
+  // A subcategory is named with its group ("Food & Basic Goods ›
+  // Groceries"): the list holds rules for both, and a bare "Groceries"
+  // doesn't say which group's total the matches will count toward.
+  const pathName = (id) => {
+    const parentId = categoryFor(id)?.parent_id;
+    return parentId && categoryFor(parentId)
+      ? `${categoryName(parentId)} › ${categoryName(id)}`
+      : categoryName(id);
+  };
   const [ruleDraft, setRuleDraft] = useState({ keyword: '', category_id: '', priority: 0 });
   const isDesktop = useIsDesktop();
   const { rows, setRow, addRow, removeRow, reset } = useBatchRows({
@@ -133,11 +143,11 @@ export default function RulesSection({
             <tbody>
               {rules.items.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.keyword}</td>
-                  <td>
+                  <td className="wrap-cell">{r.keyword}</td>
+                  <td className="wrap-cell">
                     <span className="category-cell">
                       <CategoryBadge category={categoryFor(r.category_id)} />
-                      {categoryName(r.category_id)}
+                      {pathName(r.category_id)}
                     </span>
                   </td>
                   <td className="num">{r.priority}</td>
@@ -177,6 +187,7 @@ export default function RulesSection({
             <div className="field-input">
               <input
                 value={ruleDraft.keyword}
+                placeholder={t('transactions.ruleKeywordPlaceholder')}
                 onChange={(e) => setRuleDraft({ ...ruleDraft, keyword: e.target.value })}
               />
             </div>
@@ -189,11 +200,7 @@ export default function RulesSection({
               onChange={(e) => setRuleDraft({ ...ruleDraft, category_id: e.target.value })}
             >
               <option value="">&#8212;</option>
-              {categories.items.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {categoryDisplayName(c, t)}
-                </option>
-              ))}
+              <CategoryOptions categories={categories.items} />
             </select>
           </label>
           <label className="field">
