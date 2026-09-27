@@ -1,6 +1,7 @@
 //! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
 //! `month_setup_state`, `carry_plan_forward`, `month_review`,
-//! `suggest_plan_from_spending`, `resolve_category_name`.
+//! `suggest_plan_from_spending`, `resolve_category_name`,
+//! `migrate_legacy_categories`.
 
 use wasm_bindgen::prelude::*;
 
@@ -8,11 +9,12 @@ use crate::convert::{decimal_to_f64, f64_to_decimal, to_js};
 use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
     CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto, CategoryLineDto,
-    CategoryRankParams, CategoryRankResult, CategoryShareDto, CategorySharesParams,
-    CategorySharesResult, MonthReviewParams, MonthReviewResult, MonthSetupStateParams,
-    MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, RankedCategoryDto,
-    ResolveCategoryNameParams, ResolveCategoryNameResult, SuggestPlanParams, SuggestPlanResult,
-    SuggestedRowDto, TransactionDto,
+    CategoryMigrationDto, CategoryRankParams, CategoryRankResult, CategoryShareDto,
+    CategorySharesParams, CategorySharesResult, MigrateCategoriesParams, MigrateCategoriesResult,
+    MonthReviewParams, MonthReviewResult, MonthSetupStateParams, MonthSetupStateResult,
+    MonthSummaryDto, PlanEntryDto, RankedCategoryDto, ResolveCategoryNameParams,
+    ResolveCategoryNameResult, SuggestPlanParams, SuggestPlanResult, SuggestedRowDto,
+    TransactionDto,
 };
 use crate::message::Message;
 
@@ -54,20 +56,27 @@ fn build_month_impl(params: JsValue) -> BuildMonthResult {
         };
     };
 
-    match budget_calc::build_month(&planned, &previous, &spent) {
-        Ok(lines) => {
-            let summary = budget_calc::summarize_month(&lines, &params.income_category_ids);
+    let parents = budget_calc::parent_map(
+        &params
+            .hierarchy
+            .iter()
+            .map(|c| (c.id.clone(), c.parent_id.clone()))
+            .collect::<Vec<_>>(),
+    );
+    let to_dto = |l: budget_calc::CategoryLine| CategoryLineDto {
+        category_id: l.category_id,
+        planned: decimal_to_f64(l.planned),
+        rollover: decimal_to_f64(l.rollover),
+        spent: decimal_to_f64(l.spent),
+        remaining: decimal_to_f64(l.remaining),
+    };
+
+    match budget_calc::build_month_tree(&planned, &previous, &spent, &parents) {
+        Ok(tree) => {
+            let summary = budget_calc::summarize_month(&tree.lines, &params.income_category_ids);
             BuildMonthResult {
-                lines: lines
-                    .into_iter()
-                    .map(|l| CategoryLineDto {
-                        category_id: l.category_id,
-                        planned: decimal_to_f64(l.planned),
-                        rollover: decimal_to_f64(l.rollover),
-                        spent: decimal_to_f64(l.spent),
-                        remaining: decimal_to_f64(l.remaining),
-                    })
-                    .collect(),
+                lines: tree.lines.into_iter().map(to_dto).collect(),
+                sub_lines: tree.sub_lines.into_iter().map(to_dto).collect(),
                 summary: Some(MonthSummaryDto {
                     income: decimal_to_f64(summary.income),
                     total_planned: decimal_to_f64(summary.total_planned),
@@ -483,6 +492,7 @@ fn category_from_dto(dto: &CategoryDto) -> budget_calc::Category {
         group: dto.group.clone(),
         is_income: dto.is_income,
         description: dto.description.clone(),
+        parent_id: dto.parent_id.clone(),
     }
 }
 
@@ -649,5 +659,56 @@ fn resolve_category_name_impl(params: JsValue) -> ResolveCategoryNameResult {
             group_key: Some(group_key),
             ..named("create")
         },
+    }
+}
+
+/// `budget_calc::migrate_legacy_categories`: the steps that move a budget
+/// saved under the old flat starter list onto the CPA's grouped one, or
+/// none. Composing each record's translated name is the caller's, the
+/// same way seeding a preset is.
+#[wasm_bindgen]
+pub fn migrate_legacy_categories(params: JsValue) -> JsValue {
+    to_js(&migrate_legacy_categories_impl(params))
+}
+
+fn migrate_legacy_categories_impl(params: JsValue) -> MigrateCategoriesResult {
+    let Ok(params) = serde_wasm_bindgen::from_value::<MigrateCategoriesParams>(params) else {
+        return MigrateCategoriesResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        };
+    };
+    let nodes: Vec<budget_calc::CategoryNode> = params
+        .categories
+        .into_iter()
+        .map(|c| budget_calc::CategoryNode {
+            id: c.id,
+            preset_key: c.preset_key,
+            parent_id: c.parent_id,
+        })
+        .collect();
+    MigrateCategoriesResult {
+        steps: budget_calc::migrate_legacy_categories(&nodes)
+            .into_iter()
+            .map(|step| match step {
+                budget_calc::CategoryMigration::Relabel {
+                    id,
+                    preset_key,
+                    parent_id,
+                } => CategoryMigrationDto {
+                    action: "relabel".to_string(),
+                    id,
+                    preset_key,
+                    parent_id,
+                },
+                budget_calc::CategoryMigration::Create { id, preset_key } => CategoryMigrationDto {
+                    action: "create".to_string(),
+                    id,
+                    preset_key: Some(preset_key),
+                    parent_id: None,
+                },
+            })
+            .collect(),
+        error: None,
     }
 }

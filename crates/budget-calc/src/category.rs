@@ -7,6 +7,7 @@
 //! month" rather than a failure (see budget-wasm's Message layer).
 
 use std::cmp::Reverse;
+use std::collections::{HashMap, HashSet};
 
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,13 @@ pub struct Category {
     /// this field existed still loads.
     #[serde(default)]
     pub description: String,
+    /// The top-level category this one is a subcategory of, or `None` for
+    /// a top-level one. One level only: see [`parent_map`] for what a
+    /// deeper or dangling link is read as. `#[serde(default)]` so every
+    /// category saved before subcategories existed loads as top-level,
+    /// which is exactly what it was.
+    #[serde(default)]
+    pub parent_id: Option<String>,
 }
 
 impl Category {
@@ -58,8 +66,235 @@ impl Category {
             group: group.into(),
             description: description.into(),
             is_income,
+            parent_id: None,
         })
     }
+
+    /// The same category, filed under `parent_id`.
+    #[must_use]
+    pub fn under(mut self, parent_id: impl Into<String>) -> Self {
+        self.parent_id = Some(parent_id.into());
+        self
+    }
+}
+
+/// Which top-level category each subcategory rolls up into, built from
+/// `(id, parent_id)` pairs.
+///
+/// The Budget tab plans at the top level and every total in the app is
+/// read there, so a link that would make a subcategory's money land
+/// nowhere, or twice, is not honoured as written:
+///
+/// - **A parent that doesn't exist** (deleted, or never imported) leaves
+///   the subcategory top-level. Rolling it into a missing id would drop its
+///   spending from every row on screen while the month total still counted
+///   it.
+/// - **A parent that is itself a subcategory** is followed to *its*
+///   parent. Only one level is ever created, so this only happens to data
+///   edited by hand; following it keeps the money under the group it was
+///   clearly meant for.
+/// - **A category naming itself**, or a cycle, is top-level.
+///
+/// Ids with no parent are absent from the map, so `root_of` is a lookup
+/// with the id itself as the fallback.
+pub fn parent_map(links: &[(String, Option<String>)]) -> HashMap<String, String> {
+    let direct: HashMap<&str, &str> = links
+        .iter()
+        .filter_map(|(id, parent)| parent.as_deref().map(|p| (id.as_str(), p)))
+        .filter(|(id, parent)| id != parent)
+        .collect();
+    let exists: HashSet<&str> = links.iter().map(|(id, _)| id.as_str()).collect();
+
+    let mut roots = HashMap::new();
+    for (id, _) in links {
+        let mut current = id.as_str();
+        let mut visited = vec![current];
+        let root = loop {
+            match direct.get(current) {
+                Some(&parent) if exists.contains(parent) => {
+                    // A cycle never reaches a category without a parent;
+                    // everything on it stays top-level rather than one
+                    // being picked arbitrarily.
+                    if visited.contains(&parent) {
+                        break None;
+                    }
+                    visited.push(parent);
+                    current = parent;
+                }
+                _ => break Some(current),
+            }
+        };
+        if let Some(root) = root.filter(|r| *r != id) {
+            roots.insert(id.clone(), root.to_string());
+        }
+    }
+    roots
+}
+
+/// Sums per-category amounts up into their top-level categories, keeping
+/// each top-level id at the position it (or its first subcategory) first
+/// appeared -- so the Budget rows keep the order categories were listed
+/// in, rather than resorting by anything.
+pub fn roll_up(
+    entries: &[(String, Decimal)],
+    parents: &HashMap<String, String>,
+) -> Vec<(String, Decimal)> {
+    let mut rolled: Vec<(String, Decimal)> = Vec::new();
+    for (id, amount) in entries {
+        let root = parents.get(id).unwrap_or(id);
+        match rolled.iter_mut().find(|(r, _)| r == root) {
+            Some((_, total)) => *total += *amount,
+            None => rolled.push((root.clone(), *amount)),
+        }
+    }
+    rolled
+}
+
+/// A month's lines at both levels.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MonthTree {
+    /// One line per top-level category, each subcategory's planned,
+    /// rollover and spent folded in. This is the list every total is
+    /// summed from.
+    pub lines: Vec<CategoryLine>,
+    /// One line per subcategory, on its own figures only -- the breakdown
+    /// under a top-level row. Never summed into a total: its money is
+    /// already inside its parent's line.
+    pub sub_lines: Vec<CategoryLine>,
+}
+
+/// [`build_month`] for a budget with subcategories.
+///
+/// Planning happens at the top level, with a subcategory optionally
+/// carrying a plan of its own; a top-level row's planned amount is then
+/// its own plan plus every subcategory's, and the same for spent. A
+/// category nobody has filed anything under yet still gets its line --
+/// `planned` lists every category, same as `build_month` expects.
+pub fn build_month_tree(
+    planned: &[(String, Decimal)],
+    previous_remaining: &[(String, Decimal)],
+    spent: &[(String, Decimal)],
+    parents: &HashMap<String, String>,
+) -> BudgetResult<MonthTree> {
+    let lines = build_month(
+        &roll_up(planned, parents),
+        &roll_up(previous_remaining, parents),
+        &roll_up(spent, parents),
+    )?;
+    let is_sub = |(id, _): &&(String, Decimal)| parents.contains_key(id);
+    let sub_planned: Vec<_> = planned.iter().filter(is_sub).cloned().collect();
+    let sub_lines = build_month(&sub_planned, previous_remaining, spent)?;
+    Ok(MonthTree { lines, sub_lines })
+}
+
+/// A saved category as the one-time move onto the CPA's list needs to
+/// see it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CategoryNode {
+    pub id: String,
+    pub preset_key: Option<String>,
+    pub parent_id: Option<String>,
+}
+
+/// One change `migrate_legacy_categories` asks for.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum CategoryMigration {
+    /// Rewrite an existing category, keeping its id, as `preset_key` under
+    /// `parent_id`. `preset_key` is `None` when the old category has no
+    /// counterpart: it keeps the name it was saved with and becomes an
+    /// ordinary hand-typed category.
+    Relabel {
+        id: String,
+        preset_key: Option<String>,
+        parent_id: Option<String>,
+    },
+    /// Create the top-level group an old category is moving under, because
+    /// nothing the budget already has became it.
+    Create { id: String, preset_key: String },
+}
+
+/// The id a group created by the migration gets. Fixed rather than
+/// random so that running the migration twice over a half-saved result
+/// finds the group it already made instead of adding a second.
+fn migrated_group_id(preset_key: &str) -> String {
+    format!("migrated-{preset_key}")
+}
+
+/// Moves a budget saved under the old flat list onto the CPA's grouped one
+/// (see `presets::LEGACY_PRESETS`), or returns nothing if there is nothing
+/// to move.
+///
+/// Every category keeps its id. That is the whole design: transactions,
+/// plan rows, rules and recurring items all point at a category by id, so
+/// relabelling in place moves every one of them with it and nothing else
+/// has to be rewritten. The alternative -- new categories plus a remap of
+/// every reference -- is several stores' worth of writes that can stop
+/// half-way.
+///
+/// An old category that becomes a subcategory (Utilities) goes under the
+/// budget's own copy of the new group when there is one (old Housing,
+/// which becomes Housing & Utilities), and under a newly created group
+/// otherwise. Hand-typed categories and ones already on the new list are
+/// left alone. Idempotent: its own output contains no legacy keys.
+pub fn migrate_legacy_categories(categories: &[CategoryNode]) -> Vec<CategoryMigration> {
+    let legacy = |key: &str| {
+        crate::presets::LEGACY_PRESETS
+            .iter()
+            .find(|(old, _)| *old == key)
+            .map(|(_, new)| *new)
+    };
+    let moving: Vec<(&CategoryNode, Option<&'static str>)> = categories
+        .iter()
+        .filter_map(|c| Some((c, legacy(c.preset_key.as_deref()?)?)))
+        .collect();
+    if moving.is_empty() {
+        return Vec::new();
+    }
+
+    // Which id holds each top-level preset once the relabels land: an
+    // existing category already on the new key, else an old one moving
+    // onto it.
+    let mut group_ids: HashMap<&str, String> = HashMap::new();
+    let already_new = categories
+        .iter()
+        .filter_map(|c| Some((c, c.preset_key.as_deref()?)));
+    let moving_to = moving.iter().filter_map(|(c, new)| Some((*c, (*new)?)));
+    for (c, key) in already_new.chain(moving_to) {
+        if let Some(p) = crate::presets::preset_by_key(key).filter(|p| p.parent_key.is_none()) {
+            group_ids.entry(p.key).or_insert_with(|| c.id.clone());
+        }
+    }
+
+    let mut steps = Vec::new();
+    let mut created: Vec<&str> = Vec::new();
+    for (c, new) in moving {
+        let preset = new.and_then(crate::presets::preset_by_key);
+        // A top-level preset, or no counterpart at all, stays top-level.
+        let parent_id = preset.and_then(|p| p.parent_key).map(|group_key| {
+            if let Some(id) = group_ids.get(group_key) {
+                return id.clone();
+            }
+            let id = migrated_group_id(group_key);
+            if !created.contains(&group_key) {
+                created.push(group_key);
+                steps.push(CategoryMigration::Create {
+                    id: id.clone(),
+                    preset_key: group_key.to_string(),
+                });
+            }
+            id
+        });
+        steps.push(CategoryMigration::Relabel {
+            id: c.id.clone(),
+            preset_key: preset.map(|p| p.key.to_string()),
+            parent_id,
+        });
+    }
+    // Creates first, so a caller saving these in order never has a
+    // subcategory briefly pointing at a group that isn't there yet.
+    steps.sort_by_key(|s| !matches!(s, CategoryMigration::Create { .. }));
+    steps
 }
 
 /// One category's plan for one month: what was allocated, what carried in
@@ -815,11 +1050,27 @@ pub fn suggest_plan_from_spending(
         .map(|c| c.id.clone())
         .collect();
 
+    // Plans are made at the top level, so a subcategory's history is read
+    // as its group's: three months of Groceries and Personal Care
+    // Essentials propose one Food & Basic Goods figure, not two rows the
+    // Budget tab has no place to put.
+    let parents = parent_map(
+        &categories
+            .iter()
+            .map(|c| (c.id.clone(), c.parent_id.clone()))
+            .collect::<Vec<_>>(),
+    );
     let uncategorized = crate::transaction::uncategorized_count(transactions, &existing_ids);
     let categorized: Vec<Transaction> = transactions
         .iter()
         .filter(|t| !crate::transaction::is_uncategorized(t, &existing_ids))
         .cloned()
+        .map(|mut t| {
+            if let Some(root) = t.category_id.as_ref().and_then(|id| parents.get(id)) {
+                t.category_id = Some(root.clone());
+            }
+            t
+        })
         .collect();
 
     let complete: Vec<Transaction> = categorized
@@ -2493,5 +2744,304 @@ mod tests {
             panic!("expected a new category");
         };
         assert_eq!(group_key, crate::presets::EXPENSE.0);
+    }
+
+    // ---- subcategories -------------------------------------------------
+
+    fn links(pairs: &[(&str, Option<&str>)]) -> Vec<(String, Option<String>)> {
+        pairs
+            .iter()
+            .map(|(id, p)| (id.to_string(), p.map(str::to_string)))
+            .collect()
+    }
+
+    fn amounts(pairs: &[(&str, i64)]) -> Vec<(String, Decimal)> {
+        pairs
+            .iter()
+            .map(|(id, a)| (id.to_string(), Decimal::from(*a)))
+            .collect()
+    }
+
+    #[test]
+    fn parent_map_links_subcategories_to_their_group() {
+        let map = parent_map(&links(&[("food", None), ("groceries", Some("food"))]));
+        assert_eq!(map.get("groceries").map(String::as_str), Some("food"));
+        assert!(!map.contains_key("food"));
+    }
+
+    #[test]
+    fn parent_map_leaves_a_dangling_link_top_level() {
+        // Its spending would otherwise roll into a row that isn't on screen.
+        let map = parent_map(&links(&[("groceries", Some("deleted"))]));
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn parent_map_follows_a_two_deep_link_to_the_top() {
+        let map = parent_map(&links(&[
+            ("food", None),
+            ("groceries", Some("food")),
+            ("produce", Some("groceries")),
+        ]));
+        assert_eq!(map.get("produce").map(String::as_str), Some("food"));
+    }
+
+    #[test]
+    fn parent_map_leaves_a_cycle_and_a_self_link_top_level() {
+        let map = parent_map(&links(&[
+            ("a", Some("b")),
+            ("b", Some("a")),
+            ("c", Some("c")),
+        ]));
+        assert!(map.is_empty(), "{map:?}");
+    }
+
+    #[test]
+    fn roll_up_sums_into_the_group_in_first_seen_order() {
+        let map = parent_map(&links(&[
+            ("food", None),
+            ("groceries", Some("food")),
+            ("rent", None),
+        ]));
+        let rolled = roll_up(
+            &amounts(&[("groceries", 30), ("rent", 900), ("food", 20)]),
+            &map,
+        );
+        assert_eq!(rolled, amounts(&[("food", 50), ("rent", 900)]));
+    }
+
+    #[test]
+    fn month_tree_totals_each_group_once_and_breaks_it_down() {
+        let map = parent_map(&links(&[
+            ("pay", None),
+            ("food", None),
+            ("groceries", Some("food")),
+            ("care", Some("food")),
+        ]));
+        let tree = build_month_tree(
+            &amounts(&[
+                ("pay", 3000),
+                ("food", 100),
+                ("groceries", 400),
+                ("care", 0),
+            ]),
+            &[],
+            &amounts(&[("groceries", 350), ("care", 40), ("food", 10)]),
+            &map,
+        )
+        .unwrap();
+
+        let food = tree.lines.iter().find(|l| l.category_id == "food").unwrap();
+        assert_eq!(food.planned, Decimal::from(500));
+        assert_eq!(food.spent, Decimal::from(400));
+        assert_eq!(food.remaining, Decimal::from(100));
+        assert_eq!(tree.lines.len(), 2, "subcategories are not top-level lines");
+
+        let summary = summarize_month(&tree.lines, &["pay".to_string()]);
+        assert_eq!(summary.income, Decimal::from(3000));
+        assert_eq!(
+            summary.total_planned,
+            Decimal::from(500),
+            "nothing counted twice"
+        );
+
+        let groceries = tree
+            .sub_lines
+            .iter()
+            .find(|l| l.category_id == "groceries")
+            .unwrap();
+        assert_eq!(groceries.planned, Decimal::from(400));
+        assert_eq!(groceries.spent, Decimal::from(350));
+        let care = tree
+            .sub_lines
+            .iter()
+            .find(|l| l.category_id == "care")
+            .unwrap();
+        assert_eq!(care.planned, Decimal::ZERO);
+        assert_eq!(care.spent, Decimal::from(40));
+    }
+
+    #[test]
+    fn month_tree_without_subcategories_is_build_month() {
+        let planned = amounts(&[("a", 10), ("b", 20)]);
+        let spent = amounts(&[("a", 5)]);
+        let tree = build_month_tree(&planned, &[], &spent, &HashMap::new()).unwrap();
+        assert_eq!(tree.lines, build_month(&planned, &[], &spent).unwrap());
+        assert!(tree.sub_lines.is_empty());
+    }
+
+    #[test]
+    fn suggested_plan_proposes_one_row_per_group() {
+        let categories = vec![
+            cat("pay", true),
+            cat("food", false),
+            cat("groceries", false).under("food"),
+            cat("care", false).under("food"),
+        ];
+        let txs: Vec<Transaction> = [
+            ("pay", 3000),
+            ("groceries", -300),
+            ("care", -50),
+            ("groceries", -100),
+            ("pay", 100),
+            ("care", -10),
+        ]
+        .iter()
+        .enumerate()
+        .map(|(i, (category, amount))| {
+            tx(
+                &format!("t{i}"),
+                "2026-08-10",
+                Decimal::from(*amount),
+                category,
+            )
+        })
+        .collect();
+        let plan = suggest_plan_from_spending(&txs, &categories, "2026-09", None);
+        let ids: Vec<_> = plan.rows.iter().map(|r| r.category_id.as_str()).collect();
+        assert!(ids.contains(&"food"), "{ids:?}");
+        assert!(
+            !ids.contains(&"groceries") && !ids.contains(&"care"),
+            "{ids:?}"
+        );
+        let food = plan.rows.iter().find(|r| r.category_id == "food").unwrap();
+        assert_eq!(food.observed, Decimal::from(460));
+    }
+
+    // ---- moving onto the CPA's list -----------------------------------
+
+    fn node(id: &str, key: Option<&str>) -> CategoryNode {
+        CategoryNode {
+            id: id.to_string(),
+            preset_key: key.map(str::to_string),
+            parent_id: None,
+        }
+    }
+
+    fn relabel(id: &str, key: Option<&str>, parent: Option<&str>) -> CategoryMigration {
+        CategoryMigration::Relabel {
+            id: id.to_string(),
+            preset_key: key.map(str::to_string),
+            parent_id: parent.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn a_budget_on_the_new_list_needs_no_migration() {
+        let nodes = vec![node("a", Some("cat.housingUtilities")), node("b", None)];
+        assert!(migrate_legacy_categories(&nodes).is_empty());
+    }
+
+    #[test]
+    fn housing_and_utilities_become_one_group_and_its_subcategory() {
+        let steps = migrate_legacy_categories(&[
+            node("h", Some("cat.housing")),
+            node("u", Some("cat.utilities")),
+        ]);
+        assert_eq!(
+            steps,
+            vec![
+                relabel("h", Some("cat.housingUtilities"), None),
+                relabel("u", Some("cat.utilityBills"), Some("h")),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_subcategory_without_its_group_gets_one_created_first() {
+        let steps = migrate_legacy_categories(&[
+            node("d", Some("cat.debtServicing")),
+            node("f", Some("cat.familyDependents")),
+        ]);
+        let group = "migrated-cat.obligationsSupport";
+        assert_eq!(
+            steps,
+            vec![
+                CategoryMigration::Create {
+                    id: group.to_string(),
+                    preset_key: "cat.obligationsSupport".to_string(),
+                },
+                relabel("d", Some("cat.debtPayments"), Some(group)),
+                relabel("f", Some("cat.dependentCare"), Some(group)),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_group_already_on_the_new_list_is_reused() {
+        let steps = migrate_legacy_categories(&[
+            node("e", Some("cat.entertainmentLeisure")),
+            node("s", Some("cat.subscriptionsMemberships")),
+        ]);
+        assert_eq!(
+            steps,
+            vec![relabel("s", Some("cat.subscriptionsStreaming"), Some("e"))]
+        );
+    }
+
+    #[test]
+    fn other_expenses_becomes_a_hand_typed_category() {
+        let steps = migrate_legacy_categories(&[node("o", Some("cat.otherExpenses"))]);
+        assert_eq!(steps, vec![relabel("o", None, None)]);
+    }
+
+    #[test]
+    fn hand_typed_categories_are_left_alone() {
+        let steps =
+            migrate_legacy_categories(&[node("mine", None), node("f", Some("cat.foodGroceries"))]);
+        assert_eq!(steps, vec![relabel("f", Some("cat.foodBasics"), None)]);
+    }
+
+    #[test]
+    fn migrating_the_whole_old_list_leaves_nothing_to_migrate() {
+        let old: Vec<CategoryNode> = crate::presets::LEGACY_PRESETS
+            .iter()
+            .enumerate()
+            .map(|(i, (key, _))| node(&format!("c{i}"), Some(key)))
+            .collect();
+        let steps = migrate_legacy_categories(&old);
+
+        let mut after: Vec<CategoryNode> = old.clone();
+        for step in &steps {
+            match step {
+                CategoryMigration::Create { id, preset_key } => {
+                    after.push(node(id, Some(preset_key)));
+                }
+                CategoryMigration::Relabel {
+                    id,
+                    preset_key,
+                    parent_id,
+                } => {
+                    let c = after.iter_mut().find(|c| &c.id == id).unwrap();
+                    c.preset_key.clone_from(preset_key);
+                    c.parent_id.clone_from(parent_id);
+                }
+            }
+        }
+        assert!(migrate_legacy_categories(&after).is_empty());
+
+        // Every parent it points at exists and is top-level.
+        for c in &after {
+            if let Some(parent) = &c.parent_id {
+                let p = after
+                    .iter()
+                    .find(|p| &p.id == parent)
+                    .expect("parent exists");
+                assert!(p.parent_id.is_none());
+            }
+        }
+        // Obligations & Support and Entertainment & Leisure had no old
+        // counterpart, so exactly those two groups are created.
+        let created: Vec<_> = steps
+            .iter()
+            .filter_map(|s| match s {
+                CategoryMigration::Create { preset_key, .. } => Some(preset_key.as_str()),
+                CategoryMigration::Relabel { .. } => None,
+            })
+            .collect();
+        assert_eq!(
+            created,
+            vec!["cat.obligationsSupport", "cat.entertainmentLeisure"]
+        );
     }
 }

@@ -6,23 +6,20 @@
 //! lines most households actually have, offered as a starting point to
 //! rename or delete, never imposed.
 //!
-//! This list replaced an earlier US/SG-specific pair after real-user
-//! feedback: the income/expense taxonomy below (five income sources,
-//! eleven expense categories, an "Other" catch-all on each side) isn't
-//! region-flavoured the way the old set was (S&CC, a parents' allowance).
-//! The app's region/market concept was removed outright afterwards --
-//! nothing else in this codebase needed it either, so there was no reason
-//! left to carry a `Region` parameter through here just for this.
+//! The list is two levels deep: a top-level group (Housing & Utilities)
+//! and its subcategories (Mortgage / Rent, Utilities, ...). It comes from
+//! Mei, a CPA -- her list is the authoritative source for what belongs
+//! where, down to the wording -- and replaced an earlier flat list of
+//! sixteen (also hers) that had a one-line description per category
+//! standing in for the detail the subcategories now carry. Budgets saved
+//! under that older list are moved onto this one by
+//! `category::migrate_legacy_categories`, driven by `LEGACY_PRESETS`.
 //!
-//! Both the taxonomy and each category's `description` come from Mei, a
-//! CPA -- her list is the authoritative source for what belongs where,
-//! down to the wording. Descriptions carry through to `Category` and stay
-//! visible as a standing hint (not just shown once at seed time), so
-//! "does this receipt go under Personal & Lifestyle or Family &
-//! Dependents" has an answer on-screen instead of relying on memory.
+//! Before either of hers, an US/SG-specific pair lived here; the app's
+//! region concept went with it, so nothing here takes a `Region`.
 //!
 //! **Why this lives in Rust rather than a JS constant.** Even a universal
-//! taxonomy is a specific choice -- which eleven expense buckets, in what
+//! taxonomy is a specific choice -- which eight expense groups, in what
 //! words -- that a second implementation could make differently. See
 //! CLAUDE.md's "choosing between rulesets" rule.
 //!
@@ -41,15 +38,11 @@ pub struct PresetCategory {
     pub group_key: &'static str,
     pub group: &'static str,
     pub is_income: bool,
-    /// i18n key for `description`, following the same key-plus-fallback
-    /// convention as `key`/`name` above.
-    pub description_key: &'static str,
-    /// What belongs in this category, in a CPA's own words -- the list
-    /// this whole module is sourced from (see the module doc). Shown as
-    /// a standing hint under the category, not just at seed time, so it
-    /// keeps earning its keep the next time someone can't remember which
-    /// bucket a receipt goes in.
-    pub description: &'static str,
+    /// The preset this one is a subcategory of, by key -- `None` for one
+    /// of the CPA's top-level groups. Only ever one level deep: a
+    /// subcategory is never itself a parent (see
+    /// `every_parent_is_a_top_level_preset`).
+    pub parent_key: Option<&'static str>,
 }
 
 /// The group every income preset carries, as the same key-plus-English-
@@ -61,227 +54,222 @@ pub const INCOME: (&str, &str) = ("cat.group.income", "Income");
 /// The expense counterpart of [`INCOME`].
 pub const EXPENSE: (&str, &str) = ("cat.group.expense", "Expense");
 
-#[allow(clippy::too_many_arguments)]
-const fn preset(
-    key: &'static str,
-    name: &'static str,
-    group: (&'static str, &'static str),
-    is_income: bool,
-    description_key: &'static str,
-    description: &'static str,
-) -> PresetCategory {
+const fn top(key: &'static str, name: &'static str, is_income: bool) -> PresetCategory {
+    let group = if is_income { INCOME } else { EXPENSE };
     PresetCategory {
         key,
         name,
         group_key: group.0,
         group: group.1,
         is_income,
-        description_key,
-        description,
+        parent_key: None,
     }
 }
 
-/// Five ways a household's money tends to come in, from a paycheck
-/// through to a tax refund. Named "Other Income" rather than the bare
-/// "Others" of the original feedback -- this app's category list is
-/// flat (no group headers in the picker itself), and two categories both
-/// literally named "Others" would be indistinguishable there, and would
-/// collide in the auto-seed step besides (`addCommonCategories` dedupes
-/// by name).
-const INCOME_CATEGORIES: &[PresetCategory] = &[
-    preset(
-        "cat.primaryEarnedIncome",
-        "Primary Earned Income",
-        INCOME,
-        true,
-        "cat.primaryEarnedIncome.desc",
-        "Salary, wages, overtime pay, tips, and bonuses.",
-    ),
-    preset(
-        "cat.selfEmploymentBusiness",
-        "Self-Employment & Business",
-        INCOME,
-        true,
-        "cat.selfEmploymentBusiness.desc",
-        "Freelance revenue, gig work, consulting fees, and business profits.",
-    ),
-    preset(
-        "cat.investmentCapitalIncome",
-        "Investments",
-        INCOME,
-        true,
-        "cat.investmentCapitalIncome.desc",
-        "Rental income, dividends, interest, and capital gains.",
-    ),
-    preset(
-        "cat.governmentSupplemental",
-        "Government Benefits",
-        INCOME,
-        true,
-        "cat.governmentSupplemental.desc",
-        "Pension, Social Security, child support, alimony, and tax refunds.",
-    ),
-    preset(
-        "cat.otherIncome",
-        "Other Income",
-        INCOME,
-        true,
-        "cat.otherIncome.desc",
-        "Any other income that doesn't fit the categories above.",
-    ),
-];
-
-const EXPENSE_CATEGORIES: &[PresetCategory] = &[
-    preset(
-        "cat.housing",
-        "Housing",
-        EXPENSE,
-        false,
-        "cat.housing.desc",
-        "Rent or mortgage, property taxes, homeowner/rental insurance, HOA fees, repairs.",
-    ),
-    preset(
-        "cat.utilities",
-        "Utilities",
-        EXPENSE,
-        false,
-        "cat.utilities.desc",
-        "Electricity, gas, water/sewer, trash collection, internet, wifi, mobile phone.",
-    ),
-    preset(
-        "cat.foodGroceries",
-        "Food & Groceries",
-        EXPENSE,
-        false,
-        "cat.foodGroceries.desc",
-        "Groceries, household supplies, dining out, coffee/drinks.",
-    ),
-    preset(
-        "cat.transportation",
-        "Transportation",
-        EXPENSE,
-        false,
-        "cat.transportation.desc",
-        "Auto loan/lease, vehicle insurance, gas/EV charging, parking, tolls, transit passes, car maintenance.",
-    ),
-    preset(
-        "cat.healthcareInsurance",
-        "Healthcare & Insurance",
-        EXPENSE,
-        false,
-        "cat.healthcareInsurance.desc",
-        "Health/dental/vision premiums, pharmacy copays, out-of-pocket medical bills, life insurance.",
-    ),
-    preset(
-        "cat.debtServicing",
-        "Debt Payments",
-        EXPENSE,
-        false,
-        "cat.debtServicing.desc",
-        "Credit card balances, student loans, personal loans, medical debt payments.",
-    ),
-    preset(
-        "cat.personalLifestyle",
-        "Personal & Lifestyle",
-        EXPENSE,
-        false,
-        "cat.personalLifestyle.desc",
-        "Clothing/shoes, personal care, hobbies.",
-    ),
-    preset(
-        "cat.subscriptionsMemberships",
-        "Subscriptions & Memberships",
-        EXPENSE,
-        false,
-        "cat.subscriptionsMemberships.desc",
-        "Streaming services, gym and other memberships, software subscriptions, recurring app fees.",
-    ),
-    preset(
-        "cat.familyDependents",
-        "Family & Dependents",
-        EXPENSE,
-        false,
-        "cat.familyDependents.desc",
-        "Childcare, tuition, school supplies, extracurricular activities, pet care/vet bills.",
-    ),
-    preset(
-        "cat.giftsDonations",
-        "Gifts & Donations",
-        EXPENSE,
-        false,
-        "cat.giftsDonations.desc",
-        "Birthday and holiday gifts, charitable donations, tithing.",
-    ),
-    preset(
-        "cat.otherExpenses",
-        "Other Expenses",
-        EXPENSE,
-        false,
-        "cat.otherExpenses.desc",
-        "Any other expense that doesn't fit the categories above.",
-    ),
-];
-
-/// The starter categories to offer a first-time budget.
-pub fn starter_categories() -> Vec<PresetCategory> {
-    INCOME_CATEGORIES
-        .iter()
-        .chain(EXPENSE_CATEGORIES)
-        .copied()
-        .collect()
+const fn sub(parent: &PresetCategory, key: &'static str, name: &'static str) -> PresetCategory {
+    PresetCategory {
+        key,
+        name,
+        group_key: parent.group_key,
+        group: parent.group,
+        // Inherited, never restated: a subcategory on the other side of
+        // the ledger from its parent would put its actual into a total
+        // the parent's row never reads.
+        is_income: parent.is_income,
+        parent_key: Some(parent.key),
+    }
 }
 
-/// The five keys a genuinely fresh budget (or one just cleared back to
-/// nothing) is auto-seeded with, in place of all sixteen of
-/// `starter_categories()`.
-///
-/// Onboarding research on this app (a real product-review pass, not a
-/// hunch) found the full sixteen-category table read as machinery before
-/// anyone had typed a dollar figure: a phone session opened straight onto
-/// sixteen expanded rows before a first budget existed to fill them.
-/// Five rows -- one income source, four of the expenses nearly every
-/// household actually has -- gets someone to a usable first plan in one
-/// screen; `CategoryChipPicker` and the explicit "add category" flow
-/// still offer the other eleven, one tap at a time, once there's a reason
-/// to reach for them.
-const COMPACT_STARTER_KEYS: &[&str] = &[
-    "cat.primaryEarnedIncome",
-    "cat.housing",
-    "cat.utilities",
-    "cat.foodGroceries",
-    "cat.transportation",
+const EARNED: PresetCategory = top("cat.earnedIncome", "Primary & Earned Income", true);
+const PASSIVE: PresetCategory = top("cat.passiveIncome", "Passive & Investment Income", true);
+const OTHER_INCOME: PresetCategory = top("cat.miscIncome", "Other Income", true);
+
+const HOUSING: PresetCategory = top("cat.housingUtilities", "Housing & Utilities", false);
+const TRANSPORT: PresetCategory = top("cat.transport", "Transportation", false);
+const FOOD: PresetCategory = top("cat.foodBasics", "Food & Basic Goods", false);
+const HEALTH: PresetCategory = top("cat.healthInsurance", "Health & Insurance", false);
+const OBLIGATIONS: PresetCategory = top("cat.obligationsSupport", "Obligations & Support", false);
+const DINING: PresetCategory = top("cat.diningSocial", "Dining & Social", false);
+const ENTERTAINMENT: PresetCategory =
+    top("cat.entertainmentLeisure", "Entertainment & Leisure", false);
+const LIFESTYLE: PresetCategory = top("cat.lifestyleShopping", "Lifestyle & Shopping", false);
+
+/// The CPA's list, top-level group first and its subcategories straight
+/// after it, in her order. Replaced the earlier flat sixteen (five income
+/// sources, eleven expense buckets) on 2026-09-27; the keys are all new
+/// rather than reused, so `LEGACY_PRESETS` below can tell a category
+/// saved from the old list apart from one saved from this one.
+const CATALOGUE: &[PresetCategory] = &[
+    EARNED,
+    sub(&EARNED, "cat.salaryWages", "Salary / Wages"),
+    sub(&EARNED, "cat.bonusesTips", "Bonuses & Tips"),
+    sub(&EARNED, "cat.freelanceSideGig", "Freelance / Side Gig"),
+    PASSIVE,
+    sub(&PASSIVE, "cat.dividendsInterest", "Dividends & Interest"),
+    sub(&PASSIVE, "cat.rentalIncome", "Rental Income"),
+    sub(&PASSIVE, "cat.capitalGains", "Capital Gains"),
+    OTHER_INCOME,
+    sub(&OTHER_INCOME, "cat.taxRefunds", "Tax Refunds"),
+    sub(
+        &OTHER_INCOME,
+        "cat.giftsReimbursements",
+        "Gifts & Reimbursements",
+    ),
+    sub(
+        &OTHER_INCOME,
+        "cat.governmentBenefits",
+        "Government Benefits",
+    ),
+    HOUSING,
+    sub(&HOUSING, "cat.mortgageRent", "Mortgage / Rent"),
+    sub(&HOUSING, "cat.propertyTaxes", "Property Taxes"),
+    sub(&HOUSING, "cat.hoa", "HOA"),
+    sub(&HOUSING, "cat.utilityBills", "Utilities"),
+    sub(&HOUSING, "cat.homeMaintenance", "Home Maintenance"),
+    TRANSPORT,
+    sub(&TRANSPORT, "cat.autoLoanLease", "Auto Loan / Lease"),
+    sub(&TRANSPORT, "cat.fuelCharging", "Fuel / Charging"),
+    sub(
+        &TRANSPORT,
+        "cat.transitRideshare",
+        "Public Transit & Rideshare",
+    ),
+    sub(&TRANSPORT, "cat.vehicleMaintenance", "Vehicle Maintenance"),
+    FOOD,
+    sub(&FOOD, "cat.groceries", "Groceries"),
+    sub(
+        &FOOD,
+        "cat.personalCareEssentials",
+        "Personal Care Essentials",
+    ),
+    HEALTH,
+    sub(&HEALTH, "cat.insurancePremiums", "Insurance Premiums"),
+    sub(&HEALTH, "cat.medicalOutOfPocket", "Medical Out-of-Pocket"),
+    OBLIGATIONS,
+    sub(&OBLIGATIONS, "cat.debtPayments", "Debt Payments"),
+    sub(&OBLIGATIONS, "cat.dependentCare", "Dependent Care"),
+    sub(
+        &OBLIGATIONS,
+        "cat.alimonyChildSupport",
+        "Alimony / Child Support",
+    ),
+    DINING,
+    sub(&DINING, "cat.restaurantsCafes", "Restaurants & Cafes"),
+    sub(&DINING, "cat.foodDelivery", "Food Delivery"),
+    ENTERTAINMENT,
+    sub(
+        &ENTERTAINMENT,
+        "cat.subscriptionsStreaming",
+        "Subscriptions & Streaming",
+    ),
+    sub(
+        &ENTERTAINMENT,
+        "cat.hobbiesRecreation",
+        "Hobbies & Recreation",
+    ),
+    sub(&ENTERTAINMENT, "cat.vacationTravel", "Vacation & Travel"),
+    LIFESTYLE,
+    sub(
+        &LIFESTYLE,
+        "cat.apparelAccessories",
+        "Apparel & Accessories",
+    ),
+    sub(&LIFESTYLE, "cat.electronicsTech", "Electronics & Tech"),
+    sub(&LIFESTYLE, "cat.personalUpkeep", "Personal Upkeep"),
+    sub(&LIFESTYLE, "cat.giftsGiving", "Gifts & Donations"),
 ];
 
-/// The compact starter set, in `COMPACT_STARTER_KEYS`'s declared order --
-/// filtered from `starter_categories()` rather than declared as its own
-/// preset list, so the two can never drift into naming the same category
-/// two different ways.
+/// Every starter category, top-level groups and subcategories both, each
+/// group immediately followed by its own subcategories.
+pub fn starter_categories() -> Vec<PresetCategory> {
+    CATALOGUE.to_vec()
+}
+
+/// The preset a key names, if it is one of today's.
+pub fn preset_by_key(key: &str) -> Option<PresetCategory> {
+    CATALOGUE.iter().find(|p| p.key == key).copied()
+}
+
+/// The top-level groups a genuinely fresh budget (or one just cleared back
+/// to nothing) is auto-seeded with, in place of all eleven.
+///
+/// Onboarding research on this app (a real product-review pass, not a
+/// hunch) found the full category table read as machinery before anyone
+/// had typed a dollar figure. Five groups -- one income source, four of
+/// the expenses nearly every household actually has -- gets someone to a
+/// usable first plan in one screen; the Budget tab plans at this level, so
+/// five rows is still five rows even though each arrives with its
+/// subcategories. `CategoryChipPicker` still offers the other six.
+///
+/// Dining & Social rather than Health & Insurance for the fourth: the old
+/// compact set's Food & Groceries covered eating out, and that now lives
+/// in its own group -- leaving it out would take something a fresh budget
+/// used to have away.
+const COMPACT_STARTER_KEYS: &[&str] = &[
+    "cat.earnedIncome",
+    "cat.housingUtilities",
+    "cat.foodBasics",
+    "cat.diningSocial",
+    "cat.transport",
+];
+
+/// The compact starter set: each of `COMPACT_STARTER_KEYS`'s groups, in
+/// that order, followed by its own subcategories -- filtered from
+/// `starter_categories()` rather than declared separately, so the two can
+/// never drift into naming the same category two different ways.
 pub fn compact_starter_categories() -> Vec<PresetCategory> {
-    let all = starter_categories();
     COMPACT_STARTER_KEYS
         .iter()
-        .map(|key| {
-            *all.iter()
-                .find(|p| p.key == *key)
-                .unwrap_or_else(|| panic!("{key} is not a starter_categories() preset"))
+        .flat_map(|key| {
+            let parent = preset_by_key(key)
+                .unwrap_or_else(|| panic!("{key} is not a starter_categories() preset"));
+            std::iter::once(parent).chain(
+                CATALOGUE
+                    .iter()
+                    .filter(move |p| p.parent_key == Some(parent.key))
+                    .copied(),
+            )
         })
         .collect()
 }
+
+/// Where a category saved from the pre-2026-09-27 flat list lands in the
+/// CPA's list: the new preset it becomes, or `None` for the one old
+/// category ("Other Expenses") the new list deliberately has no bucket
+/// for. `category::migrate_legacy_categories` is what applies it.
+///
+/// Each old key maps to exactly one new one, and the category keeps its
+/// id when it moves -- which is what keeps every transaction, plan and
+/// rule that points at it pointing at the right thing afterwards. Where
+/// two old categories now share a group (Housing and Utilities), the one
+/// that matches the group becomes it and the other becomes one of its
+/// subcategories, rather than merging two ids into one.
+pub const LEGACY_PRESETS: &[(&str, Option<&str>)] = &[
+    ("cat.primaryEarnedIncome", Some("cat.earnedIncome")),
+    ("cat.selfEmploymentBusiness", Some("cat.freelanceSideGig")),
+    ("cat.investmentCapitalIncome", Some("cat.passiveIncome")),
+    ("cat.governmentSupplemental", Some("cat.governmentBenefits")),
+    ("cat.otherIncome", Some("cat.miscIncome")),
+    ("cat.housing", Some("cat.housingUtilities")),
+    ("cat.utilities", Some("cat.utilityBills")),
+    ("cat.foodGroceries", Some("cat.foodBasics")),
+    ("cat.transportation", Some("cat.transport")),
+    ("cat.healthcareInsurance", Some("cat.healthInsurance")),
+    ("cat.debtServicing", Some("cat.debtPayments")),
+    ("cat.personalLifestyle", Some("cat.lifestyleShopping")),
+    (
+        "cat.subscriptionsMemberships",
+        Some("cat.subscriptionsStreaming"),
+    ),
+    ("cat.familyDependents", Some("cat.dependentCare")),
+    ("cat.giftsDonations", Some("cat.giftsGiving")),
+    ("cat.otherExpenses", None),
+];
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Category;
-
-    #[test]
-    fn offers_a_usable_starter_set() {
-        let presets = starter_categories();
-        assert!(
-            presets.len() >= 8,
-            "offers only {} categories -- too few to save anyone the typing",
-            presets.len()
-        );
-    }
 
     #[test]
     fn no_category_is_offered_twice() {
@@ -294,10 +282,10 @@ mod tests {
 
     #[test]
     fn no_two_categories_share_a_display_name() {
-        // The category picker is a flat list with no group headers, so a
-        // repeated name (the literal "Others" in the original feedback)
-        // would be indistinguishable there, and would collide in
-        // `addCommonCategories`'s name-based dedup.
+        // A subcategory's name shows on its own in the transaction list
+        // and the picker's search, so two sharing one -- even under
+        // different parents -- would be indistinguishable there, and
+        // would collide in `availablePresets`'s name-based dedup.
         let mut names: Vec<_> = starter_categories().iter().map(|p| p.name).collect();
         let before = names.len();
         names.sort_unstable();
@@ -312,7 +300,7 @@ mod tests {
         // Category::new would have rejected.
         for p in starter_categories() {
             assert!(
-                Category::new("id", p.name, p.group, p.is_income, p.description).is_ok(),
+                Category::new("id", p.name, p.group, p.is_income, "").is_ok(),
                 "{} is not a valid category name",
                 p.name
             );
@@ -331,110 +319,109 @@ mod tests {
     }
 
     #[test]
-    fn five_income_categories_and_eleven_expense_categories() {
+    fn the_cpa_list_has_three_income_and_eight_expense_groups() {
         let presets = starter_categories();
-        let income = presets.iter().filter(|p| p.group == "Income").count();
-        let expense = presets.iter().filter(|p| p.group == "Expense").count();
-        assert_eq!(income, 5);
-        assert_eq!(expense, 11);
-    }
-
-    #[test]
-    fn subscriptions_and_gifts_are_offered() {
-        let presets = starter_categories();
-        let subscriptions = presets
-            .iter()
-            .find(|p| p.key == "cat.subscriptionsMemberships")
-            .expect("subscriptions preset is offered");
-        assert!(!subscriptions.is_income);
-        assert_eq!(subscriptions.group, "Expense");
-
-        let gifts = presets
-            .iter()
-            .find(|p| p.key == "cat.giftsDonations")
-            .expect("gifts preset is offered");
-        assert!(!gifts.is_income);
-        assert_eq!(gifts.group, "Expense");
-    }
-
-    #[test]
-    fn three_labels_read_in_plain_language_now() {
-        let presets = starter_categories();
-        let by_key = |key: &str| presets.iter().find(|p| p.key == key).unwrap();
-        assert_eq!(by_key("cat.investmentCapitalIncome").name, "Investments");
-        assert_eq!(by_key("cat.debtServicing").name, "Debt Payments");
+        let tops = |income: bool| {
+            presets
+                .iter()
+                .filter(|p| p.parent_key.is_none() && p.is_income == income)
+                .count()
+        };
+        assert_eq!(tops(true), 3);
+        assert_eq!(tops(false), 8);
         assert_eq!(
-            by_key("cat.governmentSupplemental").name,
-            "Government Benefits"
+            presets.len(),
+            3 + 8 + 9 + 25,
+            "9 income and 25 expense subcategories"
         );
     }
 
     #[test]
-    fn is_income_always_agrees_with_the_group_it_was_declared_under() {
-        // The two are set independently at each `preset(...)` call site --
-        // this catches a copy-paste that flipped one without the other.
+    fn every_parent_is_a_top_level_preset() {
         for p in starter_categories() {
-            assert_eq!(
-                p.is_income,
-                p.group == "Income",
-                "{} has is_income={} but group={:?}",
-                p.name,
-                p.is_income,
-                p.group
-            );
+            if let Some(parent_key) = p.parent_key {
+                let parent = preset_by_key(parent_key)
+                    .unwrap_or_else(|| panic!("{} names a missing parent", p.key));
+                assert!(parent.parent_key.is_none(), "{} is nested twice", p.key);
+                assert_eq!(parent.is_income, p.is_income, "{} changes side", p.key);
+            }
         }
     }
 
     #[test]
-    fn every_preset_has_a_description() {
-        // Mei's list is the point of this module -- a preset that lost
-        // its description on the way in would silently fall back to
-        // showing nothing, same failure mode a missing translation has.
-        for p in starter_categories() {
-            assert!(!p.description.is_empty(), "{} has no description", p.name);
+    fn every_group_has_subcategories_listed_straight_after_it() {
+        // The Categories screen and the picker both render in catalogue
+        // order, so a subcategory declared away from its parent would
+        // still group correctly -- but this order is also what "add the
+        // whole group" inserts, and reads as the CPA wrote it.
+        let presets = starter_categories();
+        let mut current_parent = None;
+        for p in &presets {
+            match p.parent_key {
+                None => current_parent = Some(p.key),
+                Some(parent) => assert_eq!(Some(parent), current_parent, "{} is misplaced", p.key),
+            }
+        }
+        for top in presets.iter().filter(|p| p.parent_key.is_none()) {
             assert!(
-                p.description_key.starts_with("cat.") && p.description_key.ends_with(".desc"),
-                "{} is not namespaced",
-                p.description_key
+                presets.iter().any(|p| p.parent_key == Some(top.key)),
+                "{} has no subcategories",
+                top.key
             );
         }
     }
 
     #[test]
-    fn compact_starter_set_has_one_income_and_four_expense_categories() {
+    fn is_income_always_agrees_with_the_group() {
+        for p in starter_categories() {
+            assert_eq!(p.is_income, p.group == "Income", "{}", p.key);
+        }
+    }
+
+    #[test]
+    fn compact_starter_set_is_one_income_and_four_expense_groups_with_their_subcategories() {
         let compact = compact_starter_categories();
-        assert_eq!(compact.len(), 5);
-        assert_eq!(compact.iter().filter(|p| p.is_income).count(), 1);
-        assert_eq!(compact.iter().filter(|p| !p.is_income).count(), 4);
-    }
-
-    #[test]
-    fn compact_starter_set_is_a_subset_of_the_full_catalogue() {
-        let full: Vec<_> = starter_categories().iter().map(|p| p.key).collect();
-        for p in compact_starter_categories() {
-            assert!(
-                full.contains(&p.key),
-                "{} is not one of starter_categories()'s own presets",
-                p.key
+        let tops: Vec<_> = compact.iter().filter(|p| p.parent_key.is_none()).collect();
+        assert_eq!(tops.len(), 5);
+        assert_eq!(tops.iter().filter(|p| p.is_income).count(), 1);
+        let top_keys: Vec<_> = tops.iter().map(|p| p.key).collect();
+        assert_eq!(top_keys, COMPACT_STARTER_KEYS);
+        for p in &compact {
+            if let Some(parent) = p.parent_key {
+                assert!(
+                    top_keys.contains(&parent),
+                    "{} arrives without its group",
+                    p.key
+                );
+            }
+        }
+        let full = starter_categories();
+        for top in &tops {
+            let subs = |list: &[PresetCategory]| {
+                list.iter()
+                    .filter(|p| p.parent_key == Some(top.key))
+                    .count()
+            };
+            assert_eq!(
+                subs(&compact),
+                subs(&full),
+                "{} is missing subcategories",
+                top.key
             );
         }
     }
 
     #[test]
-    fn compact_starter_set_keeps_its_declared_order() {
-        let keys: Vec<_> = compact_starter_categories().iter().map(|p| p.key).collect();
-        assert_eq!(keys, COMPACT_STARTER_KEYS);
-    }
-
-    #[test]
-    fn no_description_key_is_offered_twice() {
-        let mut keys: Vec<_> = starter_categories()
-            .iter()
-            .map(|p| p.description_key)
-            .collect();
-        let before = keys.len();
-        keys.sort_unstable();
-        keys.dedup();
-        assert_eq!(before, keys.len(), "a description key repeats");
+    fn every_legacy_key_lands_on_a_real_preset_and_none_is_reused() {
+        let mut seen = Vec::new();
+        for (old, new) in LEGACY_PRESETS {
+            assert!(preset_by_key(old).is_none(), "{old} is still a live key");
+            if let Some(new) = new {
+                assert!(preset_by_key(new).is_some(), "{old} maps to missing {new}");
+                assert!(!seen.contains(new), "two old categories land on {new}");
+                seen.push(*new);
+            }
+        }
+        assert_eq!(LEGACY_PRESETS.len(), 16, "the old list had sixteen");
     }
 }

@@ -24,6 +24,9 @@ pub struct CategoryDto {
     /// Mirrors `CategoryRecord::preset_key` -- see its own doc comment.
     #[serde(default)]
     pub preset_key: Option<String>,
+    /// Mirrors `CategoryRecord::parent_id` -- see its own doc comment.
+    #[serde(default)]
+    pub parent_id: Option<String>,
 }
 
 /// A suggested starter category. Carries the i18n key *and* the English
@@ -36,8 +39,9 @@ pub struct PresetCategoryDto {
     pub group_key: String,
     pub group: String,
     pub is_income: bool,
-    pub description_key: String,
-    pub description: String,
+    /// The key of the top-level preset this is a subcategory of, or
+    /// `None` for a top-level one.
+    pub parent_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -60,6 +64,19 @@ pub struct BuildMonthParams {
     /// host-supplied but the arithmetic on it lives in the core.
     #[serde(default)]
     pub income_category_ids: Vec<String>,
+    /// Which category each subcategory belongs to. Empty (the default)
+    /// reads every category as top-level, which is `build_month` exactly.
+    #[serde(default)]
+    pub hierarchy: Vec<CategoryLinkDto>,
+}
+
+/// One category's place in the hierarchy -- the only two fields rolling a
+/// subcategory into its parent needs.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CategoryLinkDto {
+    pub id: String,
+    #[serde(default)]
+    pub parent_id: Option<String>,
 }
 
 /// `Deserialize` as well as `Serialize`: `month_review` takes back the
@@ -87,7 +104,11 @@ pub struct MonthSummaryDto {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct BuildMonthResult {
+    /// One line per top-level category, subcategories folded in.
     pub lines: Vec<CategoryLineDto>,
+    /// One line per subcategory, on its own figures -- a breakdown, never
+    /// summed: its money is already inside its parent's line.
+    pub sub_lines: Vec<CategoryLineDto>,
     pub summary: Option<MonthSummaryDto>,
     pub error: Option<String>,
     pub error_message: Option<Message>,
@@ -272,6 +293,31 @@ pub struct ResolveCategoryNameParams {
     pub existing: Vec<NamedCategoryDto>,
     #[serde(default)]
     pub presets: Vec<NamedPresetDto>,
+}
+
+/// `migrate_legacy_categories`' input: the budget's categories as stored.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MigrateCategoriesParams {
+    pub categories: Vec<CategoryDto>,
+}
+
+/// One step of the move onto the CPA's list -- see
+/// `budget_calc::CategoryMigration`. `action` is `"relabel"` (rewrite `id`
+/// in place as `preset_key` under `parent_id`; a `null` `preset_key`
+/// keeps its stored name as a hand-typed category) or `"create"` (a new
+/// top-level group at `id`).
+#[derive(Debug, Clone, Serialize)]
+pub struct CategoryMigrationDto {
+    pub action: String,
+    pub id: String,
+    pub preset_key: Option<String>,
+    pub parent_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct MigrateCategoriesResult {
+    pub steps: Vec<CategoryMigrationDto>,
+    pub error: Option<String>,
 }
 
 /// `budget_calc::NewCategoryOutcome` flattened: `outcome` names the case

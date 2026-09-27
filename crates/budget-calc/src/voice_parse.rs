@@ -89,107 +89,118 @@ fn aliases_for_preset(preset_key: &str, language: VoiceLanguage) -> &'static [&'
 }
 
 /// Extra spoken aliases per starter category, English.
+///
+/// A group's own aliases are only words that name the group ("food",
+/// "housing"); anything more specific belongs to the subcategory it
+/// names. `match_category` keeps the first of two equally close matches,
+/// and a group is always listed before its subcategories, so an alias
+/// shared between them would file "groceries" under Food & Basic Goods
+/// rather than Groceries.
 fn aliases_for_preset_en(preset_key: &str) -> &'static [&'static str] {
     match preset_key {
-        "cat.primaryEarnedIncome" => &["salary", "wage", "wages", "paycheck", "paycheque", "pay"],
-        "cat.selfEmploymentBusiness" => &[
+        "cat.earnedIncome" => &["earned income", "work income"],
+        "cat.salaryWages" => &["salary", "wage", "wages", "paycheck", "paycheque", "pay"],
+        "cat.bonusesTips" => &["bonus", "bonuses", "tip", "tips", "overtime"],
+        "cat.freelanceSideGig" => &[
             "freelance",
             "freelancing",
             "business",
             "consulting",
             "gig",
             "side hustle",
+            "side gig",
         ],
-        "cat.investmentCapitalIncome" => &[
-            "investment",
-            "investments",
-            "dividend",
-            "dividends",
-            "interest",
-            "capital gains",
-            "stocks",
-        ],
-        "cat.governmentSupplemental" => &[
+        "cat.passiveIncome" => &["investment", "investments", "passive income"],
+        "cat.dividendsInterest" => &["dividend", "dividends", "interest"],
+        "cat.rentalIncome" => &["rental income", "rent income", "tenant"],
+        "cat.capitalGains" => &["capital gains", "stocks", "stock sale"],
+        "cat.miscIncome" => &["other income", "misc income"],
+        "cat.taxRefunds" => &["tax refund", "tax return", "refund"],
+        "cat.giftsReimbursements" => &["reimbursement", "reimbursed", "gift money"],
+        "cat.governmentBenefits" => &[
             "government",
             "benefits",
             "welfare",
             "unemployment",
             "social security",
+            "pension",
         ],
-        "cat.otherIncome" => &["other income", "misc income"],
-        "cat.housing" => &["housing", "rent", "mortgage"],
-        "cat.utilities" => &[
+        "cat.housingUtilities" => &["housing"],
+        "cat.mortgageRent" => &["rent", "mortgage"],
+        "cat.propertyTaxes" => &["property tax", "property taxes"],
+        "cat.hoa" => &["hoa", "homeowners association", "strata"],
+        "cat.utilityBills" => &[
             "utilities",
             "utility",
             "electricity",
             "water bill",
             "gas bill",
             "internet bill",
+            "phone bill",
         ],
-        "cat.foodGroceries" => &[
-            "food",
-            "groceries",
-            "grocery",
-            "restaurant",
-            "dining",
-            "takeout",
+        "cat.homeMaintenance" => &["repair", "repairs", "maintenance", "plumber"],
+        "cat.transport" => &["transportation", "transport", "car", "parking", "tolls"],
+        "cat.autoLoanLease" => &["car payment", "car loan", "auto loan", "lease"],
+        "cat.fuelCharging" => &["gas", "fuel", "petrol", "charging"],
+        "cat.transitRideshare" => &["uber", "lyft", "taxi", "bus", "subway", "train", "transit"],
+        "cat.vehicleMaintenance" => &["car repair", "oil change", "car wash", "tires"],
+        "cat.foodBasics" => &["food"],
+        "cat.groceries" => &["groceries", "grocery", "supermarket"],
+        "cat.personalCareEssentials" => {
+            &["toiletries", "household supplies", "shampoo", "toothpaste"]
+        }
+        "cat.healthInsurance" => &["healthcare", "health"],
+        "cat.insurancePremiums" => &["insurance", "premium", "premiums"],
+        "cat.medicalOutOfPocket" => &[
+            "medical", "doctor", "pharmacy", "dental", "dentist", "hospital", "medicine",
         ],
-        "cat.transportation" => &[
-            "transportation",
-            "transport",
-            "gas",
-            "fuel",
-            "uber",
-            "lyft",
-            "taxi",
-            "parking",
-            "car",
-        ],
-        "cat.healthcareInsurance" => &[
-            "healthcare",
-            "health",
-            "insurance",
-            "medical",
-            "doctor",
-            "pharmacy",
-            "dental",
-        ],
-        "cat.debtServicing" => &[
+        "cat.obligationsSupport" => &["obligations"],
+        "cat.debtPayments" => &[
             "debt",
             "loan",
             "loans",
             "credit card payment",
             "student loan",
         ],
-        "cat.personalLifestyle" => &[
-            "personal",
-            "lifestyle",
-            "shopping",
-            "entertainment",
-            "clothes",
-            "clothing",
-            "movies",
+        "cat.dependentCare" => &[
+            "childcare",
+            "daycare",
+            "babysitter",
+            "kids",
+            "children",
+            "school",
+            "tuition",
         ],
-        "cat.subscriptionsMemberships" => &[
+        "cat.alimonyChildSupport" => &["alimony", "child support"],
+        "cat.diningSocial" => &["dining", "eating out"],
+        "cat.restaurantsCafes" => &[
+            "restaurant",
+            "restaurants",
+            "cafe",
+            "coffee",
+            "lunch",
+            "dinner",
+            "brunch",
+        ],
+        "cat.foodDelivery" => &["takeout", "delivery", "doordash", "grubhub"],
+        "cat.entertainmentLeisure" => &["entertainment", "leisure", "movies"],
+        "cat.subscriptionsStreaming" => &[
             "subscription",
             "subscriptions",
             "membership",
             "memberships",
             "netflix",
             "spotify",
+            "streaming",
             "gym",
         ],
-        "cat.familyDependents" => &[
-            "family",
-            "dependents",
-            "dependent",
-            "kids",
-            "children",
-            "childcare",
-            "school",
-        ],
-        "cat.giftsDonations" => &["gifts", "gift", "donation", "donations", "charity"],
-        "cat.otherExpenses" => &["other", "misc", "miscellaneous"],
+        "cat.hobbiesRecreation" => &["hobby", "hobbies", "sports", "games"],
+        "cat.vacationTravel" => &["vacation", "travel", "trip", "hotel", "flight", "flights"],
+        "cat.lifestyleShopping" => &["shopping", "lifestyle"],
+        "cat.apparelAccessories" => &["clothes", "clothing", "shoes", "apparel"],
+        "cat.electronicsTech" => &["electronics", "gadget", "laptop", "computer"],
+        "cat.personalUpkeep" => &["haircut", "salon", "spa", "barber", "manicure"],
+        "cat.giftsGiving" => &["gift", "gifts", "donation", "donations", "charity"],
         _ => &[],
     }
 }
@@ -197,38 +208,30 @@ fn aliases_for_preset_en(preset_key: &str) -> &'static [&'static str] {
 /// Extra spoken aliases per starter category, Mandarin (Simplified
 /// Chinese -- the script `voice_cmn.rs`'s model actually emits). Seeded
 /// from the spike's own test utterances (`mandarin_utterances.tsv`) plus
-/// `zh-Hans.js`'s `cat.*`/`cat.*.desc` strings for coverage beyond that
-/// 25-utterance sample. The category's own formal name (e.g. "主要劳动
-/// 收入") is matched separately, via `category.name` -- same as English,
-/// these are the *spoken* alternatives a formal name wouldn't catch.
+/// `zh-Hans.js`'s `cat.*` strings for coverage beyond that 25-utterance
+/// sample, and split between group and subcategory by the same rule as
+/// the English table above. The category's own formal name is matched
+/// separately, via `category.name` -- these are the *spoken* alternatives
+/// a formal name wouldn't catch.
 fn aliases_for_preset_cmn(preset_key: &str) -> &'static [&'static str] {
     match preset_key {
-        "cat.primaryEarnedIncome" => &["工资", "薪水", "薪资", "工钱", "加班费", "小费", "奖金"],
-        "cat.selfEmploymentBusiness" => {
-            &["自由职业", "自雇", "生意", "兼职", "副业", "咨询费", "零工"]
-        }
-        "cat.investmentCapitalIncome" => &[
-            "投资",
-            "分红",
-            "股息",
-            "利息",
-            "股票",
-            "租金收入",
-            "资本利得",
-        ],
-        "cat.governmentSupplemental" => &[
-            "政府补贴",
-            "福利",
-            "养老金",
-            "社保",
-            "社会保障金",
-            "退税",
-            "抚养费",
-            "赡养费",
-        ],
-        "cat.otherIncome" => &["其他收入", "外快", "红包", "退款"],
-        "cat.housing" => &["房租", "房贷", "租金", "住房", "物业费"],
-        "cat.utilities" => &[
+        "cat.earnedIncome" => &["劳动收入", "工作收入"],
+        "cat.salaryWages" => &["工资", "薪水", "薪资", "工钱"],
+        "cat.bonusesTips" => &["奖金", "小费", "加班费"],
+        "cat.freelanceSideGig" => &["自由职业", "自雇", "生意", "兼职", "副业", "咨询费", "零工"],
+        "cat.passiveIncome" => &["投资", "被动收入"],
+        "cat.dividendsInterest" => &["分红", "股息", "利息"],
+        "cat.rentalIncome" => &["租金收入", "房租收入"],
+        "cat.capitalGains" => &["资本利得", "股票"],
+        "cat.miscIncome" => &["其他收入", "外快"],
+        "cat.taxRefunds" => &["退税"],
+        "cat.giftsReimbursements" => &["红包", "报销", "退款"],
+        "cat.governmentBenefits" => &["政府补贴", "福利", "养老金", "社保", "社会保障金"],
+        "cat.housingUtilities" => &["住房"],
+        "cat.mortgageRent" => &["房租", "房贷", "租金"],
+        "cat.propertyTaxes" => &["房产税", "地产税"],
+        "cat.hoa" => &["物业费", "管理费"],
+        "cat.utilityBills" => &[
             "水电费",
             "电费",
             "水费",
@@ -238,53 +241,34 @@ fn aliases_for_preset_cmn(preset_key: &str) -> &'static [&'static str] {
             "网络费",
             "垃圾清运费",
         ],
-        "cat.foodGroceries" => &[
-            "杂货",
-            "食品",
-            "餐厅",
-            "吃饭",
-            "外卖",
-            "咖啡",
-            "日用品",
-            "水果",
-        ],
-        "cat.transportation" => &[
-            "交通费",
-            "打车",
-            "停车费",
-            "加油",
-            "车费",
-            "地铁",
-            "公交",
-            "汽油",
-        ],
-        "cat.healthcareInsurance" => {
-            &["医疗", "保险费", "看病", "药", "医药费", "牙科", "视力保险"]
-        }
-        "cat.debtServicing" => &["债务", "贷款", "还款", "信用卡还款", "学生贷款", "欠款"],
-        "cat.personalLifestyle" => &[
-            "购物",
-            "衣服",
-            "娱乐",
-            "电影",
-            "化妆品",
-            "个人护理",
-            "爱好",
-            "鞋",
-        ],
-        "cat.subscriptionsMemberships" => &["订阅", "会员", "健身房", "流媒体", "软件订阅"],
-        "cat.familyDependents" => &[
-            "家庭",
-            "孩子",
-            "育儿",
-            "学费",
-            "托儿费",
-            "课外活动",
-            "宠物",
-            "兽医",
-        ],
-        "cat.giftsDonations" => &["礼物", "捐款", "慈善", "捐赠", "生日礼物"],
-        "cat.otherExpenses" => &["其他", "杂项", "其他支出"],
+        "cat.homeMaintenance" => &["维修", "修理", "装修"],
+        "cat.transport" => &["交通费", "车费", "停车费"],
+        "cat.autoLoanLease" => &["车贷", "租车"],
+        "cat.fuelCharging" => &["加油", "汽油", "充电"],
+        "cat.transitRideshare" => &["打车", "地铁", "公交", "出租车"],
+        "cat.vehicleMaintenance" => &["保养", "修车", "洗车"],
+        "cat.foodBasics" => &["食品"],
+        "cat.groceries" => &["杂货", "超市", "水果"],
+        "cat.personalCareEssentials" => &["日用品", "洗发水", "牙膏"],
+        "cat.healthInsurance" => &["医疗"],
+        "cat.insurancePremiums" => &["保险费", "保险"],
+        "cat.medicalOutOfPocket" => &["看病", "药", "医药费", "牙科", "医院"],
+        "cat.obligationsSupport" => &["义务"],
+        "cat.debtPayments" => &["债务", "贷款", "还款", "信用卡还款", "学生贷款", "欠款"],
+        "cat.dependentCare" => &["育儿", "学费", "托儿费", "孩子", "课外活动"],
+        "cat.alimonyChildSupport" => &["抚养费", "赡养费"],
+        "cat.diningSocial" => &["吃饭", "聚餐"],
+        "cat.restaurantsCafes" => &["餐厅", "咖啡", "饭店"],
+        "cat.foodDelivery" => &["外卖"],
+        "cat.entertainmentLeisure" => &["娱乐", "电影"],
+        "cat.subscriptionsStreaming" => &["订阅", "会员", "健身房", "流媒体", "软件订阅"],
+        "cat.hobbiesRecreation" => &["爱好", "运动", "游戏"],
+        "cat.vacationTravel" => &["旅游", "旅行", "酒店", "机票"],
+        "cat.lifestyleShopping" => &["购物"],
+        "cat.apparelAccessories" => &["衣服", "鞋", "服装"],
+        "cat.electronicsTech" => &["电子产品", "手机", "电脑"],
+        "cat.personalUpkeep" => &["理发", "美容", "化妆品", "个人护理"],
+        "cat.giftsGiving" => &["礼物", "捐款", "慈善", "捐赠", "生日礼物"],
         _ => &[],
     }
 }
@@ -923,37 +907,27 @@ mod tests {
 
     fn starter_categories() -> Vec<VoiceCategoryCandidate> {
         vec![
-            category(
-                "inc-1",
-                "Primary/Earned Income",
-                true,
-                Some("cat.primaryEarnedIncome"),
-            ),
+            category("inc-1", "Salary / Wages", true, Some("cat.salaryWages")),
             category(
                 "inc-2",
-                "Self-Employment/Business Income",
+                "Freelance / Side Gig",
                 true,
-                Some("cat.selfEmploymentBusiness"),
+                Some("cat.freelanceSideGig"),
             ),
-            category(
-                "exp-1",
-                "Food & Groceries",
-                false,
-                Some("cat.foodGroceries"),
-            ),
-            category("exp-2", "Transportation", false, Some("cat.transportation")),
-            category("exp-3", "Debt Servicing", false, Some("cat.debtServicing")),
+            category("exp-1", "Groceries", false, Some("cat.groceries")),
+            category("exp-2", "Transportation", false, Some("cat.transport")),
+            category("exp-3", "Debt Payments", false, Some("cat.debtPayments")),
             category(
                 "exp-4",
-                "Healthcare & Insurance",
+                "Insurance Premiums",
                 false,
-                Some("cat.healthcareInsurance"),
+                Some("cat.insurancePremiums"),
             ),
             category(
                 "exp-5",
-                "Subscriptions & Memberships",
+                "Subscriptions & Streaming",
                 false,
-                Some("cat.subscriptionsMemberships"),
+                Some("cat.subscriptionsStreaming"),
             ),
         ]
     }
@@ -1072,6 +1046,26 @@ mod tests {
         assert_eq!(draft.amount, Some(450.0));
         assert_eq!(draft.is_income, Some(true));
         assert_eq!(draft.category_id.as_deref(), Some("inc-1"));
+    }
+
+    #[test]
+    fn a_subcategory_wins_over_its_group_when_both_are_in_the_budget() {
+        // The group is listed first, as the catalogue lists it; a word
+        // naming the subcategory must still land on the subcategory.
+        let categories = vec![
+            category("food", "Food & Basic Goods", false, Some("cat.foodBasics")),
+            category("groc", "Groceries", false, Some("cat.groceries")),
+            category(
+                "care",
+                "Personal Care Essentials",
+                false,
+                Some("cat.personalCareEssentials"),
+            ),
+        ];
+        let draft = parse_en("add expense twelve dollars supermarket", &categories);
+        assert_eq!(draft.category_id.as_deref(), Some("groc"));
+        let draft = parse_en("add expense twelve dollars food", &categories);
+        assert_eq!(draft.category_id.as_deref(), Some("food"));
     }
 
     #[test]
@@ -1233,20 +1227,15 @@ mod tests {
 
     fn mandarin_starter_categories() -> Vec<VoiceCategoryCandidate> {
         vec![
+            category("inc-1", "工资", true, Some("cat.salaryWages")),
+            category("exp-1", "日常杂货", false, Some("cat.groceries")),
             category(
-                "inc-1",
-                "主要劳动收入",
-                true,
-                Some("cat.primaryEarnedIncome"),
-            ),
-            category("exp-1", "饮食与日用品", false, Some("cat.foodGroceries")),
-            category("exp-2", "交通", false, Some("cat.transportation")),
-            category(
-                "exp-3",
-                "医疗与保险",
+                "exp-2",
+                "公共交通与网约车",
                 false,
-                Some("cat.healthcareInsurance"),
+                Some("cat.transitRideshare"),
             ),
+            category("exp-3", "自付医疗费", false, Some("cat.medicalOutOfPocket")),
         ]
     }
 
