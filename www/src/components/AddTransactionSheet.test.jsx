@@ -432,7 +432,7 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     fireEvent.change(screen.getByLabelText(`Amount per occurrence, row ${n}`), {
       target: { value: amount },
     });
-    fireEvent.change(screen.getByLabelText(`One real due date, row ${n}`), {
+    fireEvent.change(screen.getByLabelText(`One real date, row ${n}`), {
       target: { value: date },
     });
   };
@@ -455,7 +455,7 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     fillRow(1, { description: 'Rent', amount: '2400', date: '2026-01-01' });
     fillRow(2, { description: 'Phone', amount: '45', date: '2026-01-08' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add 2 recurring expenses' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 recurring items' }));
 
     await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(2));
     expect(recurring.save).toHaveBeenCalledWith(
@@ -472,7 +472,7 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     expect(screen.getByLabelText('Repeats, row 1')).toHaveValue('monthly');
     fireEvent.change(screen.getByLabelText('Repeats, row 1'), { target: { value: 'yearly' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring item' }));
     await waitFor(() =>
       expect(recurring.save).toHaveBeenCalledWith(expect.objectContaining({ cadence: 'yearly' })),
     );
@@ -480,7 +480,7 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
 
   it('keeps the submit disabled until a row has every field the phone form needs', () => {
     renderRecurring();
-    const submit = screen.getByRole('button', { name: 'Add recurring expense' });
+    const submit = screen.getByRole('button', { name: 'Add recurring item' });
     expect(submit).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Description, row 1'), { target: { value: 'Rent' } });
@@ -490,7 +490,7 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     expect(submit).toBeDisabled(); // no category, no due date yet
 
     fireEvent.change(screen.getByLabelText('Category, row 1'), { target: { value: 'exp1' } });
-    fireEvent.change(screen.getByLabelText('One real due date, row 1'), {
+    fireEvent.change(screen.getByLabelText('One real date, row 1'), {
       target: { value: '2026-01-01' },
     });
     expect(submit).toBeEnabled();
@@ -503,14 +503,14 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     // closing the sheet would throw it away with no report.
     fireEvent.change(screen.getByLabelText('Description, row 2'), { target: { value: 'Gym' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring item' }));
 
     await waitFor(() => expect(recurring.save).toHaveBeenCalledTimes(1));
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Description, row 1')).toHaveValue('Gym');
 
     fillRow(1, { description: 'Gym', amount: '60', date: '2026-01-15' });
-    fireEvent.click(screen.getByRole('button', { name: 'Add recurring expense' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add recurring item' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
@@ -544,7 +544,7 @@ describe('AddTransactionSheet recurring rows (desktop)', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Recurring' }));
     expect(screen.queryByLabelText('Description, row 1')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Description')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add recurring expense' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add recurring item' })).toBeInTheDocument();
   });
 });
 

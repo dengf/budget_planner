@@ -32,7 +32,7 @@ export default {
   'more.goalsHint': 'Save towards something, one month at a time.',
   'more.debtHint': 'Order your debts and see when they clear.',
   'more.rulesHint': 'Match a keyword once, and every matching transaction files itself.',
-  'more.recurringHint': 'Rent, subscriptions, anything on a schedule.',
+  'more.recurringHint': 'Rent, subscriptions, paychecks — anything on a schedule.',
 
   'intro.lede':
     'A monthly budget, savings goals and a debt payoff plan — worked out where you can see the working.',
@@ -341,26 +341,29 @@ export default {
   'transactions.voiceProcessing': 'Working it out…',
   'transactions.voiceCaptureFailed':
     "Couldn't hear that. Check your microphone permission and try again.",
-  'recurring.title': 'Recurring expenses',
+  'recurring.title': 'Recurring bills & income',
   'recurring.hint':
-    'Rent, subscriptions, anything on a schedule. Set one up once and see it coming before it posts.',
-  'recurring.none': 'No recurring expenses set up yet.',
+    'Rent, subscriptions, a paycheck — anything on a schedule. Set one up once and see it coming before it posts. Pick an income category for money coming in.',
+  'recurring.none': 'Nothing recurring set up yet.',
   'recurring.description': 'Description',
   'recurring.amount': 'Amount per occurrence',
   'recurring.cadence': 'Repeats',
-  'recurring.anchorDate': 'One real due date',
+  'recurring.anchorDate': 'One real date',
   'recurring.anchorHint':
-    "Pick any one real occurrence — this month's rent day, this month's bill date. Weekly and fortnightly expenses count actual calendar dates from it, so a 5-Friday month is counted as 5, not rounded down to 4.",
-  'recurring.add': 'Add recurring expense',
-  'recurring.addCount': 'Add {count} recurring expenses',
+    "Pick any one real occurrence — this month's rent day, bill date or payday. Weekly and fortnightly items count actual calendar dates from it, so a 5-Friday month is counted as 5, not rounded down to 4.",
+  'recurring.add': 'Add recurring item',
+  'recurring.addCount': 'Add {count} recurring items',
   'recurring.upcomingTitle': 'Upcoming this month',
   'recurring.addToPlanned': 'Add to planned',
   'recurring.scheduleTitle': 'The schedule',
   'recurring.thisMonthTitle': '{month}',
   'recurring.stillDue': '{count} still due — {amount}',
-  'recurring.allPaid': 'Everything scheduled this month has been paid.',
+  'recurring.allPaid': 'Everything scheduled this month has been paid or received.',
   'recurring.paid': 'Paid',
   'recurring.markPaid': 'Mark as paid',
+  'recurring.stillExpected': '{count} income still expected — {amount}',
+  'recurring.received': 'Received',
+  'recurring.markReceived': 'Mark as received',
   'transactions.showAllMonths': 'Show all months',
   'transactions.uncategorizedCount': 'Uncategorized ({count})',
   'transactions.editThis': 'Edit {description}',
@@ -510,7 +513,7 @@ export default {
     "That backup couldn't be fully restored. Check your data before continuing.",
   'err.invalidRecurringAmount': "That amount isn't valid (got {value}).",
   'err.categoryInUse':
-    '"{name}" is used by {count} transactions or recurring expenses — recategorize them before removing it.',
+    '"{name}" is used by {count} transactions or recurring items — recategorize them before removing it.',
 
   'errors.dismiss': 'Dismiss',
 

@@ -70,8 +70,9 @@ pub use receipt::{
     EXPENSE_EXAMPLE_PHRASES, INCOME_EXAMPLE_PHRASES,
 };
 pub use recurring::{
-    match_occurrences, occurrences_for_month, occurrences_in_month, payment_for_occurrence,
-    totals_by_category, Occurrence, OccurrencePayment, OccurrenceStatus, RecurringExpense,
+    match_occurrences, occurrences_for_month, occurrences_in_month, outstanding,
+    payment_for_occurrence, totals_by_category, Occurrence, OccurrencePayment, OccurrenceStatus,
+    Outstanding, RecurringExpense,
 };
 pub use rules::{apply_rules, suggest_rule_keyword, CategorizationRule};
 pub use transaction::{

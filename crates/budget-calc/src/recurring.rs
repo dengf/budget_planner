@@ -288,10 +288,11 @@ pub fn match_occurrences(
 /// field but the id, which only the caller can mint.
 ///
 /// The sign is decided here, by the same rule as
-/// `transaction::signed_amount`: a recurring expense's `amount` is what
-/// it costs ("rent is 500"), and what gets stored is what it does to the
-/// balance. Letting a caller negate it would be a second place that
-/// decision lives.
+/// `transaction::signed_amount`: a recurring item's `amount` is its size
+/// ("rent is 500", "the paycheck is 3000"), and what gets stored is what
+/// it does to the balance -- a bill takes money out, a paycheck filed
+/// under an income category puts it in. Letting a caller negate it would
+/// be a second place that decision lives.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OccurrencePayment {
     pub date: String,
@@ -300,13 +301,43 @@ pub struct OccurrencePayment {
     pub category_id: String,
 }
 
-pub fn payment_for_occurrence(occurrence: &Occurrence) -> OccurrencePayment {
+pub fn payment_for_occurrence(occurrence: &Occurrence, is_income: bool) -> OccurrencePayment {
     OccurrencePayment {
         date: occurrence.date.clone(),
         description: occurrence.description.clone(),
-        amount: crate::transaction::signed_amount(occurrence.amount, false),
+        amount: crate::transaction::signed_amount(occurrence.amount, is_income),
         category_id: occurrence.category_id.clone(),
     }
+}
+
+/// What is still outstanding this month, kept apart by direction: bills
+/// still to pay and income still to arrive. One "still due" figure over
+/// both would add a paycheck to the rent and report the sum as money
+/// about to leave.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Outstanding {
+    pub due_count: usize,
+    pub due_total: Decimal,
+    pub expected_count: usize,
+    pub expected_total: Decimal,
+}
+
+/// Sums the unpaid rows of `statuses` into `Outstanding`, reading each
+/// one's direction from its category through `is_income`.
+pub fn outstanding(statuses: &[OccurrenceStatus], is_income: impl Fn(&str) -> bool) -> Outstanding {
+    let mut out = Outstanding::default();
+    for s in statuses.iter().filter(|s| !s.paid) {
+        if is_income(&s.occurrence.category_id) {
+            out.expected_count += 1;
+            out.expected_total += s.occurrence.amount;
+        } else {
+            out.due_count += 1;
+            out.due_total += s.occurrence.amount;
+        }
+    }
+    out.due_total = round_currency(out.due_total);
+    out.expected_total = round_currency(out.expected_total);
+    out
 }
 
 #[cfg(test)]
@@ -458,7 +489,7 @@ mod tests {
     #[test]
     fn the_payment_it_proposes_actually_settles_the_occurrence_it_came_from() {
         let occurrence = occ("2026-09-01", dec!(500));
-        let payment = payment_for_occurrence(&occurrence);
+        let payment = payment_for_occurrence(&occurrence, false);
         assert_eq!(
             payment.amount,
             dec!(-500),
@@ -472,6 +503,63 @@ mod tests {
         let statuses = match_occurrences(&[occurrence], &[created]);
         assert!(statuses[0].paid);
         assert_eq!(statuses[0].transaction_id.as_deref(), Some("new"));
+    }
+
+    /// A paycheck set up as recurring income must land as money in, and
+    /// the row it writes must still settle the occurrence it came from.
+    #[test]
+    fn a_recurring_income_payment_is_stored_as_money_in_and_settles_it() {
+        let occurrence = occ("2026-09-01", dec!(3000));
+        let payment = payment_for_occurrence(&occurrence, true);
+        assert_eq!(
+            payment.amount,
+            dec!(3000),
+            "a paycheck of 3000 is stored as +3000"
+        );
+
+        let mut created =
+            Transaction::new("pay", &payment.date, &payment.description, payment.amount);
+        created.category_id = Some(payment.category_id.clone());
+        let statuses = match_occurrences(&[occurrence], &[created]);
+        assert!(statuses[0].paid);
+    }
+
+    #[test]
+    fn outstanding_keeps_bills_due_apart_from_income_expected() {
+        let mut rent = occ("2026-09-01", dec!(500));
+        rent.category_id = "housing".into();
+        let mut pay = occ("2026-09-15", dec!(3000));
+        pay.category_id = "salary".into();
+        let mut paid_pay = occ("2026-09-01", dec!(3000));
+        paid_pay.category_id = "salary".into();
+
+        let statuses = vec![
+            OccurrenceStatus {
+                occurrence: rent,
+                paid: false,
+                transaction_id: None,
+            },
+            OccurrenceStatus {
+                occurrence: pay,
+                paid: false,
+                transaction_id: None,
+            },
+            OccurrenceStatus {
+                occurrence: paid_pay,
+                paid: true,
+                transaction_id: Some("t".into()),
+            },
+        ];
+        let out = outstanding(&statuses, |id| id == "salary");
+        assert_eq!(
+            out,
+            Outstanding {
+                due_count: 1,
+                due_total: dec!(500),
+                expected_count: 1,
+                expected_total: dec!(3000),
+            }
+        );
     }
 
     #[test]

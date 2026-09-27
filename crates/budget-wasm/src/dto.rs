@@ -826,6 +826,10 @@ pub struct RecurringStatusParams {
     pub recurring: Vec<RecurringExpenseDto>,
     pub transactions: Vec<TransactionDto>,
     pub month: String,
+    /// The income categories, so an unpaid paycheck is counted as income
+    /// still expected rather than as a bill still due.
+    #[serde(default)]
+    pub income_category_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -841,8 +845,13 @@ pub struct RecurringStatusResult {
     /// Comes back with the list rather than being counted from it, so a
     /// "3 still due" badge can never disagree with the rows it opens.
     pub unpaid_count: usize,
-    /// What the still-unpaid occurrences add up to.
+    /// What the still-unpaid bills add up to. Income is not in here --
+    /// see `expected_*`.
     pub unpaid_total: f64,
+    /// Recurring income not yet received this month, counted apart from
+    /// the bills so a paycheck never reads as money about to leave.
+    pub expected_count: usize,
+    pub expected_total: f64,
     pub error: Option<String>,
     pub error_message: Option<Message>,
 }
@@ -850,6 +859,10 @@ pub struct RecurringStatusResult {
 #[derive(Debug, Clone, Deserialize)]
 pub struct OccurrencePaymentParams {
     pub occurrence: OccurrenceDto,
+    /// Whether the occurrence's category is an income one -- decides the
+    /// sign of the transaction that settles it.
+    #[serde(default)]
+    pub is_income: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
