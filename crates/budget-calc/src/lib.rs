@@ -33,12 +33,13 @@ pub mod voice_parse;
 mod voice_wenet;
 
 pub use category::{
-    build_month, build_savings_line, carry_plan_forward, category_rank, category_shares,
-    month_review, month_setup_state, previous_plan_month, resolve_category_name,
-    suggest_plan_from_spending, summarize_month, CarriedPlan, Category, CategoryDelta,
-    CategoryLine, CategoryShare, Direction, MonthFacts, MonthPosition, MonthReview,
-    MonthSetupState, MonthSummary, NamedCategory, NamedPreset, NewCategoryOutcome, PlanBasis,
-    PlanEntry, PlanSuggestionState, RankedCategory, SuggestedPlan, SuggestedRow,
+    build_month, build_month_tree, build_savings_line, carry_plan_forward, category_rank,
+    category_shares, migrate_legacy_categories, month_review, month_setup_state, parent_map,
+    previous_plan_month, resolve_category_name, roll_up, suggest_plan_from_spending,
+    summarize_month, CarriedPlan, Category, CategoryDelta, CategoryLine, CategoryMigration,
+    CategoryNode, CategoryShare, Direction, MonthFacts, MonthPosition, MonthReview,
+    MonthSetupState, MonthSummary, MonthTree, NamedCategory, NamedPreset, NewCategoryOutcome,
+    PlanBasis, PlanEntry, PlanSuggestionState, RankedCategory, SuggestedPlan, SuggestedRow,
     MIN_TRANSACTIONS_FOR_PLAN, SAVINGS_CATEGORY_ID,
 };
 pub use csv_import::{
@@ -62,7 +63,7 @@ pub use ocr::run_ocr;
 pub use pdf_render::{pdf_page_count, render_pdf_page, RenderedPage};
 #[cfg(feature = "pdf-text")]
 pub use pdf_text::extract_pdf_text;
-pub use presets::{compact_starter_categories, starter_categories, PresetCategory};
+pub use presets::{compact_starter_categories, preset_by_key, starter_categories, PresetCategory};
 pub use receipt::{
     classify_by_similarity, parse_receipt_text, parse_statement_text, ParsedReceipt, StatementRow,
     EXPENSE_EXAMPLE_PHRASES, INCOME_EXAMPLE_PHRASES,

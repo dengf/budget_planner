@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import CategoriesScreen from './CategoriesScreen';
@@ -34,6 +34,11 @@ function makeWasm() {
 }
 
 const CATEGORIES = [{ id: 'food', name: 'Food', group: 'Living', is_income: false }];
+const WITH_SUBS = [
+  ...CATEGORIES,
+  { id: 'salary', name: 'Salary', group: 'Income', is_income: true },
+  { id: 'groceries', name: 'Groceries', group: 'Living', is_income: false, parent_id: 'food' },
+];
 
 function renderScreen(props) {
   return render(
@@ -63,8 +68,60 @@ function renderScreen(props) {
 describe('CategoriesScreen', () => {
   it('lists existing categories with a Remove button', async () => {
     renderScreen();
-    expect(await screen.findByText('Food')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+    const remove = await screen.findByRole('button', { name: 'Remove' });
+    expect(remove.closest('.category-manage-row')).toHaveTextContent('Food');
+  });
+
+  it('lists each subcategory under its group, each with its own Remove', async () => {
+    const removeCategory = vi.fn();
+    renderScreen({ categories: { items: WITH_SUBS, save: vi.fn() }, removeCategory });
+    const rows = await screen.findAllByRole('button', { name: 'Remove' });
+    expect(rows.map((b) => b.closest('.category-manage-row').textContent)).toEqual([
+      expect.stringContaining('Food'),
+      expect.stringContaining('Groceries'),
+      expect.stringContaining('Salary'),
+    ]);
+    expect(rows[1].closest('.category-manage-row')).toHaveClass('category-manage-sub');
+    fireEvent.click(rows[1]);
+    expect(removeCategory).toHaveBeenCalledWith('groceries');
+  });
+
+  it('adds a subcategory under the group it was opened from', async () => {
+    const save = vi.fn();
+    renderScreen({
+      wasmModule: {
+        ...makeWasm(),
+        resolve_category_name: async ({ typed }) => ({
+          outcome: 'create',
+          name: typed,
+          group_key: 'cat.group.expense',
+        }),
+      },
+      categories: { items: CATEGORIES, save },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: '+ Add a subcategory' }));
+    const field = document.querySelector('.category-add-sub-field');
+    fireEvent.change(within(field).getByLabelText('Category name'), {
+      target: { value: 'Farmers market' },
+    });
+    fireEvent.click(within(field).getByRole('button', { name: 'Create “Farmers market”' }));
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Farmers market', parent_id: 'food', is_income: false }),
+      ),
+    );
+  });
+
+  it('files a new category under the chosen group, on the group’s side of the ledger', async () => {
+    const save = vi.fn();
+    renderScreen({ categories: { items: WITH_SUBS, save } });
+    fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Bonus' } });
+    fireEvent.change(screen.getByLabelText('Subcategory of'), { target: { value: 'salary' } });
+    expect(screen.getByLabelText(/income category/i)).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Category' }));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Bonus', parent_id: 'salary', is_income: true }),
+    );
   });
 
   it('removes a category on tap', async () => {
@@ -117,7 +174,7 @@ function mockDesktop() {
 
 const name = (n) => screen.getByLabelText(`Category name, row ${n}`);
 const entryType = (n) => screen.getByLabelText(`Entry type, row ${n}`);
-const group = (n) => screen.getByLabelText(`Group, row ${n}`);
+const parent = (n) => screen.getByLabelText(`Subcategory of, row ${n}`);
 
 describe('CategoriesScreen desktop rows', () => {
   afterEach(() => {
@@ -149,28 +206,34 @@ describe('CategoriesScreen desktop rows', () => {
     expect(new Set(ids).size).toBe(2);
   });
 
-  it('falls back to the Income/Expense group per row, not per form', async () => {
+  it('files each row under its own parent, or none, per row rather than per form', async () => {
     mockDesktop();
     const save = vi.fn();
     renderScreen({ categories: { items: CATEGORIES, save } });
     fireEvent.change(name(1), { target: { value: 'Rent' } });
     fireEvent.change(name(2), { target: { value: 'Salary' } });
     fireEvent.change(entryType(2), { target: { value: 'income' } });
-    // Row 3 names its own group, which must survive untouched.
-    fireEvent.change(name(3), { target: { value: 'Petrol' } });
-    fireEvent.change(group(3), { target: { value: 'Transport' } });
+    fireEvent.change(name(3), { target: { value: 'Farmers market' } });
+    fireEvent.change(parent(3), { target: { value: 'food' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add 3 categories' }));
     await waitFor(() => expect(save).toHaveBeenCalledTimes(3));
-    const groups = Object.fromEntries(save.mock.calls.map(([c]) => [c.name, c.group]));
-    expect(groups).toEqual({ Rent: 'Expense', Salary: 'Income', Petrol: 'Transport' });
+    const filed = Object.fromEntries(
+      save.mock.calls.map(([c]) => [c.name, [c.group, c.parent_id]]),
+    );
+    expect(filed).toEqual({
+      Rent: ['Expense', null],
+      Salary: ['Income', null],
+      'Farmers market': ['Living', 'food'],
+    });
   });
 
-  it('shows the group it will fall back to instead of leaving the default unsaid', () => {
+  it('locks a row to its parent’s side of the ledger once one is chosen', () => {
     mockDesktop();
     renderScreen();
-    expect(group(1)).toHaveAttribute('placeholder', 'Expense');
     fireEvent.change(entryType(1), { target: { value: 'income' } });
-    expect(group(1)).toHaveAttribute('placeholder', 'Income');
+    fireEvent.change(parent(1), { target: { value: 'food' } });
+    expect(entryType(1)).toHaveValue('expense');
+    expect(entryType(1)).toBeDisabled();
   });
 
   it('adds a row on Shift+Enter and puts the caret in its name field', async () => {
@@ -222,9 +285,9 @@ describe('CategoriesScreen desktop rows', () => {
     const save = vi.fn();
     renderScreen({ categories: { items: CATEGORIES, save } });
     expect(screen.getByRole('button', { name: 'Add Category' })).toBeDisabled();
-    // A group with no name is not a category -- the name is the whole of
+    // A parent with no name is not a category -- the name is the whole of
     // one, which is why it alone gates the submit.
-    fireEvent.change(group(1), { target: { value: 'Living' } });
+    fireEvent.change(parent(1), { target: { value: 'food' } });
     expect(screen.getByRole('button', { name: 'Add Category' })).toBeDisabled();
     fireEvent.change(name(1), { target: { value: 'Rent' } });
     expect(screen.getByRole('button', { name: 'Add Category' })).toBeEnabled();

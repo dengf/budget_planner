@@ -24,6 +24,7 @@ export function stubWasm(overrides = {}) {
       const total_spent = lines.reduce((a, l) => a + l.spent, 0);
       return {
         lines,
+        sub_lines: [],
         summary: { income, total_planned, total_spent, unassigned: income - total_planned },
         error: null,
       };

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import CategoryBadge from './CategoryBadge';
 import NewCategoryField from './NewCategoryField';
-import { categoryDisplayName } from '../presetCategories';
+import { categoryDisplayName, categoryTree } from '../presetCategories';
 
 /**
  * Picking a category, as a row of chips instead of a dropdown.
@@ -34,6 +34,17 @@ import { categoryDisplayName } from '../presetCategories';
  * above the typed-name input (see `NewCategoryField`'s own comment) --
  * typing is the fallback for a name that isn't already one of them, not
  * the only way in.
+ *
+ * Subcategories are a second, optional step. The chip row holds groups
+ * only -- ranked by the first time the group *or any of its
+ * subcategories* appears in `ordered`, so a group someone uses through
+ * "Groceries" still ranks as used. Once a group is chosen, its own
+ * subcategories appear beneath as "More specific (optional)" chips; the
+ * group alone is already a complete answer, since the budget plans at
+ * group level anyway. Tapping the selected subcategory steps back up to
+ * its group rather than clearing everything. "All" still lists every
+ * category, subcategories included, so the filter box finds "Fuel"
+ * without knowing it lives under Transportation.
  */
 const CHIP_COUNT = 6;
 
@@ -44,6 +55,9 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
   // Null when closed; otherwise the name to open the field with, which is
   // '' from the "+ New" chip and the filter text when nothing matched it.
   const [creatingFrom, setCreatingFrom] = useState(null);
+  // Whether the "More specific" row's own "+ New" field is open -- a
+  // subcategory of whichever group is selected.
+  const [creatingSub, setCreatingSub] = useState(false);
 
   // `createCategory` is `useCreateCategory`'s whole return value, not
   // just its `create` function -- this picker is the one place that
@@ -54,12 +68,45 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
 
   const pick = (id) => onChange(id === value ? '' : id);
 
-  // The selected category is always on screen, even when it isn't in the
-  // top six -- a chip row that hides what it has selected reads as
+  const tree = categoryTree(ordered);
+  const topIds = new Set(tree.tops.map((c) => c.id));
+  const byId = new Map(ordered.map((c) => [c.id, c]));
+  const rootOf = (c) => (topIds.has(c.id) ? c : byId.get(c.parent_id));
+  // Groups in the order they, or any of their subcategories, first rank.
+  const groups = [];
+  for (const c of ordered) {
+    const root = rootOf(c);
+    if (root && !groups.includes(root)) groups.push(root);
+  }
+
+  // The selected category's group is always on screen, even when it isn't
+  // in the top six -- a chip row that hides what it has selected reads as
   // nothing being selected at all.
-  const selected = ordered.find((c) => c.id === value);
-  const chips = ordered.slice(0, CHIP_COUNT);
-  if (selected && !chips.includes(selected)) chips[CHIP_COUNT - 1] = selected;
+  const selected = byId.get(value);
+  const selectedGroup = selected ? rootOf(selected) : null;
+  const chips = groups.slice(0, CHIP_COUNT);
+  if (selectedGroup && !chips.includes(selectedGroup)) chips[CHIP_COUNT - 1] = selectedGroup;
+  const subChips = selectedGroup ? tree.childrenOf(selectedGroup.id) : [];
+  const subPresets = selectedGroup
+    ? (createCategory.availableSubPresets?.(selectedGroup) ?? [])
+    : [];
+  const subsRef = useRef(null);
+  const subsFor = subChips.length > 0 ? selectedGroup.id : null;
+
+  // The subcategory row appears below the chips, which in the add sheet
+  // is often under its sticky submit bar -- options that appear out of
+  // sight might as well not exist. Brought to the middle of the scroll
+  // when a group with subcategories is chosen, the same way
+  // NewCategoryField brings itself into view; only on a change of group,
+  // so tapping between its subcategories doesn't keep yanking the sheet.
+  useEffect(() => {
+    if (!subsFor || !subsRef.current) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    subsRef.current.scrollIntoView?.({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'center',
+    });
+  }, [subsFor]);
 
   const needle = filter.trim().toLowerCase();
   const filtered = needle
@@ -72,6 +119,7 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
   const onCreated = (id) => {
     onChange(id);
     setCreatingFrom(null);
+    setCreatingSub(false);
     setFilter('');
     setShowAll(false);
   };
@@ -108,13 +156,13 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
     />
   );
 
-  const chip = (c) => (
+  const chip = (c, active = c.id === value, onClick = () => pick(c.id)) => (
     <button
       key={c.id}
       type="button"
-      className={`category-chip${c.id === value ? ' active' : ''}`}
-      aria-pressed={c.id === value}
-      onClick={() => pick(c.id)}
+      className={`category-chip${active ? ' active' : ''}`}
+      aria-pressed={active}
+      onClick={onClick}
     >
       <CategoryBadge category={c} />
       <span className="category-chip-name">{categoryDisplayName(c, t)}</span>
@@ -126,7 +174,10 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
       type="button"
       className={`category-chip category-chip-new${creatingFrom !== null ? ' active' : ''}`}
       aria-expanded={creatingFrom !== null}
-      onClick={() => setCreatingFrom(creatingFrom === null ? '' : null)}
+      onClick={() => {
+        setCreatingFrom(creatingFrom === null ? '' : null);
+        setCreatingSub(false);
+      }}
     >
       {t('category.newChip')}
     </button>
@@ -150,8 +201,11 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
     <div className="category-picker">
       <span className="field-label">{t('transactions.category')}</span>
       <div className="category-chips">
-        {chips.map(chip)}
-        {ordered.length > CHIP_COUNT && (
+        {chips.map((c) =>
+          // A group reads as chosen while one of its subcategories is.
+          chip(c, c === selectedGroup, () => onChange(c.id === value ? '' : c.id)),
+        )}
+        {ordered.length > chips.length && (
           <button
             type="button"
             className={`category-chip category-chip-more${showAll ? ' active' : ''}`}
@@ -163,6 +217,50 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
         )}
         {newChip}
       </div>
+
+      {/* Shown for any chosen group, even one with no subcategories yet:
+          its "+ New" is how the first one gets made without leaving the
+          sheet. The top row's "+ New" still makes a category of its own. */}
+      {selectedGroup && (
+        <div className="category-picker-subs" ref={subsRef}>
+          <span className="field-label">{t('category.narrowDown')}</span>
+          <div className="category-chips">
+            {subChips.map((sub) =>
+              chip(sub, sub.id === value, () =>
+                onChange(sub.id === value ? selectedGroup.id : sub.id),
+              ),
+            )}
+            <button
+              type="button"
+              className={`category-chip category-chip-new${creatingSub ? ' active' : ''}`}
+              aria-expanded={creatingSub}
+              aria-label={t('category.newSubIn', {
+                name: categoryDisplayName(selectedGroup, t),
+              })}
+              onClick={() => {
+                setCreatingSub((open) => !open);
+                setCreatingFrom(null);
+              }}
+            >
+              {t('category.newChip')}
+            </button>
+          </div>
+          {creatingSub && (
+            <NewCategoryField
+              key={`${selectedGroup.id}-${createCategory.presetsReady}`}
+              isIncome={isIncome}
+              parentId={selectedGroup.id}
+              create={createCategory.create}
+              presets={subPresets}
+              onCreated={onCreated}
+              // Same rule as the top-level field: the caret only when
+              // there is no preset chip to tap instead.
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- conditional; the caret belongs in the field exactly when nothing else does.
+              autoFocus={createCategory.presetsReady && subPresets.length === 0}
+            />
+          )}
+        </div>
+      )}
 
       {creatingFrom !== null && createField}
 
@@ -194,7 +292,7 @@ export default function CategoryPicker({ ordered, value, onChange, isIncome, cre
               )}
             </>
           ) : (
-            <div className="category-chips">{filtered.map(chip)}</div>
+            <div className="category-chips">{filtered.map((c) => chip(c))}</div>
           )}
         </div>
       )}

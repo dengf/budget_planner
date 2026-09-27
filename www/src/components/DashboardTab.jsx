@@ -11,7 +11,8 @@ import DonutChart from './DonutChart';
 import BlossomProgress, { BlossomWatermark } from './BlossomProgress';
 import SpendOverTimeChart from './SpendOverTimeChart';
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
-import { categoryDisplayName } from '../presetCategories';
+import { categoryDisplayName, rootIdOf } from '../presetCategories';
+import { categoryHierarchy } from '../useMonthBudget';
 import { categoryColor } from '../categoryVisuals';
 
 /**
@@ -212,11 +213,15 @@ export default function DashboardTab({
       // it in Rust from whichever of these `planned` entries belong to an
       // income category (see BudgetTab's identical comment).
       const incomeCategoryIds = categories.items.filter((c) => c.is_income).map((c) => c.id);
+      // Rolled up to the top level, same as BudgetTab: the donut, the
+      // ranked rows and the review all read groups, never a subcategory
+      // on its own beside the group that already counts it.
       const built = await wasmModule.build_month({
         planned,
         previous_remaining: [],
         spent,
         income_category_ids: incomeCategoryIds,
+        hierarchy: categoryHierarchy(categories.items),
       });
       const builtLines = built?.lines ?? [];
       const builtSummary = built?.summary ?? null;
@@ -422,8 +427,11 @@ export default function DashboardTab({
     const line = lines.find((l) => l.category_id === selectedCategoryId);
     if (!line) return null;
     const isGoodNews = line.remaining >= 0;
+    // A group's line counts its subcategories' spending, so its list of
+    // transactions has to include theirs too, or the list and the total
+    // above it would disagree.
     const catTx = monthTx
-      .filter((tx) => tx.category_id === selectedCategoryId)
+      .filter((tx) => rootIdOf(categories.items, tx.category_id) === selectedCategoryId)
       .sort((a, b) => (a.date < b.date ? 1 : -1));
     const shown = catTx.slice(0, 5);
     const moreCount = catTx.length - shown.length;

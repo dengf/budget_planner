@@ -1,7 +1,8 @@
 import React from 'react';
 
 /**
- * Category badge icons: 16 starter-preset icons plus 2 generic fallbacks
+ * Category badge icons: one per starter group (and a few subcategories),
+ * plus 2 generic fallbacks
  * for a hand-typed category. Deliberately a different visual register
  * from icons.jsx's thin-stroke toolbar icons -- these are solid, rounded,
  * filled shapes (fill="currentColor", no stroke) sitting inside a colored
@@ -213,7 +214,19 @@ export function ExpenseGenericIcon() {
   );
 }
 
+/** A coffee cup -- Dining & Social, the one group with no older icon. */
+export function CupIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M5 9h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5Z" />
+      <path d="M16 10.5h1.5a2.75 2.75 0 0 1 0 5.5H16v-1.8h1.5a.95.95 0 0 0 0-1.9H16Z" />
+      <path d="M8 3.5h1.6v4H8Zm3.4 0H13v4h-1.6Z" />
+    </svg>
+  );
+}
+
 export const CATEGORY_ICONS = {
+  cup: CupIcon,
   paycheck: PaycheckIcon,
   briefcase: BriefcaseIcon,
   'trending-up': TrendingUpIcon,

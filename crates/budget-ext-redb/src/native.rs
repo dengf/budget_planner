@@ -38,6 +38,7 @@ mod tests {
             is_income: false,
             description: String::new(),
             preset_key: None,
+            parent_id: None,
         }
     }
 

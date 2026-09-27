@@ -32,19 +32,29 @@ describe('categoryVisuals', () => {
     });
   });
 
-  it('gives the two new presets their own icon id', () => {
-    expect(categoryIconId({ preset_key: 'cat.subscriptionsMemberships' })).toBe('repeat');
-    expect(categoryIconId({ preset_key: 'cat.giftsDonations' })).toBe('gift');
+  it('gives the subscriptions and gifts subcategories their own icon id', () => {
+    expect(categoryIconId({ preset_key: 'cat.subscriptionsStreaming' })).toBe('repeat');
+    expect(categoryIconId({ preset_key: 'cat.giftsGiving' })).toBe('gift');
   });
 
-  it('gives the two new presets a color from the shared palette, not the hash fallback', () => {
+  it('colors a subcategory by its group, so a group reads as one color', () => {
+    const group = { preset_key: 'cat.housingUtilities' };
+    expect(categoryColor({ preset_key: 'cat.hoa' }, group)).toBe(categoryColor(group));
+    expect(categoryColor({ name: 'Pool service' }, group)).toBe(categoryColor(group));
+  });
+
+  it('keeps a migrated group on its predecessor color, so nobody sees colors shuffle', () => {
+    expect(categoryColor({ preset_key: 'cat.housingUtilities' })).toBe(
+      categoryColor({ preset_key: 'cat.housing' }),
+    );
+  });
+
+  it('gives the new groups a color from the shared palette, not the hash fallback', () => {
     // A known preset_key always resolves through PRESET_KEY_ORDER, never
     // categoryColor's djb2-hash fallback (that path is only for a
     // hand-typed category with no preset_key at all).
-    expect(CATEGORY_PALETTE).toContain(
-      categoryColor({ preset_key: 'cat.subscriptionsMemberships' }),
-    );
-    expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.giftsDonations' }));
+    expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.diningSocial' }));
+    expect(CATEGORY_PALETTE).toContain(categoryColor({ preset_key: 'cat.lifestyleShopping' }));
   });
 
   it('registers every icon id categoryIconId can return in CATEGORY_ICONS', () => {

@@ -71,4 +71,36 @@ describe('EditPlanSheet', () => {
     );
     expect(screen.getByLabelText('Planned')).toHaveValue('100');
   });
+
+  describe('subcategories', () => {
+    const SUBS = [
+      { id: 'groceries', name: 'Groceries', spent: 30, planned: 0 },
+      { id: 'care', name: 'Toiletries', spent: 10, planned: 20 },
+    ];
+
+    it('says the main field is the rest of the group once any subcategory has its own plan', () => {
+      renderSheet({ subcategories: SUBS, plannedTotal: 120, onSaveSub: () => {} });
+      expect(screen.getByText('$120.00')).toBeInTheDocument();
+      expect(screen.getByLabelText('Planned for the rest of Food')).toHaveValue('100');
+    });
+
+    it('saves only the subcategory amounts that changed', () => {
+      const onSave = vi.fn();
+      const onSaveSub = vi.fn();
+      renderSheet({ subcategories: SUBS, plannedTotal: 120, onSave, onSaveSub });
+      fireEvent.change(screen.getByLabelText('Planned — Groceries'), { target: { value: '50' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(onSave).toHaveBeenCalledWith(100);
+      expect(onSaveSub).toHaveBeenCalledTimes(1);
+      expect(onSaveSub).toHaveBeenCalledWith('groceries', 50);
+    });
+
+    it('keeps the plain Planned label when no subcategory is planned on its own', () => {
+      renderSheet({
+        subcategories: [{ id: 'groceries', name: 'Groceries', spent: 0, planned: 0 }],
+        plannedTotal: 100,
+      });
+      expect(screen.getByLabelText('Planned')).toBeInTheDocument();
+    });
+  });
 });

@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { monthsBetween, todayIso } from './month';
 import { DEBT_PREFIX, GOAL_PREFIX } from './commitments';
 
+/** What `build_month` needs to roll subcategories into their groups. */
+export function categoryHierarchy(categories) {
+  return categories.map((c) => ({ id: c.id, parent_id: c.parent_id ?? null }));
+}
+
 /**
  * `budget_calc::build_month` for one month, shared by BudgetTab (the row
  * list) and CategoriesScreen (the Savings row and the commitments table
@@ -99,11 +104,16 @@ export function useMonthBudget({
         }
       }
 
+      // Planning happens at the top level: `build_month` folds each
+      // subcategory's planned and spent into its group's line and hands
+      // the subcategories back separately, as `sub_lines`, for the
+      // breakdown under a group -- never summed a second time.
       const built = await wasmModule.build_month({
         planned,
         previous_remaining: [],
         spent,
         income_category_ids: incomeCategoryIds,
+        hierarchy: categoryHierarchy(categories.items),
       });
       if (!cancelled) setResult(built);
     }

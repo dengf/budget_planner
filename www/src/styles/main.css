@@ -1715,6 +1715,43 @@ table.data tr:last-child td {
 .category-manage-info {
   min-width: 0;
 }
+/* The category tree on the Categories screen: a group's row, its
+   subcategories indented beneath it, then its "Add a subcategory"
+   control. The indent plus a rule down the left edge is what says
+   "belongs to the row above" at 375px, where there is no room for a
+   second column. `.btn.ghost.` on the toggle, not the bare class: the
+   dense-desktop `.btn.ghost` rule would otherwise win on specificity and
+   shrink it below the 44px floor. */
+.category-manage-group {
+  margin-bottom: 12px;
+}
+.category-manage-group .category-manage-row {
+  flex-wrap: nowrap;
+  margin-bottom: 6px;
+}
+/* Name on the left, Remove pinned right -- a long group name
+   ("Primary & Earned Income") wraps within its own column rather than
+   pushing Remove onto a line of its own. */
+.category-manage-group .category-manage-info {
+  flex: 1 1 0;
+}
+.category-manage-sub {
+  margin-left: 20px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-left: 3px solid var(--line);
+  border-radius: 0 12px 12px 0;
+  font-weight: normal;
+}
+.btn.ghost.category-add-sub {
+  min-height: 44px;
+  margin-left: 14px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+}
+.category-add-sub-field {
+  margin: 4px 0 0 20px;
+}
 .category-section-header {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -2112,6 +2149,51 @@ table.data tr:last-child td {
   outline-offset: 1px;
 }
 
+/* A group's subcategories under its row on desktop Budget, revealed by
+   the row's own toggle (a button with aria-expanded, never hover). Each
+   one's planned figure is optional and typed in place, the same dense
+   inline input the group row uses. */
+.budget-row-group + .budget-row-group {
+  margin-top: 2px;
+}
+.btn.ghost.budget-row-subs-toggle {
+  min-height: 44px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+.budget-row-subs-toggle::after {
+  content: ' ▾';
+}
+.budget-row-subs-toggle[aria-expanded='true']::after {
+  content: ' ▴';
+}
+.budget-sub-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 6px 8px 40px;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+}
+.budget-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  min-height: 44px;
+  font-size: 0.85rem;
+}
+.budget-sub-name {
+  flex: 1;
+  min-width: 8em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.budget-sub-spent {
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The one remaining "upcoming this month" surface: a single row inside
    EditPlanSheet for the one category being edited (see that component's
    own doc comment), not the standalone list this used to be. The
@@ -2157,6 +2239,64 @@ table.data tr:last-child td {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+/* EditPlanSheet's optional per-subcategory plans. One row per
+   subcategory: name and spent on the left, amount on the right; the
+   "add upcoming" offer wraps under them at 375px rather than squeezing
+   the amount field. */
+.edit-plan-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  border: none;
+}
+.edit-plan-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel-alt);
+}
+.edit-plan-sub-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.edit-plan-sub-spent {
+  font-size: 0.78rem;
+  font-weight: normal;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.edit-plan-sub-input {
+  width: 7em;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.edit-plan-sub-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.btn.edit-plan-sub-upcoming {
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
 }
 
 /* Spending chart: horizontal bars, longest first, with a marker at each
@@ -3552,8 +3692,6 @@ table.data tr:last-child td {
   font-size: 0.95rem;
 }
 
-
-
 @media (max-width: 640px) {
   /* No longer stacked into two rows here -- that was for fitting a
      title, byline and language select alongside the settings gear on
@@ -3928,23 +4066,29 @@ table.data tr:last-child td {
      instead (see `.category-chip-name`). */
   min-height: 44px;
   max-width: 100%;
-  padding: 6px 14px 6px 8px;
+  padding: 6px 10px 6px 8px;
   border: 1px solid var(--input-border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   cursor: pointer;
 }
 .category-chip-name {
+  /* Two lines, then the ellipsis. The CPA's group names run long
+     ("Entertainment & Leisure", "Primary & Earned Income"), and one line
+     at half of 375px cut most of them to a single word. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  text-align: left;
+  overflow-wrap: break-word;
   /* Without this, a flex item's default `min-width: auto` computes to
-     its unwrapped content width (nowrap means there's no smaller
-     min-content size to shrink to), so the ellipsis above never
-     actually engages and a long name like "Healthcare & Insurance"
-     pushes past the pill instead of truncating. */
+     its content width, so the clamp above never actually engages and a
+     long name pushes past the pill instead of wrapping. */
   min-width: 0;
 }
 .category-chip:hover,
@@ -4001,6 +4145,13 @@ table.data tr:last-child td {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.category-picker-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
 }
 .category-picker-all {
   display: flex;

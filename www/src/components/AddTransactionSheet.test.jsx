@@ -380,16 +380,16 @@ describe('AddTransactionSheet category creation', () => {
   // them. This is the gap CategoryPicker closed alongside Budget's own.
   it('offers an unadded preset as a chip, and creates it furnished on a tap', async () => {
     const PRESET = {
-      key: 'cat.subscriptionsMemberships',
+      key: 'cat.diningSocial',
       group_key: 'cat.group.expense',
-      description_key: 'cat.subscriptionsMemberships.desc',
+      parent_key: null,
       is_income: false,
     };
     const wasmModule = { ...CREATING_WASM, preset_categories: async () => [PRESET] };
     const { saved } = renderCreatingSheet(wasmModule);
 
     fireEvent.click(screen.getByRole('button', { name: '+ New' }));
-    const chip = await screen.findByRole('button', { name: 'Subscriptions & Memberships' });
+    const chip = await screen.findByRole('button', { name: 'Dining & Social' });
     // The bug this was caught on: opening this field used to steal the
     // keyboard unconditionally, which on a real phone shoved the nav bar
     // mid-screen and hid the very chip being asserted on above, behind it.
@@ -399,15 +399,13 @@ describe('AddTransactionSheet category creation', () => {
     await waitFor(() =>
       expect(saved).toContainEqual(
         expect.objectContaining({
-          name: 'Subscriptions & Memberships',
-          preset_key: 'cat.subscriptionsMemberships',
+          name: 'Dining & Social',
+          preset_key: 'cat.diningSocial',
         }),
       ),
     );
     // Selected, exactly as a typed-and-created category would be.
-    expect(await screen.findByRole('button', { name: /Subscriptions & Memberships/ })).toHaveClass(
-      'active',
-    );
+    expect(await screen.findByRole('button', { name: 'Dining & Social' })).toHaveClass('active');
   });
 });
 

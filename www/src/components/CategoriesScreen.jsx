@@ -5,6 +5,9 @@ import { makeFormatMoney } from '../currency';
 import CategoryBadge from './CategoryBadge';
 import CategoryChipPicker from './CategoryChipPicker';
 import CategoryRows from './CategoryRows';
+import NewCategoryField from './NewCategoryField';
+import SubcategoryOfSelect from './SubcategoryOfSelect';
+import { useCreateCategory } from '../useCreateCategory';
 import useBatchRows, { rowKey } from '../useBatchRows';
 import {
   DEBT_PREFIX,
@@ -16,9 +19,9 @@ import {
 import { SAVINGS_CATEGORY_ID, totalExpenseActual } from '../savings';
 import {
   availablePresets,
-  categoryDisplayDescription,
   categoryDisplayGroup,
   categoryDisplayName,
+  categoryTree,
 } from '../presetCategories';
 import { useMonthBudget } from '../useMonthBudget';
 
@@ -44,11 +47,20 @@ import { useMonthBudget } from '../useMonthBudget';
  * keeps the single draft form, which is what fits 375px. Both save
  * through the same `saveCategory` below, so the group fallback and the
  * income flag cannot drift between them.
+ *
+ * The list is the category tree: each group, then its subcategories
+ * indented beneath it, then an "Add a subcategory" control that opens
+ * the same `NewCategoryField` Budget and the add sheet use, filed under
+ * that group -- with the group's own not-yet-added preset subcategories
+ * as chips. Both forms' old free-text "Group" field became "Subcategory
+ * of": the group label was a display string nothing grouped by, while a
+ * parent is what the budget rolls up by. A subcategory takes its group's
+ * direction, so choosing a parent overrides the income/expense choice.
  */
 
 const emptyCategoryRow = () => ({
   name: '',
-  group: '',
+  parentId: '',
   isIncome: false,
   key: rowKey('category'),
 });
@@ -69,7 +81,11 @@ export default function CategoriesScreen({
 }) {
   const { t } = useI18n();
   const formatMoney = makeFormatMoney(currencySymbol);
-  const [newCategory, setNewCategory] = useState({ name: '', group: '', isIncome: false });
+  const [newCategory, setNewCategory] = useState({ name: '', parentId: '', isIncome: false });
+  // Which group's "Add a subcategory" field is open, if any.
+  const [addingSubTo, setAddingSubTo] = useState(null);
+  const createCategory = useCreateCategory({ wasmModule, categories, newId });
+  const tree = categoryTree(categories.items);
   const { rows, setRow, addRow, removeRow, reset } = useBatchRows({
     emptyRow: emptyCategoryRow,
     isFilled: (row) => !!row.name.trim(),
@@ -156,7 +172,10 @@ export default function CategoriesScreen({
   // `newId` rather than a second copy of App's `wasmModule.new_id ?
   // ... : local-${Date.now()}` fallback -- App already passes exactly
   // that down here, and RulesSection has always used it.
-  const saveCategory = async ({ name, group, isIncome }) => {
+  const saveCategory = async ({ name, parentId, isIncome }) => {
+    const parent = parentId ? categories.items.find((c) => c.id === parentId) : null;
+    // A subcategory is always on its group's side of the ledger.
+    const income = parent ? Boolean(parent.is_income) : isIncome;
     await categories.save({
       id: newId(),
       name,
@@ -165,8 +184,10 @@ export default function CategoriesScreen({
       // picker or Budget don't land in different sections of the very
       // list that groups by this. ('General' used to be the expense
       // default -- untranslated, and a group nothing else ever used.)
-      group: group || t(isIncome ? 'cat.group.income' : 'cat.group.expense'),
-      is_income: isIncome,
+      group: parent?.group || t(income ? 'cat.group.income' : 'cat.group.expense'),
+      is_income: income,
+      description: '',
+      parent_id: parent ? parent.id : null,
     });
   };
 
@@ -174,12 +195,11 @@ export default function CategoriesScreen({
     e.preventDefault();
     if (!newCategory.name.trim()) return;
     await saveCategory(newCategory);
-    setNewCategory({ name: '', group: '', isIncome: false });
+    setNewCategory({ name: '', parentId: '', isIncome: false });
   };
 
-  // A name is the whole of a category: the group has a documented
-  // fallback and the direction defaults to expense, so a named row is
-  // always complete.
+  // A name is the whole of a category: the parent is optional and the
+  // direction defaults to expense, so a named row is always complete.
   const namedRows = rows.filter((r) => r.name.trim());
 
   const addCategories = async (e) => {
@@ -233,33 +253,76 @@ export default function CategoriesScreen({
         <p className="empty-state">{t('budget.noCategories')}</p>
       ) : (
         <div className="category-manage-list">
-          {categories.items.map((c) => (
-            <div className="category-manage-row" key={c.id}>
-              <div className="category-manage-info">
-                <div className="category-name">
-                  <CategoryBadge category={c} />
-                  {categoryDisplayName(c, t)}
+          {tree.tops.map((c) => {
+            const subs = tree.childrenOf(c.id);
+            const subPresets = createCategory.availableSubPresets(c);
+            return (
+              <div className="category-manage-group" key={c.id}>
+                <div className="category-manage-row">
+                  <div className="category-manage-info">
+                    <div className="category-name">
+                      <CategoryBadge category={c} />
+                      {categoryDisplayName(c, t)}
+                    </div>
+                    <div className="category-group">{categoryDisplayGroup(c, t)}</div>
+                  </div>
+                  <button className="btn ghost" onClick={() => removeCategory(c.id)}>
+                    {t('budget.remove')}
+                  </button>
                 </div>
-                <div className="category-group">
-                  {categoryDisplayGroup(c, t)}
-                  {categoryDisplayDescription(c, t) && ` · ${categoryDisplayDescription(c, t)}`}
-                </div>
+                {subs.map((sub) => (
+                  <div className="category-manage-row category-manage-sub" key={sub.id}>
+                    <div className="category-manage-info">
+                      <div className="category-name">
+                        <CategoryBadge category={sub} />
+                        {categoryDisplayName(sub, t)}
+                      </div>
+                    </div>
+                    <button className="btn ghost" onClick={() => removeCategory(sub.id)}>
+                      {t('budget.remove')}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn ghost category-add-sub"
+                  aria-expanded={addingSubTo === c.id}
+                  onClick={() => setAddingSubTo(addingSubTo === c.id ? null : c.id)}
+                >
+                  {t('category.addSub')}
+                </button>
+                {addingSubTo === c.id && (
+                  <div className="category-add-sub-field">
+                    <NewCategoryField
+                      key={createCategory.presetsReady ? 'ready' : 'loading'}
+                      isIncome={Boolean(c.is_income)}
+                      parentId={c.id}
+                      create={createCategory.create}
+                      presets={subPresets}
+                      onCreated={() => setAddingSubTo(null)}
+                      // Same conditional focus as Budget's field: the caret only
+                      // when there are no preset chips to tap instead.
+                      // eslint-disable-next-line jsx-a11y/no-autofocus -- conditional; the caret belongs in the field exactly when nothing else does.
+                      autoFocus={createCategory.presetsReady && subPresets.length === 0}
+                    />
+                  </div>
+                )}
               </div>
-              <button className="btn ghost" onClick={() => removeCategory(c.id)}>
-                {t('budget.remove')}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       <CategoryChipPicker
-        presets={availablePresets(presetCategories, categories.items, t)}
+        presets={availablePresets(presetCategories, categories.items, t).filter(
+          (p) => !p.parent_key,
+        )}
         onAdd={addPresetCategory}
       />
       {isDesktop ? (
         <form className="batch-form" onSubmit={addCategories}>
           <CategoryRows
+            groups={tree.tops}
             rows={rows}
             onRowChange={setRow}
             onAddRow={addRow}
@@ -286,18 +349,22 @@ export default function CategoriesScreen({
             </div>
           </label>
           <label className="field">
-            <span className="field-label">{t('budget.categoryGroup')}</span>
-            <div className="field-input">
-              <input
-                value={newCategory.group}
-                onChange={(e) => setNewCategory({ ...newCategory, group: e.target.value })}
-              />
-            </div>
+            <span className="field-label">{t('category.subcategoryOf')}</span>
+            <SubcategoryOfSelect
+              groups={tree.tops}
+              value={newCategory.parentId}
+              onChange={(parentId) => setNewCategory({ ...newCategory, parentId })}
+            />
           </label>
           <label className="field field-check">
             <input
               type="checkbox"
-              checked={newCategory.isIncome}
+              disabled={Boolean(newCategory.parentId)}
+              checked={
+                newCategory.parentId
+                  ? Boolean(tree.tops.find((g) => g.id === newCategory.parentId)?.is_income)
+                  : newCategory.isIncome
+              }
               onChange={(e) => setNewCategory({ ...newCategory, isIncome: e.target.checked })}
             />
             <span>{t('budget.categoryIsIncome')}</span>

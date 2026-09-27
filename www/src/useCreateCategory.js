@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from './i18n';
-import { availablePresets, buildCategoryFromPreset, categoryDisplayName } from './presetCategories';
+import {
+  availablePresets,
+  buildCategoryFromPreset,
+  categoryDisplayName,
+  presetsToAdd,
+  savePresets,
+} from './presetCategories';
 
 /**
  * Creating a category from wherever somebody happens to need one -- the
@@ -29,8 +35,9 @@ import { availablePresets, buildCategoryFromPreset, categoryDisplayName } from '
  * grab the keyboard on every open, then never let go even once the real
  * preset list arrives, because focus isn't revisited after mount.
  *
- * Returns `{ create, availableIncomePresets, availableExpensePresets, presetsReady }`.
- * `create(typed, isIncome)` resolves to `{ outcome, categoryId }`:
+ * Returns `{ create, availableIncomePresets, availableExpensePresets,
+ * availableSubPresets, presetsReady }`.
+ * `create(typed, isIncome, parentId)` resolves to `{ outcome, categoryId }`:
  * `outcome` is the Rust case verbatim; `categoryId` is what to select
  * afterwards, present for every case except `blank` and `error` --
  * including `other_direction`, where it points at the category that
@@ -45,6 +52,18 @@ import { availablePresets, buildCategoryFromPreset, categoryDisplayName } from '
  * typed-name-only field is only easier than More -> Categories for a
  * category that doesn't already exist as a preset; for the sixteen that
  * do, it's a guessing game against text nobody can see.
+ *
+ * Only top-level groups are offered as those chips -- a group arrives
+ * with its subcategories (`presetsToAdd`), and forty-odd chips would be a
+ * wall, not a shortcut. A subcategory name is still one typed word away:
+ * `resolve_category_name` matches every preset, and adding one brings its
+ * group along if the budget lacks it. `availableSubPresets(group)` is the
+ * narrower list for adding under one specific group.
+ *
+ * `parentId`, when given, files whatever is created under that group --
+ * the "Add a subcategory" field. A preset name typed there is saved with
+ * its preset key (so it keeps its translation) but under the group the
+ * person chose, not wherever the starter list would have put it.
  */
 export function useCreateCategory({ wasmModule, categories, newId }) {
   const { t } = useI18n();
@@ -73,11 +92,21 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
     () => availablePresets(presets, categories.items, t),
     [presets, categories.items, t],
   );
-  const availableIncomePresets = useMemo(() => notTaken.filter((p) => p.is_income), [notTaken]);
-  const availableExpensePresets = useMemo(() => notTaken.filter((p) => !p.is_income), [notTaken]);
+  const availableIncomePresets = useMemo(
+    () => notTaken.filter((p) => p.is_income && !p.parent_key),
+    [notTaken],
+  );
+  const availableExpensePresets = useMemo(
+    () => notTaken.filter((p) => !p.is_income && !p.parent_key),
+    [notTaken],
+  );
+  const availableSubPresets = useCallback(
+    (group) => (group?.preset_key ? notTaken.filter((p) => p.parent_key === group.preset_key) : []),
+    [notTaken],
+  );
 
   const create = useCallback(
-    async (typed, isIncome) => {
+    async (typed, isIncome, parentId = null) => {
       if (!wasmModule?.resolve_category_name) return { outcome: 'error' };
 
       const resolved = await wasmModule.resolve_category_name({
@@ -107,9 +136,20 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
           // icon, group, description and the `preset_key` that keeps it
           // re-translating all included.
           const preset = presets.find((p) => p.key === resolved.preset_key);
-          const record = buildCategoryFromPreset(preset, t, newId);
-          await categories.save(record);
-          return { outcome: 'preset', categoryId: record.id };
+          if (parentId) {
+            const record = buildCategoryFromPreset(preset, t, newId, parentId);
+            await categories.save(record);
+            return { outcome: 'preset', categoryId: record.id };
+          }
+          const saved = await savePresets(
+            presetsToAdd([preset], presets, categories.items, t),
+            categories.items,
+            categories.save,
+            t,
+            newId,
+          );
+          const record = saved.find((r) => r.preset_key === preset.key);
+          return { outcome: 'preset', categoryId: record?.id };
         }
         case 'create': {
           const record = {
@@ -118,6 +158,7 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
             group: t(resolved.group_key),
             is_income: Boolean(isIncome),
             description: '',
+            parent_id: parentId,
           };
           await categories.save(record);
           return { outcome: 'create', categoryId: record.id };
@@ -129,5 +170,11 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
     [wasmModule, categories, newId, presets, t],
   );
 
-  return { create, availableIncomePresets, availableExpensePresets, presetsReady };
+  return {
+    create,
+    availableIncomePresets,
+    availableExpensePresets,
+    availableSubPresets,
+    presetsReady,
+  };
 }

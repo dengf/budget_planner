@@ -29,6 +29,14 @@ pub struct CategoryRecord {
     /// fields above.
     #[serde(default)]
     pub preset_key: Option<String>,
+    /// The top-level category this is a subcategory of, if any -- see
+    /// `budget_calc::Category::parent_id`. Unlike `preset_key` this one
+    /// *is* matched on for behaviour: every figure on the Budget tab rolls
+    /// a subcategory into its parent. `#[serde(default)]` for the same
+    /// back-compat reasoning as the fields above: everything saved before
+    /// subcategories existed was top-level.
+    #[serde(default)]
+    pub parent_id: Option<String>,
 }
 
 /// One category's planned amount for one month. `month` is `YYYY-MM`.
