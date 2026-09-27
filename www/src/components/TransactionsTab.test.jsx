@@ -69,7 +69,7 @@ describe('TransactionsTab', () => {
   it('leaves categorization rules and recurring setup to the More tab', () => {
     renderTab();
     expect(screen.queryByText('Categorization rules')).not.toBeInTheDocument();
-    expect(screen.queryByText('Recurring bills & income')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recurring expenses & income')).not.toBeInTheDocument();
   });
 });
 

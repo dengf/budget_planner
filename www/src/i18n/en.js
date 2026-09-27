@@ -341,7 +341,7 @@ export default {
   'transactions.voiceProcessing': 'Working it out…',
   'transactions.voiceCaptureFailed':
     "Couldn't hear that. Check your microphone permission and try again.",
-  'recurring.title': 'Recurring bills & income',
+  'recurring.title': 'Recurring expenses & income',
   'recurring.hint':
     'Rent, subscriptions, a paycheck — anything on a schedule. Set one up once and see it coming before it posts. Pick an income category for money coming in.',
   'recurring.none': 'Nothing recurring set up yet.',
