@@ -187,8 +187,8 @@ export default {
   'category.newSubIn': 'New subcategory in {name}',
   'budget.subcategories': 'Subcategories',
   'budget.subPlanHint':
-    'Plan a subcategory on its own only if you want to track it separately — it adds to {name}’s total.',
-  'budget.plannedRest': 'Planned for the rest of {name}',
+    'Split it across the subcategories if you like — once any of them has an amount, {name}’s total is their sum.',
+  'budget.plannedIsSubSum': 'The sum of its subcategories.',
   'budget.plannedTotal': 'Total planned',
   'confirm.removeGroup': 'Remove “{name}” and its {count} subcategories?',
 

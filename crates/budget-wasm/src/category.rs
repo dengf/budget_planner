@@ -1,7 +1,7 @@
 //! `build_month`, `summarize_month`, `category_rank`, `category_shares`,
 //! `month_setup_state`, `carry_plan_forward`, `month_review`,
 //! `suggest_plan_from_spending`, `resolve_category_name`,
-//! `migrate_legacy_categories`.
+//! `migrate_legacy_categories`, `group_planned`.
 
 use wasm_bindgen::prelude::*;
 
@@ -10,13 +10,42 @@ use crate::dto::{
     BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
     CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto, CategoryLineDto,
     CategoryMigrationDto, CategoryRankParams, CategoryRankResult, CategoryShareDto,
-    CategorySharesParams, CategorySharesResult, MigrateCategoriesParams, MigrateCategoriesResult,
-    MonthReviewParams, MonthReviewResult, MonthSetupStateParams, MonthSetupStateResult,
-    MonthSummaryDto, PlanEntryDto, RankedCategoryDto, ResolveCategoryNameParams,
-    ResolveCategoryNameResult, SuggestPlanParams, SuggestPlanResult, SuggestedRowDto,
-    TransactionDto,
+    CategorySharesParams, CategorySharesResult, GroupPlannedParams, GroupPlannedResult,
+    MigrateCategoriesParams, MigrateCategoriesResult, MonthReviewParams, MonthReviewResult,
+    MonthSetupStateParams, MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, RankedCategoryDto,
+    ResolveCategoryNameParams, ResolveCategoryNameResult, SuggestPlanParams, SuggestPlanResult,
+    SuggestedRowDto, TransactionDto,
 };
 use crate::message::Message;
+
+/// A group's planned total while its plan is being edited -- the same
+/// rule `build_month` rolls groups up by, so the edit sheet's live total
+/// can never disagree with the row it lands in.
+#[wasm_bindgen]
+pub fn group_planned(params: JsValue) -> JsValue {
+    let bad_request = || {
+        let message = Message::bad_request();
+        GroupPlannedResult {
+            error: Some(message.text.clone()),
+            error_message: Some(message),
+            ..Default::default()
+        }
+    };
+    let result = match serde_wasm_bindgen::from_value::<GroupPlannedParams>(params) {
+        Ok(p) => {
+            let subs: Option<Vec<_>> = p.subcategories.iter().map(|a| f64_to_decimal(*a)).collect();
+            match (f64_to_decimal(p.own), subs) {
+                (Some(own), Some(subs)) => GroupPlannedResult {
+                    total: Some(decimal_to_f64(budget_calc::group_planned(own, &subs))),
+                    ..Default::default()
+                },
+                _ => bad_request(),
+            }
+        }
+        Err(_) => bad_request(),
+    };
+    to_js(&result)
+}
 
 #[wasm_bindgen]
 pub fn build_month(params: JsValue) -> JsValue {

@@ -50,6 +50,21 @@ pub struct AmountEntryDto {
     pub amount: f64,
 }
 
+/// `group_planned`: a group's own plan and its subcategories' plans.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GroupPlannedParams {
+    pub own: f64,
+    #[serde(default)]
+    pub subcategories: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct GroupPlannedResult {
+    pub total: Option<f64>,
+    pub error: Option<String>,
+    pub error_message: Option<Message>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct BuildMonthParams {
     pub planned: Vec<AmountEntryDto>,

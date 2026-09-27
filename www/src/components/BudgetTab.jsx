@@ -236,6 +236,18 @@ export default function BudgetTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `isIncome`/`categoryGroup`/`categoryName` are derived fresh each render from `categories.items`, already a dep below.
   }, [result, categories.items, locale]);
 
+  // The group's total is its subcategories' sum once any has an amount
+  // (`budget_calc::group_planned`), so the group's own amount is zeroed
+  // the moment a subcategory gets one -- otherwise it would sit unseen
+  // and come back if the split were later undone.
+  const saveSubPlanned = (groupId) => async (subId, amount) => {
+    await savePlanned(subId, amount);
+    if (Number(amount) > 0 && ownPlanned(groupId) > 0) await savePlanned(groupId, 0);
+  };
+  const groupPlanned = wasmModule?.group_planned
+    ? (own, subcategories) => wasmModule.group_planned({ own, subcategories })
+    : undefined;
+
   const savePlanned = async (categoryId, amount) => {
     const existing = budgetPlan.items.find((p) => p.category_id === categoryId);
     const id = existing?.id ?? (wasmModule?.new_id ? wasmModule.new_id() : `local-${Date.now()}`);
@@ -358,21 +370,22 @@ export default function BudgetTab({
                 <span>
                   {t(incomeRow ? 'budget.received' : 'budget.spent')}: {formatMoney(line.spent)}
                 </span>
-                {splitBySub && (
+                {/* Split: the total is the subcategories' sum, so there is
+                    no second number to type here -- only the result. */}
+                {splitBySub ? (
                   <span>
                     {t('budget.plannedTotal')}: {formatMoney(line.planned)}
                   </span>
+                ) : (
+                  <label className="budget-row-planned-label">
+                    {t('budget.planned')}
+                    <PlannedInlineInput
+                      value={ownPlanned(line.category_id)}
+                      onSave={(amount) => savePlanned(line.category_id, amount)}
+                      ariaLabel={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
+                    />
+                  </label>
                 )}
-                <label className="budget-row-planned-label">
-                  {splitBySub
-                    ? t('budget.plannedRest', { name: categoryName(line.category_id) })
-                    : t('budget.planned')}
-                  <PlannedInlineInput
-                    value={ownPlanned(line.category_id)}
-                    onSave={(amount) => savePlanned(line.category_id, amount)}
-                    ariaLabel={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
-                  />
-                </label>
                 {subs.length > 0 && (
                   <button
                     type="button"
@@ -398,7 +411,7 @@ export default function BudgetTab({
                     {t('budget.planned')}
                     <PlannedInlineInput
                       value={sub.planned}
-                      onSave={(amount) => savePlanned(sub.id, amount)}
+                      onSave={(amount) => saveSubPlanned(line.category_id)(sub.id, amount)}
                       ariaLabel={`${t('budget.planned')} — ${sub.name}`}
                     />
                   </label>
@@ -675,7 +688,8 @@ export default function BudgetTab({
           planned={ownPlanned(editingLine.category_id)}
           plannedTotal={editingLine.planned}
           subcategories={subRowsFor(editingLine.category_id)}
-          onSaveSub={savePlanned}
+          onSaveSub={saveSubPlanned(editingLine.category_id)}
+          groupPlanned={groupPlanned}
           spentLabel={t(isIncome(editingLine.category_id) ? 'budget.received' : 'budget.spent')}
           spent={editingLine.spent}
           remaining={remainingCell(editingLine)}

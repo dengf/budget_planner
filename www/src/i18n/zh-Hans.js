@@ -163,8 +163,9 @@ export default {
   'category.subCount': '子分类（{count}）',
   'category.newSubIn': '在“{name}”下新建子分类',
   'budget.subcategories': '子分类',
-  'budget.subPlanHint': '只有想单独追踪某个子分类时才需要给它做计划——它会计入“{name}”的总额。',
-  'budget.plannedRest': '“{name}”其余部分的计划',
+  'budget.subPlanHint':
+    '可以把它分到各个子分类——只要有一个子分类填了金额，“{name}”的总额就是子分类之和。',
+  'budget.plannedIsSubSum': '各子分类之和。',
   'budget.plannedTotal': '计划总额',
   'confirm.removeGroup': '要删除“{name}”及其 {count} 个子分类吗？',
 

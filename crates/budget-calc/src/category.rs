@@ -150,6 +150,54 @@ pub fn roll_up(
     rolled
 }
 
+/// A group's planned total from its own plan and its subcategories'.
+///
+/// Once any subcategory carries a plan, the group's total *is* the sum of
+/// its subcategories -- the group's own amount no longer counts. Adding
+/// the two double-counted the most natural way to use it: type the
+/// group's total, then split that same money across its subcategories.
+/// The group's own amount only stands while nothing under it is planned,
+/// so someone who never splits can still plan at the group level.
+pub fn group_planned(own: Decimal, subcategories: &[Decimal]) -> Decimal {
+    if subcategories.iter().any(|a| !a.is_zero()) {
+        subcategories.iter().copied().sum()
+    } else {
+        own
+    }
+}
+
+/// [`roll_up`] for planned amounts: each group's total by
+/// [`group_planned`], in the same first-seen order.
+pub fn roll_up_planned(
+    planned: &[(String, Decimal)],
+    parents: &HashMap<String, String>,
+) -> Vec<(String, Decimal)> {
+    let mut groups: Vec<(String, Decimal, Vec<Decimal>)> = Vec::new();
+    for (id, amount) in planned {
+        let (root, is_sub) = match parents.get(id) {
+            Some(root) => (root, true),
+            None => (id, false),
+        };
+        let index = match groups.iter().position(|(r, _, _)| r == root) {
+            Some(i) => i,
+            None => {
+                groups.push((root.clone(), Decimal::ZERO, Vec::new()));
+                groups.len() - 1
+            }
+        };
+        let (_, own, subs) = &mut groups[index];
+        if is_sub {
+            subs.push(*amount);
+        } else {
+            *own += *amount;
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(id, own, subs)| (id, group_planned(own, &subs)))
+        .collect()
+}
+
 /// A month's lines at both levels.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MonthTree {
@@ -167,7 +215,9 @@ pub struct MonthTree {
 ///
 /// Planning happens at the top level, with a subcategory optionally
 /// carrying a plan of its own; a top-level row's planned amount is then
-/// its own plan plus every subcategory's, and the same for spent. A
+/// [`group_planned`] -- its subcategories' sum once any is planned, else
+/// its own -- while spent is always the group's own plus every
+/// subcategory's (money spent is never ambiguous the way a plan is). A
 /// category nobody has filed anything under yet still gets its line --
 /// `planned` lists every category, same as `build_month` expects.
 pub fn build_month_tree(
@@ -177,7 +227,7 @@ pub fn build_month_tree(
     parents: &HashMap<String, String>,
 ) -> BudgetResult<MonthTree> {
     let lines = build_month(
-        &roll_up(planned, parents),
+        &roll_up_planned(planned, parents),
         &roll_up(previous_remaining, parents),
         &roll_up(spent, parents),
     )?;
@@ -2832,16 +2882,18 @@ mod tests {
         .unwrap();
 
         let food = tree.lines.iter().find(|l| l.category_id == "food").unwrap();
-        assert_eq!(food.planned, Decimal::from(500));
+        // The group's own 100 is set aside once a subcategory is planned:
+        // its total is the subcategories' sum, never own + subs.
+        assert_eq!(food.planned, Decimal::from(400));
         assert_eq!(food.spent, Decimal::from(400));
-        assert_eq!(food.remaining, Decimal::from(100));
+        assert_eq!(food.remaining, Decimal::ZERO);
         assert_eq!(tree.lines.len(), 2, "subcategories are not top-level lines");
 
         let summary = summarize_month(&tree.lines, &["pay".to_string()]);
         assert_eq!(summary.income, Decimal::from(3000));
         assert_eq!(
             summary.total_planned,
-            Decimal::from(500),
+            Decimal::from(400),
             "nothing counted twice"
         );
 
@@ -2859,6 +2911,39 @@ mod tests {
             .unwrap();
         assert_eq!(care.planned, Decimal::ZERO);
         assert_eq!(care.spent, Decimal::from(40));
+    }
+
+    #[test]
+    fn a_group_total_is_its_subcategories_sum_once_any_is_planned() {
+        let d = Decimal::from;
+        // The bug report: 5000 typed on the group, then split 3000/2000.
+        assert_eq!(group_planned(d(5000), &[d(3000), d(2000)]), d(5000));
+        assert_eq!(group_planned(d(5000), &[d(3000), d(0)]), d(3000));
+        // Nothing split: the group's own plan stands.
+        assert_eq!(group_planned(d(5000), &[d(0), d(0)]), d(5000));
+        assert_eq!(group_planned(d(5000), &[]), d(5000));
+    }
+
+    #[test]
+    fn rolled_up_plans_never_add_a_group_to_its_subcategories() {
+        let map = parent_map(&links(&[
+            ("pay", None),
+            ("salary", Some("pay")),
+            ("bonus", Some("pay")),
+            ("food", None),
+            ("groceries", Some("food")),
+        ]));
+        let rolled = roll_up_planned(
+            &amounts(&[
+                ("pay", 5000),
+                ("salary", 3000),
+                ("bonus", 2000),
+                ("food", 600),
+                ("groceries", 0),
+            ]),
+            &map,
+        );
+        assert_eq!(rolled, amounts(&[("pay", 5000), ("food", 600)]));
     }
 
     #[test]
