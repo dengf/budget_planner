@@ -12,7 +12,14 @@ import { loadTheme, saveTheme, applyTheme } from './theme';
 import UpdateBanner from './components/UpdateBanner';
 import { COLLECTIONS, readBackup } from './backup';
 import { currentMonth, todayIso } from './month';
-import { availablePresets, buildCategoryFromPreset } from './presetCategories';
+import {
+  availablePresets,
+  categoryDisplayName,
+  categoryTree,
+  presetsToAdd,
+  savePresets,
+} from './presetCategories';
+import { CategoriesContext } from './categoryContext';
 import { TABS, TAB_ORDER } from './tabs';
 import { startViewportChromeInsetTracking } from './viewportChromeInset';
 
@@ -234,27 +241,36 @@ export function AppShell({ wasmModule }) {
    * purpose, and losing which category it belonged to is the same
    * dangling-reference bug, just for spending that hasn't happened yet.
    */
+  /*
+   * A group goes with its subcategories. Leaving them behind would turn
+   * each into a top-level category nobody asked for, and the guard below
+   * covers all of them together: one subcategory still in use blocks the
+   * whole removal, the same as the group itself being in use would.
+   */
   const removeCategory = useCallback(
     async (id) => {
-      const inUseTransactions = transactions.items.filter((t) => t.category_id === id);
-      const inUseRecurring = recurring.items.filter((r) => r.category_id === id);
+      const category = categories.items.find((c) => c.id === id);
+      const name = category ? categoryDisplayName(category, t) : id;
+      const subs = categoryTree(categories.items).childrenOf(id);
+      const ids = new Set([id, ...subs.map((c) => c.id)]);
+      const inUseTransactions = transactions.items.filter((t) => ids.has(t.category_id));
+      const inUseRecurring = recurring.items.filter((r) => ids.has(r.category_id));
       const inUseCount = inUseTransactions.length + inUseRecurring.length;
       if (inUseCount > 0) {
-        const category = categories.items.find((c) => c.id === id);
-        setGuardResult({
-          error: t('err.categoryInUse', { name: category?.name ?? id, count: inUseCount }),
-        });
+        setGuardResult({ error: t('err.categoryInUse', { name, count: inUseCount }) });
         return;
       }
       const ok = await confirm(
-        t('confirm.removeCategory', {
-          name: categories.items.find((c) => c.id === id)?.name ?? id,
-        }),
+        subs.length > 0
+          ? t('confirm.removeGroup', { name, count: subs.length })
+          : t('confirm.removeCategory', { name }),
       );
       if (!ok) return;
 
-      const planRow = budgetPlan.items.find((p) => p.category_id === id);
-      if (planRow) await budgetPlan.remove(planRow.id);
+      for (const planRow of budgetPlan.items.filter((p) => ids.has(p.category_id))) {
+        await budgetPlan.remove(planRow.id);
+      }
+      for (const sub of subs) await categories.remove(sub.id);
       await categories.remove(id);
     },
     [transactions.items, recurring.items, categories, budgetPlan, confirm, t],
@@ -282,20 +298,21 @@ export function AppShell({ wasmModule }) {
     async (existingItems = categories.items) => {
       if (!wasmModule?.preset_categories) return;
       const presets = (await wasmModule.preset_categories()) ?? [];
-      for (const preset of availablePresets(presets, existingItems, t)) {
-        // Sequential rather than Promise.all: each save is one IndexedDB
-        // write through the same store handle, and the list they land in
-        // reads better in the order the presets are declared.
-        await categories.save(buildCategoryFromPreset(preset, t, newId));
-      }
+      await savePresets(
+        availablePresets(presets, existingItems, t),
+        existingItems,
+        categories.save,
+        t,
+        newId,
+      );
     },
     [wasmModule, categories, newId, t],
   );
 
   /**
-   * Seeds the compact five-category starter set -- one income category,
-   * four of the expenses nearly every household has -- rather than
-   * `addCommonCategories`'s full sixteen. Used only where a budget is
+   * Seeds the compact starter set -- one income group, four of the
+   * expense groups nearly every household has, each with its
+   * subcategories -- rather than `addCommonCategories`'s full list. Used only where a budget is
    * landing on its *very first* screen (a genuine first run, or right
    * after "Clear all data"): the full catalogue stays reachable from
    * there through `CategoryChipPicker` and the "Add common categories"
@@ -307,25 +324,102 @@ export function AppShell({ wasmModule }) {
     async (existingItems = categories.items) => {
       if (!wasmModule?.compact_preset_categories) return;
       const presets = (await wasmModule.compact_preset_categories()) ?? [];
-      for (const preset of availablePresets(presets, existingItems, t)) {
-        await categories.save(buildCategoryFromPreset(preset, t, newId));
-      }
+      await savePresets(
+        availablePresets(presets, existingItems, t),
+        existingItems,
+        categories.save,
+        t,
+        newId,
+      );
     },
     [wasmModule, categories, newId, t],
   );
 
   /**
-   * Adds exactly one starter preset -- the Budget tab's chip picker calls
-   * this once per tap, unlike `addCommonCategories` above which seeds
-   * every not-yet-taken preset in one shot. Same save shape, just one
-   * category instead of a loop over all of them.
+   * Adds one starter preset per chip tap, unlike `addCommonCategories`
+   * above which seeds every not-yet-taken preset in one shot. A group
+   * arrives with its subcategories and a subcategory with its group --
+   * see `presetsToAdd`.
    */
   const addPresetCategory = useCallback(
     async (preset) => {
-      await categories.save(buildCategoryFromPreset(preset, t, newId));
+      if (!wasmModule?.preset_categories) return;
+      const presets = (await wasmModule.preset_categories()) ?? [];
+      await savePresets(
+        presetsToAdd([preset], presets, categories.items, t),
+        categories.items,
+        categories.save,
+        t,
+        newId,
+      );
     },
-    [categories, newId, t],
+    [wasmModule, categories, newId, t],
   );
+
+  /**
+   * Moves a budget saved under the old flat starter list onto the CPA's
+   * grouped one, the first time it loads after the change -- and again
+   * after an import brings old-list categories back in. Which record
+   * becomes what is `budget_calc::migrate_legacy_categories`; this only
+   * composes the translated names and saves.
+   *
+   * Every category keeps its id, so nothing that points at one
+   * (transactions, plans, rules, recurring bills) needs touching. Groups
+   * the move has to create are saved first, so a subcategory never points
+   * at one that isn't there yet. `migratingRef` keeps a second run from
+   * starting while the first is still saving -- each save re-renders with
+   * a new `categories.items`, and the steps are only safe to compute from
+   * a list that isn't half-written.
+   */
+  const migratingRef = useRef(false);
+  const migrationCheckedRef = useRef(null);
+  useEffect(() => {
+    if (!categories.loaded || migratingRef.current) return;
+    if (!wasmModule?.migrate_legacy_categories || !wasmModule?.preset_categories) return;
+    // Once per list, not once per render: `categories` itself is a fresh
+    // object every render, but its `items` only change on a real write.
+    if (migrationCheckedRef.current === categories.items) return;
+    migrationCheckedRef.current = categories.items;
+    migratingRef.current = true;
+    (async () => {
+      try {
+        const result = await wasmModule.migrate_legacy_categories({
+          categories: categories.items,
+        });
+        const steps = result?.steps ?? [];
+        if (steps.length === 0) return;
+        const presets = (await wasmModule.preset_categories()) ?? [];
+        const presetFor = (key) => presets.find((p) => p.key === key);
+        for (const step of steps) {
+          const preset = step.preset_key ? presetFor(step.preset_key) : null;
+          if (step.action === 'create') {
+            if (!preset) continue;
+            await categories.save({
+              id: step.id,
+              name: t(preset.key),
+              group: t(preset.group_key),
+              is_income: preset.is_income,
+              description: '',
+              preset_key: preset.key,
+              parent_id: null,
+            });
+            continue;
+          }
+          const existing = categories.items.find((c) => c.id === step.id);
+          if (!existing) continue;
+          await categories.save({
+            ...existing,
+            name: preset ? t(preset.key) : existing.name,
+            description: preset ? '' : existing.description,
+            preset_key: preset ? preset.key : null,
+            parent_id: step.parent_id ?? null,
+          });
+        }
+      } finally {
+        migratingRef.current = false;
+      }
+    })();
+  }, [categories.loaded, categories.items, categories, wasmModule, t]);
 
   /**
    * A budget with zero categories opens with the starter set already in
@@ -536,8 +630,9 @@ export function AppShell({ wasmModule }) {
   };
 
   return (
-    <div className="app">
-      {/* The app's one <h1>. This page had none at all, on any screen or
+    <CategoriesContext.Provider value={categories.items}>
+      <div className="app">
+        {/* The app's one <h1>. This page had none at all, on any screen or
           width -- mortgage_calculator and postcard_maker both name
           themselves in an <h1> in the header, but this app's header
           carries the month strip instead and the title lives in More, so
@@ -549,107 +644,108 @@ export function AppShell({ wasmModule }) {
           phone layout, where the bar is only as tall as the month strip.
           Making the sidebar's brand the <h1> would fix desktop and leave
           the phone without one, so the heading lives here, above both. */}
-      <h1 className="visually-hidden">{t('app.title')}</h1>
-      {isDesktop && (
-        <DesktopSidebar
-          activeTab={activeTab}
-          moreSectionId={moreSectionId}
-          onNavigate={navigateTo}
-          onOpenAdd={openAdd}
-        />
-      )}
-      <div className="app-content">
-        <Header
-          activeTab={activeTab}
-          onTabChange={(id) => navigateTo(id)}
-          onOpenAdd={openAdd}
-          currencySymbol={currencySymbol}
-          onCurrencySymbolChange={(next) => {
-            saveCurrencySymbol(next);
-            setCurrencySymbol(next);
-          }}
-          theme={theme}
-          onThemeChange={(next) => {
-            saveTheme(next);
-            applyTheme(next);
-            setTheme(next);
-          }}
-          wasmModule={wasmModule}
-          today={today}
-          viewMonth={viewMonth}
-          setViewMonth={setViewMonth}
-          categories={categories}
-          transactions={transactions}
-          rules={rules}
-          budgetPlan={budgetPlan}
-          goals={goals}
-          debts={debts}
-          recurring={recurring}
-          clearAllData={clearAllData}
-          importData={importData}
-        />
-        <main
-          className="app-main"
-          onPointerDown={onMainPointerDown}
-          onPointerMove={onMainPointerMove}
-          onPointerUp={onMainPointerUp}
-          onPointerCancel={onMainPointerUp}
-        >
-          <SwipeHint />
-          <Suspense fallback={<TabFallback />}>
-            <div className="tab-panel" key={activeTab}>
-              <ActivePanel
-                wasmModule={wasmModule}
-                currencySymbol={currencySymbol}
-                today={today}
-                viewMonth={viewMonth}
-                setViewMonth={setViewMonth}
-                newId={newId}
-                confirm={confirm}
-                categories={categories}
-                removeCategory={removeCategory}
-                addCommonCategories={addCommonCategories}
-                addPresetCategory={addPresetCategory}
-                transactions={transactions}
-                rules={rules}
-                goals={goals}
-                debts={debts}
-                recurring={recurring}
-                budgetPlan={budgetPlan}
-                moreSectionId={moreSectionId}
-                onMoreSectionChange={setMoreSectionId}
-                onNavigateTab={(id) => navigateTo(id)}
-                onOpenAdd={openAdd}
-                onEditTransaction={openEdit}
-              />
-            </div>
-          </Suspense>
-          <Intro />
-        </main>
-      </div>
-      {addMounted && (
-        <Suspense fallback={null}>
-          <AddTransactionSheet
-            open={addOpen}
-            onClose={closeAdd}
-            initialMethod={addMethod}
-            editing={editing}
-            wasmModule={wasmModule}
-            newId={newId}
-            today={todayDate}
-            categories={categories}
-            rules={rules}
-            transactions={transactions}
-            recurring={recurring}
-            formatMoney={formatMoney}
-            isDesktop={isDesktop}
+        <h1 className="visually-hidden">{t('app.title')}</h1>
+        {isDesktop && (
+          <DesktopSidebar
+            activeTab={activeTab}
+            moreSectionId={moreSectionId}
+            onNavigate={navigateTo}
+            onOpenAdd={openAdd}
           />
-        </Suspense>
-      )}
-      <CalcErrorPortal result={guardResult} />
-      {confirmDialog}
-      <UpdateBanner />
-    </div>
+        )}
+        <div className="app-content">
+          <Header
+            activeTab={activeTab}
+            onTabChange={(id) => navigateTo(id)}
+            onOpenAdd={openAdd}
+            currencySymbol={currencySymbol}
+            onCurrencySymbolChange={(next) => {
+              saveCurrencySymbol(next);
+              setCurrencySymbol(next);
+            }}
+            theme={theme}
+            onThemeChange={(next) => {
+              saveTheme(next);
+              applyTheme(next);
+              setTheme(next);
+            }}
+            wasmModule={wasmModule}
+            today={today}
+            viewMonth={viewMonth}
+            setViewMonth={setViewMonth}
+            categories={categories}
+            transactions={transactions}
+            rules={rules}
+            budgetPlan={budgetPlan}
+            goals={goals}
+            debts={debts}
+            recurring={recurring}
+            clearAllData={clearAllData}
+            importData={importData}
+          />
+          <main
+            className="app-main"
+            onPointerDown={onMainPointerDown}
+            onPointerMove={onMainPointerMove}
+            onPointerUp={onMainPointerUp}
+            onPointerCancel={onMainPointerUp}
+          >
+            <SwipeHint />
+            <Suspense fallback={<TabFallback />}>
+              <div className="tab-panel" key={activeTab}>
+                <ActivePanel
+                  wasmModule={wasmModule}
+                  currencySymbol={currencySymbol}
+                  today={today}
+                  viewMonth={viewMonth}
+                  setViewMonth={setViewMonth}
+                  newId={newId}
+                  confirm={confirm}
+                  categories={categories}
+                  removeCategory={removeCategory}
+                  addCommonCategories={addCommonCategories}
+                  addPresetCategory={addPresetCategory}
+                  transactions={transactions}
+                  rules={rules}
+                  goals={goals}
+                  debts={debts}
+                  recurring={recurring}
+                  budgetPlan={budgetPlan}
+                  moreSectionId={moreSectionId}
+                  onMoreSectionChange={setMoreSectionId}
+                  onNavigateTab={(id) => navigateTo(id)}
+                  onOpenAdd={openAdd}
+                  onEditTransaction={openEdit}
+                />
+              </div>
+            </Suspense>
+            <Intro />
+          </main>
+        </div>
+        {addMounted && (
+          <Suspense fallback={null}>
+            <AddTransactionSheet
+              open={addOpen}
+              onClose={closeAdd}
+              initialMethod={addMethod}
+              editing={editing}
+              wasmModule={wasmModule}
+              newId={newId}
+              today={todayDate}
+              categories={categories}
+              rules={rules}
+              transactions={transactions}
+              recurring={recurring}
+              formatMoney={formatMoney}
+              isDesktop={isDesktop}
+            />
+          </Suspense>
+        )}
+        <CalcErrorPortal result={guardResult} />
+        {confirmDialog}
+        <UpdateBanner />
+      </div>
+    </CategoriesContext.Provider>
   );
 }
 

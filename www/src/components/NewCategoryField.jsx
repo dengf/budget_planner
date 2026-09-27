@@ -41,6 +41,7 @@ export default function NewCategoryField({
   presets = [],
   initialName = '',
   autoFocus = false,
+  parentId = null,
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(initialName);
@@ -80,7 +81,7 @@ export default function NewCategoryField({
     const trimmed = candidate.trim();
     if (!trimmed || busy) return;
     setBusy(true);
-    const result = await create(candidate, isIncome);
+    const result = await create(candidate, isIncome, parentId);
     setBusy(false);
     // The name is somebody's own expense category sitting on the income
     // side (or the reverse). Saying so beats both alternatives: creating
@@ -112,7 +113,13 @@ export default function NewCategoryField({
                 disabled={busy}
                 onClick={() => submitNamed(t(preset.key))}
               >
-                <CategoryBadge category={{ preset_key: preset.key, is_income: preset.is_income }} />
+                <CategoryBadge
+                  category={{
+                    preset_key: preset.key,
+                    parent_key: preset.parent_key,
+                    is_income: preset.is_income,
+                  }}
+                />
                 {t(preset.key)}
               </button>
             ))}

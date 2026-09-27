@@ -31,8 +31,11 @@ function presetKeys() {
   const source = fs.readFileSync(PRESETS_RS, 'utf8');
   // Only the real declarations: the file's own `#[cfg(test)]` block
   // contains prefix literals like "cat.group." that are assertions, not
-  // keys, and would otherwise be demanded of every catalog.
-  const declarations = source.split('#[cfg(test)]')[0];
+  // keys, and would otherwise be demanded of every catalog. The
+  // `LEGACY_PRESETS` table sits just above it and is cut off too: it names
+  // the retired keys only so old budgets can be migrated off them, and no
+  // catalog should carry a translation for a key nothing displays.
+  const declarations = source.split('#[cfg(test)]')[0].split('pub const LEGACY_PRESETS')[0];
   // Both `preset("cat.groceries", ...)` entries and the group constants
   // `("cat.group.food", "Food")` — every string literal starting `cat.`.
   return [...new Set([...declarations.matchAll(/"(cat\.[A-Za-z.]+)"/g)].map((m) => m[1]))];
@@ -44,7 +47,8 @@ describe('category presets', () => {
     // declared would otherwise make this whole file silently vacuous.
     const keys = presetKeys();
     expect(keys.length).toBeGreaterThan(15);
-    expect(keys).toContain('cat.foodGroceries');
+    expect(keys).toContain('cat.groceries');
+    expect(keys).not.toContain('cat.foodGroceries');
     expect(keys).toContain('cat.group.expense');
   });
 

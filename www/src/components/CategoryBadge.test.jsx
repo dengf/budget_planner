@@ -5,16 +5,16 @@ import CategoryBadge from './CategoryBadge';
 import { categoryIconId } from '../categoryVisuals';
 
 describe('CategoryBadge', () => {
-  it('renders the housing icon for a category created from the housing preset', () => {
+  it('renders the house icon for the Housing & Utilities group', () => {
     const { container } = render(
-      <CategoryBadge category={{ id: 'c1', preset_key: 'cat.housing' }} />,
+      <CategoryBadge category={{ id: 'c1', preset_key: 'cat.housingUtilities' }} />,
     );
     expect(container.querySelector('svg')).toBeInTheDocument();
-    expect(categoryIconId({ preset_key: 'cat.housing' })).toBe('house');
+    expect(categoryIconId({ preset_key: 'cat.housingUtilities' })).toBe('house');
   });
 
-  it('renders the utilities icon for a category created from the utilities preset', () => {
-    expect(categoryIconId({ preset_key: 'cat.utilities' })).toBe('bolt');
+  it('renders the bolt icon for the Utilities subcategory', () => {
+    expect(categoryIconId({ preset_key: 'cat.utilityBills' })).toBe('bolt');
   });
 
   it('falls back to the expense-generic icon for a hand-typed expense category', () => {
@@ -25,12 +25,12 @@ describe('CategoryBadge', () => {
     expect(categoryIconId({ preset_key: undefined, is_income: true })).toBe('income-generic');
   });
 
-  it('renders the repeat icon for a category created from the subscriptions preset', () => {
-    expect(categoryIconId({ preset_key: 'cat.subscriptionsMemberships' })).toBe('repeat');
+  it('renders the repeat icon for the Subscriptions & Streaming subcategory', () => {
+    expect(categoryIconId({ preset_key: 'cat.subscriptionsStreaming' })).toBe('repeat');
   });
 
-  it('renders the gift icon for a category created from the gifts preset', () => {
-    expect(categoryIconId({ preset_key: 'cat.giftsDonations' })).toBe('gift');
+  it('renders the gift icon for the Gifts & Donations subcategory', () => {
+    expect(categoryIconId({ preset_key: 'cat.giftsGiving' })).toBe('gift');
   });
 
   it('renders a badge with a background color even for an undefined category', () => {

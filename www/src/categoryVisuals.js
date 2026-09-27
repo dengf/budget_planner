@@ -79,29 +79,60 @@ const PRESET_KEY_ORDER = [
   'cat.giftsDonations',
 ];
 
+// The CPA's grouped list (2026-09-27) replaced every key above, and
+// `migrate_legacy_categories` relabels a saved category from its old key
+// to its new one in place. A group that took over an old category takes
+// over its color slot too, so nobody's Housing turns a different color
+// the day it becomes Housing & Utilities. The one group with no
+// predecessor, Dining & Social, is appended to PRESET_KEY_ORDER below
+// like any other new preset.
+const INHERITED_SLOT = {
+  'cat.earnedIncome': 'cat.primaryEarnedIncome',
+  'cat.passiveIncome': 'cat.investmentCapitalIncome',
+  'cat.miscIncome': 'cat.otherIncome',
+  'cat.housingUtilities': 'cat.housing',
+  'cat.foodBasics': 'cat.foodGroceries',
+  'cat.transport': 'cat.transportation',
+  'cat.healthInsurance': 'cat.healthcareInsurance',
+  'cat.obligationsSupport': 'cat.debtServicing',
+  'cat.entertainmentLeisure': 'cat.subscriptionsMemberships',
+  'cat.lifestyleShopping': 'cat.personalLifestyle',
+};
+PRESET_KEY_ORDER.push('cat.diningSocial');
+
+// Top-level groups get their own icon. A subcategory shows its group's
+// badge (see `CategoryBadge`), except the few below whose own icon says
+// more than the group's does.
 export const PRESET_ICONS = {
-  'cat.primaryEarnedIncome': 'paycheck',
-  'cat.selfEmploymentBusiness': 'briefcase',
-  'cat.investmentCapitalIncome': 'trending-up',
-  'cat.governmentSupplemental': 'building',
-  'cat.otherIncome': 'coin',
-  'cat.housing': 'house',
-  'cat.utilities': 'bolt',
-  'cat.foodGroceries': 'basket',
-  'cat.transportation': 'car',
-  'cat.healthcareInsurance': 'heart',
-  'cat.debtServicing': 'card',
-  'cat.personalLifestyle': 'sparkle',
-  'cat.familyDependents': 'people',
-  'cat.otherExpenses': 'tag',
-  'cat.subscriptionsMemberships': 'repeat',
-  'cat.giftsDonations': 'gift',
+  'cat.earnedIncome': 'paycheck',
+  'cat.passiveIncome': 'trending-up',
+  'cat.miscIncome': 'coin',
+  'cat.housingUtilities': 'house',
+  'cat.transport': 'car',
+  'cat.foodBasics': 'basket',
+  'cat.healthInsurance': 'heart',
+  'cat.obligationsSupport': 'card',
+  'cat.diningSocial': 'cup',
+  'cat.entertainmentLeisure': 'sparkle',
+  'cat.lifestyleShopping': 'tag',
+  'cat.freelanceSideGig': 'briefcase',
+  'cat.governmentBenefits': 'building',
+  'cat.giftsReimbursements': 'gift',
+  'cat.utilityBills': 'bolt',
+  'cat.dependentCare': 'people',
+  'cat.subscriptionsStreaming': 'repeat',
+  'cat.giftsGiving': 'gift',
 };
 
-/** Which icon id (a key into CategoryIcons.jsx's lookup map) a category's badge shows. */
-export function categoryIconId(category) {
+/**
+ * Which icon id (a key into CategoryIcons.jsx's lookup map) a category's
+ * badge shows. `parent` is the category's group, for a subcategory -- a
+ * saved record, or `{ preset_key }` for a preset not yet added.
+ */
+export function categoryIconId(category, parent = null) {
   return (
     PRESET_ICONS[category?.preset_key] ??
+    PRESET_ICONS[parent?.preset_key] ??
     (category?.is_income ? 'income-generic' : 'expense-generic')
   );
 }
@@ -119,9 +150,16 @@ function hashString(value) {
   return Math.abs(hash);
 }
 
-/** Which color from CATEGORY_PALETTE a category's badge (and its pie wedge) uses. */
-export function categoryColor(category) {
-  const presetIndex = PRESET_KEY_ORDER.indexOf(category?.preset_key);
-  const index = presetIndex >= 0 ? presetIndex : hashString(category?.id ?? '');
+/**
+ * Which color from CATEGORY_PALETTE a category's badge (and its pie
+ * wedge) uses. A subcategory wears its group's color -- pass the group as
+ * `parent` -- so a group and everything filed under it read as one thing
+ * in a list.
+ */
+export function categoryColor(category, parent = null) {
+  const owner = parent ?? category;
+  const key = owner?.preset_key;
+  const presetIndex = PRESET_KEY_ORDER.indexOf(INHERITED_SLOT[key] ?? key);
+  const index = presetIndex >= 0 ? presetIndex : hashString(owner?.id ?? '');
   return CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
 }

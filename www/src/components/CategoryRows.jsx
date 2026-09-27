@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../i18n';
 import BatchRows from './BatchRows';
+import SubcategoryOfSelect from './SubcategoryOfSelect';
 
 /**
  * The new-category form as a list of rows, for a screen wide enough to
@@ -15,12 +16,12 @@ import BatchRows from './BatchRows';
  * down eight rows it is a column of unlabelled boxes -- and it only ever
  * names one of the two things a row can be. The select says both.
  *
- * Group is optional and shows its fallback as a placeholder rather than
- * leaving the default unsaid: an empty group is filed under
- * "Income"/"Expense", and someone scanning eight rows should be able to
- * see that without saving one to find out.
+ * "Subcategory of" is optional: left at its default, the row is a
+ * category of its own. Choosing a group files the row under it, and the
+ * direction select then shows -- and is locked to -- the group's own
+ * side of the ledger, because a subcategory can't be on the other one.
  */
-export default function CategoryRows({ rows, onRowChange, onAddRow, onRemoveRow }) {
+export default function CategoryRows({ groups = [], rows, onRowChange, onAddRow, onRemoveRow }) {
   const { t } = useI18n();
 
   // The column headers are visual, so every control names its own row
@@ -30,47 +31,47 @@ export default function CategoryRows({ rows, onRowChange, onAddRow, onRemoveRow 
   return (
     <BatchRows
       className="category-rows"
-      headers={[t('budget.categoryName'), t('transactions.entryType'), t('budget.categoryGroup')]}
+      headers={[t('budget.categoryName'), t('transactions.entryType'), t('category.subcategoryOf')]}
       rows={rows}
       onAddRow={onAddRow}
       onRemoveRow={onRemoveRow}
       firstFieldSelector="input[data-row-name]"
     >
-      {(row, i) => (
-        <>
-          <div className="field-input">
-            <input
-              type="text"
-              data-row-name=""
-              aria-label={rowLabel(t('budget.categoryName'), i)}
-              value={row.name}
-              onChange={(e) => onRowChange(row.key, { name: e.target.value })}
-            />
-          </div>
+      {(row, i) => {
+        const parent = row.parentId ? groups.find((g) => g.id === row.parentId) : null;
+        const isIncome = parent ? Boolean(parent.is_income) : row.isIncome;
+        return (
+          <>
+            <div className="field-input">
+              <input
+                type="text"
+                data-row-name=""
+                aria-label={rowLabel(t('budget.categoryName'), i)}
+                value={row.name}
+                onChange={(e) => onRowChange(row.key, { name: e.target.value })}
+              />
+            </div>
 
-          <select
-            className="field-select"
-            aria-label={rowLabel(t('transactions.entryType'), i)}
-            value={row.isIncome ? 'income' : 'expense'}
-            onChange={(e) => onRowChange(row.key, { isIncome: e.target.value === 'income' })}
-          >
-            <option value="expense">{t('transactions.expense')}</option>
-            <option value="income">{t('transactions.income')}</option>
-          </select>
+            <select
+              className="field-select"
+              aria-label={rowLabel(t('transactions.entryType'), i)}
+              value={isIncome ? 'income' : 'expense'}
+              disabled={Boolean(parent)}
+              onChange={(e) => onRowChange(row.key, { isIncome: e.target.value === 'income' })}
+            >
+              <option value="expense">{t('transactions.expense')}</option>
+              <option value="income">{t('transactions.income')}</option>
+            </select>
 
-          <div className="field-input">
-            <input
-              type="text"
-              aria-label={rowLabel(t('budget.categoryGroup'), i)}
-              // The group this row lands in if it is left alone -- the
-              // same fallback `CategoriesScreen` saves, said out loud.
-              placeholder={t(row.isIncome ? 'cat.group.income' : 'cat.group.expense')}
-              value={row.group}
-              onChange={(e) => onRowChange(row.key, { group: e.target.value })}
+            <SubcategoryOfSelect
+              groups={groups}
+              ariaLabel={rowLabel(t('category.subcategoryOf'), i)}
+              value={row.parentId ?? ''}
+              onChange={(parentId) => onRowChange(row.key, { parentId })}
             />
-          </div>
-        </>
-      )}
+          </>
+        );
+      }}
     </BatchRows>
   );
 }

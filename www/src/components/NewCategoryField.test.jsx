@@ -14,7 +14,7 @@ import NewCategoryField from './NewCategoryField';
  * reimplementation of the matching rule. A mock that re-derives the rule
  * can only ever agree with itself; this asserts the wiring.
  */
-function renderField({ outcome, categoryId, isIncome = false, presets = [] } = {}) {
+function renderField({ outcome, categoryId, isIncome = false, presets = [], parentId } = {}) {
   const create = vi.fn(async () => ({ outcome, categoryId }));
   const onCreated = vi.fn();
   render(
@@ -24,6 +24,7 @@ function renderField({ outcome, categoryId, isIncome = false, presets = [] } = {
         create={create}
         onCreated={onCreated}
         presets={presets}
+        parentId={parentId}
       />
     </I18nProvider>,
   );
@@ -54,14 +55,14 @@ describe('NewCategoryField', () => {
     type('Vet bills');
     fireEvent.click(screen.getByRole('button', { name: 'Create “Vet bills”' }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c9'));
-    expect(create).toHaveBeenCalledWith('Vet bills', false);
+    expect(create).toHaveBeenCalledWith('Vet bills', false, null);
   });
 
   it('passes the income side through, so the section it sits under decides', async () => {
     const { create } = renderField({ outcome: 'create', categoryId: 'c9', isIncome: true });
     type('Dividends');
     fireEvent.click(screen.getByRole('button', { name: 'Create “Dividends”' }));
-    await waitFor(() => expect(create).toHaveBeenCalledWith('Dividends', true));
+    await waitFor(() => expect(create).toHaveBeenCalledWith('Dividends', true, null));
   });
 
   it('selects an existing category instead of announcing a new one', async () => {
@@ -99,6 +100,13 @@ describe('NewCategoryField', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('files the new category under the group it was opened from', async () => {
+    const { create } = renderField({ outcome: 'create', categoryId: 'c9', parentId: 'food' });
+    type('Farmers market');
+    fireEvent.click(screen.getByRole('button', { name: 'Create “Farmers market”' }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith('Farmers market', false, 'food'));
+  });
+
   it('submits on Enter, since the field has no form of its own to submit', async () => {
     const { onCreated } = renderField({ outcome: 'create', categoryId: 'c9' });
     type('Vet bills');
@@ -109,7 +117,7 @@ describe('NewCategoryField', () => {
 
 describe('NewCategoryField preset chips', () => {
   const PRESET = {
-    key: 'cat.subscriptionsMemberships',
+    key: 'cat.subscriptionsStreaming',
     group_key: 'cat.group.expense',
     is_income: false,
   };
@@ -121,7 +129,7 @@ describe('NewCategoryField preset chips', () => {
 
   it('shows an unused preset as a tappable chip, translated', () => {
     renderField({ outcome: 'preset', categoryId: 'c9', presets: [PRESET] });
-    expect(screen.getByRole('button', { name: 'Subscriptions & Memberships' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Subscriptions & Streaming' })).toBeInTheDocument();
   });
 
   // A tap goes through the exact same `create` call a typed name would --
@@ -133,15 +141,15 @@ describe('NewCategoryField preset chips', () => {
       categoryId: 'c9',
       presets: [PRESET],
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Subscriptions & Memberships' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subscriptions & Streaming' }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c9'));
-    expect(create).toHaveBeenCalledWith('Subscriptions & Memberships', false);
+    expect(create).toHaveBeenCalledWith('Subscriptions & Streaming', false, null);
   });
 
   it('leaves the typed field empty after a preset tap', async () => {
     const { onCreated } = renderField({ outcome: 'preset', categoryId: 'c9', presets: [PRESET] });
     type('Half-typed name');
-    fireEvent.click(screen.getByRole('button', { name: 'Subscriptions & Memberships' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subscriptions & Streaming' }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c9'));
     // The tap created the preset, not whatever was sitting in the input --
     // leaving stale text behind would misname the next thing typed there.

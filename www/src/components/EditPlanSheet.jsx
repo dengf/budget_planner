@@ -20,6 +20,15 @@ import NumberField from './NumberField';
  * used to be BudgetTab's standalone "Upcoming this month" `<details>` --
  * contextual to the one category being edited instead of a second global
  * list to scroll past.
+ *
+ * `subcategories` is optional too: for a group, each of its subcategories
+ * with what it has spent and its own plan, if it has one. Planning a
+ * subcategory is optional -- most people plan the group and let the
+ * subcategories only sort where the money went -- so each has its own
+ * field, saved with the group's by the one Save button. Once any
+ * subcategory carries a plan, the main field is the group's plan for
+ * everything else, and `plannedTotal` (Rust's rolled-up figure) shows
+ * what the two add up to; nothing here adds them itself.
  */
 export default function EditPlanSheet({
   open,
@@ -34,9 +43,13 @@ export default function EditPlanSheet({
   upcoming,
   formatMoney,
   onSave,
+  subcategories = [],
+  plannedTotal,
+  onSaveSub,
 }) {
   const { t } = useI18n();
   const [amount, setAmount] = useState(planned);
+  const [subAmounts, setSubAmounts] = useState({});
 
   // Re-seeds every time a different row's sheet opens -- the sheet stays
   // mounted (App.jsx's usual lazy-but-persistent pattern) so the draft
@@ -44,12 +57,22 @@ export default function EditPlanSheet({
   useEffect(() => {
     if (open) setAmount(planned);
   }, [open, planned]);
+  useEffect(() => {
+    if (open) setSubAmounts({});
+  }, [open, title]);
 
   if (!open) return null;
+
+  const splitBySub = subcategories.some((s) => s.planned > 0);
 
   const submit = (e) => {
     e.preventDefault();
     onSave(amount === '' ? 0 : amount);
+    for (const [id, value] of Object.entries(subAmounts)) {
+      const before = subcategories.find((s) => s.id === id)?.planned ?? 0;
+      const after = value === '' || value == null ? 0 : Number(value);
+      if (after !== before) onSaveSub?.(id, after);
+    }
     onClose();
   };
 
@@ -98,7 +121,61 @@ export default function EditPlanSheet({
           </div>
 
           <form className="form-grid" onSubmit={submit}>
-            <NumberField label={t('budget.planned')} value={amount} onChange={setAmount} grouped />
+            {splitBySub && (
+              <div className="edit-plan-stat">
+                <span className="cell-label">{t('budget.plannedTotal')}</span>
+                <span className="num">{formatMoney(plannedTotal)}</span>
+              </div>
+            )}
+            <NumberField
+              label={splitBySub ? t('budget.plannedRest', { name: title }) : t('budget.planned')}
+              value={amount}
+              onChange={setAmount}
+              grouped
+            />
+            {subcategories.length > 0 && (
+              <fieldset className="edit-plan-subs">
+                <legend className="cell-label">{t('budget.subcategories')}</legend>
+                <p className="field-label">{t('budget.subPlanHint', { name: title })}</p>
+                {subcategories.map((sub) => (
+                  <div className="edit-plan-sub" key={sub.id}>
+                    <span className="edit-plan-sub-name">
+                      {sub.name}
+                      <span className="edit-plan-sub-spent">
+                        {spentLabel}: {formatMoney(sub.spent)}
+                      </span>
+                    </span>
+                    {sub.upcoming > 0 && (
+                      <button
+                        type="button"
+                        className="btn secondary edit-plan-sub-upcoming"
+                        onClick={() =>
+                          setSubAmounts((prev) => {
+                            const current = prev[sub.id] ?? sub.planned;
+                            const base = current === '' || current == null ? 0 : Number(current);
+                            return { ...prev, [sub.id]: base + sub.upcoming };
+                          })
+                        }
+                      >
+                        {t('recurring.addToPlanned')} {formatMoney(sub.upcoming)}
+                      </button>
+                    )}
+                    <input
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      className="edit-plan-sub-input"
+                      aria-label={`${t('budget.planned')} — ${sub.name}`}
+                      placeholder="0"
+                      value={subAmounts[sub.id] ?? (sub.planned > 0 ? sub.planned : '')}
+                      onChange={(e) =>
+                        setSubAmounts((prev) => ({ ...prev, [sub.id]: e.target.value }))
+                      }
+                    />
+                  </div>
+                ))}
+              </fieldset>
+            )}
             <button className="btn" type="submit">
               {t('budget.save')}
             </button>

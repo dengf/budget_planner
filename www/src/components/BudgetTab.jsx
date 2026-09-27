@@ -14,6 +14,7 @@ import {
   categoryDisplayDescription,
   categoryDisplayGroup,
   categoryDisplayName,
+  categoryTree,
 } from '../presetCategories';
 import { categoryColor } from '../categoryVisuals';
 import { useMonthBudget } from '../useMonthBudget';
@@ -130,6 +131,8 @@ export default function BudgetTab({
   // at desktop width. Nothing else on this tab branches on width.
   const isDesktop = useIsDesktop();
   const [editingId, setEditingId] = useState(null);
+  // Desktop only: which groups have their subcategory rows open.
+  const [expanded, setExpanded] = useState(() => new Set());
   // Which section's "add a category" field is open: 'income', 'expense',
   // or null. One at a time -- two open name fields on a 375px column is
   // two things to finish where there was one thing to do.
@@ -179,7 +182,25 @@ export default function BudgetTab({
     return c ? categoryDisplayName(c, t) : id;
   };
   const categoryGroup = (id) => categoryDisplayGroup(categoryFor(id), t);
-  const categoryDescription = (id) => categoryDisplayDescription(categoryFor(id), t);
+  const categoryDescription = (id) =>
+    categoryDisplayDescription(categoryFor(id), t, categories.items);
+  const tree = categoryTree(categories.items);
+  // The group's own plan entry -- what its field edits. `line.planned` is
+  // Rust's total, which also counts any subcategory planned on its own.
+  const ownPlanned = (id) => budgetPlan.items.find((p) => p.category_id === id)?.planned ?? 0;
+  /** A group's subcategories with their own figures, for its breakdown. */
+  const subRowsFor = (id) =>
+    tree.childrenOf(id).map((c) => {
+      const line = result?.sub_lines?.find((l) => l.category_id === c.id);
+      return {
+        id: c.id,
+        name: categoryDisplayName(c, t),
+        spent: line?.spent ?? 0,
+        planned: line?.planned ?? 0,
+        upcoming:
+          upcoming?.totals_by_category?.find((tot) => tot.category_id === c.id)?.amount ?? 0,
+      };
+    });
 
   /**
    * Grouped for display, alphabetically within each group.
@@ -313,32 +334,78 @@ export default function BudgetTab({
     // nesting), so this is a plain row instead of the phone version's
     // single tap target.
     if (isDesktop) {
+      const subs = subRowsFor(line.category_id);
+      const splitBySub = subs.some((sub) => sub.planned > 0);
+      const isOpen = expanded.has(line.category_id);
+      const toggle = () =>
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          if (next.has(line.category_id)) next.delete(line.category_id);
+          else next.add(line.category_id);
+          return next;
+        });
       return (
-        <div
-          key={line.category_id}
-          className={`budget-row budget-row-desktop${dimmed ? ' category-row-dim' : ''}`}
-        >
-          <CategoryBadge category={categoryFor(line.category_id)} />
-          <span className="budget-row-body">
-            <span className="budget-row-top">
-              <span className="budget-row-name">{categoryName(line.category_id)}</span>
-              <span className={`budget-row-pill ${remaining.className}`}>{remaining.text}</span>
-            </span>
-            {track}
-            <span className="budget-row-sub budget-row-sub-desktop">
-              <span>
-                {t(incomeRow ? 'budget.received' : 'budget.spent')}: {formatMoney(line.spent)}
+        <div key={line.category_id} className="budget-row-group">
+          <div className={`budget-row budget-row-desktop${dimmed ? ' category-row-dim' : ''}`}>
+            <CategoryBadge category={categoryFor(line.category_id)} />
+            <span className="budget-row-body">
+              <span className="budget-row-top">
+                <span className="budget-row-name">{categoryName(line.category_id)}</span>
+                <span className={`budget-row-pill ${remaining.className}`}>{remaining.text}</span>
               </span>
-              <label className="budget-row-planned-label">
-                {t('budget.planned')}
-                <PlannedInlineInput
-                  value={line.planned}
-                  onSave={(amount) => savePlanned(line.category_id, amount)}
-                  ariaLabel={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
-                />
-              </label>
+              {track}
+              <span className="budget-row-sub budget-row-sub-desktop">
+                <span>
+                  {t(incomeRow ? 'budget.received' : 'budget.spent')}: {formatMoney(line.spent)}
+                </span>
+                {splitBySub && (
+                  <span>
+                    {t('budget.plannedTotal')}: {formatMoney(line.planned)}
+                  </span>
+                )}
+                <label className="budget-row-planned-label">
+                  {splitBySub
+                    ? t('budget.plannedRest', { name: categoryName(line.category_id) })
+                    : t('budget.planned')}
+                  <PlannedInlineInput
+                    value={ownPlanned(line.category_id)}
+                    onSave={(amount) => savePlanned(line.category_id, amount)}
+                    ariaLabel={`${t('budget.planned')} — ${categoryName(line.category_id)}`}
+                  />
+                </label>
+                {subs.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn ghost budget-row-subs-toggle"
+                    aria-expanded={isOpen}
+                    onClick={toggle}
+                  >
+                    {t('category.subCount', { count: subs.length })}
+                  </button>
+                )}
+              </span>
             </span>
-          </span>
+          </div>
+          {isOpen && (
+            <div className="budget-sub-rows">
+              {subs.map((sub) => (
+                <div className="budget-sub-row" key={sub.id}>
+                  <span className="budget-sub-name">{sub.name}</span>
+                  <span className="budget-sub-spent">
+                    {t(incomeRow ? 'budget.received' : 'budget.spent')}: {formatMoney(sub.spent)}
+                  </span>
+                  <label className="budget-row-planned-label">
+                    {t('budget.planned')}
+                    <PlannedInlineInput
+                      value={sub.planned}
+                      onSave={(amount) => savePlanned(sub.id, amount)}
+                      ariaLabel={`${t('budget.planned')} — ${sub.name}`}
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
@@ -605,7 +672,10 @@ export default function BudgetTab({
               ? ` · ${categoryDescription(editingLine.category_id)}`
               : '')
           }
-          planned={editingLine.planned}
+          planned={ownPlanned(editingLine.category_id)}
+          plannedTotal={editingLine.planned}
+          subcategories={subRowsFor(editingLine.category_id)}
+          onSaveSub={savePlanned}
           spentLabel={t(isIncome(editingLine.category_id) ? 'budget.received' : 'budget.spent')}
           spent={editingLine.spent}
           remaining={remainingCell(editingLine)}

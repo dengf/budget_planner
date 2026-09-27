@@ -5,17 +5,17 @@ import { I18nProvider } from '../i18n';
 import CategoryChipPicker from './CategoryChipPicker';
 
 const HOUSING = {
-  key: 'cat.housing',
+  key: 'cat.housingUtilities',
   group_key: 'cat.group.expense',
   is_income: false,
-  description_key: 'cat.housing.desc',
+  parent_key: null,
 };
 
 const SALARY = {
-  key: 'cat.primaryEarnedIncome',
+  key: 'cat.earnedIncome',
   group_key: 'cat.group.income',
   is_income: true,
-  description_key: 'cat.primaryEarnedIncome.desc',
+  parent_key: null,
 };
 
 function renderPicker(props) {
@@ -54,7 +54,7 @@ describe('CategoryChipPicker', () => {
     const groups = screen.getAllByText(/^(Income|Expense)$/);
     expect(groups.map((el) => el.textContent)).toEqual(['Income', 'Expense']);
     expect(screen.getByRole('button', { name: /Housing/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Primary Earned Income/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Primary & Earned Income/i })).toBeInTheDocument();
   });
 
   it('omits a group label entirely when it has no presets to show', () => {

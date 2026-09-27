@@ -287,9 +287,9 @@ describe('BudgetTab category creation', () => {
   // text nobody could see. This is the gap PR #96 shipped with.
   describe('offering the starter presets nobody has added yet', () => {
     const PRESET = {
-      key: 'cat.subscriptionsMemberships',
+      key: 'cat.diningSocial',
       group_key: 'cat.group.expense',
-      description_key: 'cat.subscriptionsMemberships.desc',
+      parent_key: null,
       is_income: false,
     };
 
@@ -300,9 +300,7 @@ describe('BudgetTab category creation', () => {
     it('shows an unadded preset as a chip once the expense field opens', async () => {
       mountWithStore([], withPreset());
       fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
-      expect(
-        await screen.findByRole('button', { name: 'Subscriptions & Memberships' }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Dining & Social' })).toBeInTheDocument();
     });
 
     // The bug this was caught on: opening this field used to steal the
@@ -322,40 +320,34 @@ describe('BudgetTab category creation', () => {
       mountWithStore([], withPreset());
       fireEvent.click(await screen.findByRole('button', { name: '+ Add an income category' }));
       await screen.findByLabelText('Category name');
-      expect(
-        screen.queryByRole('button', { name: 'Subscriptions & Memberships' }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Dining & Social' })).not.toBeInTheDocument();
     });
 
     it('adds the furnished preset on a tap, and gives it a row, with nothing typed', async () => {
       const saved = mountWithStore([], withPreset());
       fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
-      fireEvent.click(await screen.findByRole('button', { name: 'Subscriptions & Memberships' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Dining & Social' }));
 
       await vi.waitFor(() =>
         expect(saved).toContainEqual(
           expect.objectContaining({
-            name: 'Subscriptions & Memberships',
+            name: 'Dining & Social',
             is_income: false,
-            preset_key: 'cat.subscriptionsMemberships',
+            preset_key: 'cat.diningSocial',
           }),
         ),
       );
-      expect(
-        await screen.findByRole('button', { name: /Subscriptions & Memberships/ }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /Dining & Social/ })).toBeInTheDocument();
     });
 
     it('stops offering a preset once it has been added', async () => {
       mountWithStore(
-        [{ id: 'subs', name: 'Subscriptions & Memberships', group: 'Expense', is_income: false }],
+        [{ id: 'subs', name: 'Dining & Social', group: 'Expense', is_income: false }],
         withPreset(),
       );
       fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
       await screen.findByLabelText('Category name');
-      expect(
-        screen.queryByRole('button', { name: 'Subscriptions & Memberships' }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Dining & Social' })).not.toBeInTheDocument();
     });
   });
 });
