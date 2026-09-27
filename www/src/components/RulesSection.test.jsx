@@ -7,7 +7,7 @@ import RulesSection from './RulesSection';
 const CATEGORY = { id: 'food', name: 'Food' };
 const OTHER = { id: 'transport', name: 'Transport' };
 
-function renderRules({ save = vi.fn() } = {}) {
+function renderRules({ save = vi.fn(), categories = [CATEGORY, OTHER] } = {}) {
   let seq = 0;
   const rules = { items: [], save, remove: vi.fn() };
   render(
@@ -16,7 +16,7 @@ function renderRules({ save = vi.fn() } = {}) {
         wasmModule={{}}
         newId={() => `rule-${(seq += 1)}`}
         confirm={vi.fn()}
-        categories={{ items: [CATEGORY, OTHER] }}
+        categories={{ items: categories }}
         transactions={{ items: [], save: vi.fn() }}
         rules={rules}
       />
@@ -45,6 +45,21 @@ function fillRow(n, { keyword: kw, category: cat }) {
 describe('RulesSection desktop rows', () => {
   afterEach(() => {
     delete window.matchMedia;
+  });
+
+  it('offers a subcategory under its group and saves several keywords as one rule', async () => {
+    mockDesktop();
+    const snacks = { id: 'snacks', name: 'Snacks', parent_id: 'food' };
+    const { rules } = renderRules({ categories: [CATEGORY, OTHER, snacks] });
+    const group = category(1).querySelector('optgroup[label="Food"]');
+    expect([...group.querySelectorAll('option')].map((o) => o.value)).toEqual(['food', 'snacks']);
+    fillRow(1, { keyword: 'costco, walmart', category: 'snacks' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    await waitFor(() =>
+      expect(rules.save).toHaveBeenCalledWith(
+        expect.objectContaining({ keyword: 'costco, walmart', category_id: 'snacks' }),
+      ),
+    );
   });
 
   it('saves every finished row in one submit', async () => {

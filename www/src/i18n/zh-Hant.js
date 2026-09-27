@@ -273,8 +273,10 @@ export default {
   'transactions.skippedCount': '跳過了 {count} 列',
   'transactions.datesReadAs': '日期按 {format} 讀取——值得抽查一兩列。',
   'transactions.rulesTitle': '分類規則',
-  'transactions.rulesHint': '簡單的關鍵字比對，你可以查看與編輯——絕不是猜測你資料的黑箱模型。',
+  'transactions.rulesHint':
+    '簡單的關鍵字比對，你可以查看與編輯——絕不是猜測你資料的黑箱模型。多個關鍵字用逗號分隔，符合任一個即可。',
   'transactions.ruleKeyword': '關鍵字',
+  'transactions.ruleKeywordPlaceholder': '例如：全聯，家樂福',
   'transactions.rulePriority': '優先順序',
   'transactions.addRule': '新增規則',
   'transactions.addRuleCount': '新增 {count} 條規則',

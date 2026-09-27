@@ -1513,6 +1513,15 @@ table.data tr:last-child td {
     padding: 7px 8px;
     white-space: nowrap;
   }
+  /* The exception: a rule's keyword list ("costco, walmart, target")
+     and a subcategory's "Group › Sub" name are the two cells that grow
+     with the data, and on one line they pushed Remove a long swipe
+     away. They wrap instead, from a floor that still reads as words. */
+  table.data td.wrap-cell {
+    white-space: normal;
+    min-width: 7rem;
+    overflow-wrap: anywhere;
+  }
   /* Same underlying issue as `.category-manage-row .btn.ghost`'s fix
      above: `.btn.ghost` deliberately opts out of `.btn`'s 44px floor for
      dense desktop rows, but a plain `<table class="data">` (Debt's debt

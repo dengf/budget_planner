@@ -304,8 +304,9 @@ export default {
   'transactions.datesReadAs': 'Dates read as {format} — worth checking a row or two.',
   'transactions.rulesTitle': 'Categorization rules',
   'transactions.rulesHint':
-    'A plain keyword match you can read and edit — never a hidden model guessing on your data.',
+    'A plain keyword match you can read and edit — never a hidden model guessing on your data. Separate several keywords with commas; any one of them matches.',
   'transactions.ruleKeyword': 'Keyword',
+  'transactions.ruleKeywordPlaceholder': 'e.g. costco, walmart',
   'transactions.rulePriority': 'Priority',
   'transactions.addRule': 'Add rule',
   // The desktop rules form saves a batch of rows at once, so the button

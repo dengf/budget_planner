@@ -273,8 +273,10 @@ export default {
   'transactions.skippedCount': '跳过了 {count} 行',
   'transactions.datesReadAs': '日期按 {format} 读取——值得抽查一两行。',
   'transactions.rulesTitle': '分类规则',
-  'transactions.rulesHint': '简单的关键词匹配，你可以查看和编辑——绝不是猜测你数据的黑箱模型。',
+  'transactions.rulesHint':
+    '简单的关键词匹配，你可以查看和编辑——绝不是猜测你数据的黑箱模型。多个关键词用逗号分隔，符合任一个即可。',
   'transactions.ruleKeyword': '关键词',
+  'transactions.ruleKeywordPlaceholder': '例如：全家，7-11',
   'transactions.rulePriority': '优先级',
   'transactions.addRule': '添加规则',
   'transactions.addRuleCount': '添加 {count} 条规则',
