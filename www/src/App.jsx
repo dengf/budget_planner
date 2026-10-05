@@ -17,8 +17,10 @@ import {
   buildCategoryFromPreset,
   categoryDisplayName,
   categoryTree,
+  markSubcategoriesFilled,
   presetsToAdd,
   savePresets,
+  subcategoriesFilled,
 } from './presetCategories';
 import { CategoriesContext } from './categoryContext';
 import { TABS, TAB_ORDER } from './tabs';
@@ -379,6 +381,10 @@ export function AppShell({ wasmModule }) {
    */
   const migratingRef = useRef(false);
   const migrationCheckedRef = useRef(null);
+  // Fill in each preset group's missing subcategories after the next
+  // settled migration check: once for a budget migrated before the fill
+  // existed, and again after any run that moved something.
+  const fillSubcategoriesRef = useRef(!subcategoriesFilled());
   // Bumped when a migration run re-parents something, or finishes while
   // the plan fold below was waiting on it -- see `settle` below.
   const [migrationRuns, setMigrationRuns] = useState(0);
@@ -396,8 +402,22 @@ export function AppShell({ wasmModule }) {
         const result = await wasmModule.migrate_legacy_categories({
           categories: categories.items,
         });
-        const steps = result?.steps ?? [];
-        if (steps.length > 0) settleWaitingRef.current = true;
+        let steps = result?.steps ?? [];
+        if (steps.length > 0) {
+          settleWaitingRef.current = true;
+          // Whatever it moves, the save re-renders and this runs again --
+          // the fill below waits for that settled list.
+          fillSubcategoriesRef.current = true;
+        } else if (fillSubcategoriesRef.current && wasmModule.missing_subcategories) {
+          // Done once on any list the migration has finished with: the
+          // move leaves groups with only the subcategories the old list
+          // happened to have. Not on every load -- one the reader
+          // deletes afterwards must stay deleted.
+          fillSubcategoriesRef.current = false;
+          markSubcategoriesFilled();
+          steps =
+            (await wasmModule.missing_subcategories({ categories: categories.items }))?.steps ?? [];
+        }
         if (steps.length === 0) return;
         const presets = (await wasmModule.preset_categories()) ?? [];
         const presetFor = (key) => presets.find((p) => p.key === key);
@@ -412,7 +432,7 @@ export function AppShell({ wasmModule }) {
               is_income: preset.is_income,
               description: '',
               preset_key: preset.key,
-              parent_id: null,
+              parent_id: step.parent_id ?? null,
             });
             continue;
           }

@@ -129,6 +129,18 @@ export async function savePresets(presets, existingCategories, save, translate, 
   const groupIds = new Map(
     existingCategories.filter((c) => c.preset_key && !c.parent_id).map((c) => [c.preset_key, c.id]),
   );
+  // A hand-typed group that reads as a preset's is that preset as far as
+  // `availablePresets` is concerned, so it is never offered again -- its
+  // subcategories belong under it, not loose at the top level.
+  for (const preset of presets) {
+    const key = preset.parent_key;
+    if (!key || groupIds.has(key)) continue;
+    const name = translate(key).trim().toLowerCase();
+    const typed = existingCategories.find(
+      (c) => !c.parent_id && c.name.trim().toLowerCase() === name,
+    );
+    if (typed) groupIds.set(key, typed.id);
+  }
   const saved = [];
   for (const preset of presets) {
     const parentId = preset.parent_key ? (groupIds.get(preset.parent_key) ?? null) : null;
@@ -233,4 +245,29 @@ export function makeCategoryLookup(categories, t) {
       return category ? categoryDisplayName(category, t) : t('transactions.uncategorized');
     },
   };
+}
+
+const SUBCATEGORIES_FILLED_KEY = 'bp:subcategoriesFilled';
+
+/**
+ * Whether this budget has had its preset groups' missing subcategories
+ * filled in once (`budget_calc::missing_subcategories`). A budget moved
+ * off the old flat list before the fill existed has groups holding only
+ * what the old list had; this lets the fill reach it exactly once, so a
+ * subcategory the reader deletes afterwards isn't brought back.
+ */
+export function subcategoriesFilled() {
+  try {
+    return localStorage.getItem(SUBCATEGORIES_FILLED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markSubcategoriesFilled() {
+  try {
+    localStorage.setItem(SUBCATEGORIES_FILLED_KEY, '1');
+  } catch {
+    // Runs again next load; it only ever adds what is still missing.
+  }
 }

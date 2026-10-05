@@ -353,14 +353,21 @@ pub enum CategoryMigration {
         preset_key: Option<String>,
         parent_id: Option<String>,
     },
-    /// Create the top-level group an old category is moving under, because
-    /// nothing the budget already has became it.
-    Create { id: String, preset_key: String },
+    /// Create the preset category `preset_key` at `id`: the top-level group
+    /// an old category is moving under, because nothing the budget already
+    /// has became it (`parent_id` is `None`), or a subcategory a group in
+    /// the budget is missing (see `missing_subcategories`).
+    Create {
+        id: String,
+        preset_key: String,
+        parent_id: Option<String>,
+    },
 }
 
-/// The id a group created by the migration gets. Fixed rather than
-/// random so that running the migration twice over a half-saved result
-/// finds the group it already made instead of adding a second.
+/// The id a category created by the migration (or by
+/// `missing_subcategories`) gets. Fixed rather than random so that running
+/// either twice over a half-saved result finds what it already made
+/// instead of adding a second.
 fn migrated_group_id(preset_key: &str) -> String {
     format!("migrated-{preset_key}")
 }
@@ -425,6 +432,7 @@ pub fn migrate_legacy_categories(categories: &[CategoryNode]) -> Vec<CategoryMig
                 steps.push(CategoryMigration::Create {
                     id: id.clone(),
                     preset_key: group_key.to_string(),
+                    parent_id: None,
                 });
             }
             id
@@ -438,6 +446,53 @@ pub fn migrate_legacy_categories(categories: &[CategoryNode]) -> Vec<CategoryMig
     // Creates first, so a caller saving these in order never has a
     // subcategory briefly pointing at a group that isn't there yet.
     steps.sort_by_key(|s| !matches!(s, CategoryMigration::Create { .. }));
+    steps
+}
+
+/// The preset subcategories missing under each preset group the budget
+/// has, as `Create` steps filed under that group -- in catalogue order.
+///
+/// A group in the budget comes with its whole list of subcategories: the
+/// CPA's detail is the point of the list, and a group with half of it is
+/// a gap nobody chose. Adding a preset already brings them
+/// (`presetsToAdd` on the web side); this is for the groups that got in
+/// some other way -- the move off the old flat list relabels "Housing"
+/// into Housing & Utilities with only the old "Utilities" under it.
+///
+/// A subcategory counts as present by `preset_key` anywhere in the
+/// budget, under any parent: one the reader moved elsewhere is still
+/// theirs, not missing. Ids are fixed (`migrated_group_id`'s rule), so a
+/// second run over a half-saved result finds what the first one made.
+pub fn missing_subcategories(categories: &[CategoryNode]) -> Vec<CategoryMigration> {
+    let mut present: HashSet<&str> = categories
+        .iter()
+        .filter_map(|c| c.preset_key.as_deref())
+        .collect();
+    let mut steps = Vec::new();
+    for group in categories.iter().filter(|c| c.parent_id.is_none()) {
+        let Some(key) = group.preset_key.as_deref() else {
+            continue;
+        };
+        let Some(preset) = crate::presets::preset_by_key(key).filter(|p| p.parent_key.is_none())
+        else {
+            continue;
+        };
+        for sub in crate::presets::starter_categories()
+            .into_iter()
+            .filter(|p| p.parent_key == Some(preset.key))
+        {
+            // `insert` is false for one already there -- or already made
+            // by this call, for a budget holding the same group twice.
+            if !present.insert(sub.key) {
+                continue;
+            }
+            steps.push(CategoryMigration::Create {
+                id: migrated_group_id(sub.key),
+                preset_key: sub.key.to_string(),
+                parent_id: Some(group.id.clone()),
+            });
+        }
+    }
     steps
 }
 
@@ -3209,6 +3264,7 @@ mod tests {
                 CategoryMigration::Create {
                     id: group.to_string(),
                     preset_key: "cat.obligationsSupport".to_string(),
+                    parent_id: None,
                 },
                 relabel("d", Some("cat.debtPayments"), Some(group)),
                 relabel("f", Some("cat.dependentCare"), Some(group)),
@@ -3253,7 +3309,7 @@ mod tests {
         let mut after: Vec<CategoryNode> = old.clone();
         for step in &steps {
             match step {
-                CategoryMigration::Create { id, preset_key } => {
+                CategoryMigration::Create { id, preset_key, .. } => {
                     after.push(node(id, Some(preset_key)));
                 }
                 CategoryMigration::Relabel {
@@ -3292,5 +3348,107 @@ mod tests {
             created,
             vec!["cat.obligationsSupport", "cat.entertainmentLeisure"]
         );
+    }
+
+    // ---- a group brings its whole list ----------------------------------
+
+    fn sub_node(id: &str, key: &str, parent: &str) -> CategoryNode {
+        CategoryNode {
+            parent_id: Some(parent.to_string()),
+            ..node(id, Some(key))
+        }
+    }
+
+    fn created(steps: &[CategoryMigration]) -> Vec<(&str, &str)> {
+        steps
+            .iter()
+            .map(|s| match s {
+                CategoryMigration::Create {
+                    preset_key,
+                    parent_id,
+                    ..
+                } => (preset_key.as_str(), parent_id.as_deref().unwrap()),
+                CategoryMigration::Relabel { .. } => panic!("only creates expected: {s:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_migrated_group_gets_the_subcategories_it_is_missing() {
+        // What the move off the old list leaves: Housing relabelled into
+        // the group, the old Utilities as its only subcategory.
+        let nodes = vec![
+            node("h", Some("cat.housingUtilities")),
+            sub_node("u", "cat.utilityBills", "h"),
+        ];
+        assert_eq!(
+            created(&missing_subcategories(&nodes)),
+            vec![
+                ("cat.mortgageRent", "h"),
+                ("cat.propertyTaxes", "h"),
+                ("cat.hoa", "h"),
+                ("cat.homeMaintenance", "h"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_complete_budget_needs_nothing() {
+        let nodes: Vec<CategoryNode> = crate::presets::starter_categories()
+            .iter()
+            .map(|p| match p.parent_key {
+                Some(parent) => sub_node(p.key, p.key, parent),
+                None => node(p.key, Some(p.key)),
+            })
+            .collect();
+        assert!(missing_subcategories(&nodes).is_empty());
+    }
+
+    #[test]
+    fn a_subcategory_moved_under_another_group_is_not_missing() {
+        let nodes = vec![
+            node("food", Some("cat.foodBasics")),
+            node("mine", None),
+            sub_node("g", "cat.groceries", "mine"),
+        ];
+        assert_eq!(
+            created(&missing_subcategories(&nodes)),
+            vec![("cat.personalCareEssentials", "food")]
+        );
+    }
+
+    #[test]
+    fn hand_typed_groups_and_subcategories_are_left_alone() {
+        let nodes = vec![node("mine", None), sub_node("g", "cat.groceries", "mine")];
+        assert!(missing_subcategories(&nodes).is_empty());
+    }
+
+    #[test]
+    fn a_group_held_twice_gets_its_subcategories_once() {
+        let nodes = vec![
+            node("a", Some("cat.diningSocial")),
+            node("b", Some("cat.diningSocial")),
+        ];
+        assert_eq!(
+            created(&missing_subcategories(&nodes)),
+            vec![("cat.restaurantsCafes", "a"), ("cat.foodDelivery", "a")]
+        );
+    }
+
+    #[test]
+    fn filling_twice_creates_nothing_the_second_time() {
+        let mut nodes = vec![node("t", Some("cat.transport"))];
+        for step in missing_subcategories(&nodes) {
+            if let CategoryMigration::Create {
+                id,
+                preset_key,
+                parent_id,
+            } = step
+            {
+                nodes.push(sub_node(&id, &preset_key, &parent_id.unwrap()));
+            }
+        }
+        assert_eq!(nodes.len(), 5);
+        assert!(missing_subcategories(&nodes).is_empty());
     }
 }
