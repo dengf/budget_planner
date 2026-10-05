@@ -125,6 +125,18 @@ describe('savePresets', () => {
     );
     expect(saved[0].parent_id).toBe('old-food');
   });
+
+  it('files a subcategory under a hand-typed group that reads as its group', async () => {
+    const existing = [{ id: 'typed', name: ' food & basic goods ', parent_id: null }];
+    const saved = await savePresets(
+      [GROCERIES, CARE],
+      existing,
+      async () => {},
+      tTree,
+      () => 'new',
+    );
+    expect(saved.map((r) => r.parent_id)).toEqual(['typed', 'typed']);
+  });
 });
 
 describe('categoryTree and rootIdOf', () => {

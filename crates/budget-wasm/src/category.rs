@@ -756,6 +756,24 @@ pub fn migrate_legacy_categories(params: JsValue) -> JsValue {
 }
 
 fn migrate_legacy_categories_impl(params: JsValue) -> MigrateCategoriesResult {
+    category_steps_impl(params, budget_calc::migrate_legacy_categories)
+}
+
+/// `budget_calc::missing_subcategories`: a `create` step, filed under its
+/// group, for each preset subcategory a preset group in the budget lacks.
+/// Same params and result shape as `migrate_legacy_categories`.
+#[wasm_bindgen]
+pub fn missing_subcategories(params: JsValue) -> JsValue {
+    to_js(&category_steps_impl(
+        params,
+        budget_calc::missing_subcategories,
+    ))
+}
+
+fn category_steps_impl(
+    params: JsValue,
+    steps: fn(&[budget_calc::CategoryNode]) -> Vec<budget_calc::CategoryMigration>,
+) -> MigrateCategoriesResult {
     let Ok(params) = serde_wasm_bindgen::from_value::<MigrateCategoriesParams>(params) else {
         return MigrateCategoriesResult {
             error: Some(Message::bad_request().text),
@@ -772,7 +790,7 @@ fn migrate_legacy_categories_impl(params: JsValue) -> MigrateCategoriesResult {
         })
         .collect();
     MigrateCategoriesResult {
-        steps: budget_calc::migrate_legacy_categories(&nodes)
+        steps: steps(&nodes)
             .into_iter()
             .map(|step| match step {
                 budget_calc::CategoryMigration::Relabel {
@@ -785,11 +803,15 @@ fn migrate_legacy_categories_impl(params: JsValue) -> MigrateCategoriesResult {
                     preset_key,
                     parent_id,
                 },
-                budget_calc::CategoryMigration::Create { id, preset_key } => CategoryMigrationDto {
+                budget_calc::CategoryMigration::Create {
+                    id,
+                    preset_key,
+                    parent_id,
+                } => CategoryMigrationDto {
                     action: "create".to_string(),
                     id,
                     preset_key: Some(preset_key),
-                    parent_id: None,
+                    parent_id,
                 },
             })
             .collect(),

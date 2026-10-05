@@ -347,7 +347,7 @@ pub struct MigrateCategoriesParams {
 /// `budget_calc::CategoryMigration`. `action` is `"relabel"` (rewrite `id`
 /// in place as `preset_key` under `parent_id`; a `null` `preset_key`
 /// keeps its stored name as a hand-typed category) or `"create"` (a new
-/// top-level group at `id`).
+/// preset category at `id`, under `parent_id` when it is a subcategory).
 #[derive(Debug, Clone, Serialize)]
 pub struct CategoryMigrationDto {
     pub action: String,
