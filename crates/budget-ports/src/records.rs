@@ -37,6 +37,13 @@ pub struct CategoryRecord {
     /// subcategories existed was top-level.
     #[serde(default)]
     pub parent_id: Option<String>,
+    /// Set on a top-level preset group once its preset subcategories have
+    /// been filled in (`budget_calc::missing_subcategories`), or when it
+    /// was added with them. Kept with the budget, not the browser, so a
+    /// subcategory the reader deletes stays deleted wherever the data
+    /// goes. `#[serde(default)]` for the same back-compat reasoning.
+    #[serde(default)]
+    pub subcategories_filled: bool,
 }
 
 /// One category's planned amount for one month. `month` is `YYYY-MM`.

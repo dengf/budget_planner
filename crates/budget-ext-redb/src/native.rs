@@ -39,6 +39,7 @@ mod tests {
             description: String::new(),
             preset_key: None,
             parent_id: None,
+            subcategories_filled: false,
         }
     }
 

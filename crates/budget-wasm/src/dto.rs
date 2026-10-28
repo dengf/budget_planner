@@ -27,6 +27,9 @@ pub struct CategoryDto {
     /// Mirrors `CategoryRecord::parent_id` -- see its own doc comment.
     #[serde(default)]
     pub parent_id: Option<String>,
+    /// Mirrors `CategoryRecord::subcategories_filled`.
+    #[serde(default)]
+    pub subcategories_filled: bool,
 }
 
 /// A suggested starter category. Carries the i18n key *and* the English

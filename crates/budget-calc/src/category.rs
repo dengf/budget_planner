@@ -333,11 +333,15 @@ pub fn settle_split_plans(
 
 /// A saved category as the one-time move onto the CPA's list needs to
 /// see it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct CategoryNode {
     pub id: String,
     pub preset_key: Option<String>,
     pub parent_id: Option<String>,
+    /// A group `missing_subcategories` has already filled (or that
+    /// arrived with its whole list): never filled again, so a
+    /// subcategory the reader deletes stays deleted.
+    pub subcategories_filled: bool,
 }
 
 /// One change `migrate_legacy_categories` asks for.
@@ -463,13 +467,22 @@ pub fn migrate_legacy_categories(categories: &[CategoryNode]) -> Vec<CategoryMig
 /// budget, under any parent: one the reader moved elsewhere is still
 /// theirs, not missing. Ids are fixed (`migrated_group_id`'s rule), so a
 /// second run over a half-saved result finds what the first one made.
+///
+/// A group marked `subcategories_filled` is skipped: it has had its fill,
+/// and whatever is missing from it now the reader deleted. The caller
+/// marks each group it filled once the creates are saved, not before, so
+/// a fill cut off partway runs again.
 pub fn missing_subcategories(categories: &[CategoryNode]) -> Vec<CategoryMigration> {
     let mut present: HashSet<&str> = categories
         .iter()
         .filter_map(|c| c.preset_key.as_deref())
         .collect();
     let mut steps = Vec::new();
-    for group in categories.iter().filter(|c| c.parent_id.is_none()) {
+    let catalogue = crate::presets::starter_categories();
+    for group in categories
+        .iter()
+        .filter(|c| c.parent_id.is_none() && !c.subcategories_filled)
+    {
         let Some(key) = group.preset_key.as_deref() else {
             continue;
         };
@@ -477,8 +490,8 @@ pub fn missing_subcategories(categories: &[CategoryNode]) -> Vec<CategoryMigrati
         else {
             continue;
         };
-        for sub in crate::presets::starter_categories()
-            .into_iter()
+        for sub in catalogue
+            .iter()
             .filter(|p| p.parent_key == Some(preset.key))
         {
             // `insert` is false for one already there -- or already made
@@ -3097,6 +3110,7 @@ mod tests {
 
     fn tree_node(id: &str, key: Option<&str>, parent: Option<&str>) -> CategoryNode {
         CategoryNode {
+            subcategories_filled: false,
             id: id.to_string(),
             preset_key: key.map(str::to_string),
             parent_id: parent.map(str::to_string),
@@ -3216,6 +3230,7 @@ mod tests {
 
     fn node(id: &str, key: Option<&str>) -> CategoryNode {
         CategoryNode {
+            subcategories_filled: false,
             id: id.to_string(),
             preset_key: key.map(str::to_string),
             parent_id: None,
@@ -3433,6 +3448,19 @@ mod tests {
             created(&missing_subcategories(&nodes)),
             vec![("cat.restaurantsCafes", "a"), ("cat.foodDelivery", "a")]
         );
+    }
+
+    #[test]
+    fn a_group_already_filled_is_not_filled_again() {
+        // Its HOA was deleted after the fill: that is the reader's call.
+        let nodes = vec![
+            CategoryNode {
+                subcategories_filled: true,
+                ..node("h", Some("cat.housingUtilities"))
+            },
+            sub_node("u", "cat.utilityBills", "h"),
+        ];
+        assert!(missing_subcategories(&nodes).is_empty());
     }
 
     #[test]
