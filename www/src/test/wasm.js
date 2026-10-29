@@ -59,6 +59,27 @@ export function stubWasm(overrides = {}) {
       error: null,
     }),
     init_storage: async () => {},
+    ...presetCheckStubs,
     ...overrides,
   };
 }
+
+/**
+ * `available_presets` and `preset_group_ids`, for a test building its own
+ * wasm stub rather than starting from `stubWasm`.
+ */
+export const presetCheckStubs = {
+  // Synchronous, like the real bindings. Taken by `preset_key` only --
+  // the name half of the rule is budget-calc's and tested there.
+  available_presets: ({ categories = [], presets = [] } = {}) => {
+    const keys = new Set(categories.map((c) => c.preset_key).filter(Boolean));
+    return { keys: presets.map((p) => p.key).filter((k) => !keys.has(k)), error: null };
+  },
+  preset_group_ids: ({ categories = [], presets = [] } = {}) => ({
+    groups: presets.flatMap((p) => {
+      const c = categories.find((x) => !x.parent_id && x.preset_key === p.key);
+      return c ? [{ key: p.key, id: c.id }] : [];
+    }),
+    error: null,
+  }),
+};

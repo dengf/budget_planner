@@ -1,62 +1,52 @@
 /**
- * Which starter presets are still worth offering, given the categories
- * that already exist.
- *
- * `addCommonCategories` (seeds every not-yet-taken preset at once) and the
- * Budget tab's chip picker (offers the same not-yet-taken presets one tap
- * at a time) both need the identical "is this preset already taken" rule
- * -- pulled out here so there is one implementation instead of two that
- * could drift apart.
- *
- * A preset is taken by either of two independent checks, both required:
- *
- * 1. By identity: a preset whose `key` matches an existing category's
- *    `preset_key`. This matters because presets get renamed (their
- *    translated `name` text changes) -- an existing user's already-saved
- *    category still carries the OLD display name under the SAME
- *    `preset_key`, and without this check a renamed preset would be
- *    re-offered and inserted as a duplicate carrying the NEW name.
- * 2. By translated display name, case- and whitespace-insensitive: a
- *    hand-typed category has no `preset_key` at all (e.g. someone typed
- *    "Housing" by hand), so a preset that translates to the same name
- *    must still be treated as taken.
- *
- * Both checks are needed; neither replaces the other.
- *
- * Assumes `presets` itself contains no two entries sharing a `key` or a
- * translated name -- `taken`/`takenPresetKeys` below are computed once
- * from `existingCategories` and then held fixed while filtering, so
- * nothing here would catch a same-batch collision inside `presets`.
- * `crates/budget-calc/src/presets.rs`'s own tests
- * (`no_category_is_offered_twice`, `no_two_categories_share_a_display_name`)
- * guarantee this for the real starter list, so it's not defended against
- * here. The pre-refactor inline version in `App.jsx` happened to dedup
- * incrementally within one pass (each accepted preset was added to the
- * running sets before the next was checked), which would have masked
- * such a collision rather than surfacing it -- that incidental behavior
- * isn't reproduced here, on purpose, since adding runtime defenses for a
- * scenario the Rust test suite already forecloses would be exactly the
- * kind of unneeded complexity this repo tries to avoid.
- *
- * @param {Array<{key: string, group_key: string, is_income: boolean, parent_key: string|null}>} presets
- *   Presets as returned by `wasm.preset_categories()`.
- * @param {Array<{name: string, preset_key?: string}>} existingCategories
- *   The categories already saved.
- * @param {(key: string) => string} translate
- *   The reader's `t` function, used to resolve a preset's `key` and an
- *   existing category's stored name to the same comparable string.
- * @returns {Array} The subset of `presets` not yet taken, in their
- *   original order.
+ * The budget's categories as the Rust preset checks read them, each under
+ * the name the reader sees (`categoryDisplayName`), which is what a typed
+ * name or a preset's translated name gets compared against.
  */
-export function availablePresets(presets, existingCategories, translate) {
-  const takenNames = new Set(existingCategories.map((c) => c.name.trim().toLowerCase()));
-  const takenPresetKeys = new Set(existingCategories.map((c) => c.preset_key).filter(Boolean));
+export function categoryNodes(categories, translate) {
+  return categories.map((c) => ({
+    id: c.id,
+    name: categoryDisplayName(c, translate),
+    group: c.group ?? '',
+    is_income: Boolean(c.is_income),
+    preset_key: c.preset_key ?? null,
+    parent_id: c.parent_id ?? null,
+    subcategories_filled: Boolean(c.subcategories_filled),
+  }));
+}
 
-  return presets.filter((preset) => {
-    if (takenPresetKeys.has(preset.key)) return false;
-    const fingerprint = translate(preset.key).trim().toLowerCase();
-    return !takenNames.has(fingerprint);
+/**
+ * Presets with their names resolved into the reader's language -- preset
+ * names cross the wasm boundary as i18n keys, so only this side can say
+ * what one reads as.
+ */
+export function namedPresets(presets, translate) {
+  return presets.map((p) => ({
+    key: p.key,
+    name: translate(p.key),
+    is_income: Boolean(p.is_income),
+  }));
+}
+
+/**
+ * Which starter presets are still worth offering, given the categories
+ * that already exist -- `budget_calc::available_presets`, which owns the
+ * rule (taken by `preset_key`, or by a category already carrying the
+ * preset's name). `addCommonCategories`, the first-run seed, the chip
+ * pickers and `presetsToAdd` all ask it, so none of them can drift from
+ * the others.
+ *
+ * Returns the subset of `presets` not yet taken, in their original order,
+ * or nothing while the wasm module isn't there to ask.
+ */
+export function availablePresets(wasm, presets, existingCategories, translate) {
+  if (!wasm?.available_presets || presets.length === 0) return [];
+  const result = wasm.available_presets({
+    categories: categoryNodes(existingCategories, translate),
+    presets: namedPresets(presets, translate),
   });
+  const keys = new Set(result?.keys ?? []);
+  return presets.filter((preset) => keys.has(preset.key));
 }
 
 /**
@@ -98,9 +88,9 @@ export function buildCategoryFromPreset(preset, translate, newId, parentId = nul
  * its group if the budget doesn't have it yet. Anything already taken
  * (`availablePresets`' rule) is skipped.
  */
-export function presetsToAdd(chosen, allPresets, existingCategories, translate) {
+export function presetsToAdd(wasm, chosen, allPresets, existingCategories, translate) {
   const available = new Set(
-    availablePresets(allPresets, existingCategories, translate).map((p) => p.key),
+    availablePresets(wasm, allPresets, existingCategories, translate).map((p) => p.key),
   );
   const out = [];
   const push = (preset) => {
@@ -128,25 +118,22 @@ export function presetsToAdd(chosen, allPresets, existingCategories, translate) 
  *
  * Resolves to the saved records, in order.
  */
-export async function savePresets(presets, existingCategories, save, translate, newId) {
-  const groupIds = new Map(
-    existingCategories.filter((c) => c.preset_key && !c.parent_id).map((c) => [c.preset_key, c.id]),
-  );
-  // A hand-typed group that reads as a preset's is that preset as far as
-  // `availablePresets` is concerned, so it is never offered again -- its
-  // subcategories belong under it, not loose at the top level.
-  for (const preset of presets) {
-    const key = preset.parent_key;
-    if (!key || groupIds.has(key)) continue;
-    const name = translate(key).trim().toLowerCase();
-    const typed = existingCategories.find(
-      (c) =>
-        !c.parent_id &&
-        !c.preset_key &&
-        Boolean(c.is_income) === Boolean(preset.is_income) &&
-        c.name.trim().toLowerCase() === name,
-    );
-    if (typed) groupIds.set(key, typed.id);
+export async function savePresets(wasm, presets, existingCategories, save, translate, newId) {
+  // Which saved category each group is -- `budget_calc::preset_group_ids`:
+  // the one saved from that preset, else a hand-typed one that reads as
+  // it (which `availablePresets` already counts as that preset, so it is
+  // never offered again).
+  const parents = [...new Set(presets.map((p) => p.parent_key).filter(Boolean))].map((key) => ({
+    key,
+    is_income: presets.find((p) => p.parent_key === key).is_income,
+  }));
+  const groupIds = new Map();
+  if (parents.length > 0 && wasm?.preset_group_ids) {
+    const result = wasm.preset_group_ids({
+      categories: categoryNodes(existingCategories, translate),
+      presets: namedPresets(parents, translate),
+    });
+    for (const { key, id } of result?.groups ?? []) groupIds.set(key, id);
   }
   const saved = [];
   for (const preset of presets) {

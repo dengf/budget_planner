@@ -314,7 +314,7 @@ export default function CategoriesScreen({
       )}
 
       <CategoryChipPicker
-        presets={availablePresets(presetCategories, categories.items, t).filter(
+        presets={availablePresets(wasmModule, presetCategories, categories.items, t).filter(
           (p) => !p.parent_key,
         )}
         onAdd={addPresetCategory}

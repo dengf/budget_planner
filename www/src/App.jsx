@@ -16,11 +16,13 @@ import {
   availablePresets,
   buildCategoryFromPreset,
   categoryDisplayName,
+  categoryNodes,
   categoryTree,
   clearLegacySubcategoriesFilled,
   presetsToAdd,
   savePresets,
   legacySubcategoriesFilled,
+  namedPresets,
 } from './presetCategories';
 import { CategoriesContext } from './categoryContext';
 import { TABS, TAB_ORDER } from './tabs';
@@ -291,8 +293,8 @@ export function AppShell({ wasmModule }) {
    * actually stored, in the reader's language, so a Chinese budget
    * doesn't open with English category names. Which presets are still
    * worth offering -- skipping one already taken by identity or by
-   * translated display name -- is `availablePresets` in
-   * `presetCategories.js`; see its doc comment for why both checks exist.
+   * translated display name -- is `budget_calc::available_presets`,
+   * asked through `availablePresets`.
    *
    * `existingItems` defaults to the live `categories.items`, but takes an
    * explicit override for callers that just mutated categories themselves
@@ -307,7 +309,8 @@ export function AppShell({ wasmModule }) {
       if (!wasmModule?.preset_categories) return;
       const presets = (await wasmModule.preset_categories()) ?? [];
       await savePresets(
-        availablePresets(presets, existingItems, t),
+        wasmModule,
+        availablePresets(wasmModule, presets, existingItems, t),
         existingItems,
         categories.save,
         t,
@@ -333,7 +336,8 @@ export function AppShell({ wasmModule }) {
       if (!wasmModule?.compact_preset_categories) return;
       const presets = (await wasmModule.compact_preset_categories()) ?? [];
       await savePresets(
-        availablePresets(presets, existingItems, t),
+        wasmModule,
+        availablePresets(wasmModule, presets, existingItems, t),
         existingItems,
         categories.save,
         t,
@@ -354,7 +358,8 @@ export function AppShell({ wasmModule }) {
       if (!wasmModule?.preset_categories) return;
       const presets = (await wasmModule.preset_categories()) ?? [];
       await savePresets(
-        presetsToAdd([preset], presets, categories.items, t),
+        wasmModule,
+        presetsToAdd(wasmModule, [preset], presets, categories.items, t),
         categories.items,
         categories.save,
         t,
@@ -440,7 +445,7 @@ export function AppShell({ wasmModule }) {
         // that settled list. A run whose every step was skipped changes
         // nothing, so it fills now rather than never.
         if (saved > 0) return;
-        await fillSubcategories(categories.items, presetFor);
+        await fillSubcategories(categories.items, presets, presetFor);
       } finally {
         migratingRef.current = false;
         if (settleWaitingRef.current) {
@@ -454,7 +459,7 @@ export function AppShell({ wasmModule }) {
     // then marked on the group itself, so one the reader deletes later
     // stays deleted. Marked only after its creates are saved: a fill cut
     // off partway runs again on the next load.
-    async function fillSubcategories(items, presetFor) {
+    async function fillSubcategories(items, presets, presetFor) {
       if (!wasmModule.missing_subcategories) return;
       const unfilled = items.filter(
         (c) =>
@@ -471,14 +476,16 @@ export function AppShell({ wasmModule }) {
       // A browser that already ran #134's one-time fill: its groups had
       // their turn, so mark them without adding back what was deleted.
       if (!legacySubcategoriesFilled()) {
-        const steps = (await wasmModule.missing_subcategories({ categories: items }))?.steps ?? [];
-        // Skip one whose name is already a category, the same "taken"
-        // rule `availablePresets` uses -- a hand-typed "Groceries" is
-        // the reader's Groceries, not a gap to fill with a second one.
-        const taken = new Set(items.map((c) => c.name.trim().toLowerCase()));
+        const steps =
+          (
+            await wasmModule.missing_subcategories({
+              categories: categoryNodes(items, t),
+              presets: namedPresets(presets, t),
+            })
+          )?.steps ?? [];
         for (const step of steps) {
           const preset = presetFor(step.preset_key);
-          if (!preset || taken.has(t(preset.key).trim().toLowerCase())) continue;
+          if (!preset) continue;
           await categories.save({
             id: step.id,
             name: t(preset.key),

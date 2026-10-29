@@ -8,39 +8,56 @@ import {
   savePresets,
 } from './presetCategories';
 
-const HOUSING = { key: 'cat.housing' };
-const UTILITIES = { key: 'cat.utilities' };
+// The taken-or-not rule itself is `budget_calc::available_presets` and
+// `preset_group_ids`, tested in Rust. These stand in for the bindings and
+// check only what crosses the boundary and what comes back.
+function stubPresetWasm({ available, groups = [] } = {}) {
+  const calls = { available: [], groups: [] };
+  return {
+    calls,
+    available_presets: (params) => {
+      calls.available.push(params);
+      const keys = available ?? params.presets.map((p) => p.key);
+      return { keys, error: null };
+    },
+    preset_group_ids: (params) => {
+      calls.groups.push(params);
+      return { groups, error: null };
+    },
+  };
+}
+
+const HOUSING = { key: 'cat.housing', is_income: false };
+const UTILITIES = { key: 'cat.utilities', is_income: false };
 const NAMES = { 'cat.housing': 'Housing', 'cat.utilities': 'Utilities' };
-const translate = (key) => NAMES[key];
+const translate = (key) => NAMES[key] ?? key;
 
 describe('availablePresets', () => {
-  it('offers every preset when nothing exists yet', () => {
-    expect(availablePresets([HOUSING, UTILITIES], [], translate)).toEqual([HOUSING, UTILITIES]);
+  it('keeps the presets Rust says are free, in their own order', () => {
+    const wasm = stubPresetWasm({ available: ['cat.utilities'] });
+    expect(availablePresets(wasm, [HOUSING, UTILITIES], [], translate)).toEqual([UTILITIES]);
   });
 
-  it('excludes a preset whose translated name is already a category, case- and whitespace-insensitive', () => {
-    const existing = [{ id: 'c1', name: ' housing ' }];
-    expect(availablePresets([HOUSING, UTILITIES], existing, translate)).toEqual([UTILITIES]);
-  });
-
-  it('excludes a preset taken by a hand-typed category with the exact same name', () => {
-    const existing = [{ id: 'c1', name: 'Housing' }];
-    expect(availablePresets([HOUSING, UTILITIES], existing, translate)).toEqual([UTILITIES]);
-  });
-
-  it('excludes a preset by preset_key identity even when the stored name no longer matches the current translated name', () => {
-    // Simulates a renamed preset: the existing category was saved under
-    // the old display name, but still carries the same preset_key.
-    const existing = [{ id: 'c1', name: 'Old Housing Name', preset_key: 'cat.housing' }];
-    expect(availablePresets([HOUSING, UTILITIES], existing, translate)).toEqual([UTILITIES]);
-  });
-
-  it('returns an empty list once every preset is taken (mix of both dedup paths)', () => {
+  it('sends each preset under its translated name, and each category under the name the reader sees', () => {
+    const wasm = stubPresetWasm();
     const existing = [
-      { id: 'c1', name: 'Old Housing Name', preset_key: 'cat.housing' },
-      { id: 'c2', name: ' Utilities ' },
+      { id: 'c1', name: 'Old Housing Name', preset_key: 'cat.housing', group: 'Expense' },
+      { id: 'c2', name: 'Mine', parent_id: 'c1' },
     ];
-    expect(availablePresets([HOUSING, UTILITIES], existing, translate)).toEqual([]);
+    availablePresets(wasm, [HOUSING, UTILITIES], existing, translate);
+    const [params] = wasm.calls.available;
+    expect(params.presets).toEqual([
+      { key: 'cat.housing', name: 'Housing', is_income: false },
+      { key: 'cat.utilities', name: 'Utilities', is_income: false },
+    ]);
+    expect(params.categories.map((c) => [c.id, c.name, c.preset_key, c.parent_id])).toEqual([
+      ['c1', 'Housing', 'cat.housing', null],
+      ['c2', 'Mine', null, 'c1'],
+    ]);
+  });
+
+  it('offers nothing while there is no wasm module to ask', () => {
+    expect(availablePresets(null, [HOUSING], [], translate)).toEqual([]);
   });
 });
 
@@ -85,17 +102,21 @@ const tTree = (key) => TREE_NAMES[key];
 
 describe('presetsToAdd', () => {
   it('brings a group’s subcategories along with it', () => {
-    expect(presetsToAdd([FOOD], TREE, [], tTree)).toEqual([FOOD, GROCERIES, CARE]);
+    expect(presetsToAdd(stubPresetWasm(), [FOOD], TREE, [], tTree)).toEqual([
+      FOOD,
+      GROCERIES,
+      CARE,
+    ]);
   });
 
   it('brings a subcategory’s group first when the budget lacks it', () => {
-    expect(presetsToAdd([GROCERIES], TREE, [], tTree)).toEqual([FOOD, GROCERIES]);
+    expect(presetsToAdd(stubPresetWasm(), [GROCERIES], TREE, [], tTree)).toEqual([FOOD, GROCERIES]);
   });
 
-  it('skips anything already in the budget', () => {
-    const existing = [{ id: 'g', name: 'Food & Basic Goods', preset_key: 'cat.foodBasics' }];
-    expect(presetsToAdd([GROCERIES], TREE, existing, tTree)).toEqual([GROCERIES]);
-    expect(presetsToAdd([FOOD], TREE, existing, tTree)).toEqual([GROCERIES, CARE]);
+  it('skips anything Rust says the budget already has', () => {
+    const wasm = stubPresetWasm({ available: ['cat.groceries', 'cat.personalCareEssentials'] });
+    expect(presetsToAdd(wasm, [GROCERIES], TREE, [], tTree)).toEqual([GROCERIES]);
+    expect(presetsToAdd(wasm, [FOOD], TREE, [], tTree)).toEqual([GROCERIES, CARE]);
   });
 });
 
@@ -103,6 +124,7 @@ describe('savePresets', () => {
   it('files each subcategory under the group saved just before it', async () => {
     let n = 0;
     const saved = await savePresets(
+      stubPresetWasm(),
       [FOOD, GROCERIES],
       [],
       async () => {},
@@ -115,21 +137,11 @@ describe('savePresets', () => {
     ]);
   });
 
-  it('files a subcategory under the budget’s existing copy of its group', async () => {
-    const existing = [{ id: 'old-food', preset_key: 'cat.foodBasics', parent_id: null }];
+  it('files a subcategory under the group Rust finds in the budget', async () => {
+    const wasm = stubPresetWasm({ groups: [{ key: 'cat.foodBasics', id: 'typed' }] });
+    const existing = [{ id: 'typed', name: 'food & basic goods', parent_id: null }];
     const saved = await savePresets(
-      [CARE],
-      existing,
-      async () => {},
-      tTree,
-      () => 'new',
-    );
-    expect(saved[0].parent_id).toBe('old-food');
-  });
-
-  it('files a subcategory under a hand-typed group that reads as its group', async () => {
-    const existing = [{ id: 'typed', name: ' food & basic goods ', parent_id: null }];
-    const saved = await savePresets(
+      wasm,
       [GROCERIES, CARE],
       existing,
       async () => {},
@@ -137,16 +149,18 @@ describe('savePresets', () => {
       () => 'new',
     );
     expect(saved.map((r) => r.parent_id)).toEqual(['typed', 'typed']);
+    // Asked once, about the one group, under its translated name.
+    expect(wasm.calls.groups).toHaveLength(1);
+    expect(wasm.calls.groups[0].presets).toEqual([
+      { key: 'cat.foodBasics', name: 'Food & Basic Goods', is_income: false },
+    ]);
   });
 
-  it('never files a subcategory under a same-named category on the other side or from another preset', async () => {
-    const existing = [
-      { id: 'income', name: 'Food & Basic Goods', is_income: true, parent_id: null },
-      { id: 'other', name: 'Food & Basic Goods', preset_key: 'cat.diningSocial', parent_id: null },
-    ];
+  it('leaves a subcategory top-level when Rust finds no group for it', async () => {
     const saved = await savePresets(
+      stubPresetWasm(),
       [GROCERIES],
-      existing,
+      [],
       async () => {},
       tTree,
       () => 'new',
@@ -157,6 +171,7 @@ describe('savePresets', () => {
   it('marks a group as already having its subcategories, and a subcategory not', async () => {
     let n = 0;
     const saved = await savePresets(
+      stubPresetWasm(),
       [FOOD, GROCERIES],
       [],
       async () => {},

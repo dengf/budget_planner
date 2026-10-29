@@ -89,8 +89,8 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
   }, [wasmModule]);
 
   const notTaken = useMemo(
-    () => availablePresets(presets, categories.items, t),
-    [presets, categories.items, t],
+    () => availablePresets(wasmModule, presets, categories.items, t),
+    [wasmModule, presets, categories.items, t],
   );
   const availableIncomePresets = useMemo(
     () => notTaken.filter((p) => p.is_income && !p.parent_key),
@@ -142,7 +142,8 @@ export function useCreateCategory({ wasmModule, categories, newId }) {
             return { outcome: 'preset', categoryId: record.id };
           }
           const saved = await savePresets(
-            presetsToAdd([preset], presets, categories.items, t),
+            wasmModule,
+            presetsToAdd(wasmModule, [preset], presets, categories.items, t),
             categories.items,
             categories.save,
             t,

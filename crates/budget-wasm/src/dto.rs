@@ -340,10 +340,46 @@ pub struct ResolveCategoryNameParams {
     pub presets: Vec<NamedPresetDto>,
 }
 
-/// `migrate_legacy_categories`' input: the budget's categories as stored.
+/// `migrate_legacy_categories`' and `missing_subcategories`' input: the
+/// budget's categories as stored. `presets` (each preset's name in the
+/// reader's language) is read only by `missing_subcategories`, for the
+/// "already taken by name" half of its rule.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MigrateCategoriesParams {
     pub categories: Vec<CategoryDto>,
+    #[serde(default)]
+    pub presets: Vec<NamedPresetDto>,
+}
+
+/// `available_presets`' and `preset_group_ids`' input: the budget's
+/// categories as stored, and the presets to judge, each with its name in
+/// the reader's language.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PresetCheckParams {
+    pub categories: Vec<CategoryDto>,
+    pub presets: Vec<NamedPresetDto>,
+}
+
+/// `available_presets`: the keys of the presets not yet taken, in order.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AvailablePresetsResult {
+    pub keys: Vec<String>,
+    pub error: Option<String>,
+}
+
+/// One preset group and the saved category that is it.
+#[derive(Debug, Clone, Serialize)]
+pub struct PresetGroupDto {
+    pub key: String,
+    pub id: String,
+}
+
+/// `preset_group_ids`: each preset group the budget has, and which
+/// category it is.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PresetGroupIdsResult {
+    pub groups: Vec<PresetGroupDto>,
+    pub error: Option<String>,
 }
 
 /// One step of the move onto the CPA's list -- see
