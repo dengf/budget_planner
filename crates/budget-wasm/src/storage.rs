@@ -75,6 +75,7 @@ pub async fn save_category(dto: JsValue) -> JsValue {
         description: dto.description,
         preset_key: dto.preset_key,
         parent_id: dto.parent_id,
+        subcategories_filled: dto.subcategories_filled,
     };
     match store.save_category(record).await {
         Ok(()) => to_js(&SaveResult {
@@ -105,6 +106,7 @@ pub async fn list_categories() -> JsValue {
                     description: r.description,
                     preset_key: r.preset_key,
                     parent_id: r.parent_id,
+                    subcategories_filled: r.subcategories_filled,
                 })
                 .collect::<Vec<_>>(),
         ),

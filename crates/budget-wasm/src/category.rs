@@ -78,6 +78,7 @@ pub fn settle_split_plans(params: JsValue) -> JsValue {
             id: c.id,
             preset_key: c.preset_key,
             parent_id: c.parent_id,
+            subcategories_filled: c.subcategories_filled,
         })
         .collect();
     let folds = budget_calc::settle_split_plans(&nodes, &planned)
@@ -787,6 +788,7 @@ fn category_steps_impl(
             id: c.id,
             preset_key: c.preset_key,
             parent_id: c.parent_id,
+            subcategories_filled: c.subcategories_filled,
         })
         .collect();
     MigrateCategoriesResult {

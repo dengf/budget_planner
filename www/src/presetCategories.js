@@ -81,6 +81,9 @@ export function buildCategoryFromPreset(preset, translate, newId, parentId = nul
     description: '',
     preset_key: preset.key,
     parent_id: parentId,
+    // A group is only ever added along with its subcategories
+    // (`presetsToAdd`), so it never needs the fill.
+    subcategories_filled: !preset.parent_key,
   };
 }
 
@@ -137,7 +140,11 @@ export async function savePresets(presets, existingCategories, save, translate, 
     if (!key || groupIds.has(key)) continue;
     const name = translate(key).trim().toLowerCase();
     const typed = existingCategories.find(
-      (c) => !c.parent_id && c.name.trim().toLowerCase() === name,
+      (c) =>
+        !c.parent_id &&
+        !c.preset_key &&
+        Boolean(c.is_income) === Boolean(preset.is_income) &&
+        c.name.trim().toLowerCase() === name,
     );
     if (typed) groupIds.set(key, typed.id);
   }
@@ -250,13 +257,14 @@ export function makeCategoryLookup(categories, t) {
 const SUBCATEGORIES_FILLED_KEY = 'bp:subcategoriesFilled';
 
 /**
- * Whether this budget has had its preset groups' missing subcategories
- * filled in once (`budget_calc::missing_subcategories`). A budget moved
- * off the old flat list before the fill existed has groups holding only
- * what the old list had; this lets the fill reach it exactly once, so a
- * subcategory the reader deletes afterwards isn't brought back.
+ * Whether this browser ran the first, per-browser version of the
+ * subcategory fill (#134). That version kept its "done" flag here; the
+ * fill now marks each group record instead (`subcategories_filled`). A
+ * budget with this flag set already had its fill, so its groups are
+ * marked without filling again -- filling would bring back subcategories
+ * the reader deleted since.
  */
-export function subcategoriesFilled() {
+export function legacySubcategoriesFilled() {
   try {
     return localStorage.getItem(SUBCATEGORIES_FILLED_KEY) === '1';
   } catch {
@@ -264,10 +272,10 @@ export function subcategoriesFilled() {
   }
 }
 
-export function markSubcategoriesFilled() {
+export function clearLegacySubcategoriesFilled() {
   try {
-    localStorage.setItem(SUBCATEGORIES_FILLED_KEY, '1');
+    localStorage.removeItem(SUBCATEGORIES_FILLED_KEY);
   } catch {
-    // Runs again next load; it only ever adds what is still missing.
+    // Nothing to clear when storage is unavailable.
   }
 }

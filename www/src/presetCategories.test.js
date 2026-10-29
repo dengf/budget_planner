@@ -67,6 +67,7 @@ describe('buildCategoryFromPreset', () => {
       description: '',
       preset_key: 'cat.housingUtilities',
       parent_id: null,
+      subcategories_filled: true,
     });
   });
 });
@@ -136,6 +137,33 @@ describe('savePresets', () => {
       () => 'new',
     );
     expect(saved.map((r) => r.parent_id)).toEqual(['typed', 'typed']);
+  });
+
+  it('never files a subcategory under a same-named category on the other side or from another preset', async () => {
+    const existing = [
+      { id: 'income', name: 'Food & Basic Goods', is_income: true, parent_id: null },
+      { id: 'other', name: 'Food & Basic Goods', preset_key: 'cat.diningSocial', parent_id: null },
+    ];
+    const saved = await savePresets(
+      [GROCERIES],
+      existing,
+      async () => {},
+      tTree,
+      () => 'new',
+    );
+    expect(saved[0].parent_id).toBeNull();
+  });
+
+  it('marks a group as already having its subcategories, and a subcategory not', async () => {
+    let n = 0;
+    const saved = await savePresets(
+      [FOOD, GROCERIES],
+      [],
+      async () => {},
+      tTree,
+      () => `id-${++n}`,
+    );
+    expect(saved.map((r) => r.subcategories_filled)).toEqual([true, false]);
   });
 });
 

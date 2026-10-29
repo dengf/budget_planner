@@ -17,10 +17,10 @@ import {
   buildCategoryFromPreset,
   categoryDisplayName,
   categoryTree,
-  markSubcategoriesFilled,
+  clearLegacySubcategoriesFilled,
   presetsToAdd,
   savePresets,
-  subcategoriesFilled,
+  legacySubcategoriesFilled,
 } from './presetCategories';
 import { CategoriesContext } from './categoryContext';
 import { TABS, TAB_ORDER } from './tabs';
@@ -381,16 +381,18 @@ export function AppShell({ wasmModule }) {
    */
   const migratingRef = useRef(false);
   const migrationCheckedRef = useRef(null);
-  // Fill in each preset group's missing subcategories after the next
-  // settled migration check: once for a budget migrated before the fill
-  // existed, and again after any run that moved something.
-  const fillSubcategoriesRef = useRef(!subcategoriesFilled());
+  // True while an import or "Clear all data" rewrites the categories one
+  // record at a time. Neither the migration nor the fill may read that
+  // half-written list: a fill that sees Housing restored before its
+  // Utilities adds a second Utilities. Each re-reads the categories when
+  // it ends, so the finished list gets its turn.
+  const bulkWriteRef = useRef(false);
   // Bumped when a migration run re-parents something, or finishes while
   // the plan fold below was waiting on it -- see `settle` below.
   const [migrationRuns, setMigrationRuns] = useState(0);
   const settleWaitingRef = useRef(false);
   useEffect(() => {
-    if (!categories.loaded || migratingRef.current) return;
+    if (!categories.loaded || migratingRef.current || bulkWriteRef.current) return;
     if (!wasmModule?.migrate_legacy_categories || !wasmModule?.preset_categories) return;
     // Once per list, not once per render: `categories` itself is a fresh
     // object every render, but its `items` only change on a real write.
@@ -399,28 +401,14 @@ export function AppShell({ wasmModule }) {
     migratingRef.current = true;
     (async () => {
       try {
+        const presets = (await wasmModule.preset_categories()) ?? [];
+        const presetFor = (key) => presets.find((p) => p.key === key);
         const result = await wasmModule.migrate_legacy_categories({
           categories: categories.items,
         });
-        let steps = result?.steps ?? [];
-        if (steps.length > 0) {
-          settleWaitingRef.current = true;
-          // Whatever it moves, the save re-renders and this runs again --
-          // the fill below waits for that settled list.
-          fillSubcategoriesRef.current = true;
-        } else if (fillSubcategoriesRef.current && wasmModule.missing_subcategories) {
-          // Done once on any list the migration has finished with: the
-          // move leaves groups with only the subcategories the old list
-          // happened to have. Not on every load -- one the reader
-          // deletes afterwards must stay deleted.
-          fillSubcategoriesRef.current = false;
-          markSubcategoriesFilled();
-          steps =
-            (await wasmModule.missing_subcategories({ categories: categories.items }))?.steps ?? [];
-        }
-        if (steps.length === 0) return;
-        const presets = (await wasmModule.preset_categories()) ?? [];
-        const presetFor = (key) => presets.find((p) => p.key === key);
+        const steps = result?.steps ?? [];
+        if (steps.length > 0) settleWaitingRef.current = true;
+        let saved = 0;
         for (const step of steps) {
           const preset = step.preset_key ? presetFor(step.preset_key) : null;
           if (step.action === 'create') {
@@ -434,6 +422,7 @@ export function AppShell({ wasmModule }) {
               preset_key: preset.key,
               parent_id: step.parent_id ?? null,
             });
+            saved += 1;
             continue;
           }
           const existing = categories.items.find((c) => c.id === step.id);
@@ -445,7 +434,13 @@ export function AppShell({ wasmModule }) {
             preset_key: preset ? preset.key : null,
             parent_id: step.parent_id ?? null,
           });
+          saved += 1;
         }
+        // Each save re-renders and this runs again; the fill waits for
+        // that settled list. A run whose every step was skipped changes
+        // nothing, so it fills now rather than never.
+        if (saved > 0) return;
+        await fillSubcategories(categories.items, presetFor);
       } finally {
         migratingRef.current = false;
         if (settleWaitingRef.current) {
@@ -454,6 +449,52 @@ export function AppShell({ wasmModule }) {
         }
       }
     })();
+    // A group in the budget comes with its whole list of subcategories
+    // (`budget_calc::missing_subcategories`), filled once per group and
+    // then marked on the group itself, so one the reader deletes later
+    // stays deleted. Marked only after its creates are saved: a fill cut
+    // off partway runs again on the next load.
+    async function fillSubcategories(items, presetFor) {
+      if (!wasmModule.missing_subcategories) return;
+      const unfilled = items.filter(
+        (c) =>
+          !c.parent_id &&
+          !c.subcategories_filled &&
+          c.preset_key &&
+          presetFor(c.preset_key) &&
+          !presetFor(c.preset_key).parent_key,
+      );
+      if (unfilled.length === 0) {
+        clearLegacySubcategoriesFilled();
+        return;
+      }
+      // A browser that already ran #134's one-time fill: its groups had
+      // their turn, so mark them without adding back what was deleted.
+      if (!legacySubcategoriesFilled()) {
+        const steps = (await wasmModule.missing_subcategories({ categories: items }))?.steps ?? [];
+        // Skip one whose name is already a category, the same "taken"
+        // rule `availablePresets` uses -- a hand-typed "Groceries" is
+        // the reader's Groceries, not a gap to fill with a second one.
+        const taken = new Set(items.map((c) => c.name.trim().toLowerCase()));
+        for (const step of steps) {
+          const preset = presetFor(step.preset_key);
+          if (!preset || taken.has(t(preset.key).trim().toLowerCase())) continue;
+          await categories.save({
+            id: step.id,
+            name: t(preset.key),
+            group: t(preset.group_key),
+            is_income: preset.is_income,
+            description: '',
+            preset_key: preset.key,
+            parent_id: step.parent_id ?? null,
+          });
+        }
+      }
+      for (const group of unfilled) {
+        await categories.save({ ...group, subcategories_filled: true });
+      }
+      clearLegacySubcategoriesFilled();
+    }
   }, [categories.loaded, categories.items, categories, wasmModule, t]);
 
   /**
@@ -579,17 +620,8 @@ export function AppShell({ wasmModule }) {
    * parks for later. Replace-after-confirm is the honest version of what
    * this can do today, and the confirm says so.
    */
-  const importData = useCallback(
-    async (payload) => {
-      const backup = readBackup(payload);
-      if (!backup.ok) return { error: t(backup.reason) };
-
-      const ok = await confirm(
-        t('data.importConfirm', { count: backup.count }),
-        t('confirm.replace'),
-      );
-      if (!ok) return null;
-
+  const restoreBackup = useCallback(
+    async (backup) => {
       const byName = {
         categories,
         rules,
@@ -643,12 +675,32 @@ export function AppShell({ wasmModule }) {
 
       return { imported: backup.count, month: backup.budgetPlan.month };
     },
-    [categories, rules, transactions, goals, debts, recurring, budgetPlan, viewMonth, confirm, t],
+    [categories, rules, transactions, goals, debts, recurring, budgetPlan, viewMonth, t],
   );
 
-  const clearAllData = useCallback(async () => {
-    const ok = await confirm(t('data.clearConfirm'), t('data.clearAll'));
-    if (!ok) return;
+  const importData = useCallback(
+    async (payload) => {
+      const backup = readBackup(payload);
+      if (!backup.ok) return { error: t(backup.reason) };
+
+      const ok = await confirm(
+        t('data.importConfirm', { count: backup.count }),
+        t('confirm.replace'),
+      );
+      if (!ok) return null;
+
+      bulkWriteRef.current = true;
+      try {
+        return await restoreBackup(backup);
+      } finally {
+        bulkWriteRef.current = false;
+        await categories.reload();
+      }
+    },
+    [categories, restoreBackup, confirm, t],
+  );
+
+  const clearAndSeed = useCallback(async () => {
     for (const collection of [
       transactions,
       budgetPlan,
@@ -670,18 +722,19 @@ export function AppShell({ wasmModule }) {
     // this closure's own `categories.items` still reads the pre-clear
     // list until a re-render catches up.
     await seedStarterCategories([]);
-  }, [
-    transactions,
-    budgetPlan,
-    rules,
-    goals,
-    debts,
-    recurring,
-    categories,
-    confirm,
-    t,
-    seedStarterCategories,
-  ]);
+  }, [transactions, budgetPlan, rules, goals, debts, recurring, categories, seedStarterCategories]);
+
+  const clearAllData = useCallback(async () => {
+    const ok = await confirm(t('data.clearConfirm'), t('data.clearAll'));
+    if (!ok) return;
+    bulkWriteRef.current = true;
+    try {
+      await clearAndSeed();
+    } finally {
+      bulkWriteRef.current = false;
+      await categories.reload();
+    }
+  }, [categories, confirm, t, clearAndSeed]);
 
   const ActivePanel = TABS.find((tab) => tab.id === activeTab)?.Component;
 
