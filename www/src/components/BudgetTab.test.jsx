@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import BudgetTab from './BudgetTab';
+import { presetCheckStubs } from '../test/wasm';
 
 /**
  * A small stand-in for `budget_calc::build_month`, faithful enough to
@@ -294,7 +295,7 @@ describe('BudgetTab category creation', () => {
     };
 
     function withPreset() {
-      return { ...makeWasm(), preset_categories: async () => [PRESET] };
+      return { ...makeWasm(), ...presetCheckStubs, preset_categories: async () => [PRESET] };
     }
 
     it('shows an unadded preset as a chip once the expense field opens', async () => {
@@ -340,10 +341,16 @@ describe('BudgetTab category creation', () => {
       expect(await screen.findByRole('button', { name: /Dining & Social/ })).toBeInTheDocument();
     });
 
-    it('stops offering a preset once it has been added', async () => {
+    // Whether a hand-typed "Dining & Social" takes the preset is
+    // budget_calc::available_presets' call, tested there; this is the
+    // chip row honouring its answer.
+    it('stops offering a preset once Rust says it is taken', async () => {
       mountWithStore(
         [{ id: 'subs', name: 'Dining & Social', group: 'Expense', is_income: false }],
-        withPreset(),
+        {
+          ...withPreset(),
+          available_presets: () => ({ keys: [], error: null }),
+        },
       );
       fireEvent.click(await screen.findByRole('button', { name: '+ Add an expense category' }));
       await screen.findByLabelText('Category name');

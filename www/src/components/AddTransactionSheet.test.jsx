@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import AddTransactionSheet from './AddTransactionSheet';
+import { presetCheckStubs } from '../test/wasm';
 
 const CATEGORIES = {
   items: [
@@ -385,7 +386,11 @@ describe('AddTransactionSheet category creation', () => {
       parent_key: null,
       is_income: false,
     };
-    const wasmModule = { ...CREATING_WASM, preset_categories: async () => [PRESET] };
+    const wasmModule = {
+      ...CREATING_WASM,
+      ...presetCheckStubs,
+      preset_categories: async () => [PRESET],
+    };
     const { saved } = renderCreatingSheet(wasmModule);
 
     fireEvent.click(screen.getByRole('button', { name: '+ New' }));

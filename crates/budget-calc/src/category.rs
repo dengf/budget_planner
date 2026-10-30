@@ -336,6 +336,11 @@ pub fn settle_split_plans(
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CategoryNode {
     pub id: String,
+    /// The name as saved -- read only by the "is this preset taken" rule
+    /// (`available_presets` and friends), which matches by name as well
+    /// as by `preset_key`.
+    pub name: String,
+    pub is_income: bool,
     pub preset_key: Option<String>,
     pub parent_id: Option<String>,
     /// A group `missing_subcategories` has already filled (or that
@@ -463,20 +468,30 @@ pub fn migrate_legacy_categories(categories: &[CategoryNode]) -> Vec<CategoryMig
 /// some other way -- the move off the old flat list relabels "Housing"
 /// into Housing & Utilities with only the old "Utilities" under it.
 ///
-/// A subcategory counts as present by `preset_key` anywhere in the
-/// budget, under any parent: one the reader moved elsewhere is still
-/// theirs, not missing. Ids are fixed (`migrated_group_id`'s rule), so a
+/// A subcategory counts as present when it is taken (`preset_taken`):
+/// by `preset_key` anywhere in the budget, under any parent -- one the
+/// reader moved elsewhere is still theirs, not missing -- or by a
+/// category already carrying its name, so a hand-typed "Food Delivery"
+/// isn't joined by a second one. `presets` carries each preset's name in
+/// the reader's language; a subcategory with no entry there is matched by
+/// key alone. Ids are fixed (`migrated_group_id`'s rule), so a
 /// second run over a half-saved result finds what the first one made.
 ///
 /// A group marked `subcategories_filled` is skipped: it has had its fill,
 /// and whatever is missing from it now the reader deleted. The caller
 /// marks each group it filled once the creates are saved, not before, so
 /// a fill cut off partway runs again.
-pub fn missing_subcategories(categories: &[CategoryNode]) -> Vec<CategoryMigration> {
-    let mut present: HashSet<&str> = categories
-        .iter()
-        .filter_map(|c| c.preset_key.as_deref())
-        .collect();
+pub fn missing_subcategories(
+    categories: &[CategoryNode],
+    presets: &[NamedPreset],
+) -> Vec<CategoryMigration> {
+    let mut taken = Taken::of(categories);
+    let name_of = |key: &str| {
+        presets
+            .iter()
+            .find(|p| p.key == key)
+            .map(|p| p.name.as_str())
+    };
     let mut steps = Vec::new();
     let catalogue = crate::presets::starter_categories();
     for group in categories
@@ -494,9 +509,9 @@ pub fn missing_subcategories(categories: &[CategoryNode]) -> Vec<CategoryMigrati
             .iter()
             .filter(|p| p.parent_key == Some(preset.key))
         {
-            // `insert` is false for one already there -- or already made
-            // by this call, for a budget holding the same group twice.
-            if !present.insert(sub.key) {
+            // Taken by the budget -- or already made by this call, for a
+            // budget holding the same group twice.
+            if !taken.claim(sub.key, name_of(sub.key)) {
                 continue;
             }
             steps.push(CategoryMigration::Create {
@@ -1642,12 +1657,121 @@ pub enum NewCategoryOutcome {
 }
 
 /// Case- and whitespace-insensitive, which is how a person reads two
-/// category names as "the same one". `www/src/presetCategories.js`'s
-/// `availablePresets` applies the identical rule to decide whether a
-/// preset is already taken; it stays in JS because it filters a list
-/// against the live catalogs rather than deciding anything.
+/// category names as "the same one" -- for a typed name here, and for
+/// whether a preset is already taken (`available_presets`).
 fn fingerprint(name: &str) -> String {
     name.trim().to_lowercase()
+}
+
+/// What a budget already holds, as the "is this preset taken" rule reads
+/// it: the preset keys its categories were saved from, and the
+/// fingerprints of their names.
+struct Taken<'a> {
+    keys: HashSet<&'a str>,
+    names: HashSet<String>,
+}
+
+impl<'a> Taken<'a> {
+    fn of(categories: &'a [CategoryNode]) -> Self {
+        Taken {
+            keys: categories
+                .iter()
+                .filter_map(|c| c.preset_key.as_deref())
+                .collect(),
+            names: categories
+                .iter()
+                .map(|c| fingerprint(&c.name))
+                .filter(|n| !n.is_empty())
+                .collect(),
+        }
+    }
+
+    /// A preset is taken by either of two independent checks, and both
+    /// are needed:
+    ///
+    /// 1. By identity: a category saved from it carries its `key`. Presets
+    ///    get renamed, and an existing user's category keeps the OLD
+    ///    display name under the SAME key -- without this a renamed
+    ///    preset would be offered again and saved as a duplicate.
+    /// 2. By name in the reader's language: a hand-typed category has no
+    ///    key at all (someone typed "Housing" by hand), so a preset that
+    ///    reads the same must still count as taken.
+    fn has(&self, key: &str, name: Option<&str>) -> bool {
+        self.keys.contains(key)
+            || name.is_some_and(|n| {
+                let n = fingerprint(n);
+                !n.is_empty() && self.names.contains(&n)
+            })
+    }
+
+    /// `has`, and if it was free, holds it from now on -- so one pass
+    /// never hands out the same preset twice.
+    fn claim(&mut self, key: &'a str, name: Option<&str>) -> bool {
+        if self.has(key, name) {
+            return false;
+        }
+        self.keys.insert(key);
+        if let Some(n) = name.map(fingerprint).filter(|n| !n.is_empty()) {
+            self.names.insert(n);
+        }
+        true
+    }
+}
+
+/// The keys of `presets` the budget doesn't already have, in their
+/// order -- what the chip picker, "Add common categories" and the
+/// first-run seed may still offer. See `Taken::has` for the rule.
+///
+/// Every preset is judged against `existing` alone, not against the
+/// others in the same list: `presets::starter_categories()` never has two
+/// sharing a key or a name (`no_category_is_offered_twice`,
+/// `no_two_categories_share_a_display_name`), so nothing here needs to
+/// defend against it.
+pub fn available_presets(presets: &[NamedPreset], existing: &[CategoryNode]) -> Vec<String> {
+    let taken = Taken::of(existing);
+    presets
+        .iter()
+        .filter(|p| !taken.has(&p.key, Some(&p.name)))
+        .map(|p| p.key.clone())
+        .collect()
+}
+
+/// Which saved category each top-level preset group in `presets` is, for
+/// filing a subcategory under it: the top-level category saved from that
+/// preset, else a top-level hand-typed one on the same side of the ledger
+/// whose name reads as the preset's. A group that matches nothing is
+/// left out.
+///
+/// The hand-typed match exists because `available_presets` counts that
+/// category as the preset (it is never offered again), so its
+/// subcategories belong under it rather than loose at the top level. It
+/// never takes a category saved from a different preset, or one on the
+/// other side: an income "Food" is not where Groceries goes.
+pub fn preset_group_ids(
+    presets: &[NamedPreset],
+    existing: &[CategoryNode],
+) -> Vec<(String, String)> {
+    let tops: Vec<&CategoryNode> = existing.iter().filter(|c| c.parent_id.is_none()).collect();
+    presets
+        .iter()
+        .filter(|p| {
+            crate::presets::preset_by_key(&p.key).is_some_and(|preset| preset.parent_key.is_none())
+        })
+        .filter_map(|p| {
+            let saved = tops
+                .iter()
+                .find(|c| c.preset_key.as_deref() == Some(p.key.as_str()));
+            let typed = || {
+                let name = fingerprint(&p.name);
+                tops.iter().find(|c| {
+                    c.preset_key.is_none()
+                        && c.is_income == p.is_income
+                        && fingerprint(&c.name) == name
+                })
+            };
+            saved.or_else(typed).map(|c| (p.key.clone(), c.id.clone()))
+        })
+        .collect()
 }
 
 /// Decides what to do with a category name somebody typed where they
@@ -3110,6 +3234,8 @@ mod tests {
 
     fn tree_node(id: &str, key: Option<&str>, parent: Option<&str>) -> CategoryNode {
         CategoryNode {
+            name: String::new(),
+            is_income: false,
             subcategories_filled: false,
             id: id.to_string(),
             preset_key: key.map(str::to_string),
@@ -3230,6 +3356,8 @@ mod tests {
 
     fn node(id: &str, key: Option<&str>) -> CategoryNode {
         CategoryNode {
+            name: String::new(),
+            is_income: false,
             subcategories_filled: false,
             id: id.to_string(),
             preset_key: key.map(str::to_string),
@@ -3397,7 +3525,7 @@ mod tests {
             sub_node("u", "cat.utilityBills", "h"),
         ];
         assert_eq!(
-            created(&missing_subcategories(&nodes)),
+            created(&missing_subcategories(&nodes, &[])),
             vec![
                 ("cat.mortgageRent", "h"),
                 ("cat.propertyTaxes", "h"),
@@ -3416,7 +3544,7 @@ mod tests {
                 None => node(p.key, Some(p.key)),
             })
             .collect();
-        assert!(missing_subcategories(&nodes).is_empty());
+        assert!(missing_subcategories(&nodes, &[]).is_empty());
     }
 
     #[test]
@@ -3427,7 +3555,7 @@ mod tests {
             sub_node("g", "cat.groceries", "mine"),
         ];
         assert_eq!(
-            created(&missing_subcategories(&nodes)),
+            created(&missing_subcategories(&nodes, &[])),
             vec![("cat.personalCareEssentials", "food")]
         );
     }
@@ -3435,7 +3563,7 @@ mod tests {
     #[test]
     fn hand_typed_groups_and_subcategories_are_left_alone() {
         let nodes = vec![node("mine", None), sub_node("g", "cat.groceries", "mine")];
-        assert!(missing_subcategories(&nodes).is_empty());
+        assert!(missing_subcategories(&nodes, &[]).is_empty());
     }
 
     #[test]
@@ -3445,7 +3573,7 @@ mod tests {
             node("b", Some("cat.diningSocial")),
         ];
         assert_eq!(
-            created(&missing_subcategories(&nodes)),
+            created(&missing_subcategories(&nodes, &[])),
             vec![("cat.restaurantsCafes", "a"), ("cat.foodDelivery", "a")]
         );
     }
@@ -3460,13 +3588,13 @@ mod tests {
             },
             sub_node("u", "cat.utilityBills", "h"),
         ];
-        assert!(missing_subcategories(&nodes).is_empty());
+        assert!(missing_subcategories(&nodes, &[]).is_empty());
     }
 
     #[test]
     fn filling_twice_creates_nothing_the_second_time() {
         let mut nodes = vec![node("t", Some("cat.transport"))];
-        for step in missing_subcategories(&nodes) {
+        for step in missing_subcategories(&nodes, &[]) {
             if let CategoryMigration::Create {
                 id,
                 preset_key,
@@ -3477,6 +3605,142 @@ mod tests {
             }
         }
         assert_eq!(nodes.len(), 5);
-        assert!(missing_subcategories(&nodes).is_empty());
+        assert!(missing_subcategories(&nodes, &[]).is_empty());
+    }
+
+    // ---- is a preset taken ---------------------------------------------
+
+    fn saved(id: &str, name: &str, key: Option<&str>) -> CategoryNode {
+        CategoryNode {
+            name: name.to_string(),
+            ..node(id, key)
+        }
+    }
+
+    fn preset(key: &str, name: &str) -> NamedPreset {
+        NamedPreset {
+            key: key.to_string(),
+            name: name.to_string(),
+            is_income: false,
+        }
+    }
+
+    fn housing_and_utilities() -> Vec<NamedPreset> {
+        vec![
+            preset("cat.housingUtilities", "Housing & Utilities"),
+            preset("cat.utilityBills", "Utilities"),
+        ]
+    }
+
+    #[test]
+    fn every_preset_is_available_in_an_empty_budget() {
+        assert_eq!(
+            available_presets(&housing_and_utilities(), &[]),
+            vec!["cat.housingUtilities", "cat.utilityBills"]
+        );
+    }
+
+    #[test]
+    fn a_hand_typed_name_takes_a_preset_ignoring_case_and_spaces() {
+        let existing = [saved("c1", " housing & UTILITIES ", None)];
+        assert_eq!(
+            available_presets(&housing_and_utilities(), &existing),
+            vec!["cat.utilityBills"]
+        );
+    }
+
+    #[test]
+    fn a_renamed_preset_is_still_taken_by_its_key() {
+        // Saved under an old display name, same key.
+        let existing = [saved(
+            "c1",
+            "Old Housing Name",
+            Some("cat.housingUtilities"),
+        )];
+        assert_eq!(
+            available_presets(&housing_and_utilities(), &existing),
+            vec!["cat.utilityBills"]
+        );
+    }
+
+    #[test]
+    fn both_checks_together_can_take_every_preset() {
+        let existing = [
+            saved("c1", "Old Housing Name", Some("cat.housingUtilities")),
+            saved("c2", " Utilities ", None),
+        ];
+        assert!(available_presets(&housing_and_utilities(), &existing).is_empty());
+    }
+
+    #[test]
+    fn a_blank_name_takes_nothing() {
+        let existing = [saved("c1", "  ", None)];
+        let presets = [preset("cat.groceries", "")];
+        assert_eq!(
+            available_presets(&presets, &existing),
+            vec!["cat.groceries"]
+        );
+    }
+
+    #[test]
+    fn a_group_is_found_by_its_preset_key_first() {
+        let existing = [
+            saved("typed", "Food & Basic Goods", None),
+            saved("saved", "Old name", Some("cat.foodBasics")),
+        ];
+        let presets = [
+            preset("cat.foodBasics", "Food & Basic Goods"),
+            preset("cat.groceries", "Groceries"),
+        ];
+        assert_eq!(
+            preset_group_ids(&presets, &existing),
+            vec![("cat.foodBasics".to_string(), "saved".to_string())]
+        );
+    }
+
+    #[test]
+    fn a_hand_typed_group_that_reads_as_the_preset_is_the_group() {
+        let existing = [saved("typed", " food & basic goods ", None)];
+        let presets = [preset("cat.foodBasics", "Food & Basic Goods")];
+        assert_eq!(
+            preset_group_ids(&presets, &existing),
+            vec![("cat.foodBasics".to_string(), "typed".to_string())]
+        );
+    }
+
+    #[test]
+    fn a_same_named_category_on_the_other_side_or_from_another_preset_is_not_the_group() {
+        let existing = [
+            CategoryNode {
+                is_income: true,
+                ..saved("income", "Food & Basic Goods", None)
+            },
+            saved("other", "Food & Basic Goods", Some("cat.diningSocial")),
+            CategoryNode {
+                parent_id: Some("x".to_string()),
+                ..saved("sub", "Food & Basic Goods", None)
+            },
+        ];
+        let presets = [preset("cat.foodBasics", "Food & Basic Goods")];
+        assert!(preset_group_ids(&presets, &existing).is_empty());
+    }
+
+    #[test]
+    fn the_fill_skips_a_subcategory_whose_name_is_already_a_category() {
+        let nodes = vec![
+            node("d", Some("cat.diningSocial")),
+            CategoryNode {
+                parent_id: Some("d".to_string()),
+                ..saved("fd", "food delivery", None)
+            },
+        ];
+        let presets = [
+            preset("cat.restaurantsCafes", "Restaurants & Cafes"),
+            preset("cat.foodDelivery", "Food Delivery"),
+        ];
+        assert_eq!(
+            created(&missing_subcategories(&nodes, &presets)),
+            vec![("cat.restaurantsCafes", "d")]
+        );
     }
 }

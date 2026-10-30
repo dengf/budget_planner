@@ -7,13 +7,14 @@ use wasm_bindgen::prelude::*;
 
 use crate::convert::{decimal_to_f64, f64_to_decimal, to_js};
 use crate::dto::{
-    BuildMonthParams, BuildMonthResult, BuildSavingsLineParams, BuildSavingsLineResult,
-    CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto, CategoryLineDto,
-    CategoryMigrationDto, CategoryRankParams, CategoryRankResult, CategoryShareDto,
-    CategorySharesParams, CategorySharesResult, GroupPlannedParams, GroupPlannedResult,
-    MigrateCategoriesParams, MigrateCategoriesResult, MonthReviewParams, MonthReviewResult,
-    MonthSetupStateParams, MonthSetupStateResult, MonthSummaryDto, PlanEntryDto, PlanFoldDto,
-    RankedCategoryDto, ResolveCategoryNameParams, ResolveCategoryNameResult,
+    AvailablePresetsResult, BuildMonthParams, BuildMonthResult, BuildSavingsLineParams,
+    BuildSavingsLineResult, CarryPlanParams, CarryPlanResult, CategoryDeltaDto, CategoryDto,
+    CategoryLineDto, CategoryMigrationDto, CategoryRankParams, CategoryRankResult,
+    CategoryShareDto, CategorySharesParams, CategorySharesResult, GroupPlannedParams,
+    GroupPlannedResult, MigrateCategoriesParams, MigrateCategoriesResult, MonthReviewParams,
+    MonthReviewResult, MonthSetupStateParams, MonthSetupStateResult, MonthSummaryDto,
+    NamedPresetDto, PlanEntryDto, PlanFoldDto, PresetCheckParams, PresetGroupDto,
+    PresetGroupIdsResult, RankedCategoryDto, ResolveCategoryNameParams, ResolveCategoryNameResult,
     SettleSplitPlansParams, SettleSplitPlansResult, SuggestPlanParams, SuggestPlanResult,
     SuggestedRowDto, TransactionDto,
 };
@@ -71,16 +72,8 @@ pub fn settle_split_plans(params: JsValue) -> JsValue {
     let Some(planned) = planned else {
         return to_js(&bad_request());
     };
-    let nodes: Vec<budget_calc::CategoryNode> = params
-        .categories
-        .into_iter()
-        .map(|c| budget_calc::CategoryNode {
-            id: c.id,
-            preset_key: c.preset_key,
-            parent_id: c.parent_id,
-            subcategories_filled: c.subcategories_filled,
-        })
-        .collect();
+    let nodes: Vec<budget_calc::CategoryNode> =
+        params.categories.into_iter().map(category_node).collect();
     let folds = budget_calc::settle_split_plans(&nodes, &planned)
         .into_iter()
         .map(|fold| {
@@ -757,12 +750,15 @@ pub fn migrate_legacy_categories(params: JsValue) -> JsValue {
 }
 
 fn migrate_legacy_categories_impl(params: JsValue) -> MigrateCategoriesResult {
-    category_steps_impl(params, budget_calc::migrate_legacy_categories)
+    category_steps_impl(params, |nodes, _| {
+        budget_calc::migrate_legacy_categories(nodes)
+    })
 }
 
 /// `budget_calc::missing_subcategories`: a `create` step, filed under its
 /// group, for each preset subcategory a preset group in the budget lacks.
-/// Same params and result shape as `migrate_legacy_categories`.
+/// Same params and result shape as `migrate_legacy_categories`, plus
+/// `presets` with each preset's name in the reader's language.
 #[wasm_bindgen]
 pub fn missing_subcategories(params: JsValue) -> JsValue {
     to_js(&category_steps_impl(
@@ -771,9 +767,70 @@ pub fn missing_subcategories(params: JsValue) -> JsValue {
     ))
 }
 
+fn category_node(c: CategoryDto) -> budget_calc::CategoryNode {
+    budget_calc::CategoryNode {
+        id: c.id,
+        name: c.name,
+        is_income: c.is_income,
+        preset_key: c.preset_key,
+        parent_id: c.parent_id,
+        subcategories_filled: c.subcategories_filled,
+    }
+}
+
+fn named_preset(p: NamedPresetDto) -> budget_calc::NamedPreset {
+    budget_calc::NamedPreset {
+        key: p.key,
+        name: p.name,
+        is_income: p.is_income,
+    }
+}
+
+/// `budget_calc::available_presets`: the keys of the presets the budget
+/// doesn't already have, by key or by name.
+#[wasm_bindgen]
+pub fn available_presets(params: JsValue) -> JsValue {
+    let Ok(params) = serde_wasm_bindgen::from_value::<PresetCheckParams>(params) else {
+        return to_js(&AvailablePresetsResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        });
+    };
+    let nodes: Vec<_> = params.categories.into_iter().map(category_node).collect();
+    let presets: Vec<_> = params.presets.into_iter().map(named_preset).collect();
+    to_js(&AvailablePresetsResult {
+        keys: budget_calc::available_presets(&presets, &nodes),
+        error: None,
+    })
+}
+
+/// `budget_calc::preset_group_ids`: which saved category each preset
+/// group is, for filing a subcategory under it.
+#[wasm_bindgen]
+pub fn preset_group_ids(params: JsValue) -> JsValue {
+    let Ok(params) = serde_wasm_bindgen::from_value::<PresetCheckParams>(params) else {
+        return to_js(&PresetGroupIdsResult {
+            error: Some(Message::bad_request().text),
+            ..Default::default()
+        });
+    };
+    let nodes: Vec<_> = params.categories.into_iter().map(category_node).collect();
+    let presets: Vec<_> = params.presets.into_iter().map(named_preset).collect();
+    to_js(&PresetGroupIdsResult {
+        groups: budget_calc::preset_group_ids(&presets, &nodes)
+            .into_iter()
+            .map(|(key, id)| PresetGroupDto { key, id })
+            .collect(),
+        error: None,
+    })
+}
+
 fn category_steps_impl(
     params: JsValue,
-    steps: fn(&[budget_calc::CategoryNode]) -> Vec<budget_calc::CategoryMigration>,
+    steps: impl Fn(
+        &[budget_calc::CategoryNode],
+        &[budget_calc::NamedPreset],
+    ) -> Vec<budget_calc::CategoryMigration>,
 ) -> MigrateCategoriesResult {
     let Ok(params) = serde_wasm_bindgen::from_value::<MigrateCategoriesParams>(params) else {
         return MigrateCategoriesResult {
@@ -781,18 +838,11 @@ fn category_steps_impl(
             ..Default::default()
         };
     };
-    let nodes: Vec<budget_calc::CategoryNode> = params
-        .categories
-        .into_iter()
-        .map(|c| budget_calc::CategoryNode {
-            id: c.id,
-            preset_key: c.preset_key,
-            parent_id: c.parent_id,
-            subcategories_filled: c.subcategories_filled,
-        })
-        .collect();
+    let nodes: Vec<budget_calc::CategoryNode> =
+        params.categories.into_iter().map(category_node).collect();
+    let presets: Vec<_> = params.presets.into_iter().map(named_preset).collect();
     MigrateCategoriesResult {
-        steps: steps(&nodes)
+        steps: steps(&nodes, &presets)
             .into_iter()
             .map(|step| match step {
                 budget_calc::CategoryMigration::Relabel {
